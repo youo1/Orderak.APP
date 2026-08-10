@@ -1,0 +1,32 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# TypeScript/JavaScript/JSON: tabs, matching services/backend/.prettierrc
+# (useTabs: true) and every source file's actual on-disk indentation.
+[*.{ts,tsx,js,mjs,cjs,json,jsonc}]
+indent_style = tab
+
+# Kotlin and Gradle Kotlin DSL: 4 spaces, matching the Android project's
+# on-disk convention (verified against build.gradle.kts and app sources).
+[*.{kt,kts}]
+indent_style = space
+indent_size = 4
+
+# YAML, Markdown, SQL: 2-space convention already used throughout docs/ and
+# .github/workflows/.
+[*.{yml,yaml,md,sql}]
+indent_style = space
+indent_size = 2
+
+# Windows-native launchers stay CRLF, matching .gitattributes.
+[*.{bat,cmd,ps1}]
+end_of_line = crlf
+
+[*.{png,jpg,jpeg,ico,svg,woff,woff2,jar,docx,pdf}]
+insert_final_newline = false
+trim_trailing_whitespace = false

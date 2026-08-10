@@ -1,0 +1,16 @@
+# Gitleaks configuration for Orderak.APP.
+#
+# No allowlist. The two path exemptions carried in the source repository
+# (youo1/Orderak) — a saved developer.android.com page and a scraped vendor
+# docs dump, both containing Google's own devsite keys rather than ours —
+# existed only because they were reachable in that repository's history. This
+# repository starts from a manifest-verified file set with no such history, so
+# there is nothing here for those entries to exempt.
+#
+# If a future finding here is a genuine false positive, add a narrow entry
+# scoped to one path and one rule, dated, with the evidence for why it is not
+# a real secret — the standing bar is "no unaddressed real secrets," not "no
+# allowlist at any cost."
+
+[extend]
+useDefault = true

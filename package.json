@@ -1,0 +1,25 @@
+{
+  "name": "orderak-workspace",
+  "private": true,
+  "packageManager": "pnpm@11.20.0",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "test:types": "turbo run test:types",
+    "lint:markdown": "npx --yes markdownlint-cli2@0.23.2 \"**/*.md\" \"#**/node_modules/**\" \"#**/build/**\" \"#**/dist/**\" \"#**/portal-build/**\" \"#**/.wrangler/**\" \"#site/**\" \"#docs/archive/**\" \"#packages/ai-prompts/**\" \"#**/.venv/**\"",
+    "mock:seller-v1": "pnpm --filter @orderak/openapi run mock:seller-v1",
+    "openapi:check": "pnpm --filter @orderak/openapi run check",
+    "openapi:bundle": "pnpm --filter @orderak/openapi run bundle",
+    "verify:deployment-map": "node tooling/repository/verify-deployment-map.mjs",
+    "verify:contract-guards": "node tooling/repository/verify-contract-guards.mjs",
+    "verify:built-site": "node tooling/repository/verify-built-site.mjs site",
+    "verify:doc-links": "node tooling/repository/verify-doc-links.mjs"
+  },
+  "devDependencies": {
+    "turbo": "^2.10.8"
+  }
+}

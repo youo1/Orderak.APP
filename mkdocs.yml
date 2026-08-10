@@ -1,0 +1,110 @@
+site_name: Orderak Documentation
+site_description: Internal documentation for the Orderak platform
+repo_url: https://github.com/youo1/Orderak
+edit_uri: ''
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.indexes
+    - content.code.copy
+    - search.highlight
+
+strict: true
+
+exclude_docs: |
+  /archive/
+
+nav:
+  - Home: index.md
+  - Setup: guides/setup.md
+  - Glossary: reference/glossary.md
+  - API Reference: reference/api.md
+  - API Changelog: reference/api-changelog.md
+  - Product:
+    - App Plan: product/app-plan.md
+    - Phase 4 Launch PRD: product/phase4-product-requirements.md
+    - Phase 4 Roles and Journeys: product/phase4-roles-and-journeys.md
+    - Phase 4 Data and Permissions: product/phase4-data-and-permissions.md
+    - Phase 4 Content Controls: product/phase4-content-controls.md
+    - Phase 4 Traceability and G4: product/phase4-traceability-and-gate.md
+    - Production Auth Plan: product/production-auth-plan.md
+    - Versioned Seller Auth Contract: contracts/auth-phase1-contract.md
+    - Localization Architecture: architecture/localization-architecture.md
+  - Architecture:
+    - Overview: architecture/overview.md
+    - Application Structure: architecture/application-structure.md
+    - Cross-Platform Readiness: architecture/cross-platform-readiness.md
+    - Deployment Environment Map: architecture/deployment-environment-map.md
+    - Security Model: architecture/security-model.md
+    - Threat Model: architecture/threat-model.md
+    - Data Classification: architecture/data-classification.md
+    - Logging Standard: architecture/logging-standard.md
+  - Contracts:
+    - Authentication Invariants: contracts/authentication-security-invariants.md
+    - Localization Invariants: contracts/localization-invariants.md
+    - Seller API Compatibility: contracts/api-compatibility-contract.md
+    - Sync and Conflict: contracts/sync-conflict-contract.md
+    - Android Auth Profile: platforms/android-auth-profile.md
+    - Android Localization Profile: platforms/android-localization-profile.md
+  - Governance:
+    - Control Center: governance/index.md
+    - Program Charter: governance/program-charter.md
+    - Role Assignment and RACI: governance/raci.md
+    - Operating Cadence: governance/operating-cadence.md
+    - Evidence Standard: governance/evidence-standard.md
+    - Data Map: governance/data-map.md
+    - Retention and Deletion Matrix: governance/retention-matrix.md
+    - Temporary Change Freeze: governance/temporary-change-freeze.md
+    - Source-Plan Traceability: governance/source-plan-traceability.md
+    - Registers:
+      - Register Index: governance/registers/index.md
+      - Requirements: governance/registers/requirements-register.md
+      - Decisions: governance/registers/decision-log.md
+      - Risks: governance/registers/risk-register.md
+      - Issues and Changes: governance/registers/issue-and-change-log.md
+      - Third Parties and Permissions: governance/registers/third-party-and-permission-register.md
+      - Policy Versions: governance/registers/policy-version-register.md
+      - Findings: governance/registers/findings-register.md
+    - Baseline Evidence: governance/evidence/2026-07-18-repository-baseline.md
+    - Repository Restructure Review: governance/evidence/repository-restructure-review-2026-08-01.md
+    - Tenant Shard Migration Rehearsal: governance/evidence/tenant-shard-migration-rehearsal-template.md
+    - Initial G0 Gate Review: governance/evidence/gate-g0-20260718-v0.1.md
+  - Decisions:
+    - Template: decisions/template.md
+    - ADR 001 — Cloudflare Workers + D1: decisions/adr-001-cloudflare-workers-d1.md
+    - ADR 002 — Integer Piasters: decisions/adr-002-integer-piasters.md
+    - ADR 003 — UUID Public URLs: decisions/adr-003-uuid-public-urls.md
+    - ADR 004 - Free Launch Billing: decisions/adr-004-free-launch-billing.md
+    - ADR 005 - Versioned Entitlements and Google Play: decisions/adr-005-versioned-entitlements-google-play.md
+    - ADR 006 - Authoritative Play Verification: decisions/adr-006-authoritative-play-verification.md
+    - ADR 007 - Shard-ready Single D1: decisions/adr-007-shard-ready-single-d1.md
+    - ADR 008 - Evolvable Safety Contracts: decisions/adr-008-evolvable-safety-contracts.md
+  - Runbooks:
+    - Account Deletion: runbooks/account-deletion.md
+    - Incident Response: runbooks/incident-response.md
+    - D1 Migration Drift: runbooks/d1-migration-drift.md
+    - D1 Restore From Backup: runbooks/d1-restore.md
+    - Design System Recovery: runbooks/design-system-recovery.md
+    - Firebase Auth Outage: runbooks/firebase-auth-outage.md
+    - Google Play Billing DLQ: runbooks/play-billing-dlq.md
+    - Tenant Shard Migration: runbooks/tenant-shard-migration.md
+  - Guides:
+    - Documentation: guides/documentation.md
+    - OpenAPI Development: guides/openapi-development.md
+    - Local Development Agents: guides/development-agents.md
+    - Testing: guides/testing.md
+    - Staging and Production Workflow: guides/staging-production-workflow.md
+    - Troubleshooting: guides/troubleshooting.md
+    - Generated Migration Reference: guides/database-migrations.md
+  - User Guide:
+    - Getting Started: user-guide/getting-started.md
+  - Legal:
+    - Legal Document Status: legal/README.md
+    - Privacy Policy: legal/privacy-policy.md
+    - Privacy Policy (Arabic): legal/privacy-policy.ar.md
+    - Terms of Service: legal/terms-of-service.md
+    - Terms of Service (Arabic): legal/terms-of-service.ar.md
+plugins:
+  - search

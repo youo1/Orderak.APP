@@ -1,0 +1,62 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "schedule": ["before 6am on Wednesday"],
+  "timezone": "Africa/Cairo",
+  "rangeStrategy": "pin",
+  "separateMajorMinor": true,
+  "packageRules": [
+    {
+      "description": "Android / Compose / Kotlin toolchain",
+      "matchPaths": ["apps/seller-android/**"],
+      "groupName": "Android & Compose",
+      "matchUpdateTypes": ["minor", "patch"]
+    },
+    {
+      "description": "Kotlin & AGP — manual approval for majors",
+      "matchPaths": ["apps/seller-android/**"],
+      "matchPackageNames": ["org.jetbrains.kotlin", "com.android.application", "org.jetbrains.kotlin.android"],
+      "groupName": "Kotlin & AGP (review majors)",
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
+    },
+    {
+      "description": "Cloudflare / Wrangler",
+      "matchPaths": ["services/backend/**", "apps/admin-web/**"],
+      "matchPackageNames": ["wrangler", "@cloudflare/*"],
+      "groupName": "Cloudflare & Wrangler"
+    },
+    {
+      "description": "React / Vite frontend",
+      "matchPaths": ["apps/admin-web/**"],
+      "matchPackageNames": ["react", "react-dom", "vite", "@vitejs/*", "tailwindcss"],
+      "groupName": "React & Vite"
+    },
+    {
+      "description": "Dev tooling (oxlint, vitest, playwright, tsx)",
+      "matchPackagePatterns": ["oxlint", "vitest", "playwright", "tsx", "@playwright/*"],
+      "groupName": "Dev Tooling"
+    },
+    {
+      "description": "Sentry",
+      "matchPackagePatterns": ["@sentry/*"],
+      "groupName": "Sentry"
+    },
+    {
+      "description": "Auto-merge patch updates once CI gates pass",
+      "matchUpdateTypes": ["patch"],
+      "automerge": true,
+      "automergeType": "pr"
+    }
+  ],
+  "gradle": {
+    "enabled": true
+  },
+  "npm": {
+    "enabled": true
+  },
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security"]
+  }
+}

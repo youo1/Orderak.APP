@@ -1,0 +1,32 @@
+packages:
+  - "apps/*"
+  - "services/*"
+  - "contracts/*"
+
+# wrangler, workerd, and @cloudflare/vitest-pool-workers resolve binaries and
+# native modules assuming an npm-style flat node_modules. pnpm's default
+# isolated linker breaks them, so use the hoisted linker: we keep pnpm's
+# content-addressable store (and its disk savings) with a compatible layout.
+nodeLinker: hoisted
+
+# workerd, esbuild, and @sentry/cli download platform-specific binaries in a
+# postinstall script — without these the Workers runtime and bundler cannot run.
+# @scarf/scarf is install analytics only, so it stays disabled.
+allowBuilds:
+  '@scarf/scarf': false
+  '@sentry/cli': true
+  esbuild: true
+  workerd: true
+
+# Security overrides, workspace-wide.
+#
+# These must live here rather than in package.json: pnpm 11 no longer reads the
+# "pnpm" field, and a per-package "overrides" block only reaches one path in
+# the tree - contracts/openapi had one for lodash and the workspace still
+# resolved a vulnerable copy alongside the patched one.
+#
+# Both entries are dev and build-time dependencies (the OpenAPI mock server and
+# miniflare via wrangler), not anything the production Workers ship.
+overrides:
+  lodash@<4.17.24: ">=4.17.24"
+  undici@<7.29.0: ">=7.29.0"
