@@ -1,0 +1,38 @@
+name: Require deploy owner
+description: >
+  Fails before any deploy step runs unless github.repository matches the
+  DEPLOY_OWNER variable configured on the target environment.
+
+# Defence in depth, not the real control. Each repository can only edit its
+# own variables, and Cloudflare API tokens are account-scoped rather than
+# resource-scoped, so this check cannot by itself stop a repository that
+# holds a working deploy token from reaching the wrong environment. The
+# actual control is credential custody: the non-owning repository must hold
+# no usable deploy token in Actions at all. This step exists so a
+# misconfigured workflow fails loudly here, before any Cloudflare call,
+# instead of silently deploying from the wrong place.
+#
+# A gate that has never been observed failing is not a gate: prove this one
+# by running the calling workflow from a repository whose DEPLOY_OWNER does
+# not match, and confirm it stops here with nothing deployed.
+
+inputs:
+  expected-owner:
+    description: The repository slug (owner/name) permitted to deploy this environment.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+        if [ -z "${{ inputs.expected-owner }}" ]; then
+          echo "::error::DEPLOY_OWNER is not set for this environment. Refusing to deploy without an explicit owner."
+          exit 1
+        fi
+        if [ "${{ inputs.expected-owner }}" != "${{ github.repository }}" ]; then
+          echo "::error::This environment is owned by '${{ inputs.expected-owner }}', not '${{ github.repository }}'. Refusing to deploy."
+          exit 1
+        fi
+        echo "Deploy owner check passed: ${{ github.repository }} is authorized for this environment."
