@@ -1,0 +1,31 @@
+{
+  "chat.includeApplyingInstructions": true,
+  "chat.includeReferencedInstructions": true,
+  "chat.useAgentsMdFile": true,
+  "chat.hookFilesLocations": {
+    ".github/hooks": true
+  },
+  "chat.tools.edits.autoApprove": {
+    "AGENTS.md": false,
+    ".github/agents/**": false,
+    ".github/skills/**": false,
+    ".github/instructions/**": false,
+    ".github/copilot-instructions.md": false,
+    ".github/copilot/**": false,
+    ".github/hooks/**": false,
+    ".github/mcp.json": false,
+    ".github/plugin/**": false,
+    ".github/workflows/**": false,
+    ".github/CODEOWNERS": false,
+    "docs/contracts/auth-phase1-contract.md": false,
+    "docs/product/production-auth-plan.md": false,
+    "docs/architecture/security-model.md": false,
+    "docs/architecture/localization-architecture.md": false,
+    "**/.env": false,
+    "**/.dev.vars": false
+  },
+  "chat.tools.terminal.autoApprove": {
+    "/^node\\s+\\.github[\\\\/]skills[\\\\/]orderak-agent-improvement[\\\\/]scripts[\\\\/]record-learning\\.mjs(?:\\s|$)/": true
+  },
+  "terminal.integrated.cwd": "${workspaceFolder}"
+}
