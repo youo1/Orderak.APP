@@ -2,7 +2,7 @@
 
 This is the Phase 0 runtime and data-touching inventory. It is not yet a
 complete SBOM or approved processor register. Exact versions remain sourced
-from `services/backend/package.json`, `services/backend/package-lock.json`,
+from `services/backend/package.json`, the workspace-root `pnpm-lock.yaml`,
 `apps/seller-android/gradle/libs.versions.toml`, and Gradle dependency output.
 
 ## Providers, vendors, and data-touching SDKs

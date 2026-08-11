@@ -23,7 +23,7 @@ security/product outcomes without the owner's explicit approval for the
 specific authentication migration.
 
 The long-lived outcomes are defined in
-[`contracts/authentication-security-invariants.md`](./authentication-security-invariants.md).
+[`docs/contracts/authentication-security-invariants.md`](./authentication-security-invariants.md).
 Android-specific provider, timing, storage, and UI choices are recorded in
 [`platforms/android-auth-profile.md`](../platforms/android-auth-profile.md). Class
 names and source layout may be refactored when the executable evidence remains
