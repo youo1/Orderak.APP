@@ -1,0 +1,21 @@
+{
+  "name": "orderak-development",
+  "description": "Orderak agents and evidence-backed, automatically maintained skills for Android, Cloudflare Workers, the admin console, planning, documentation, security review, and verification.",
+  "version": "1.1.0",
+  "author": {
+    "name": "Orderak"
+  },
+  "repository": "https://github.com/youo1/Orderak.APP",
+  "keywords": [
+    "android",
+    "cloudflare-workers",
+    "jetpack-compose",
+    "react",
+    "typescript",
+    "continuous-learning"
+  ],
+  "category": "Developer Tools",
+  "agents": ".github/agents",
+  "skills": ".github/skills",
+  "mcpServers": ".github/mcp.json"
+}
