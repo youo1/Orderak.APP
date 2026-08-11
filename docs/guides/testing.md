@@ -165,8 +165,9 @@ gradlew.bat verifyAuthPhase1Contract verifySellerApiContract testStagingDebugUni
 
 ## CI
 
-There are 15 workflows, not the 4 this section previously named. Grouped by
-what triggers them:
+Seventeen workflows. Grouped by what actually triggers them here — verified
+against the `on:` block of each file, because several are configured
+differently in this repository than in the one it was migrated from.
 
 **Runs on every PR, path-filtered:**
 
@@ -174,28 +175,44 @@ what triggers them:
 - `android-ci.yml`: staging assembly, unit tests, lint, and all build guards.
 - `auth-phase1-contract.yml`: auth/API guards plus focused Android and Worker
   behavioral tests.
-- `docs-ci.yml`: Markdown lint, links, MkDocs strict build, and architecture map.
+- `docs-ci.yml`: Markdown lint, links, MkDocs strict build, architecture map,
+  frontmatter and subject authority, documented-claim checks, and the
+  generated-migration-reference drift check.
 - `openapi-ci.yml`: spec lint/validate, Prism mock contract tests, Schemathesis.
 - `ai-customizations-ci.yml`: validates `AGENTS.md` and `.github/{agents,skills,instructions}/**`.
 
 **Runs on every PR and on push to `main`:**
 
 - `security-scan.yml`: gitleaks secret scan, dependency review.
-- `supply-chain.yml`: `pnpm audit`, CycloneDX SBOM.
-- `open-source-security.yml`: additional OSS dependency checks.
+- `supply-chain.yml`: `pnpm audit`, CycloneDX SBOM. Also weekly, Mondays 05:00 UTC.
+- `open-source-security.yml`: Semgrep CE and Trivy filesystem scans. Also
+  weekly, Mondays 04:00 UTC.
 
 **Push to `main` only:**
 
-- `staging-deploy.yml`: deploys to staging on merge, path-filtered.
+- `staging-deploy.yml`: deploys to staging on merge, path-filtered. This
+  repository owns staging deploys — see
+  [staging-production-workflow.md](./staging-production-workflow.md).
 
 **Scheduled:**
 
-- `d1-backup.yml`: daily, 02:00 UTC.
-- `infra-drift.yml`: daily, before `d1-backup`.
-- `openapi-nightly.yml`: daily, 00:20 UTC — live-staging contract run against an allowlist.
-- `skills-auto-update.yml`: weekly.
+- `skills-auto-update.yml`: weekly, Mondays 04:17 UTC.
 
 **Manual dispatch only:**
 
+- `d1-backup.yml`: encrypted D1 export to R2, per environment.
+- `restore-drill.yml`: downloads an encrypted backup, decrypts it under a
+  reviewer-gated environment, and proves it restores.
+- `infra-drift.yml`: compares declared Cloudflare resources against the account.
+- `openapi-nightly.yml`: live-staging contract run against a read-only allowlist.
 - `android-staging-distribution.yml`: Firebase App Distribution.
 - `production-deploy.yml`: requires an explicit release SHA already verified on staging.
+
+> **Why four of those are dispatch-only here and scheduled in the source
+> repository.** `d1-backup`, `infra-drift` and `openapi-nightly` act on shared
+> Cloudflare resources that both repositories can still reach. Running the same
+> schedule from both would double every backup and race every drift check, so
+> the source repository keeps the crons until it is decommissioned and this one
+> takes them over. `restore-drill` is dispatch-only by design, not by phase: it
+> is the only path that decrypts a backup, and that must stay a deliberate,
+> reviewed act rather than something that happens nightly.

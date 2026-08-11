@@ -248,6 +248,39 @@ fire it while a real regression still does inside the 5-minute window.
 Re-measure the baseline before relying on these numbers for a real
 production rollback decision — this table is dated, not evergreen.
 
+### The smoke baseline does not survive sustained load
+
+A 60-minute soak was run against Staging on 2026-08-11 at the `soak` profile
+(20 requests/second) and stopped after ~36 minutes and 43,890 requests. It
+did not fail the way a soak is supposed to fail:
+
+| Metric | Smoke (2 VUs, 30s) | Soak (20 rps, ~36 min) | Trigger |
+| --- | --- | --- | --- |
+| Error rate | 0.00% | **0.00%** | > 1% |
+| Failed checks | 0 | **0 of 87,780** | any |
+| p95 latency | 150.61 ms | **1117.50 ms** | > 500 ms |
+| max latency | 363.9 ms | 5190.86 ms | — |
+
+Zero errors, zero failed checks, and **p95 2.2x over its own trigger**. The
+`p(95)<500` and `p(99)<1500` thresholds both reported breached.
+
+Two things follow, and neither is "raise the threshold":
+
+1. **The p95 and p99 numbers in the table above were derived from a 30-second
+   two-user smoke run.** That is a measurement of an idle system, not a
+   baseline. Any trigger set from it describes behaviour that does not occur
+   under load.
+2. **This says nothing yet about Production.** Staging is not provisioned to
+   match it, and 20 rps sustained against Staging may simply be past what
+   Staging is sized for — self-inflicted, not a defect. Distinguishing the two
+   requires load figures from Production, which do not exist pre-launch.
+
+So the latency triggers are **not usable for a production rollback decision
+as they stand**, and are marked as such rather than quietly widened until the
+observed number fits underneath. The error-rate trigger is unaffected: zero
+failures across 43,890 sustained requests is a real result and the 1% bound
+holds.
+
 ### Rehearsed, not assumed
 
 The rollback path below was exercised end to end on Staging on 2026-08-11,
