@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="120"
+    android:viewportHeight="120">
+    <!-- Chat bubble body with notch for badge -->
+    <path
+        android:pathData="M42,14 L78,14 A26,26 0,0,1 104,40 L104,68 A26,26 0,0,1 78,94 L38,94 L14,110 L16,80 L16,40 A26,26 0,0,1 42,14 Z"
+        android:fillColor="#127943" />
+    <!-- White check mark -->
+    <path
+        android:pathData="M39,55 L53,69 L82,39"
+        android:strokeWidth="11"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+    <!-- Orange notification badge -->
+    <path
+        android:pathData="M100,20 m-11,0 a11,11 0,1,0 22,0 a11,11 0,1,0 -22,0"
+        android:fillColor="#ED8936" />
+</vector>

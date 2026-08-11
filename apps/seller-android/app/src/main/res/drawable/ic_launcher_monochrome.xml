@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Themed-icon (Android 13+) layer: single-alpha silhouette of the
+     bubble with the check and badge notch punched out (evenOdd), so
+     the launcher can tint it to the wallpaper palette. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="0.45"
+        android:scaleY="0.45"
+        android:translateX="25"
+        android:translateY="28.1">
+        <path
+            android:fillColor="#FFFFFF"
+            android:fillType="evenOdd"
+            android:pathData="M42,14 H78 A26,26 0 0 1 104,40 V68 A26,26 0 0 1 78,94 H38 L14,110 L16,80 V40 A26,26 0 0 1 42,14 Z M85,20 a15,15 0 1 0 30,0 a15,15 0 1 0 -30,0 Z M35.1,58.9 L53,73.4 L86,42.8 L78,35.2 L53,61.2 L42.9,51.1 Z" />
+    </group>
+</vector>

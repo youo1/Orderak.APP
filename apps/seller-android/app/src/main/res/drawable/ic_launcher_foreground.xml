@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Adaptive-icon foreground: the Orderak mark (green chat bubble +
+     white check + orange notification badge) scaled into the 66dp
+     safe zone of the 108dp adaptive canvas. The badge notch is a
+     real hole (evenOdd) so it works on any background layer. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="0.45"
+        android:scaleY="0.45"
+        android:translateX="25"
+        android:translateY="28.1">
+        <path
+            android:fillColor="#1DAB61"
+            android:fillType="evenOdd"
+            android:pathData="M42,14 H78 A26,26 0 0 1 104,40 V68 A26,26 0 0 1 78,94 H38 L14,110 L16,80 V40 A26,26 0 0 1 42,14 Z M85,20 a15,15 0 1 0 30,0 a15,15 0 1 0 -30,0 Z" />
+        <path
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="11"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:pathData="M39,55 L53,69 L82,39" />
+        <path
+            android:fillColor="#ED8936"
+            android:pathData="M89,20 a11,11 0 1 0 22,0 a11,11 0 1 0 -22,0 Z" />
+    </group>
+</vector>

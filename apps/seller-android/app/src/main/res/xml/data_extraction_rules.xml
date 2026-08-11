@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- API 31+ backups & transfer: exclude both the legacy DataStore location and
+     the encrypted shared-pref secret store that hold the backend device
+     credential. A restored/transferred app re-authenticates via Firebase OTP. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="file" path="datastore/session.preferences_pb" />
+        <exclude domain="sharedpref" path="orderak_secure_secret.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="datastore/session.preferences_pb" />
+        <exclude domain="sharedpref" path="orderak_secure_secret.xml" />
+    </device-transfer>
+</data-extraction-rules>

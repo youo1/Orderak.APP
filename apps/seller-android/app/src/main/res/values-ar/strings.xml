@@ -1,0 +1,465 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Common -->
+    <string name="common_continue">استمرار</string>
+    <string name="common_back">رجوع</string>
+    <string name="common_ok">تم</string>
+    <string name="common_cancel">إلغاء</string>
+    <string name="common_confirm">تأكيد</string>
+    <string name="error_generic">حدث خطأ، حاول مرة أخرى</string>
+    <string name="currency_egp">%1$s ج.م</string>
+
+    <!-- S1 Auth -->
+    <string name="auth_title">جاهز للبيع على أوردرك؟</string>
+    <string name="auth_subtitle">يلا نبدأ.</string>
+    <string name="auth_step_caption">الخطوة %1$d من ٢</string>
+    <string name="auth_otp_expectation">اكتب الكود المكون من ٦ أرقام اللي وصلك على موبايلك.</string>
+    <string name="auth_phone_label">رقم الموبايل</string>
+    <string name="auth_phone_hint">اكتب رقمك</string>
+    <string name="auth_phone_reason">هنبعت كود لتأكيد رقمك.</string>
+    <string name="auth_use_my_number">استخدام رقمي</string>
+    <string name="auth_phone_hint_unavailable">اقتراح رقم الهاتف غير متاح. أدخل رقمك يدويًا.</string>
+    <string name="auth_phone_invalid">اكتب رقم موبايل صحيح</string>
+    <string name="auth_unsupported_country">أوردرك جاي لدولتك قريب!</string>
+    <string name="auth_send_code">إرسال كود التأكيد</string>
+    <string name="auth_verify_code">تأكيد الكود</string>
+    <string name="auth_sending">جاري الاتصال…</string>
+    <string name="auth_otp_title">تأكيد الرقم</string>
+    <string name="auth_otp_sent_to">تم الإرسال إلى %1$s</string>
+    <string name="auth_resend_in">إعادة طلب خلال %1$d ثانية</string>
+    <string name="auth_resend">إعادة إرسال الكود</string>
+    <string name="auth_change_number">غيّر الرقم</string>
+    <string name="auth_resend_sms">إرسال عبر SMS</string>
+    <string name="auth_otp_invalid">كود غير صحيح، جرب تاني.</string>
+    <string name="auth_send_failed">فشل إرسال الكود، جرب تاني.</string>
+    <string name="auth_too_many_requests">محاولات كثيرة، انتظر قليلًا.</string>
+    <string name="auth_network_unavailable">لا يوجد اتصال بالإنترنت.</string>
+    <string name="auth_app_verification_failed">فشل فحص الأمان، حدث التطبيق.</string>
+    <string name="auth_send_timeout">انتهى وقت المحاولة، جرب تاني.</string>
+    <string name="auth_otp_expired">صلاحية الكود انتهت، اطلب كود جديد.</string>
+    <string name="auth_verifying">جاري التأكيد…</string>
+    <string name="auth_otp_code_entered">تم إدخال الكود</string>
+    <string name="auth_otp_waiting_for_code">في انتظار الكود…</string>
+    <string name="auth_otp_digit_box">خانة رقم %1$d</string>
+    <string name="auth_step_phone_short">رقمك</string>
+    <string name="auth_step_otp_short">تأكيد</string>
+    <string name="auth_accept_terms_hint">وافق على الشروط للمتابعة</string>
+    <string name="auth_otp_progress">رقم الكود %1$d من %2$d</string>
+
+    <!-- Terms -->
+    <string name="auth_terms_prefix">بالضغط على إرسال كود التأكيد، أنت توافق على</string>
+    <string name="auth_terms_link">الشروط</string>
+    <string name="auth_terms_and">و</string>
+    <string name="auth_privacy_link">سياسة الخصوصية</string>
+    <string name="auth_security_note">أمان بمستوى بنكي. بياناتك مشفرة تمامًا.</string>
+    <string name="auth_marketing_opt_in">عايز استلم نصايح وعروض لشغلي</string>
+    <string name="auth_trouble">محتاج مساعدة؟</string>
+    <string name="cd_select_country">اختار الدولة: %1$s (+%2$s)</string>
+    <string name="cd_country_row">%1$s +%2$s</string>
+    <string name="cd_selected">مختار</string>
+
+    <!-- S1a Language -->
+    <string name="language_pick_title">اختار لغتك</string>
+    <string name="cd_language">تغيير اللغة</string>
+    <string name="cd_valid_number">رقم هاتف صحيح</string>
+
+    <!-- S2 Shop setup -->
+    <string name="setup_title">بيانات متجرك</string>
+    <string name="setup_step_indicator">خطوة %1$d من ٢</string>
+    <string name="setup_step1_title">إيه اسم متجرك؟</string>
+    <string name="setup_shop_name_label">اسم المتجر (الاسم اللي هيظهر للعملاء)</string>
+    <string name="setup_shop_name_placeholder">مثال: متجر السعادة</string>
+    <string name="setup_category_label">نوع النشاط</string>
+    <string name="setup_subcategory_label">التصنيف الفرعي</string>
+    <string name="setup_subcategory_placeholder">اختر التصنيف الرئيسي أولًا</string>
+    <string name="setup_country_label">الدولة</string>
+    <string name="setup_country_placeholder">ابحث عن الدولة…</string>
+    <string name="setup_city_label">المدينة</string>
+    <string name="setup_city_placeholder">ابحث عن المدينة…</string>
+    <string name="setup_logo_label">شعار المتجر (اختياري)</string>
+    <string name="setup_add_photo">إضافة صورة</string>
+    <string name="setup_change_photo">تغيير الصورة</string>
+    <string name="setup_create_button">إنشاء المتجر</string>
+    <string name="setup_next">التالي</string>
+    <string name="setup_birth_year_label">سنة الميلاد</string>
+    <string name="setup_birth_year_title">اختر سنة الميلاد</string>
+    <string name="setup_birth_year_placeholder">اختر السنة</string>
+    <string name="setup_birth_year_open_description">فتح قائمة اختيار سنة الميلاد</string>
+    <string name="setup_full_name_error">أدخل اسمك الكامل من 3 إلى 80 حرفًا.</string>
+    <string name="setup_birth_year_error">اختر سنة ميلاد صحيحة.</string>
+
+    <!-- Step 2 Account -->
+    <string name="setup_account_title">إنشاء حساب</string>
+    <string name="setup_full_name_label">الاسم بالكامل</string>
+    <string name="setup_email_label">البريد الإلكتروني (اختياري)</string>
+    <string name="setup_google_sync">مزامنة مع جوجل للنسخ الاحتياطي</string>
+    <string name="setup_profile_photo_label">الصورة الشخصية (اختياري)</string>
+
+    <string name="category_restaurant">🍔 مطعم</string>
+    <string name="category_cafe">☕ كافيه</string>
+    <string name="category_grocery">🛒 بقالة</string>
+    <string name="category_fashion">👕 ملابس</string>
+    <string name="category_beauty">💄 تجميل</string>
+    <string name="category_pharmacy">💊 صيدلية</string>
+    <string name="category_electronics">💻 إلكترونيات</string>
+    <string name="category_home">🏠 منزل وأثاث</string>
+    <string name="category_automotive">🚗 سيارات</string>
+    <string name="category_gifts">🎁 هدايا</string>
+    <string name="category_books">📚 كتب وأدوات مكتبية</string>
+    <string name="category_pet_shop">🐶 مستلزمات حيوانات</string>
+    <string name="category_sports">🏋️ رياضة</string>
+    <string name="category_jewelry">💍 مجوهرات</string>
+    <string name="category_mobile">📱 موبايلات وإكسسوارات</string>
+    <string name="category_services">🛠️ خدمات</string>
+    <string name="category_other">🛒 أخرى</string>
+    <string name="volume_lt5">أقل من ٥</string>
+    <string name="volume_5_20">٥–٢٠</string>
+    <string name="volume_21_50">٢١–٥٠</string>
+    <string name="volume_gt50">أكتر من ٥٠</string>
+
+    <!-- S4 Dashboard -->
+    <string name="dash_greeting">أهلًا يا %1$s 👋</string>
+    <string name="dash_today_orders">أوردرات النهاردة</string>
+    <string name="dash_unpaid">لسه مدفعوش</string>
+    <string name="dash_to_ship">جاهز للشحن</string>
+    <string name="dash_empty_title">متجرك جاهز!</string>
+    <string name="dash_empty_body_v2">ضيف أول منتج من تاب المنتجات وبعدين شارك الكتالوج على واتساب</string>
+    <string name="dash_share_catalog">شارك الكتالوج</string>
+    <string name="ai_test_title">AI backend test</string>
+    <string name="ai_test_message_label">Message</string>
+    <string name="ai_test_send">Send to backend</string>
+    <string name="ai_test_error">Backend error: %1$s</string>
+    <string name="cd_settings">الإعدادات</string>
+
+    <!-- Bottom nav -->
+    <string name="nav_dashboard">الرئيسية</string>
+    <string name="nav_orders">الأوردرات</string>
+    <string name="nav_products">المنتجات</string>
+    <string name="nav_customers">العملاء</string>
+
+    <!-- S8/S9 Products -->
+    <string name="products_empty">لسه مفيش منتجات — دوس ➕ وضيف أول منتج بصورة</string>
+    <string name="product_add_title">أضف منتج</string>
+    <string name="product_edit_title">عدّل المنتج</string>
+    <string name="product_name_label">اسم المنتج</string>
+    <string name="product_description_label">وصف المنتج (اختياري)</string>
+    <string name="product_price_label">السعر (ج.م)</string>
+    <string name="product_stock_label">المخزون</string>
+    <string name="product_discount_title">الخصم</string>
+    <string name="product_discount_none">بدون خصم</string>
+    <string name="product_discount_percentage">نسبة (%)</string>
+    <string name="product_discount_amount">مبلغ ثابت</string>
+    <string name="product_discount_value_label">قيمة الخصم</string>
+    <string name="product_available">متاح للبيع</string>
+    <string name="product_save">احفظ المنتج</string>
+    <string name="product_delete">امسح المنتج</string>
+    <string name="product_pick_photo">دوس واختار صورة المنتج</string>
+
+    <!-- Catalog share (text v1) -->
+    <string name="share_catalog_header">🛍️ كتالوج %1$s</string>
+    <string name="share_catalog_footer">اطلب على واتساب: %1$s\n— Powered by Orderak.app</string>
+
+    <!-- S5/S7 Orders -->
+    <string name="orders_all">الكل</string>
+    <string name="orders_empty">لسه مفيش أوردرات — دوس ➕ وسجّل أول أوردر من الشات</string>
+    <string name="order_new_title">أوردر جديد</string>
+    <string name="order_buyer_phone">رقم موبايل العميل</string>
+    <string name="order_buyer_name_opt">اسم العميل (اختياري)</string>
+    <string name="order_note_opt">ملاحظات (اختياري)</string>
+    <string name="order_items_title">المنتجات</string>
+    <string name="order_pay_method">طريقة الدفع</string>
+    <string name="order_total">الإجمالي:</string>
+    <string name="order_save">سجّل الأوردر</string>
+    <string name="order_stock_error">الكمية المطلوبة أكبر من المخزون المتاح</string>
+    <string name="order_qty_decrease">تقليل كمية %1$s</string>
+    <string name="order_qty_increase">زيادة كمية %1$s</string>
+
+    <!-- Statuses -->
+    <string name="status_new">جديد</string>
+    <string name="status_confirmed">متأكد</string>
+    <string name="status_paid">مدفوع</string>
+    <string name="status_shipped">اتشحن</string>
+    <string name="status_done">خلص</string>
+    <string name="status_cancelled">ملغي</string>
+
+    <!-- Pay methods -->
+    <string name="pay_vfcash">فودافون كاش</string>
+    <string name="pay_instapay">انستاباي</string>
+    <string name="pay_fawry">فوري</string>
+    <string name="pay_cod">كاش عند الاستلام</string>
+
+    <!-- S6 Order details -->
+    <string name="order_details_title">أوردر #%1$d</string>
+    <string name="order_whatsapp">كلمه على واتساب</string>
+    <string name="order_advance_to">انقل لـ: %1$s</string>
+    <string name="order_cancel">الغي الأوردر</string>
+
+    <!-- S6a Payment verification -->
+    <string name="payment_section_title">الدفع</string>
+    <string name="payment_verify">✅ أكد الدفع بالسكرين شوت</string>
+    <string name="payment_manual">أكد الدفع يدوي</string>
+    <string name="payment_checking">بنفحص السكرين شوت…</string>
+    <string name="payment_verified_ok">الدفع مطابق — اتأكد تلقائيًا ✅</string>
+    <string name="payment_flagged_title">⚠️ في حاجة مش مظبوطة</string>
+    <string name="payment_flag_amount">• المبلغ في السكرين شوت مش مطابق للأوردر</string>
+    <string name="payment_flag_ref">• مفيش رقم عملية واضح في الصورة</string>
+    <string name="payment_flag_dup">• رقم العملية ده اتستخدم في أوردر قبل كده!</string>
+    <string name="payment_disclaimer">الفحص ده مساعدة على كشف التلاعب ومش بديل عن التأكد من محفظتك</string>
+
+    <!-- S11/S12 Customers -->
+    <string name="customers_empty">هيظهر هنا كل عميل طلب منك — تلقائيًا مع أول أوردر</string>
+    <plurals name="customer_orders_count">
+        <item quantity="zero">مفيش أوردرات</item>
+        <item quantity="one">أوردر واحد</item>
+        <item quantity="two">أوردرين</item>
+        <item quantity="few">%d أوردرات</item>
+        <item quantity="many">%d أوردر</item>
+        <item quantity="other">%d أوردر</item>
+    </plurals>
+
+    <!-- S13 Settings -->
+    <string name="settings_title">الإعدادات</string>
+    <string name="settings_payout_title">بيانات استلام الفلوس (بتظهر للعميل)</string>
+    <string name="settings_instapay">عنوان انستاباي (مثال: name@instapay)</string>
+    <string name="settings_vfcash">رقم فودافون كاش</string>
+    <string name="settings_save">احفظ</string>
+    <string name="settings_logout">تسجيل خروج</string>
+    <string name="settings_delete_account">طلب حذف الحساب</string>
+    <!-- Backend link -->
+    <string name="settings_link_title">لينك الكتالوج بتاعك</string>
+    <string name="settings_slug_label">اسم اللينك (حروف إنجليزية)</string>
+    <string name="settings_link_pending">اللينك بيتجهز… هيظهر هنا بعد أول مزامنة (محتاج نت)</string>
+    <string name="share_link_footer">اطلب أونلاين من اللينك ☝️ — Powered by Orderak.app</string>
+    <string name="common_premium_feature">ميزة متقدمة</string>
+    <!-- Store Information + Categories (public URL architecture) -->
+    <string name="store_info_title">بيانات المتجر</string>
+    <string name="store_info_country">الدولة</string>
+    <string name="store_info_code">كود المتجر</string>
+    <string name="store_info_public_id">المعرّف العام</string>
+    <string name="store_info_name">اسم المتجر</string>
+    <string name="store_info_slug">اسم اللينك</string>
+    <string name="store_info_description">الوصف</string>
+    <string name="store_info_phone">التليفون</string>
+    <string name="store_info_phone_verified_help">ده رقم تسجيل الدخول المتأكد منه. تغييره محتاج تأكيد جديد.</string>
+    <string name="store_info_whatsapp">واتساب</string>
+    <string name="store_info_email">الإيميل</string>
+    <string name="store_info_website">الموقع الإلكتروني</string>
+    <string name="store_info_address">العنوان</string>
+    <string name="store_info_logo">الشعار</string>
+    <string name="store_info_cover">صورة الغلاف</string>
+    <string name="action_copy_url">نسخ اللينك</string>
+    <string name="action_share_store">شارك المتجر</string>
+    <string name="action_share_link">مشاركة</string>
+    <string name="link_copied">تم نسخ اللينك</string>
+    <string name="categories_title">الأقسام</string>
+    <string name="categories_new">قسم جديد</string>
+    <string name="categories_add">إضافة</string>
+    <plurals name="categories_product_count">
+        <item quantity="zero">لا توجد منتجات</item>
+        <item quantity="one">منتج واحد</item>
+        <item quantity="two">منتجان</item>
+        <item quantity="few">%d منتجات</item>
+        <item quantity="many">%d منتجًا</item>
+        <item quantity="other">%d منتج</item>
+    </plurals>
+    <string name="common_delete">حذف</string>
+    <string name="language_system_default">لغة الجهاز</string>
+    <string name="settings_plan_debug">خطة الاشتراك (للتجربة)</string>
+    <string name="plan_free">مجاني</string>
+    <string name="plan_starter">المبتدئ</string>
+    <string name="plan_professional">الاحترافي</string>
+    <string name="error_auth">تعذّر تسجيل الدخول. حاول مرة أخرى.</string>
+    <string name="error_slug_taken">رابط المتجر مستخدم بالفعل.</string>
+    <string name="error_rate_limited">طلبات كثيرة جدًا. حاول بعد قليل.</string>
+    <string name="error_plan_limit">وصلت إلى الحد المتاح في خطتك.</string>
+    <string name="error_service_unavailable">الخدمة غير متاحة حاليًا.</string>
+    <string name="error_not_found">العنصر المطلوب غير موجود.</string>
+    <string name="error_network">تحقق من اتصال الإنترنت وحاول مرة أخرى.</string>
+    <string name="error_unknown">حدث خطأ غير متوقع. حاول مرة أخرى.</string>
+    <string name="settings_current_plan">الخطة الحالية: %1$s</string>
+    <string name="settings_choose_plan">اختر %1$s (%2$s)</string>
+    <string name="settings_choose_plan_priced">اختر %1$s (%2$s) — %3$s</string>
+    <string name="common_dismiss">إخفاء</string>
+    <string name="plan_settings_updated">تم تحديث إعدادات الباقة.</string>
+    <string name="plan_settings_refresh_failed">تعذر تحديث إعدادات الباقة. نستخدم آخر إعدادات محفوظة.</string>
+    <string name="plan_using_offline_settings">يتم استخدام إعدادات الباقة المحفوظة</string>
+    <string name="plan_billing_grace">تحتاج دفعة اشتراكك إلى مراجعة. يظل الوصول الحالي متاحًا خلال مهلة السداد.</string>
+    <string name="plan_change_pending">ستتغير باقتك في %1$s. ستظل بياناتك الحالية متاحة.</string>
+    <string name="plan_usage_title">استخدام الباقة</string>
+    <string name="usage_products">المنتجات</string>
+    <string name="usage_orders_month">طلبات هذا الشهر</string>
+    <string name="usage_ai_requests">طلبات الذكاء الاصطناعي هذا الشهر</string>
+    <string name="usage_categories">الفئات</string>
+    <string name="usage_devices">الأجهزة</string>
+    <string name="usage_value">%1$d / %2$d</string>
+    <string name="usage_value_unlimited">%1$d / غير محدود</string>
+    <string name="products_usage_header">المنتجات (%1$d / %2$d)</string>
+    <string name="products_usage_unlimited">المنتجات (%1$d / غير محدود)</string>
+    <string name="products_limit_title">تم بلوغ حد المنتجات</string>
+    <string name="products_limit_body">لقد وصلت إلى حد %1$d منتجًا. قم بالترقية إلى %2$s للحصول على حد أعلى.</string>
+    <string name="products_limit_body_over">تسمح خطتك بـ %1$d منتجًا ولديك حاليًا %2$d. يمكنك تعديل المنتجات الحالية أو حذفها، ولكن يجب خفض العدد إلى أقل من %1$d قبل إضافة منتج آخر.</string>
+    <string name="products_limit_body_max_plan">لقد وصلت إلى حد %1$d منتجًا. تواصل مع الدعم إذا كنت تحتاج إلى سعة أكبر.</string>
+    <string name="product_add_locked">تم بلوغ حد المنتجات. اضغط لمراجعة خيارات الترقية.</string>
+    <string name="upgrade_now">الترقية الآن</string>
+    <string name="plan_paid1">المدفوعة 1</string>
+    <string name="plan_paid2">المدفوعة 2</string>
+    <string name="plan_paid3">المدفوعة 3</string>
+    <string name="sync_pending">اتحفظ على الجهاز ومستني المزامنة.</string>
+    <string name="sync_failed">ماقدرناش نزامن آخر التغييرات.</string>
+    <string name="common_retry">حاول تاني</string>
+    <string name="order_cancel_confirm">تلغي الأوردر وترجّع كمياته للمخزون؟</string>
+    <string name="product_delete_confirm">تحذف المنتج؟ مش هينفع ترجّعه بعد كده.</string>
+    <string name="category_delete_confirm">تحذف التصنيف؟ المنتجات هتفضل من غير تصنيف.</string>
+    <string name="categories_error">ماقدرناش نحدّث التصنيفات. حاول تاني.</string>
+    <string name="settings_delete_confirm">تبعت طلب حذف حساب متأكد منه؟ الطلب هيتنفذ حسب المدة المنشورة.</string>
+    <string name="settings_logout_confirm">تسجل خروج وتمسح بيانات الشغل المحلية من الجهاز ده؟</string>
+    <string name="settings_delete_requested">تم إرسال طلب حذف الحساب المتأكد منه.</string>
+    <string name="settings_delete_failed">الطلب ماتبعتش. راجع الاتصال وحاول تاني.</string>
+    <string name="operations_error">تعذر تحميل المعلومات. راجع الاتصال وحاول مرة أخرى.</string>
+    <string name="common_send">إرسال</string>
+    <string name="common_empty">لا توجد عناصر حتى الآن.</string>
+    <string name="support_title">الدعم</string>
+    <string name="support_new">تذكرة دعم جديدة</string>
+    <string name="support_subject">الموضوع</string>
+    <string name="support_message">الرسالة</string>
+    <string name="announcements_title">الإعلانات</string>
+    <string name="announcements_unread">الإعلانات (%1$d جديدة)</string>
+    <string name="announcement_new">جديد</string>
+    <string name="catalog_languages_title">لغات الكتالوج</string>
+    <string name="translation_missing">الترجمة غير موجودة</string>
+    <string name="translation_name">الاسم المترجم</string>
+    <string name="translation_description">الوصف المترجم</string>
+    <string name="devices_title">الأجهزة والجلسات</string>
+    <string name="device_unknown">جهاز غير معروف</string>
+    <string name="device_revoke">إلغاء الجهاز</string>
+    <string name="device_primary">الجهاز الأساسي</string>
+    <string name="subscription_title">الاشتراك</string>
+    <string name="subscription_recover">استعادة مشتريات Google Play</string>
+    <string name="subscription_status">الحالة: %1$s</string>
+    <string name="subscription_period_end">تنتهي الفترة الحالية: %1$s</string>
+    <string name="subscription_play_guidance">يمكنك إدارة الإلغاء وطرق الدفع من Google Play. استخدم استعادة المشتريات بعد إعادة التثبيت أو تغيير الجهاز.</string>
+    <string name="subscription_verification_pending">لا يزال التحقق من Google Play قيد التنفيذ. سنحدّث صلاحياتك تلقائيًا.</string>
+    <string name="subscription_verification_error">تعذر التحقق من عملية الشراء حاليًا. تحقق من الاتصال ثم استعد مشتريات Google Play.</string>
+    <string name="ai_assistant_title">مساعد الذكاء الاصطناعي</string>
+    <string name="ai_disclosure">قد تكون ردود الذكاء الاصطناعي غير دقيقة. راجع الاقتراحات قبل تغيير المنتجات أو الأسعار أو الطلبات.</string>
+    <string name="ai_you">أنت</string>
+    <string name="ai_message">اسأل عن متجرك</string>
+    <string name="ai_reset">بدء محادثة جديدة</string>
+    <string name="deletion_status_title">حالة طلب الحذف</string>
+    <string name="deletion_status_none">لا يوجد طلب حذف</string>
+    <string name="deletion_status_help">يُنفذ الطلب المتحقق منه وفق الموعد المنشور. تواصل مع الدعم إذا كانت الحالة غير صحيحة.</string>
+    <string name="restricted_title">الحساب مقيّد</string>
+    <string name="restricted_body">لا يمكن لهذا الحساب استخدام عمليات البائع. تواصل مع الدعم لمعرفة السبب وخطوات الاستعادة.</string>
+    <string name="restricted_contact">التواصل مع الدعم</string>
+    <string name="slug_loading">جارٍ التحقق من التوفر…</string>
+    <string name="slug_available">متاح</string>
+    <string name="slug_taken">مستخدم بالفعل</string>
+    <string name="slug_reserved">محجوز</string>
+    <string name="slug_network">تعذر التحقق من التوفر</string>
+    <string name="slug_invalid">استخدم 3 أحرف أو أرقام أو شرطات على الأقل</string>
+    <string name="app_version_warning">يتوفر إصدار أحدث من أوردرَك.</string>
+    <string name="app_version_stale_warning">تعذر تحديث سياسة الإصدار. يمكنك المتابعة مؤقتًا والمحاولة عند الاتصال بالإنترنت.</string>
+    <string name="app_version_update_title">التحديث مطلوب</string>
+    <string name="app_version_update_body">حدّث أوردرَك من Google Play للمتابعة بأمان.</string>
+    <string name="app_version_update_action">فتح Google Play</string>
+    <string name="app_version_blocked_title">إصدار التطبيق غير متاح</string>
+    <string name="app_version_blocked_body">تم تعطيل هذا الإصدار لأسباب أمنية. ثبّت الإصدار الحالي للمتابعة.</string>
+    <string name="app_version_maintenance_title">أوردرَك قيد الصيانة</string>
+    <string name="app_version_maintenance_body">عمليات البائع غير متاحة مؤقتًا. حاول مرة أخرى قريبًا.</string>
+
+    <!-- Payment history -->
+    <string name="payment_history_title">سجل الدفع</string>
+    <string name="payment_ref_label">مرجع: %1$s</string>
+    <string name="payment_verified_badge">تم التحقق</string>
+    <string name="payment_flagged_badge">معلّم</string>
+
+    <!-- Seller profile -->
+    <string name="seller_profile_title">الملف الشخصي للبائع</string>
+    <string name="seller_profile_header">هذه المعلومات تحدد هويتك كمالك للحساب. لا تظهر للمشترين.</string>
+    <string name="seller_profile_full_name">الاسم الكامل</string>
+    <string name="seller_profile_email">البريد الإلكتروني</string>
+    <string name="seller_profile_birth_year">سنة الميلاد</string>
+    <string name="seller_profile_photo">الصورة الشخصية</string>
+    <string name="seller_profile_phone">رقم الهاتف (معرف الحساب)</string>
+    <string name="seller_profile_photo_set">تم رفع الصورة</string>
+
+    <!-- Deletion status expanded -->
+    <string name="deletion_status_label">الحالة: %1$s</string>
+    <string name="deletion_requested_at">تاريخ الطلب: %1$s</string>
+    <string name="deletion_deadline_at">المهلة: %1$s</string>
+    <string name="deletion_verified_at">تم التحقق: %1$s</string>
+    <string name="deletion_completed_at">تم الإكمال: %1$s</string>
+    <!-- Auth and onboarding V2 -->
+    <string name="welcome_value">أدر متجرك بسهولة واحترافية</string>
+    <string name="welcome_subtitle">أنشئ متجرك وابدأ البيع في خطوات بسيطة.</string>
+    <string name="welcome_create_store">إنشاء متجر جديد</string>
+    <string name="welcome_sign_in">تسجيل الدخول عبر مفتاح المرور</string>
+    <string name="welcome_otp_fallback">استخدام التحقق بالهاتف بدلاً من ذلك</string>
+    <string name="auth_phone_entry_title">أدخل رقم هاتفك</string>
+    <string name="auth_help">مساعدة</string>
+    <string name="auth_faq">الأسئلة الشائعة</string>
+    <string name="auth_contact_support">اتصل بالدعم</string>
+    <string name="auth_passkey_unavailable">لا يوجد مفتاح مرور متاح على هذا الجهاز. يمكنك استخدام التحقق بالهاتف.</string>
+    <string name="auth_passkey_failed">تعذر تسجيل الدخول بمفتاح المرور. حاول مرة أخرى أو استخدم التحقق بالهاتف.</string>
+    <string name="passkey_invite_title">دخول أسرع في المرة القادمة</string>
+    <string name="passkey_invite_body">استخدم بصمتك أو وجهك أو قفل الجهاز بدلاً من انتظار رسالة. لا يستلم أوردرَك أي بيانات حيوية.</string>
+    <string name="passkey_invite_create">إنشاء مفتاح مرور</string>
+    <string name="passkey_invite_deferred_body">بعد تجهيز متجرك، سنفتح نافذة النظام الآمنة لإنشاء مفتاح المرور. لا يستلم أوردرَك أي بيانات حيوية.</string>
+    <string name="passkey_invite_deferred_create">متابعة وإنشاؤه بعد الإعداد</string>
+    <string name="passkey_invite_not_now">ليس الآن</string>
+    <string name="country_picker_title">اختر الدولة</string>
+    <string name="country_picker_search">ابحث بالدولة أو كود الاتصال</string>
+    <string name="setup_store_title">معلومات المتجر</string>
+    <string name="setup_account_heading">معلومات الحساب</string>
+    <string name="setup_account_subtitle">يرجى إدخال بياناتك للمتابعة.</string>
+    <string name="setup_store_heading">جهّز متجرك للانطلاق</string>
+    <string name="setup_store_subtitle">تفصلك خطوة قصيرة عن بدء البيع.</string>
+    <string name="setup_email_private_help">يُستخدم فقط للفواتير والتنبيهات. لا يمكن استخدامه لاسترجاع الحساب.</string>
+    <string name="setup_email_error">أدخل بريدًا صالحًا وغير مستخدم، أو اتركه فارغًا.</string>
+    <string name="setup_legal_prefix">بمتابعتك، أنت توافق على شروط الاستخدام وسياسة الخصوصية المنشورتين.</string>
+    <string name="setup_legal_before_terms">بمتابعتك، أنت توافق على النسخة المنشورة من</string>
+    <string name="setup_legal_between_links">و</string>
+    <string name="setup_slug_label">رابط المتجر</string>
+    <string name="setup_slug_help">يمكنك تعديل عنوان متجرك الاحترافي.</string>
+    <string name="setup_slug_checking">جارٍ التحقق من التوفر…</string>
+    <string name="setup_slug_available">هذا الرابط متاح.</string>
+    <string name="setup_slug_taken">هذا الرابط مستخدم بالفعل.</string>
+    <string name="setup_slug_invalid">استخدم 3–40 حرفًا إنجليزيًا صغيرًا أو رقمًا أو شرطة.</string>
+    <string name="setup_slug_offline">تعذر فحص الرابط. تحقق من اتصالك.</string>
+    <string name="setup_city_manual_help">اختر اقتراحًا أو أدخل المدينة يدويًا. لن نطلب صلاحية الموقع.</string>
+    <string name="setup_start_selling">ابدأ البيع الآن</string>
+    <string name="setup_logo_optional_help">اختياري — سنستخدم حرفين مميزين إذا تخطيت الشعار.</string>
+    <string name="category_food">طعام</string>
+    <string name="passkeys_settings_title">مفاتيح المرور</string>
+    <string name="passkeys_settings_help">أضف مفاتيح الدخول أو سمّها أو ألغها. تتطلب التغييرات الحساسة إثباتًا حديثًا بمفتاح مرور أو رمز هاتف.</string>
+    <string name="passkeys_add">إضافة مفتاح مرور</string>
+    <string name="passkey_unnamed">مفتاح مرور</string>
+    <string name="passkey_synced">مفتاح مرور متزامن</string>
+    <string name="passkey_device_bound">مفتاح مرتبط بالجهاز</string>
+    <string name="passkey_last_used">آخر استخدام: %1$s</string>
+    <string name="passkey_rename">إعادة التسمية</string>
+    <string name="passkey_revoke">إلغاء</string>
+    <string name="passkey_label">اسم مفتاح المرور</string>
+    <string name="passkey_revoke_confirm">هل تريد إلغاء مفتاح المرور؟ ستظل وسائل الدخول المصرح بها الأخرى تعمل.</string>
+    <string name="authorized_devices_title">الأجهزة المصرح بها</string>
+    <string name="seller_profile_resend_verification">إعادة إرسال تحقق البريد</string>
+    <string name="seller_profile_verification_sent">أُرسلت رسالة التحقق، وتنتهي صلاحيتها خلال 24 ساعة.</string>
+    <string name="seller_profile_verification_failed">تعذر إرسال الرسالة. حاول لاحقًا.</string>
+    <string name="setup_store_link_preview">رابط متجرك</string>
+    <string name="setup_category_and_subcategory_label">التصنيف والتصنيف الفرعي</string>
+    <string name="setup_category_open_description">اختر تصنيف النشاط وتصنيفه الفرعي</string>
+    <string name="setup_category_placeholder">اختر نوع نشاطك</string>
+    <string name="setup_category_picker_title">نوع النشاط</string>
+    <string name="setup_category_choose_main">اختر التصنيف الرئيسي أولًا.</string>
+    <string name="setup_category_search">ابحث في التصنيفات الرئيسية</string>
+    <string name="setup_subcategory_search">ابحث في التصنيفات الفرعية</string>
+    <string name="setup_city_open_description">ابحث عن مدينتك</string>
+    <string name="setup_city_country_from_phone">نعرض مدن %1$s بناءً على رقم هاتفك.</string>
+    <string name="setup_city_picker_title">اختر مدينتك</string>
+    <string name="setup_city_search">اكتب اسم المدينة</string>
+    <string name="setup_city_search_error">تعذر تحميل اقتراحات المدن.</string>
+    <string name="setup_city_no_results">لم نجد مدينة مطابقة. يمكنك استخدام الإدخال اليدوي أدناه.</string>
+    <string name="setup_city_use_manual">استخدم «%1$s» كما كتبته</string>
+    <string name="setup_city_data_attribution">بيانات المدن: Countries States Cities Database (ODbL)</string>
+</resources>

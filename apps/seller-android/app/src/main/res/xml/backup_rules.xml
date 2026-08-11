@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- API <= 30 backups: exclude both the legacy DataStore location and the
+     encrypted shared-pref secret store that now holds the backend device
+     credential. Restoring either onto another device would leak identity. -->
+<full-backup-content>
+    <exclude domain="file" path="datastore/session.preferences_pb" />
+    <exclude domain="sharedpref" path="orderak_secure_secret.xml" />
+</full-backup-content>

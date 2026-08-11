@@ -1,0 +1,7 @@
+<resources>
+    <!-- Dark window background prevents white flash on cold launch in dark mode.
+         Must stay DayNight parent for the per-app locale backport. -->
+    <style name="Theme.Orderak" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
+</resources>
