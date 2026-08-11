@@ -1,0 +1,557 @@
+Technical Architecture and Platform Readiness Plan
+1. Objective
+Establish a secure, scalable, and company-owned technical foundation for the mobile application before production development and public release.
+The plan must result in:
+•	An approved application architecture.
+•	A preliminary threat model.
+•	A documented cloud and data-residency decision.
+•	Company-owned platform accounts.
+•	A role-based access-control matrix.
+•	Tested backup and recovery procedures.
+•	Production monitoring and incident-response processes.
+•	An approved Android SDK compatibility strategy.
+________________________________________
+2. Recommended Delivery Schedule
+Phase 1 — Requirements and Architecture Decisions
+Target: Week 1
+Activities
+1.	Confirm the expected product scope:
+o	Primary user groups.
+o	Expected number of users.
+o	Geographic markets.
+o	Types of personal or sensitive data.
+o	Availability and performance requirements.
+o	Regulatory or contractual requirements.
+2.	Decide the mobile technology:
+o	Select Kotlin with Jetpack Compose when Android is the confirmed primary platform and the best native Android performance and integration are required.
+o	Select Flutter only when there is an approved and funded iOS roadmap and the team accepts the cross-platform architecture and maintenance model.
+3.	Select and document:
+o	Backend framework and runtime.
+o	API style, such as REST or GraphQL.
+o	Primary database.
+o	Cache technology.
+o	Message queue or event-bus solution.
+o	Object and file storage.
+o	Search service, when full-text or advanced filtering is required.
+o	Authentication and identity solution.
+o	Cloud provider and deployment region.
+4.	Produce the initial architecture diagrams:
+o	System context diagram.
+o	Application and service diagram.
+o	Data-flow diagram.
+o	Deployment and network diagram.
+o	Authentication and authorization flow.
+Outputs
+•	Architecture Decision Records.
+•	Initial Architecture Document.
+•	Technology Selection Matrix.
+•	Initial cost and scalability estimate.
+•	Mobile framework decision.
+________________________________________
+Phase 2 — Security and Data Governance
+Target: Week 2
+Activities
+1.	Create a preliminary threat model covering:
+o	Account takeover.
+o	Unauthorized data access.
+o	API abuse.
+o	Injection attacks.
+o	Lost or stolen devices.
+o	Privilege escalation.
+o	Administrative misuse.
+o	Data leakage through logs or analytics.
+o	Compromised credentials and secrets.
+o	Dependency and supply-chain risks.
+2.	Define the data classification model:
+o	Public.
+o	Internal.
+o	Confidential.
+o	Restricted or highly sensitive.
+3.	Approve the cloud and data-residency decision based on:
+o	User locations.
+o	Legal requirements.
+o	Customer contracts.
+o	Backup locations.
+o	Disaster-recovery locations.
+o	Third-party data processors.
+4.	Establish security controls:
+o	TLS for all network traffic.
+o	Encryption at rest for databases, backups, and object storage.
+o	Centralized secrets and key management.
+o	Key rotation procedures.
+o	Least-privilege access.
+o	Role-based access control.
+o	Separation of administrative duties.
+o	Multi-factor authentication for privileged accounts.
+o	Regular access reviews.
+5.	Define secure logging requirements:
+o	Security logs.
+o	Compliance and audit logs.
+o	Application and operational logs.
+o	Administrative activity logs.
+o	Retention periods.
+o	Access restrictions.
+Passwords, access tokens, private keys, session identifiers, payment data, and unnecessary personal information must never be written to logs.
+Outputs
+•	Preliminary Threat Model.
+•	Data Classification Standard.
+•	Cloud and Data Residency Decision.
+•	Security Control Baseline.
+•	Logging and Audit Standard.
+________________________________________
+Phase 3 — Company Account Ownership
+Target: Week 2
+Activities
+1.	Register the Google Play Console account as a company Organization account.
+2.	Ensure the organization name, address, registration details, website, telephone number, and verification documents are consistent.
+3.	Create or transfer the following resources to company ownership:
+o	Cloud provider.
+o	Firebase.
+o	Google Play Console.
+o	Domain registrar.
+o	DNS.
+o	Corporate email.
+o	Source-code repositories.
+o	CI/CD platform.
+o	Design tools.
+o	Analytics and monitoring platforms.
+o	Customer-support tools.
+o	Application-signing assets.
+4.	Require individual company accounts instead of shared credentials.
+5.	Assign at least two authorized administrative owners for every critical system.
+6.	Establish:
+o	Account-recovery procedures.
+o	Emergency administrative access.
+o	Employee onboarding and offboarding procedures.
+o	Immediate access revocation.
+o	Quarterly access reviews.
+o	Ownership-transfer procedures.
+Outputs
+•	Company Account Inventory.
+•	Administrative Owner Register.
+•	Access-Control Matrix.
+•	Account-Recovery Procedure.
+•	Employee Offboarding Checklist.
+________________________________________
+Phase 4 — Environments and Delivery Pipeline
+Target: Week 3
+Activities
+1.	Create separate environments:
+o	Development.
+o	Staging.
+o	Production.
+2.	Use separate resources wherever practical:
+o	Cloud projects or accounts.
+o	Databases.
+o	Storage buckets.
+o	Service accounts.
+o	API credentials.
+o	Encryption keys.
+o	Monitoring dashboards.
+o	Log destinations.
+o	Analytics properties.
+3.	Prevent production data from being copied into development or staging unless it has been formally approved and anonymized.
+4.	Build the CI/CD pipeline with:
+o	Automated builds.
+o	Unit and integration tests.
+o	Static code analysis.
+o	Dependency and vulnerability scanning.
+o	Secret scanning.
+o	Infrastructure validation.
+o	Signed release artifacts.
+o	Approval gates for production.
+o	Deployment rollback procedures.
+5.	Define the source-control model:
+o	Protected main branch.
+o	Mandatory pull-request review.
+o	Required automated checks.
+o	Restricted release permissions.
+o	Traceability between code, approvals, and releases.
+Outputs
+•	Environment Architecture.
+•	CI/CD Pipeline.
+•	Release and Rollback Procedure.
+•	Source-Control and Code-Review Policy.
+•	Environment Access Matrix.
+________________________________________
+Phase 5 — Backup, Recovery, and Monitoring
+Target: Week 4
+Activities
+1.	Define recovery objectives:
+o	RPO: Maximum acceptable amount of data loss.
+o	RTO: Maximum acceptable service-recovery time.
+2.	Configure encrypted backups for:
+o	Databases.
+o	Object storage.
+o	Critical configurations.
+o	Infrastructure definitions.
+o	Signing and encryption material, where appropriate.
+3.	Protect backups from:
+o	Unauthorized deletion.
+o	Compromised production credentials.
+o	Ransomware.
+o	Accidental overwriting.
+o	Regional cloud outages.
+4.	Conduct an actual restoration test in a controlled environment.
+5.	Implement operational monitoring:
+o	Application crashes.
+o	API error rates.
+o	Latency.
+o	Database health.
+o	Queue failures.
+o	Authentication failures.
+o	Resource capacity.
+o	Deployment failures.
+o	Security events.
+6.	Define alert severity levels and escalation paths:
+o	Informational.
+o	Warning.
+o	High severity.
+o	Critical incident.
+7.	Prepare incident-response procedures covering:
+o	Detection.
+o	Triage.
+o	Containment.
+o	Service recovery.
+o	Internal escalation.
+o	Customer or regulator notification.
+o	Evidence preservation.
+o	Root-cause analysis.
+o	Corrective actions.
+Outputs
+•	Backup and Restore Plan.
+•	Approved RPO and RTO.
+•	Completed Restore-Test Report.
+•	Monitoring and Alerting Matrix.
+•	Incident-Response Plan.
+•	Incident Communication Templates.
+________________________________________
+Phase 6 — Android Release Readiness
+Target: Weeks 5–6
+Activities
+1.	Decide and document:
+o	targetSdk.
+o	minSdk.
+o	compileSdk.
+o	Supported device types.
+o	Supported screen sizes.
+o	Supported CPU architectures.
+o	Backward-compatibility testing requirements.
+2.	For a standard Android mobile application submitted on or after August 31, 2026, plan to target Android 16 / API level 36 or higher for new applications and application updates.
+3.	Existing mobile applications must target Android 15 / API level 35 or higher to remain available to new users whose devices run Android versions newer than the application’s target level. Different requirements apply to Wear OS, Android Automotive OS, Android TV, and Android XR. The team must check the official policy and Play Console immediately before every submission because the requirements may change.
+4.	Recommended initial configuration:
+o	compileSdk: 36 or the latest stable supported version.
+o	targetSdk: 36.
+o	minSdk: Select after reviewing the target market’s device distribution and the features required by the application.
+5.	Establish an annual Android upgrade process:
+o	Review Android developer previews.
+o	Test behavioral changes.
+o	Upgrade dependencies.
+o	Update the target API.
+o	Run regression and compatibility tests.
+o	Complete the upgrade at least eight weeks before the Google Play deadline.
+6.	Complete release-readiness checks:
+o	Application signing is company-controlled.
+o	Play App Signing is correctly configured.
+o	Privacy policy is published.
+o	Data Safety declarations match actual application behavior.
+o	Permissions are minimized.
+o	Production analytics and crash reporting are active.
+o	Staged rollout and rollback procedures are tested.
+Outputs
+•	Android SDK Decision Record.
+•	Device Support Matrix.
+•	Annual Android Upgrade Plan.
+•	Google Play Submission Checklist.
+•	Signed Production Release Procedure.
+________________________________________
+3. Recommended Responsibility Matrix
+Area	Accountable Owner	Supporting Roles
+Architecture	CTO or Technical Lead	Mobile, Backend, DevOps
+Mobile technology decision	Technical Lead	Product and Mobile Lead
+Cloud and data residency	CTO or Security Owner	Legal, DevOps, Product
+Threat modeling	Security Owner	Engineering Leads
+Account ownership	Operations or IT Owner	Security and Finance
+Access management	Security Owner	IT and System Owners
+CI/CD and environments	DevOps Lead	Engineering Leads
+Backup and recovery	DevOps Lead	Database and Security Owners
+Monitoring and incidents	Operations Lead	DevOps, Security, Engineering
+Android SDK compliance	Mobile Lead	QA and Release Manager
+Google Play submission	Release Manager	Mobile, Legal, Product
+________________________________________
+4. Approval Gates
+Gate 1 — Architecture Approval
+Development may proceed after:
+•	The mobile framework is selected.
+•	The backend and database are selected.
+•	The data flows are documented.
+•	The cloud region is approved.
+•	Major architecture risks are recorded.
+Gate 2 — Security Approval
+Staging may be opened after:
+•	The threat model is reviewed.
+•	Encryption and secrets management are configured.
+•	RBAC is implemented.
+•	Sensitive-data logging controls are tested.
+•	Security scanning is active.
+Gate 3 — Operational Approval
+Production deployment may proceed after:
+•	Backups are running successfully.
+•	A restore test has passed.
+•	Monitoring and critical alerts are active.
+•	Incident escalation contacts are confirmed.
+•	Rollback has been tested.
+Gate 4 — Store Submission Approval
+The application may be submitted after:
+•	The target API requirement is rechecked.
+•	The release is signed using company-controlled assets.
+•	Privacy and Data Safety information is verified.
+•	Production ownership and administrative access are confirmed.
+•	The final release checklist is approved.
+________________________________________
+5. Definition of Done
+The foundation phase is complete when:
+•	Architecture and threat-model documents are approved.
+•	The cloud and data-residency decision is formally recorded.
+•	All critical accounts are owned by the company.
+•	At least two administrative owners are assigned to critical platforms.
+•	Individual, revocable accounts are used.
+•	Development, staging, and production are separated.
+•	Secrets are centrally managed.
+•	Encryption in transit and at rest is verified.
+•	RBAC and least-privilege controls are implemented.
+•	Backup restoration has been successfully tested.
+•	RPO and RTO are approved.
+•	Monitoring, alerts, and incident procedures are operational.
+•	The targetSdk and minSdk decisions are documented.
+•	The annual Android compatibility and upgrade cycle is scheduled.
+
+________________________________________
+6. IMPLEMENTATION STATUS CHECKLIST (updated 2026-07-18)
+
+This appendix tracks every deliverable and gate condition against the current
+project state.
+
+Legend:
+  [DONE]     Fully implemented or documented
+  [PARTIAL]  Some work done, needs completion
+  [PENDING]  Not started
+
+6.1 Phase 1 — Requirements and Architecture Decisions
+
+  [DONE]    Mobile framework: Kotlin + Jetpack Compose (android-app/)
+  [DONE]    Backend framework: Cloudflare Workers + TypeScript (backend/)
+  [DONE]    API style: REST
+  [DONE]    Primary database: D1 (SQLite)
+  [DONE]    Cache: KV (sessions, branding config)
+  [DONE]    Object storage: R2 (media, product images)
+  [DONE]    Auth/identity: Firebase Phone Auth + device secrets
+  [DONE]    Cloud provider: Cloudflare
+  [PENDING] Message queue / event bus — not needed for current scope
+  [PENDING] Search service — not needed for current scope
+  [DONE]    Architecture Decision Records —
+            4 ADRs in docs/decisions/ (Cloudflare+D1, integer piasters,
+            UUID public URLs, free-launch billing)
+  [DONE]    System context diagram — docs/architecture/overview.md (Mermaid)
+  [DONE]    Application/service diagram — docs/architecture/overview.md
+  [DONE]    Data-flow diagram — docs/architecture/overview.md §Data sync
+  [DONE]    Auth flow diagram — docs/architecture/security-model.md
+  [PENDING] Deployment/network diagram — not produced
+  [PENDING] Technology selection matrix — not produced as standalone doc
+  [PENDING] Initial cost and scalability estimate — not produced
+
+6.2 Phase 2 — Security and Data Governance
+
+  [DONE]    Preliminary threat model —
+            docs/architecture/threat-model.md (created 2026-07-18);
+            10 threats assessed with STRIDE, risk matrix, 3 open actions
+  [DONE]    Data classification model —
+            docs/architecture/data-classification.md (created 2026-07-18);
+            L0-L3 levels with per-table mapping and handling rules
+  [DONE]    Encryption in transit — HTTPS everywhere; enforced
+  [DONE]    Encryption at rest — D1, R2, KV all encrypted
+  [DONE]    Centralized secrets management — wrangler secret put; .dev.vars
+            git-ignored; CI/CD runner secrets
+  [DONE]    Key rotation procedures — documented in SECURITY.md
+  [DONE]    Least-privilege access — store-scoped queries; RBAC for admin
+  [DONE]    Role-based access control — owner/finance/support/readonly
+  [DONE]    Separation of admin duties — 4 distinct roles with scoped perms
+  [DONE]    MFA for privileged accounts — TOTP 2FA for admin login
+  [PENDING] Regular access reviews — planned quarterly, not yet executed
+  [DONE]    Secure logging requirements —
+            docs/architecture/logging-standard.md (created 2026-07-18);
+            5 log categories, prohibited content list, audit spec
+  [PENDING] Cloud and data residency decision formally recorded —
+            Cloudflare region observed as WEUR; hosting decision paper
+            not yet written per Plan 5 Phase 3
+  [PENDING] Backup locations documented with access controls —
+            D1 automated backups are Cloudflare-managed; no separate doc
+
+6.3 Phase 3 — Company Account Ownership
+
+  [PENDING] Company Account Inventory — not documented
+  [PENDING] Administrative Owner Register — at least 2 owners per critical
+            system not documented
+  [PENDING] Access-Control Matrix — admin RBAC exists but no company-wide
+            account access matrix
+  [PENDING] Account-Recovery Procedure — not documented
+  [PENDING] Employee Offboarding Checklist — not documented
+  [PENDING] Google Play Console as organization account — status unknown
+  [PENDING] Domain/DNS/email ownership — status unknown
+  [DONE]    Source-code repositories — GitHub (youo1/Orderak)
+  [PENDING] CI/CD platform — not documented
+  [PENDING] Individual company accounts vs shared credentials — status
+            unknown
+
+6.4 Phase 4 — Environments and Delivery Pipeline
+
+  [PARTIAL] Development environment — local wrangler dev + Android emulator
+  [PARTIAL] Staging environment — not separated; only local/remote D1
+  [DONE]    Production environment — Cloudflare Workers (deployed)
+  [PENDING] Separate staging resources (D1, R2, KV, API keys) — not created
+  [PENDING] CI/CD pipeline — not documented; assumed GitHub Actions
+  [PENDING] Automated builds — not documented
+  [DONE]    Unit and integration tests — vitest (backend) + JUnit (Android)
+  [PENDING] Static code analysis — not documented
+  [PENDING] Dependency/vulnerability scanning — not implemented
+  [PENDING] Secret scanning — not documented
+  [PENDING] Signed release artifacts — not documented
+  [PENDING] Approval gates for production — not formalized
+  [PENDING] Deployment rollback procedures — not documented
+  [DONE]    Protected main branch — mandatory PR review (GitHub)
+  [PENDING] Source-control and code-review policy — not written
+  [PENDING] Environment Access Matrix — not produced
+
+6.5 Phase 5 — Backup, Recovery, and Monitoring
+
+  [PENDING] RPO (Recovery Point Objective) — not approved
+  [PENDING] RTO (Recovery Time Objective) — not approved
+  [DONE]    Encrypted database backups — D1 automated backups
+  [PARTIAL] Object storage backup — R2 auto-replication
+  [PENDING] Backup protection (unauthorized deletion, ransomware,
+            credential compromise, regional outage) — not documented
+  [PENDING] Actual restoration test — not performed
+  [PENDING] Operational monitoring — no monitoring console/alerts
+            configured beyond Worker error logs
+  [PENDING] Alert severity levels and escalation paths — defined in
+            docs/runbooks/incident-response.md §1 but not wired to
+            monitoring system
+  [PENDING] Incident-response procedures —
+            docs/runbooks/incident-response.md created 2026-07-18;
+            not yet operational (no monitoring, no alerting, no contacts)
+  [PENDING] Backup and Restore Plan — not written
+  [PENDING] Restore-Test Report — not performed
+  [PENDING] Monitoring and Alerting Matrix — not produced
+  [PENDING] Incident Communication Templates — templates exist in
+            incident-response.md §5; not yet tested or approved
+
+6.6 Phase 6 — Android Release Readiness
+
+  [DONE]    targetSdk / minSdk / compileSdk — configured in build.gradle.kts
+  [PENDING] Supported device types / screen sizes / CPU architectures —
+            not formally documented
+  [DONE]    App Bundle — configured in build.gradle.kts
+  [PENDING] Backward-compatibility testing requirements — not defined
+  [PENDING] Annual Android upgrade process — not scheduled
+  [DONE]    Application signing — company-controlled keystore
+  [DONE]    Play App Signing — configured
+  [DONE]    Privacy policy published — docs/legal/privacy-policy.md
+            accessible at orderak.app/privacy
+  [PENDING] Data Safety declarations — not yet completed in Play Console
+  [DONE]    Permissions minimized — only INTERNET; all others prohibited
+  [PENDING] Production analytics and crash reporting — not active
+  [PENDING] Staged rollout and rollback procedures — not tested
+  [PENDING] Android SDK Decision Record — not written
+  [PENDING] Device Support Matrix — not produced
+  [PENDING] Annual Android Upgrade Plan — not written
+  [PENDING] Google Play Submission Checklist — not created
+  [PENDING] Signed Production Release Procedure — not written
+
+6.7 Approval Gates
+
+  Gate 1 — Architecture Approval
+    [DONE]    Mobile framework selected (Kotlin + Compose)
+    [DONE]    Backend and database selected (Workers + D1)
+    [DONE]    Data flows documented (architecture/overview.md)
+    [PENDING] Cloud region approved (hosting decision pending)
+    [PENDING] Major architecture risks recorded (threat model exists but
+              not formally reviewed)
+    → Gate 1: NOT PASSED (cloud region + risk sign-off pending)
+
+  Gate 2 — Security Approval
+    [DONE]    Threat model reviewed (created 2026-07-18)
+    [DONE]    Encryption and secrets management configured
+    [DONE]    RBAC implemented (4 roles)
+    [DONE]    Sensitive-data logging controls tested (retention.ts scrubs
+              IPs; no PII in logs)
+    [PENDING] Security scanning active — not implemented
+    → Gate 2: NOT PASSED (security scanning pending)
+
+  Gate 3 — Operational Approval
+    [DONE]    Backups running (D1 automated)
+    [PENDING] Restore test passed — not performed
+    [PENDING] Monitoring and critical alerts active — not configured
+    [PENDING] Incident escalation contacts confirmed — not assigned
+    [PENDING] Rollback tested — not performed
+    → Gate 3: NOT PASSED (4 of 5 items pending)
+
+  Gate 4 — Store Submission Approval
+    [PENDING] Target API requirement rechecked — not done for submission
+    [DONE]    Release signed with company-controlled assets
+    [PENDING] Privacy and Data Safety verified — not completed
+    [PENDING] Production ownership and admin access confirmed — not
+              documented
+    [PENDING] Final release checklist approved — not created
+    → Gate 4: NOT PASSED (4 of 5 items pending)
+
+6.8 Definition of Done (14 items)
+
+  | # | Condition | Status |
+  |---|---|---|
+  | 1 | Architecture and threat-model docs approved | [DONE] Written; [PENDING] Approval |
+  | 2 | Cloud and data-residency decision formally recorded | [PENDING] |
+  | 3 | All critical accounts owned by company | [PENDING] Not documented |
+  | 4 | At least two admin owners per critical platform | [PENDING] Not documented |
+  | 5 | Individual, revocable accounts used | [PENDING] Not verified |
+  | 6 | Dev, staging, production separated | [PARTIAL] Dev+prod exist; no staging |
+  | 7 | Secrets centrally managed | [DONE] Wrangler secrets + CI/CD |
+  | 8 | Encryption in transit and at rest verified | [DONE] |
+  | 9 | RBAC and least-privilege controls implemented | [DONE] |
+  | 10 | Backup restoration tested | [PENDING] |
+  | 11 | RPO and RTO approved | [PENDING] |
+  | 12 | Monitoring, alerts, and incident procedures operational | [PARTIAL] Incident plan written; no monitoring |
+  | 13 | targetSdk and minSdk documented | [DONE] In build.gradle.kts |
+  | 14 | Annual Android upgrade cycle scheduled | [PENDING] |
+
+  5 DONE · 2 PARTIAL · 7 PENDING
+  Foundation phase: NOT COMPLETE
+
+6.9 Summary
+
+  Deliverable status across all phases and gates:
+
+    24  [DONE]    Implemented or documented
+     9  [PARTIAL] Some work done, needs completion
+    42  [PENDING] Not started or not documented
+
+  The technical architecture is solid — the codebase implements the chosen
+  stack correctly with proper security controls. The major gap is
+  operational readiness (Phase 5) and company account governance (Phase 3).
+
+  Top 5 highest-priority gaps:
+
+  1. Formal cloud/data-residency hosting decision (blocks Gate 1 and
+     Plan 5 Phase 3)
+  2. Staging environment with separate D1/R2/KV/API keys (blocks Gate 2)
+  3. Restore test + approved RPO/RTO (blocks Gate 3)
+  4. Company account inventory with admin owners (blocks Gate 1 and
+     Definition of Done)
+  5. Production monitoring and alerting (blocks Gate 3)
+
+  Documents created today to close Plan 7 gaps:
+  - docs/architecture/threat-model.md (Gate 2)
+  - docs/architecture/data-classification.md (Phase 2)
+  - docs/architecture/logging-standard.md (Phase 2)
+  - docs/runbooks/incident-response.md (Phase 5, Gate 3)
+  - docs/architecture/security-model.md updated with cross-references
+

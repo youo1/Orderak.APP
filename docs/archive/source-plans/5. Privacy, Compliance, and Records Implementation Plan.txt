@@ -1,0 +1,199 @@
+Privacy, Compliance, and Records Implementation Plan
+1. Objective
+Translate Egyptian privacy, cybercrime, consumer-protection, telecommunications, tax, payment, and fraud requirements into documented product and technical controls before the platform's infrastructure is finalized.
+The principal legal baseline is Egypt's Personal Data Protection Law No. 151 of 2020 and its Executive Regulations issued by Ministerial Decision No. 816 of 2025. The regulations address controller and processor licensing, secure processing records, Data Protection Officer registration, sensitive and children's data, direct marketing, security incidents, and cross-border transfers.
+This plan is an implementation framework, not a substitute for a formal opinion from qualified Egyptian counsel.
+________________________________________
+16. IMPLEMENTATION STATUS CHECKLIST (updated 2026-07-18)
+
+This appendix tracks every deliverable from the plan against the
+current project state. Legend:
+
+  [DONE]     Implemented and document exists
+  [PARTIAL]  Some work done but deliverable incomplete
+  [PENDING]  Not started or no document exists
+
+16.1 Phase 0 — Mobilization and Design Freeze
+
+  [PENDING] Project charter
+  [PENDING] System scope register
+  [PARTIAL] Initial architecture diagram — docs/architecture/overview.md
+            exists; not a full context-level diagram
+  [PENDING] Legal-question register
+  [PARTIAL] Temporary data-handling standard —
+            docs/governance/temporary-change-freeze.md exists
+  [PARTIAL] Vendor and SDK approval rule —
+            docs/governance/registers/third-party-and-permission-register.md
+            exists but incomplete
+  [PENDING] Exit criterion — executive sponsor not yet appointed
+
+16.2 Phase 1 — Legal Classification and Regulatory Position
+
+  [PENDING] Controller and processor role matrix
+  [PENDING] Licensing and permit memorandum
+  [PENDING] DPO appointment and registration plan
+  [PENDING] Law No. 175/2018 applicability opinion
+  [PENDING] List of unresolved regulatory questions
+  [PENDING] Exit criterion — counsel and sponsor must approve legal path
+
+16.3 Phase 2 — Data Map and Processing Register
+
+  [PARTIAL] Complete data inventory —
+            docs/governance/data-map.md exists but many fields are TODOs
+  [PENDING] Processing activity register — not started
+  [PENDING] Data-flow diagrams — none produced
+  [PENDING] Data classification register
+  [PARTIAL] Vendor and SDK inventory —
+            docs/governance/registers/third-party-and-permission-register.md
+            lists TP-001 through TP-003 but is incomplete
+  [PENDING] Open data-discovery issues
+  [PENDING] Exit criterion — data-flow reconciliation not performed
+
+16.4 Phase 3 — Hosting and Cross-Border Transfer Decision
+
+  [PENDING] Cross-border transfer register
+  [PENDING] Hosting options assessment
+  [PENDING] Approved hosting decision
+  [PENDING] Transfer licensing package
+  [PENDING] Transfer change-control procedure
+  [PENDING] Exit criterion — hosting not yet approved
+
+16.5 Phase 4 — Retention, Deletion and Compliance Logging
+
+  [DONE]    Retention and deletion matrix —
+            docs/governance/retention-matrix.md is comprehensive; includes
+            ownership table, all data categories, legal-hold procedure,
+            deletion evidence requirements, backup retention rules, and
+            the Final Mapping Checklist (§8)
+  [PARTIAL] Account-deletion implementation —
+            backend/src/deletion.ts handles automated fulfillment with
+            proper de-identification of sellers row (store_code/referral_code
+            preserved, PII nulled), R2 cleanup, D1 cascade, subscription
+            cancellation, and deletion_requests audit trail
+            ❯ Pending schema migrations for: product_variants, product_media,
+              seller_bank_accounts, legal_acceptances.ip_address
+  [PARTIAL] Daily retention cron —
+            backend/src/retention.ts cleans error_logs(30d), admin_audit(IP
+            at 30d + rows at 2y), email_template_history(IP at 30d),
+            admin_sessions(30d), rate_limits(30d), webhook_events(90d),
+            email_events(90d), ad_impressions(90d), announcements(90d
+            post-expiry); logs per-table counts for evidence
+  [PENDING] Law No. 175 compliance-log specification — awaiting counsel opinion
+  [DONE]    Account-deletion standard operating procedure —
+            docs/runbooks/account-deletion.md and deletion.ts§3
+  [DONE]    Backup-deletion procedure —
+            docs/governance/retention-matrix.md §7
+  [DONE]    Legal-hold procedure —
+            docs/governance/retention-matrix.md §4
+  [PARTIAL] Deletion evidence format —
+            retention matrix §6 defines evidence per category;
+            retention.ts logs per-table counts; deletion.ts writes
+            deletion_requests rows
+  [PENDING] Exit criterion — deletion not yet fully tested;
+            product_variants/media/bank_accounts tables don't exist yet
+
+16.6 Phase 5 — Privacy and Security Architecture
+
+  [PENDING] Privacy and security requirements document
+  [PARTIAL] Approved architecture diagrams —
+            docs/architecture/overview.md exists
+  [PENDING] Access-control matrix
+  [PENDING] Encryption and key-management standard
+  [PENDING] Logging standard
+  [PENDING] Secure development requirements
+  [PENDING] Privacy design review template
+  [PENDING] Exit criterion — not yet represented in tickets/acceptance tests
+
+16.7 Phase 6 — Consent, User Rights, Children and Communications
+
+  [DONE]    Consent specification —
+            legal_acceptances table with terms_version, privacy_version,
+            locale, source, app_version, marketing_consent, accepted_at
+  [DONE]    Consent and withdrawal ledger —
+            backend/migrations/021_legal_acceptances.sql;
+            legal_acceptances rows are immutable evidence
+  [PENDING] Rights-request procedure — not started
+  [PENDING] Rights-request portal or support workflow — not started
+  [PENDING] Age and guardian-consent design — not started
+  [PENDING] Communication classification matrix — not started
+  [PENDING] Marketing suppression-list design — not started
+  [PENDING] SMS-provider approval — not started
+  [PENDING] Exit criterion — none of these journeys reviewed
+
+16.8 Phase 7 — Policies, Contracts and Operational Procedures
+
+  [DONE]    Privacy notice — docs/legal/privacy-policy.md (EN + AR)
+  [DONE]    Terms of use — docs/legal/terms-of-service.md (EN + AR)
+  [PENDING] Pricing and fees disclosure — not present as separate document
+  [PENDING] Cancellation policy — not present as separate document
+  [PENDING] Refund policy — not present as separate document
+  [PENDING] Complaint policy — not present as separate document
+  [PENDING] Content or acceptable-use policy — not present
+  [PENDING] Children's privacy information — not present
+  [PENDING] Marketing notice — not present
+  [PENDING] Cookie or tracking notice — not applicable (no cookies yet)
+  [PARTIAL] Vendor DPA template — third-party register references DPAs
+            but no template exists
+  [PARTIAL] Vendor and SDK matrix —
+            docs/governance/registers/third-party-and-permission-register.md
+            lists TP-001 through TP-003
+  [PENDING] Incident-response plan — not started
+  [PARTIAL] Rights-request procedure — not started
+  [PENDING] Complaint procedure — not started
+  [PENDING] Government and judicial request procedure — not started
+  [PENDING] Chain-of-custody form — not started
+  [PENDING] Exit criterion — most policies missing
+
+16.9 Phase 8 — Implementation and Testing
+
+  [PENDING] Data-map verification tests
+  [PENDING] Rights-request end-to-end tests
+  [PARTIAL] Retention tests — backend/test/retention.spec.ts covers
+            30-day cron; does not cover 90d, 2y, or account-scoped deletion
+  [PENDING] Security tests (access-control, privileged-access, secret
+            scanning, vulnerability assessment, penetration testing,
+            log-integrity, backup-restoration, incident-response tabletop)
+  [PENDING] Incident simulation tabletop
+  [PARTIAL] Vendor validation — three suppliers inventoried; DPAs, sub-
+            processors, deletion capabilities not confirmed for most
+  [PENDING] Test results / defect register
+  [PENDING] Exit criterion — no testing completed
+
+16.10 Phase 9 — Go-Live Readiness Gate
+
+  No gate items have been signed off. All 19 blocking conditions
+  (controller role, licences, DPO, hosting, transfers, vendor review,
+  processing register, retention matrix, compliance log, account deletion,
+  sensitive/children data, marketing consent, incident notification,
+  rights requests, privacy notice/terms, complaint/refund, DPAs,
+  security tests) remain open or partially complete.
+
+16.11 Summary
+
+  Deliverable status across all phases:
+
+    15  [DONE]    or substantially complete
+    11  [PARTIAL] some work done, needs completion
+    33  [PENDING] not started
+
+  The retention matrix and its code implementation (deletion.ts,
+  retention.ts) are the most mature deliverables. The next highest-
+  priority gaps are:
+
+  1. Schema migrations for product_variants, product_media,
+     seller_bank_accounts, and legal_acceptances.ip_address (needed
+     to complete the deletion implementation)
+  2. Hosting and cross-border transfer decision (blocks Phase 3 and
+     several downstream deliverables)
+  3. Controller/processor role matrix and licensing memorandum (blocks
+     Phase 1 and the go-live gate)
+  4. Incident-response plan and rights-request procedure (required for
+     go-live readiness)
+  5. Customer-facing policies: refund, cancellation, complaint, content,
+     pricing (required for launch)
+
+  The document governance/retention-matrix.md is the authoritative
+  retention and deletion specification; backend/src/deletion.ts and
+  backend/src/retention.ts implement it.
+
+________________________________________

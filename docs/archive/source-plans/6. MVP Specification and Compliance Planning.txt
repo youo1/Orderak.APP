@@ -1,0 +1,556 @@
+MVP Specification and Compliance Planning
+Objective
+Convert the product idea, operational model, regulatory responsibilities, and app-store requirements into clear product requirements and testable acceptance criteria before development begins.
+The development team should not start implementation until the first-version scope, responsibilities, user flows, permissions, and compliance requirements have been reviewed and approved.
+________________________________________
+Phase 1: Product and Compliance Discovery
+1. Define the MVP Scope
+Document:
+•	The problem the product solves.
+•	The target users and markets.
+•	The core transaction or user activity.
+•	Features included in the MVP.
+•	Features explicitly excluded from the MVP.
+•	Countries and jurisdictions where the MVP will operate.
+•	Whether the product includes payments, user-generated content, minors, regulated services, or sensitive personal data.
+2. Identify Users, Roles, and Permissions
+Define every user type, such as:
+•	Guest user.
+•	Registered customer.
+•	Merchant or service provider.
+•	Customer-support employee.
+•	Compliance or risk employee.
+•	Operations employee.
+•	Administrator.
+•	Super administrator.
+For every screen and API endpoint, specify:
+•	Who can view it.
+•	Who can create, edit, approve, cancel, or delete records.
+•	Whether additional verification is required.
+•	Whether the action must be recorded in an audit log.
+•	What happens when access is denied.
+Deliverable: Role and Permission Matrix covering both the application interface and APIs.
+________________________________________
+Phase 2: User Journeys and Core Operations
+3. Account and Authentication Journeys
+Design and document the complete flows for:
+•	Registration.
+•	Email or mobile-number verification.
+•	Login and logout.
+•	OTP generation, delivery, expiration, and retry limits.
+•	Password reset and account recovery.
+•	Two-factor authentication where required.
+•	Suspicious-login detection.
+•	Device or session management.
+•	Locked, suspended, or compromised accounts.
+•	Account deletion.
+Include failure cases such as:
+•	Incorrect or expired OTP.
+•	Duplicate accounts.
+•	Unavailable email or phone number.
+•	Excessive login attempts.
+•	Lost access to the registered email or phone number.
+•	Failed identity verification.
+4. Core Product Journey
+Map the primary end-to-end operation from initiation to completion.
+Document:
+•	Entry conditions.
+•	Required user information.
+•	Validation rules.
+•	Status changes.
+•	Notifications.
+•	Completion conditions.
+•	Records or evidence created.
+•	Cancellation rules.
+•	Refund rules.
+•	Dispute handling.
+•	Failure and retry behaviour.
+For each stage, define what happens when:
+•	The user leaves the process.
+•	A third-party service is unavailable.
+•	Payment fails.
+•	Verification fails.
+•	One party does not complete the required action.
+•	The transaction is duplicated.
+•	A refund or reversal is requested.
+•	A complaint or dispute is opened.
+Deliverables: User flows, wireframes, system states, and error-state designs.
+________________________________________
+Phase 3: Payments, KYC, AML, and Responsibility Allocation
+5. Map the Payment Flow
+Document the complete movement of money, including:
+•	The payer.
+•	The payee.
+•	The merchant of record.
+•	The payment-service provider.
+•	Collection, authorization, capture, settlement, and payout.
+•	Fees and commissions.
+•	Refunds, partial refunds, reversals, and chargebacks.
+•	Failed or pending transactions.
+•	Reconciliation and financial reporting.
+•	Receipts or invoices.
+Do not assume that one transaction limit, KYC threshold, or monitoring rule applies to every product or jurisdiction.
+6. Assign Regulatory Responsibilities
+Agree in writing with the payment provider which party is responsible for:
+•	Merchant onboarding.
+•	Customer or merchant identity verification.
+•	KYC checks.
+•	AML screening.
+•	Sanctions and watchlist screening.
+•	Transaction monitoring.
+•	Suspicious-activity investigation and reporting.
+•	Transaction limits.
+•	Source-of-funds checks where applicable.
+•	Record retention.
+•	Chargeback management.
+•	Fraud monitoring.
+•	Regulatory reporting.
+•	Responding to law-enforcement or regulator requests.
+The agreement must also explain:
+•	What information each party collects.
+•	What information is exchanged.
+•	Which party makes approval or rejection decisions.
+•	What happens when a user fails verification.
+•	How suspended or restricted funds are handled.
+•	How compliance cases are escalated.
+Deliverable: Payment, AML, and KYC Responsibility Matrix approved by the product, legal, compliance, finance, and payment-provider teams.
+________________________________________
+Phase 4: Administration and Operations
+7. Define the Administration Dashboard
+Specify the tools required by internal employees, including:
+•	User search and account review.
+•	Account suspension, restriction, and reactivation.
+•	Transaction review.
+•	Refund and cancellation processing.
+•	Dispute and complaint management.
+•	Identity-verification review.
+•	Content review where applicable.
+•	Support-ticket management.
+•	Risk alerts.
+•	Financial reconciliation.
+•	Reporting and exports.
+For every sensitive employee action, define:
+•	Eligible employee roles.
+•	Required reason or case reference.
+•	Approval requirements.
+•	Whether dual approval is necessary.
+•	Data visible before and after the action.
+•	Notification requirements.
+•	Audit-log requirements.
+Sensitive activity logs should capture, where appropriate:
+•	Employee identity.
+•	Date and time.
+•	Affected account or transaction.
+•	Previous and new values.
+•	Reason for the action.
+•	Approval information.
+•	Relevant device or session information.
+________________________________________
+Phase 5: Customer Communications and Rights
+8. Specify Customer-Facing Documents and Support
+Define requirements for:
+•	Invoices or receipts.
+•	Transaction confirmations.
+•	Email, SMS, push, and in-app notifications.
+•	Support channels.
+•	Complaint submission.
+•	Complaint status tracking.
+•	Escalation procedures.
+•	Refund notifications.
+•	Account restriction notices.
+•	Privacy requests.
+•	Account deletion and data-retention notices.
+Each communication should specify:
+•	Triggering event.
+•	Recipient.
+•	Delivery channel.
+•	Required content.
+•	Language.
+•	Delivery timing.
+•	Retry behaviour.
+•	Whether delivery evidence must be retained.
+________________________________________
+Phase 6: User-Generated Content and Minor Safety
+9. Add UGC Controls Where Applicable
+Where users can publish, upload, message, review, comment, or otherwise provide content, define:
+•	Content-reporting mechanisms.
+•	Report categories.
+•	User blocking.
+•	Content removal.
+•	Account restriction.
+•	Moderator review.
+•	Appeal procedures.
+•	Repeat-offender handling.
+•	Emergency escalation.
+•	Record retention.
+•	Response-time targets.
+Where minors may use or appear in the product, also define:
+•	Age-assurance measures.
+•	Age-appropriate defaults.
+•	Parental or guardian controls where applicable.
+•	Contact and messaging restrictions.
+•	Advertising restrictions.
+•	Location-sharing restrictions.
+•	Reporting routes for child-safety concerns.
+•	Escalation and preservation procedures.
+________________________________________
+Phase 7: Google Play and Android Permissions
+10. Apply Data and Permission Minimisation
+For every Android permission, document:
+•	The feature that requires it.
+•	The exact point at which it is requested.
+•	Whether the feature works without it.
+•	The data accessed.
+•	How long the data is retained.
+•	Whether a lower-risk alternative exists.
+•	The user experience after permission denial.
+•	The user experience after permanent denial.
+Do not request camera, location, microphone, or contact access during installation or initial launch unless access is immediately required for a core feature.
+Request access only when the user starts the relevant feature and use the narrowest available permission.
+11. Contacts Access
+Use Android Contact Picker instead of READ_CONTACTS when users only need to select individual contacts.
+For applications targeting Android 17/API 37 or later, prepare for the Google Play requirements scheduled to apply from 28 October 2026 when requesting READ_CONTACTS. The product documentation should demonstrate why Contact Picker is insufficient for an essential feature before broader contact access is approved. [M18]
+12. Google Play Billing
+Classify every item sold through the application as one of the following:
+•	Digital product.
+•	Digital service or subscription.
+•	Physical product.
+•	Physical service.
+•	Peer-to-peer or other transaction type requiring separate assessment.
+Review Google Play Billing requirements for digital products or services consumed within the application.
+Do not use Google Play Billing for the same transaction when the purchase is for qualifying physical goods or physical services. [M19]
+Document the billing decision and its justification in the PRD.
+13. Target Audience
+Define the target audience and age groups before finalizing:
+•	User experience.
+•	Account creation.
+•	Data collection.
+•	Advertising.
+•	Analytics.
+•	Content controls.
+•	Communication features.
+•	Permissions.
+•	Store-listing declarations.
+The selected audience must remain consistent across the PRD, application behaviour, privacy disclosures, advertising setup, and Google Play Console declarations.
+________________________________________
+Phase 8: Data Mapping and Security Requirements
+14. Create a Data-to-Feature Matrix
+For every feature, document:
+•	Data collected.
+•	Purpose.
+•	Source.
+•	Whether collection is mandatory or optional.
+•	Legal or contractual basis where applicable.
+•	Data recipients.
+•	Third-party processors.
+•	Storage location.
+•	Retention period.
+•	Deletion method.
+•	Security classification.
+•	User controls.
+•	Whether the data is declared in the app-store data-safety form.
+15. Define Security Requirements
+Include requirements for:
+•	Encryption in transit and at rest.
+•	Password and credential protection.
+•	Session expiration and revocation.
+•	Rate limiting.
+•	Brute-force protection.
+•	API authentication and authorization.
+•	Protection against duplicate requests.
+•	Secure file uploads.
+•	Secrets management.
+•	Audit logging.
+•	Monitoring and alerting.
+•	Backup and recovery.
+•	Vulnerability management.
+•	Incident response.
+•	Third-party dependency review.
+•	Secure deletion.
+•	Separation of production and testing environments.
+________________________________________
+Phase 9: Acceptance Criteria
+16. Write Testable Acceptance Criteria
+Every feature must include functional, legal, security, privacy, and operational acceptance criteria.
+A feature is not complete merely because the expected interface works.
+Each requirement should use a testable format such as:
+Given a defined starting condition,
+When the user or system performs an action,
+Then the expected result occurs,
+And the required security, logging, notification, and compliance controls are applied.
+Example:
+Given that a user has requested an OTP,
+When the OTP expires,
+Then the system rejects it without authenticating the user,
+And records the failed attempt,
+And applies the configured retry and rate limits,
+And does not reveal whether another account exists.
+Acceptance criteria should cover:
+•	Successful completion.
+•	Invalid input.
+•	Permission denial.
+•	Service interruption.
+•	Duplicate requests.
+•	Unauthorized access.
+•	Cancellation.
+•	Refunds.
+•	Data deletion.
+•	Audit logging.
+•	Notification failure.
+•	Regulatory or policy restrictions.
+________________________________________
+Required MVP Deliverables
+Before development approval, the following items must be completed:
+1.	Approved and version-frozen MVP PRD.
+2.	User flows for all core and supporting journeys.
+3.	Wireframes, including empty, loading, error, restricted, and success states.
+4.	Screen and API Permission Matrix.
+5.	Data-to-Feature Matrix.
+6.	Payment-flow diagram.
+7.	Payment, AML, and KYC Responsibility Matrix agreed with the payment provider.
+8.	Android Permission Matrix.
+9.	Google Play Billing assessment.
+10.	Target-audience and age-group decision.
+11.	Legal, privacy, security, and operational acceptance criteria for every feature.
+12.	Administration-dashboard requirements.
+13.	Audit-log specification.
+14.	Support, complaint, refund, dispute, and account-deletion procedures.
+15.	UGC and minor-safety specification where applicable.
+________________________________________
+Suggested Delivery Schedule
+Week 1: Discovery and Scope
+•	Confirm the product model, markets, users, and MVP boundaries.
+•	Identify regulated activities, payments, UGC, minors, and sensitive data.
+•	Draft user roles and the core journey.
+•	Identify unresolved business and compliance decisions.
+Week 2: Flows and Responsibilities
+•	Complete account, authentication, payment, refund, dispute, and deletion flows.
+•	Draft wireframes and error states.
+•	Build the Permission Matrix and Data-to-Feature Matrix.
+•	Meet the payment provider to allocate KYC, AML, onboarding, monitoring, and reporting responsibilities.
+Week 3: Requirements and Acceptance Criteria
+•	Complete the PRD.
+•	Define administration and operational procedures.
+•	Add privacy, security, legal, and Google Play requirements.
+•	Write acceptance criteria for every feature and failure scenario.
+Week 4: Review and Scope Freeze
+•	Conduct product, engineering, security, legal, compliance, operations, and finance reviews.
+•	Resolve gaps and conflicting responsibilities.
+•	Approve all supporting matrices and diagrams.
+•	Freeze the MVP scope and assign change-control ownership.
+________________________________________
+Approval Gate
+Development may begin only after the accountable stakeholders approve:
+•	MVP scope.
+•	User roles and permissions.
+•	Payment and regulatory responsibilities.
+•	Data collection and retention.
+•	Android permissions.
+•	Billing approach.
+•	Security requirements.
+•	Legal and compliance acceptance criteria.
+•	Operational support and escalation procedures.
+Any later change affecting payments, permissions, personal data, user eligibility, UGC, minors, or regulated responsibilities must return through legal, compliance, security, and product review before implementation.
+
+________________________________________
+16. IMPLEMENTATION STATUS CHECKLIST (updated 2026-07-18)
+
+This appendix tracks every MVP deliverable against the current project state.
+
+Legend:
+  [DONE]     Fully implemented or documented
+  [PARTIAL]  Some work done, needs completion
+  [PENDING]  Not started
+
+16.1 Phase 1 — Product and Compliance Discovery
+
+  [DONE]    §1  MVP Scope defined —
+            docs/product/phase4-product-requirements.md freezes 12 launch
+            requirements (AUTH, STORE, CATALOG, PUBLIC, ORDER, CUSTOMER,
+            SETTINGS, ADMIN, SUPPORT, CONTENT, BILLING, AI). Features
+            explicitly excluded: paid billing, seller AI assistant.
+  [DONE]    §2  Users, Roles, and Permissions —
+            docs/product/phase4-roles-and-journeys.md defines 7 roles
+            (Buyer/Guest, Seller, Support Admin, Finance Admin, Read-only
+            Reviewer, DPO/Compliance, Owner/Platform Admin) with allowed
+            actions and explicit limits.
+  [PARTIAL] §2  Screen and API Permission Matrix —
+            Roles defined but per-screen/per-API specification not fully
+            enumerated in a single matrix format. The RBAC implementation
+            in backend/src/admin*.ts covers API-level checks.
+  [DONE]    Target market: Egypt, adult merchants, Arabic/English
+
+16.2 Phase 2 — User Journeys and Core Operations
+
+  [DONE]    §3  Account and Authentication Journeys —
+            Registration, OTP verification, login/logout, device/session
+            management, account deletion all implemented in Android
+            (AuthViewModel, SettingsViewModel, SessionStore) and backend
+            (auth.ts, api-store.ts, deletion.ts).
+  [DONE]    §3  Failure cases —
+            Incorrect/expired OTP, duplicate accounts, excessive login
+            attempts handled per auth-phase1-contract.md.
+  [PARTIAL] §3  Password reset and account recovery —
+            Firebase SMS OTP re-verification exists for device recovery.
+            No separate password reset flow (seller auth is phone-only).
+  [PENDING] §3  Suspicious-login detection — not implemented.
+  [PENDING] §3  Locked/suspended/compromised accounts — not implemented.
+  [DONE]    §3  Account deletion —
+            Authenticated in-app + public web form; automated fulfillment
+            in backend/src/deletion.ts; runbook at
+            docs/runbooks/account-deletion.md.
+  [DONE]    §4  Core Product Journey —
+            Seller journey (6 steps) documented in phase4-roles-and-
+            journeys.md. Buyers browse public catalog and submit order
+            requests; sellers manage orders through status transitions.
+  [PENDING] §4  User flows, wireframes, system states —
+            No visual wireframes exist. Seller journey is documented in
+            prose; error-state designs are partial.
+
+16.3 Phase 3 — Payments, KYC, AML, and Responsibility Allocation
+
+  [PARTIAL] §5  Payment Flow —
+            Orderak model clearly documented: merchant SaaS + order relay;
+            Orderak does NOT custody buyer funds. Buyers pay sellers
+            directly (COD, InstaPay, Vodafone Cash, Fawry). No visual
+            payment-flow diagram exists.
+  [PENDING] §6  Payment/AML/KYC Responsibility Matrix —
+            No agreement with a payment provider exists. Free launch means
+            no payment processing by Orderak. This deliverable applies
+            when paid SaaS billing is enabled.
+
+16.4 Phase 4 — Administration and Operations
+
+  [PARTIAL] §7  Administration Dashboard —
+            Admin panel exists (admin.orderak.app) with seller search,
+            support tickets, announcements, content pages, billing view,
+            and audit log. Missing: account suspension/reactivation UI,
+            transaction review, dispute management, risk alerts, financial
+            reconciliation, reporting/exports. RBAC controls are
+            implemented (owner/finance/support/readonly).
+  [PARTIAL] §7  Sensitive action audit requirements —
+            admin_audit table captures admin_id, action, entity, timestamp,
+            IP. Audit-log specification now exists in
+            docs/architecture/logging-standard.md §3.3.
+
+16.5 Phase 5 — Customer Communications and Rights
+
+  [PENDING] §8  Communication Matrix (trigger, recipient, channel,
+            content, language, timing, retry, evidence) — not created.
+  [DONE]    §8  Account deletion and data-retention notices —
+            Backend sends deletion confirmation; retention categories
+            explained per runbook.
+  [PENDING] §8  Invoices/receipts — not applicable (free launch, no
+            Orderak-processed payments).
+  [PENDING] §8  Support channels, complaint submission/tracking,
+            escalation procedures, refund notifications, account
+            restriction notices — not created as standalone documents.
+  [DONE]    §8  Privacy requests —
+            Deletion request intake exists (authenticated + public web).
+            Other rights requests (access, correction, restriction,
+            objection) not yet implemented.
+
+16.6 Phase 6 — User-Generated Content and Minor Safety
+
+  [PARTIAL] §9  UGC Controls —
+            docs/product/phase4-content-controls.md defines prohibited
+            content categories, 8-step workflow (report → triage → review
+            → action → appeal → escalation), and acceptance criteria.
+            Implementation is a G6/pilot blocker — NOT yet coded.
+  [PENDING] §9  Minor Safety —
+            Target audience is adult Egyptian merchants. No minor-specific
+            age assurance, guardian controls, or child-safety measures
+            implemented. This is acceptable per the target-audience
+            decision (adults 18+).
+
+16.7 Phase 7 — Google Play and Android Permissions
+
+  [DONE]    §10 Android Permission Matrix —
+            docs/product/phase4-data-and-permissions.md §2 documents 7
+            permission decisions: INTERNET only; Contacts/Camera/Location/
+            SMS/Notifications/Advertising ID all prohibited or not approved.
+  [DONE]    §11 Contacts Access —
+            No READ_CONTACTS. Contact Picker used where needed. Compliant.
+  [PARTIAL] §12 Google Play Billing Assessment —
+            Free launch documented in ADR-004 and PRD. BILLING_ENABLED
+            defaults to false. No formal Play Billing classification
+            document exists for future paid plans.
+  [PENDING] §13 Target Audience Decision —
+            Adult Egyptian merchants implicitly assumed but not documented
+            as a formal, standalone decision with rationale and Play Store
+            declaration alignment.
+
+16.8 Phase 8 — Data Mapping and Security Requirements
+
+  [DONE]    §14 Data-to-Feature Matrix —
+            docs/product/phase4-data-and-permissions.md §1 covers 13
+            features with data, purpose, access, retention, and launch
+            state.
+  [DONE]    §15 Security Requirements —
+            All 17 security requirement categories are implemented:
+            encryption, credential protection, session management, rate
+            limiting, brute-force protection, API auth, idempotency,
+            secure uploads, secrets management, audit logging, monitoring,
+            backup/recovery, vulnerability management, incident response
+            (plan created today), dependency review, secure deletion,
+            environment separation (local/remote).
+            Evidence across docs/architecture/security-model.md,
+            docs/architecture/threat-model.md,
+            docs/architecture/logging-standard.md,
+            docs/runbooks/incident-response.md.
+
+16.9 Phase 9 — Acceptance Criteria
+
+  [PARTIAL] §16 Testable Acceptance Criteria —
+            PRD has "Acceptance summary" columns in prose format. NOT
+            converted to Given/When/Then format as the plan requires.
+            Example from plan: "Given a user has requested an OTP, When
+            the OTP expires, Then the system rejects it..."
+  [PARTIAL] §16 Existing automated tests cover: authentication, store/
+            catalog, orders, localization, privacy/retention, admin/RBAC,
+            billing/AI default-off. G6 evidence gaps listed in
+            phase4-traceability-and-gate.md §2.
+
+16.10 Required MVP Deliverables (15 items)
+
+  | # | Deliverable | Status | Evidence |
+  |---|---|---|---|
+  | 1 | Approved version-frozen MVP PRD | [PARTIAL] | phase4-product-requirements.md exists; G4 gate not passed (5 approvers pending) |
+  | 2 | User flows for all core journeys | [PARTIAL] | Seller 6-step journey documented; buyer flow is partial; no visual wireframes |
+  | 3 | Wireframes (all states) | [PENDING] | No visual wireframes produced |
+  | 4 | Screen and API Permission Matrix | [PARTIAL] | Roles defined in phase4-roles; per-screen matrix not fully enumerated |
+  | 5 | Data-to-Feature Matrix | [DONE] | phase4-data-and-permissions.md §1 |
+  | 6 | Payment-flow diagram | [PENDING] | No visual diagram; model described in prose |
+  | 7 | Payment/AML/KYC Responsibility Matrix | [PENDING] | Not applicable until paid billing; no provider agreement exists |
+  | 8 | Android Permission Matrix | [DONE] | phase4-data-and-permissions.md §2 |
+  | 9 | Google Play Billing assessment | [PARTIAL] | Free launch decision documented; formal Play Billing classification for future not done |
+  | 10 | Target-audience and age-group decision | [PENDING] | Implicit (adult merchants); not a standalone documented decision |
+  | 11 | Acceptance criteria for every feature | [PARTIAL] | Prose summaries exist; not in Given/When/Then format |
+  | 12 | Administration-dashboard requirements | [PARTIAL] | Admin panel implemented; requirements not fully specified per plan §7 |
+  | 13 | Audit-log specification | [DONE] | docs/architecture/logging-standard.md §3.3 created today |
+  | 14 | Support/complaint/refund/dispute/deletion procedures | [PARTIAL] | Deletion: DONE (runbook + code). Incident response: DONE (created today). Support/complaint/refund/dispute: PENDING |
+  | 15 | UGC and minor-safety specification | [PARTIAL] | Content controls: DONE (requirements). Implementation: G6 blocker. Minor safety: N/A (adult audience) |
+
+16.11 Summary
+
+  Deliverable status across the 15 MVP deliverables:
+
+    4   [DONE]    Fully complete
+    8   [PARTIAL] Some work done, needs completion
+    3   [PENDING] Not started
+
+  The project has a solid Phase 4 baseline with frozen product requirements,
+  roles/permissions, data mapping, Android permissions, and security controls
+  all substantially complete. The highest-priority gaps are:
+
+  1. Convert acceptance criteria to Given/When/Then format (deliverable #11)
+  2. Create visual wireframes for all user journeys (deliverable #3)
+  3. Formalize target audience decision for Play Store (deliverable #10)
+  4. Create Play Billing assessment for future paid plans (deliverable #9)
+  5. Document support/complaint/refund/dispute procedures (deliverable #14)
+  6. Create payment-flow diagram (deliverable #6)
+
+  None of these gaps require code changes — they are all documentation,
+  design, or operational readiness items. The codebase implements the
+  frozen MVP scope as specified in the launch PRD.
+

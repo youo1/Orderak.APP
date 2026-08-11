@@ -1,0 +1,244 @@
+# Staging and Production Workflow
+
+**Status:** Current  
+**Audience:** Developers, operators, and release owners
+
+This guide explains how Orderak uses GitHub, how Staging and Production stay
+isolated, and how a tested change is promoted safely. It describes the current
+repository and deployment workflows; it is not a proposal for separate
+long-lived environment branches.
+
+## Core model
+
+Orderak has one authoritative code line and two isolated runtime environments:
+
+```text
+short-lived branch -> pull request -> main -> automatic Staging deployment
+                                              |
+                                              +-> test the exact commit SHA
+                                                   |
+                                                   +-> manual Production deployment
+```
+
+- `main` is the source for releasable code.
+- Feature and fix branches are short-lived and merge into `main` through pull
+  requests.
+- Staging and Production are GitHub Environments with separate credentials.
+- A Staging deployment does not deploy to Production.
+- Production does not automatically follow the newest commit on `main`; its
+  workflow checks out the exact commit SHA or release tag supplied by the
+  release owner.
+- Environment isolation is implemented through configuration, credentials,
+  service bindings, domains, and data stores, not by maintaining divergent
+  Staging and Production branches.
+
+## Environment boundaries
+
+| Area | Staging | Production |
+| --- | --- | --- |
+| GitHub Environment | `staging` | `production` |
+| Backend deployment | Automatic after relevant changes merge to `main`; manual dispatch is also supported | Manual dispatch only |
+| Public API | `https://api.staging.orderak.app` | `https://api.orderak.app` |
+| Public site | `https://staging.orderak.app` | `https://orderak.app` |
+| Admin | `https://admin.staging.orderak.app` | `https://admin.orderak.app` |
+| Android application ID | `app.orderak.seller.staging` | `app.orderak.seller` |
+| Firebase | Separate Staging project and test users | Production project and real users |
+| Cloudflare | Staging Workers, Static Assets, D1, R2, and Queues | Production Workers, Static Assets, D1, R2, and Queues |
+| Data | Test data only | Real operational data |
+
+Never copy Production database contents, seller phone numbers, admin sessions,
+service-account keys, or Production API tokens into Staging.
+
+## GitHub controls
+
+The repository currently uses these controls:
+
+- Protected `main` branch with required CI checks and force-push/deletion
+  protection.
+- Separate `staging` and `production` GitHub Environments.
+- Environment-scoped secrets and variables; workflows do not share credentials
+  implicitly.
+- Separate concurrency groups so two deployments to the same environment do
+  not overlap.
+- A manual Production workflow requiring both a tested `release_ref` and the
+  exact confirmation text `DEPLOY_PRODUCTION`.
+
+The current GitHub plan does not support Environment required reviewers for
+this private repository. Consequently, the typed confirmation and restricted
+manual dispatch are the current Production approval boundary. Do not describe
+the workflow as having a GitHub reviewer gate unless the plan and Environment
+configuration are changed and verified.
+
+## Daily development workflow
+
+### 1. Start from a clean, current `main`
+
+Do not switch branches while uncommitted work could be lost or mixed into a
+new change.
+
+```powershell
+git status
+git switch main
+git pull --ff-only
+git switch -c feature/<short-description>
+```
+
+Use `fix/<short-description>` for human-authored fixes. Branches created by
+Codex normally use `codex/<short-description>`.
+
+### 2. Implement and verify locally
+
+Run the checks appropriate to the files changed. At minimum, follow the
+[testing guide](./testing.md). Authentication and localization changes must also
+run their protected contract checks as required by `AGENTS.md`.
+
+Do not place provider or infrastructure secrets in the Android application.
+Android calls the Cloudflare backend, and the backend accesses external
+providers using Worker secrets.
+
+### 3. Commit, push, and open a pull request
+
+```powershell
+git add <intended-files>
+git commit -m "Describe the change"
+git push -u origin HEAD
+```
+
+Open a pull request targeting `main`. Review the changed files and wait for all
+required GitHub Actions checks to pass. Fix failures on the same branch; do not
+bypass or weaken a protected contract check.
+
+### 4. Merge into `main`
+
+Merge only after the pull request represents one coherent change and required
+checks pass. The merge commit SHA becomes the candidate that Staging verifies.
+
+## Deploying and testing Staging
+
+### Backend and Admin
+
+`Deploy Staging` runs automatically when a merge to `main` changes:
+
+- `services/backend/**`
+- `apps/admin-web/**`
+- the Staging deployment workflow itself
+
+The workflow:
+
+1. Installs dependencies.
+2. Runs backend tests, type checks, Admin tests, builds, and Wrangler dry runs.
+3. Applies both migration streams to the Staging D1 databases.
+4. Deploys the public Worker, private Admin Worker, and Admin Edge Worker with
+   Workers Static Assets using the `staging` GitHub Environment.
+5. Smoke-tests the Staging API and Admin URLs.
+
+Documentation-only and Android-only merges do not cause an unnecessary backend
+deployment.
+
+### Android Staging
+
+Run `Distribute Android Staging` manually from GitHub Actions after the intended
+commit is on `main`. It builds `StagingDebug`, runs the protected contract and
+unit checks, and uploads the APK to the configured Firebase App Distribution
+tester group.
+
+The Staging APK can coexist with the Production app because it uses the
+`.staging` application ID suffix and points only to Staging URLs.
+
+### Staging acceptance checklist
+
+Before promotion, record the exact successful commit SHA and verify:
+
+- `Deploy Staging` completed successfully for that SHA when the change affects
+  the backend or Admin.
+- `https://api.staging.orderak.app/health` responds successfully.
+- The relevant Admin and Android journeys work with Staging accounts and data.
+- Any D1 migration behaved as expected and its rollback/forward-fix strategy is
+  understood.
+- No Production credentials, personal data, or live payment actions were used.
+- Feature-specific release gates and documented blockers are satisfied.
+
+## Promoting the tested version to Production
+
+Production promotion is deliberate and manual. It currently deploys the
+backend and Admin surfaces; it does **not** publish the Android application to
+Google Play.
+
+### Preconditions
+
+1. Identify the exact commit SHA that passed Staging acceptance.
+2. Confirm the SHA is reachable from `main` and has not been replaced by a
+   different untested commit.
+3. Confirm required secrets and variables exist in the `production` GitHub
+   Environment.
+4. Review pending Production migrations and operational impact.
+5. Choose a monitored deployment window and ensure a known-good SHA is
+   available for application rollback.
+
+### GitHub Actions procedure
+
+1. Open the repository on GitHub.
+2. Select **Actions**.
+3. Select **Deploy Production**.
+4. Select **Run workflow** and keep the workflow branch set to `main`.
+5. Enter the tested commit SHA or approved release tag in `release_ref`.
+6. Enter exactly `DEPLOY_PRODUCTION` in `confirm`.
+7. Run the workflow and monitor every step until the smoke tests complete.
+
+The workflow validates the backend and Admin again before it applies Production
+migrations and deploys. It then smoke-tests the Production API and Admin URLs.
+Because there is currently no supported required-reviewer rule, dispatching the
+workflow starts this process without a second GitHub approval screen.
+
+### Production verification
+
+After a successful run:
+
+- Confirm `https://api.orderak.app/health` is healthy.
+- Confirm `https://admin.orderak.app` loads and the intended change works.
+- Check Worker errors, queue failures, and migration status relevant to the
+  release.
+- Record the deployed SHA and the GitHub Actions run URL in the appropriate
+  release or governance evidence.
+
+## Rollback and forward fixes
+
+For an application-code regression, run `Deploy Production` again with the last
+known-good Production SHA and the same explicit confirmation. This redeploys
+the older application code.
+
+A code rollback does **not** reverse D1 migrations. Database migrations are
+forward-only unless a reviewed recovery procedure explicitly says otherwise.
+For migration problems, stop and follow the [database migration guide](./database-migrations.md)
+and [D1 migration drift runbook](../runbooks/d1-migration-drift.md). Do not edit
+the remote D1 migration ledger manually.
+
+For a Staging regression, create a fix or revert pull request, run the checks,
+merge it into `main`, and let the Staging workflow deploy the resulting commit.
+
+## What does not move between environments
+
+Promotion moves a tested code revision and applies environment-specific
+migrations. It does not transfer:
+
+- D1 rows or R2 objects
+- Firebase users or configuration files
+- queue messages
+- GitHub or Cloudflare secret values
+- Admin accounts or recovery codes
+- Android APKs from Firebase App Distribution to Google Play
+
+Any required Production configuration must be provisioned separately, with
+least privilege, before the release that needs it.
+
+## Quick decision guide
+
+| Situation | Correct action |
+| --- | --- |
+| Start a feature | Create a short-lived branch from current `main` |
+| Test services/backend/Admin changes | Merge a reviewed PR and use automatic Staging deployment |
+| Test Android changes | Run `Distribute Android Staging` for the intended `main` commit |
+| Release services/backend/Admin | Manually deploy the exact Staging-tested SHA to Production |
+| Release Android publicly | Use the separate, approved Google Play release process when available |
+| Production code regression | Redeploy the last known-good SHA |
+| Production migration problem | Use the migration runbook; do not assume code rollback reverses data changes |

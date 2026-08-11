@@ -1,0 +1,636 @@
+MVP Development and Compliance Implementation Plan
+Objective
+Build a feature-complete MVP that matches the approved Product Requirements Document (PRD). Only approved functionality will be implemented, and compliance, security, privacy, and operational readiness will be included in the Definition of Done rather than treated as post-launch activities.
+Guiding Principles
+1.	Implement only requirements approved in the PRD.
+2.	Link every backlog item to a PRD requirement and its acceptance criteria.
+3.	Apply privacy, legal, security, and Data Safety reviews to every material change.
+4.	Collect and retain only the data required for approved product functionality.
+5.	Use feature flags to reduce launch risk and disable high-risk functionality quickly.
+6.	Do not consider a feature complete until its tests, documentation, security controls, and compliance requirements are complete.
+________________________________________
+Phase 1: Requirements and Delivery Setup
+1.1 PRD Traceability
+Create a delivery backlog directly mapped to the approved PRD.
+Each backlog item must include:
+•	PRD requirement reference
+•	Business objective
+•	Functional requirements
+•	Acceptance criteria
+•	Data collected or processed
+•	Legal and compliance considerations
+•	Security considerations
+•	Data Safety impact
+•	Dependencies
+•	Testing requirements
+•	Documentation requirements
+1.2 Backlog Prioritization
+Classify backlog items as:
+•	MVP launch requirement
+•	Compliance-critical requirement
+•	Security-critical requirement
+•	Operational requirement
+•	Post-MVP requirement
+Post-MVP items must not be included unless formally approved through change control.
+1.3 Engineering Controls
+Establish the following controls before feature development begins:
+•	Mandatory pull-request reviews
+•	Protected main and release branches
+•	Automated unit, integration, and security tests
+•	Static code analysis
+•	Secret scanning
+•	Software composition and dependency scanning
+•	Dependency approval workflow
+•	Environment-based configuration
+•	Centralized feature-flag management
+•	Audit logging standards
+•	Secure coding guidelines
+________________________________________
+Phase 2: Core MVP Development
+2.1 Product Features
+Implement only the product functionality approved in the PRD.
+For each feature:
+1.	Confirm its acceptance criteria.
+2.	Identify the required data and processing activities.
+3.	Identify authentication and authorization requirements.
+4.	Identify legal, privacy, and security impacts.
+5.	Implement the feature behind a feature flag where appropriate.
+6.	Add automated tests.
+7.	Add monitoring and operational documentation.
+8.	Complete code, security, and compliance reviews.
+2.2 API Security
+Apply the following controls to all APIs:
+•	Authentication for protected operations
+•	Role- and permission-based authorization
+•	Server-side input validation
+•	Output encoding and safe error handling
+•	Rate limiting and abuse protection
+•	Secure session creation, rotation, expiration, and revocation
+•	Protection against unauthorized object access
+•	Idempotency for sensitive or financial operations
+•	Request correlation identifiers
+•	Security-event logging
+•	Versioned API contracts
+•	No secrets, tokens, or sensitive personal information in URLs or logs
+API authorization must be validated on the server for every protected request.
+________________________________________
+Phase 3: Privacy, Consent, and User Rights
+3.1 Consent and Preferences
+Implement:
+•	Consent capture
+•	Preference management
+•	Consent withdrawal
+•	Timestamp and source of consent
+•	Version of the policy or notice accepted by the user
+•	Proof of the consent action
+•	Enforcement of the user’s current preferences
+•	Re-consent when material policy changes require it
+Consent records must be auditable and must not be overwritten without retaining the required history.
+3.2 Account Deletion
+Implement an account-deletion workflow that:
+1.	Verifies the user’s identity.
+2.	records the deletion request;
+3.	prevents unauthorized or accidental deletion;
+4.	identifies data eligible for deletion;
+5.	identifies data subject to legal retention requirements;
+6.	deletes or anonymizes eligible data;
+7.	records any legal exception and its justification;
+8.	removes or invalidates active sessions and credentials;
+9.	handles downstream systems and approved service providers;
+10.	records completion of the process.
+The system must not represent legally retained data as fully deleted.
+3.3 Data Rights Requests
+Implement workflows for applicable user rights, including:
+•	Access
+•	Correction
+•	Deletion
+•	Restriction
+•	Objection
+•	Portability, where applicable
+Each request must have:
+•	Identity-verification status
+•	Request type
+•	Submission date
+•	Assigned owner
+•	Due date
+•	Current status
+•	Systems searched
+•	Applicable exceptions
+•	Decision and justification
+•	Completion record
+•	Communications history
+Access to rights-request records must be restricted to authorized personnel.
+________________________________________
+Phase 4: Billing, Support, and Customer Operations
+4.1 Billing and Receipts
+Implement:
+•	Accurate billing records
+•	Invoice or receipt generation
+•	Payment-status tracking
+•	Tax and pricing information required by the product
+•	Failed-payment handling
+•	Billing-event audit trails
+•	Access controls for financial information
+•	Reconciliation support
+Do not store complete payment-card data unless explicitly required and supported by an approved compliant payment architecture.
+4.2 Cancellation and Refunds
+Implement:
+•	Cancellation requests
+•	Immediate or end-of-period cancellation rules
+•	Renewal prevention
+•	Refund eligibility checks
+•	Full and partial refund workflows, where approved
+•	Refund status tracking
+•	User notifications
+•	Audit records for decisions and transactions
+Financial operations should be idempotent to prevent duplicate charges or refunds.
+4.3 Support and Complaints
+Implement support and complaint workflows containing:
+•	Request category
+•	Submission channel
+•	Priority and severity
+•	Assigned owner
+•	Status
+•	Response history
+•	Resolution
+•	Escalation path
+•	Complaint outcome
+•	Relevant compliance or security classification
+Sensitive tickets must be visible only to authorized support or compliance personnel.
+________________________________________
+Phase 5: Logging, Monitoring, and Auditability
+5.1 Required Logs
+Implement the approved set of:
+•	Administrative activity logs
+•	Security-event logs
+•	Authentication and authorization logs
+•	Consent and preference logs
+•	Account-deletion logs
+•	User-rights request logs
+•	Billing and refund logs
+•	Configuration-change logs
+•	Compliance-operation logs
+5.2 Logging Rules
+Logs must:
+•	Capture the actor, action, affected resource, timestamp, result, and request identifier
+•	Avoid recording passwords, access tokens, payment credentials, or unnecessary personal data
+•	Avoid printing complete user objects
+•	Use structured and documented event formats
+•	Apply role-based access controls
+•	Have defined retention periods
+•	Support incident investigation and compliance evidence
+•	Be protected against unauthorized alteration
+Logging failures for critical operations must be monitored and escalated.
+5.3 Monitoring and Alerts
+Configure alerts for:
+•	Repeated authentication failures
+•	Authorization failures
+•	Suspicious session activity
+•	Rate-limit violations
+•	Unexpected administrative actions
+•	Secret exposure
+•	Dependency vulnerabilities
+•	Payment and refund failures
+•	Deletion or rights-request workflow failures
+•	Critical API error-rate increases
+•	Feature-flag changes affecting sensitive functions
+________________________________________
+Phase 6: Dependencies and Third-Party SDKs
+6.1 Dependency Register
+Maintain a register containing:
+•	Dependency or SDK name
+•	Version
+•	Owner
+•	Purpose
+•	License
+•	Data accessed or transmitted
+•	Third-party recipient
+•	Security review status
+•	Privacy review status
+•	Data Safety disclosure status
+•	Approval status
+•	Update and retirement plan
+6.2 SDK Minimization
+For each external SDK:
+1.	Confirm that it is necessary for an approved MVP requirement.
+2.	Evaluate whether the functionality can be implemented without it.
+3.	Review the data it collects automatically.
+4.	Disable unnecessary collection.
+5.	Restrict permissions and configuration.
+6.	Record it in the data inventory and Dependency Register.
+7.	update applicable Data Safety disclosures;
+8.	Obtain security and privacy approval.
+Unapproved SDKs must not be added to production builds.
+6.3 Dependency Security
+The delivery pipeline must:
+•	Scan dependencies for known vulnerabilities
+•	Detect prohibited or incompatible licenses
+•	Block unapproved high-risk packages
+•	Pin or lock production dependency versions
+•	Generate a software bill of materials where required
+•	Monitor newly disclosed vulnerabilities
+•	Define remediation timelines based on severity
+________________________________________
+Phase 7: Feature Flags and Controlled Launch
+Use feature flags for:
+•	New functionality
+•	Sensitive data processing
+•	Billing changes
+•	New SDK integrations
+•	Experimental workflows
+•	High-risk administrative functions
+•	Features that may require rapid suspension
+Each significant feature flag must have:
+•	An owner
+•	A documented purpose
+•	Default state
+•	Environment configuration
+•	Authorized operators
+•	Activation criteria
+•	Rollback criteria
+•	Monitoring requirements
+•	Removal or expiration date
+Feature-flag changes affecting sensitive functionality must be logged and restricted.
+________________________________________
+Phase 8: Change Review Process
+Every new feature or material change must be reviewed across four dimensions.
+8.1 Business Review
+Confirm:
+•	The change supports an approved business objective.
+•	It is required for the MVP or has formal approval.
+•	Its acceptance criteria are measurable.
+•	Its operational owner is identified.
+8.2 Legal and Compliance Review
+Confirm:
+•	The legal basis and required notices
+•	Consent requirements
+•	User-rights implications
+•	Retention requirements
+•	Contractual restrictions
+•	Geographic or age-related restrictions
+•	Required policy or disclosure updates
+8.3 Security Review
+Confirm:
+•	Authentication and authorization controls
+•	Abuse and fraud scenarios
+•	Threat model updates
+•	Secrets and credential handling
+•	Encryption requirements
+•	Logging and alerting
+•	Dependency risk
+•	Incident-response considerations
+8.4 Data Safety Review
+Confirm:
+•	Data types collected
+•	Purpose of collection
+•	Whether collection is mandatory or optional
+•	Data sharing with third parties
+•	Data retention and deletion
+•	Security protections
+•	Required store, platform, or public disclosures
+No material change may be released until the applicable reviews are complete.
+________________________________________
+Testing Plan
+Automated Testing
+The MVP should include:
+•	Unit tests for business logic
+•	API contract tests
+•	Integration tests
+•	Authentication and authorization tests
+•	Input-validation tests
+•	Rate-limiting tests
+•	Session-management tests
+•	Consent and withdrawal tests
+•	Account-deletion tests
+•	User-rights workflow tests
+•	Billing, cancellation, and refund tests
+•	Audit-log generation tests
+•	Dependency and secret scanning
+•	Regression tests for critical user journeys
+Sensitive Test Cases
+Test at minimum:
+•	Unauthorized access attempts
+•	Cross-user data-access attempts
+•	Expired and revoked sessions
+•	Duplicate payment and refund requests
+•	Consent withdrawal during an active session
+•	Deletion requests involving legally retained records
+•	Failed downstream deletion
+•	Excessive API requests
+•	Invalid and malicious inputs
+•	Feature-flag rollback
+•	Logging without exposing complete user records
+•	Temporary third-party service failures
+Release Acceptance Testing
+Before release, confirm that:
+•	Every PRD acceptance criterion has evidence.
+•	Critical user journeys pass end-to-end testing.
+•	No unresolved critical or high-severity security issues remain.
+•	No secrets or keys are present in source code or application packages.
+•	Required policies and disclosures match actual product behavior.
+•	Data Safety declarations match the final SDK and data inventory.
+•	Deletion, rights requests, billing, cancellation, and refunds work in production-like environments.
+•	Operational teams can execute documented procedures.
+________________________________________
+Definition of Done
+A backlog item is complete only when:
+•	It is linked to an approved PRD requirement.
+•	Its acceptance criteria are satisfied.
+•	Code review is complete.
+•	Required automated tests pass.
+•	Security controls are implemented.
+•	Applicable legal and compliance requirements are complete.
+•	Data Safety impact has been reviewed.
+•	Logging and monitoring are implemented without unnecessary personal data.
+•	Dependencies and SDKs are approved and recorded.
+•	API and database documentation is updated.
+•	Operational procedures are documented.
+•	Feature flags and rollback procedures are configured where appropriate.
+•	No secrets or credentials exist in the code, repository, logs, or application package.
+•	The product owner has accepted the completed functionality.
+________________________________________
+Required Deliverables
+Product
+•	Feature-complete MVP matching the approved PRD
+•	Traceability matrix connecting requirements, backlog items, tests, and release evidence
+•	Controlled production configuration using approved feature flags
+Quality
+•	Automated test coverage for core workflows
+•	Test coverage for sensitive and high-risk scenarios
+•	Security and regression test results
+•	Documented acceptance-test evidence
+Security and Compliance
+•	Updated dependency and SDK register
+•	Updated data inventory and Data Safety assessment
+•	Consent and policy-version records
+•	Account-deletion and user-rights procedures
+•	Audit and security logging specification
+•	Security review and vulnerability findings
+•	Confirmation that no secrets or keys are embedded in the code or application
+Technical Documentation
+•	API documentation
+•	Database schema and data-flow documentation
+•	Authentication and authorization model
+•	Session-management design
+•	Logging-event catalogue
+•	Feature-flag register
+•	Deployment and rollback procedures
+•	Incident-response procedures
+•	Support, complaint, cancellation, and refund procedures
+________________________________________
+Suggested Delivery Sequence
+Sprint 0: Foundations
+•	Confirm PRD scope and acceptance criteria.
+•	Build the traceability matrix.
+•	Establish repositories, environments, CI/CD, reviews, and scans.
+•	Define architecture, data flows, security controls, and logging standards.
+•	Create the dependency, SDK, and feature-flag registers.
+Sprint 1: Identity and Core Platform
+•	Implement authentication and authorization.
+•	Implement secure session management.
+•	Establish API validation and rate limiting.
+•	Implement core database structures.
+•	Build administrative and security logging foundations.
+Sprint 2: Core Product Features
+•	Implement approved primary user journeys.
+•	Add automated unit and integration tests.
+•	Add monitoring and feature flags.
+•	Complete initial API and database documentation.
+Sprint 3: Privacy and User Control
+•	Implement consent and preference management.
+•	Store accepted policy versions.
+•	Implement consent withdrawal.
+•	Implement account deletion and rights-request workflows.
+•	Add legal-retention exception handling and audit records.
+Sprint 4: Commercial and Support Operations
+•	Implement billing and receipts.
+•	Implement cancellation and refunds.
+•	Implement support and complaint management.
+•	Add financial-operation controls and audit trails.
+Sprint 5: Hardening and Release Readiness
+•	Complete end-to-end and sensitive-scenario testing.
+•	Review dependencies and third-party SDKs.
+•	Validate Data Safety and policy disclosures.
+•	Perform security and compliance reviews.
+•	Complete operational documentation.
+•	Test feature-flag rollback and incident procedures.
+•	Complete release acceptance and product-owner approval.
+________________________________________
+Release Gate
+The MVP may be released only when:
+•	The approved PRD is fully implemented.
+•	All critical acceptance tests pass.
+•	Compliance requirements are included in the Definition of Done.
+•	Critical and high-severity security findings are resolved or formally accepted by authorized owners.
+•	Required user-control, deletion, rights, billing, support, cancellation, and refund processes are operational.
+•	Dependencies and SDKs are documented and approved.
+•	API, database, and operating procedures are documented.
+•	No secrets or embedded credentials are present.
+•	Monitoring, logging, feature flags, and rollback procedures are operational.
+
+________________________________________
+10. IMPLEMENTATION STATUS CHECKLIST (updated 2026-07-19)
+
+This appendix tracks every deliverable against the current project state.
+
+Legend:
+  [DONE]     Fully implemented or in place
+  [PARTIAL]  Some work done, needs completion
+  [PENDING]  Not started
+
+10.1 Phase 1 — Requirements and Delivery Setup
+
+  [PARTIAL] §1.1 PRD Traceability —
+            docs/product/phase4-traceability-and-gate.md maps requirements
+            to artifacts (code, tests, risks, gates). Not linked to a
+            specific backlog tool (no Jira/Linear integration).
+  [PARTIAL] §1.2 Backlog Prioritization —
+            12 launch requirements defined in PRD; AI and billing explicitly
+            deferred. Not classified in the MVP/Critical/Security/Post-MVP
+            format the plan requires.
+  [PARTIAL] §1.3 Engineering Controls —
+            Mandatory PR reviews [DONE], Protected main branch [DONE],
+            Unit/integration tests [DONE], Static analysis [PENDING],
+            Secret scanning [PENDING], Dependency scanning [PENDING],
+            Dependency approval workflow [PARTIAL — register exists in
+            third-party-and-permission-register.md], Environment config
+            [DONE — wrangler.jsonc variables], Feature flags [DONE —
+            BILLING_ENABLED, AI_ASSISTANT_ENABLED], Audit logging
+            [DONE — admin_audit table + logging-standard.md], Secure
+            coding guidelines [PENDING]
+
+10.2 Phase 2 — Core MVP Development
+
+  [DONE]    §2.1 Product Features —
+            12 PRD items implemented (AUTH, STORE, CATALOG, PUBLIC, ORDER,
+            CUSTOMER, SETTINGS, ADMIN, SUPPORT, CONTENT requirements frozen,
+            BILLING and AI deferred/disabled).
+  [DONE]    §2.2 API Security —
+            Auth required for protected ops [DONE], RBAC [DONE], Input
+            validation [DONE], Rate limiting [DONE], Session management
+            with HttpOnly JWT [DONE], Idempotency on payments/webhooks
+            [DONE], Request correlation [PARTIAL — not implemented], No
+            secrets in URLs/logs [DONE], Parameterized SQL [DONE].
+
+10.3 Phase 3 — Privacy, Consent, and User Rights
+
+  [DONE]    §3.1 Consent and Preferences —
+            legal_acceptances table captures consent version, timestamp,
+            locale, marketing_consent, source, app_version. Immutable
+            append-only records. Re-consent on policy version change [DONE].
+  [PARTIAL] §3.1 Preference management —
+            Marketing consent stored; no in-app preference dashboard for
+            sellers to revoke marketing consent without full deletion.
+  [DONE]    §3.2 Account Deletion —
+            All 10 workflow steps implemented: identity verification,
+            request recording, deletion/anonymization, legal exceptions
+            (payment_events, legal_acceptances retained), session/credential
+            removal (seller_devices deleted, Firebase sign-out),
+            downstream (Stripe cancel), completion recording
+            (deletion_requests.status=completed).
+  [PENDING] §3.3 Data Rights Requests —
+            Deletion request implemented. Access, correction, restriction,
+            objection, and portability not implemented.
+
+10.4 Phase 4 — Billing, Support, and Customer Operations
+
+  [PENDING] §4.1 Billing and Receipts —
+            BILLING_ENABLED=false. Stripe integration code exists but
+            disabled. No invoice/receipt generation active.
+  [PENDING] §4.2 Cancellation and Refunds —
+            Not applicable while billing is disabled. Subscription
+            cancellation code exists in deletion.ts (Stripe cancel).
+  [PARTIAL] §4.3 Support and Complaints —
+            support_tickets table exists. Admin panel has ticket
+            management. Missing: formal SLA, escalation paths outside
+            admin panel, buyer-facing complaint submission.
+
+10.5 Phase 5 — Logging, Monitoring, and Auditability
+
+  [DONE]    §5.1 Required Logs —
+            Admin audit log [DONE — admin_audit], Auth events [DONE],
+            Consent records [DONE — legal_acceptances], Deletion logs
+            [DONE — deletion_requests], Billing logs [PENDING until
+            billing enabled], Config changes [PARTIAL].
+  [DONE]    §5.2 Logging Rules —
+            Actor/action/resource/timestamp captured [DONE], No passwords/
+            tokens/logged [DONE], Structured formats [PARTIAL], RBAC on
+            logs [DONE — owner/security roles only], Retention periods
+            defined [DONE — retention matrix §1.7], Protected from
+            alteration [DONE — append-only tables].
+  [PENDING] §5.3 Monitoring and Alerts —
+            Severity levels defined in incident-response.md §1. No
+            monitoring console configured. No automated alerts active.
+
+10.6 Phase 6 — Dependencies and Third-Party SDKs
+
+  [PARTIAL] §6.1 Dependency Register —
+            docs/governance/registers/third-party-and-permission-register.md
+            lists TP-001 through TP-012. Incomplete — missing license
+            info, security review status, Data Safety disclosure status for
+            most entries.
+  [PARTIAL] §6.2 SDK Minimization —
+            Only INTERNET permission declared. ML Kit and osmdroid noted
+            in register; behavior review pending. No unapproved SDKs.
+  [PENDING] §6.3 Dependency Security —
+            No automated vulnerability scanning (npm audit, gradle
+            dependencyCheckAnalyze). Versions pinned via lock files
+            [DONE]. No SBOM generation.
+
+10.7 Phase 7 — Feature Flags and Controlled Launch
+
+  [DONE]    Feature flags —
+            BILLING_ENABLED [DONE — defaults false, fails closed],
+            AI_ASSISTANT_ENABLED [DONE — defaults false, fails closed].
+            Both documented with owner, purpose, default state, and
+            rollback criteria in security-model.md.
+  [PENDING] §7  Flag documentation —
+            No formal feature-flag register with activation criteria and
+            removal/expiration dates. Current flags are simple booleans
+            but not catalogued as the plan requires.
+
+10.8 Phase 8 — Change Review Process
+
+  [PENDING] §8.1 Business Review process — not formalized.
+  [PENDING] §8.2 Legal and Compliance Review process — not formalized.
+  [PENDING] §8.3 Security Review process — not formalized.
+  [PENDING] §8.4 Data Safety Review process — not formalized.
+  [PARTIAL] Ad hoc review: PR reviews serve as informal gate but don't
+            cover the four dimensions the plan requires.
+
+10.9 Testing Plan
+
+  [DONE]    Unit tests — backend vitest suite; Android JUnit
+            (AuthViewModelTest).
+  [PARTIAL] API contract tests — backend integration tests exist for
+            store, orders, auth, and public routes.
+  [PENDING] Rate-limiting tests — not automated.
+  [PENDING] Session-management tests — not comprehensive.
+  [DONE]    Consent and withdrawal tests — legal_acceptances creation
+            tested in auth flow.
+  [DONE]    Account-deletion tests — deletion flow and idempotency tested
+            in store.spec.ts and retention.spec.ts.
+  [PENDING] User-rights workflow tests — only deletion tested.
+  [PENDING] Billing/cancellation/refund tests — N/A while billing disabled.
+  [DONE]    Audit-log generation tests — admin_audit verified in
+            retention.spec.ts.
+  [PENDING] Dependency and secret scanning — not automated.
+  [PENDING] Regression tests for critical journeys — not comprehensive.
+  [PENDING] Sensitive test cases (unauthorized access, cross-user data,
+            expired sessions, duplicate payments, malicious inputs) —
+            not fully covered.
+
+10.10 Definition of Done (14 items)
+
+  | # | Condition | Status |
+  |---|---|---|
+  | 1 | Linked to approved PRD requirement | [DONE] — Phase 4 traceability |
+  | 2 | Acceptance criteria satisfied | [PARTIAL] — prose, not G/W/T |
+  | 3 | Code review complete | [DONE] — GitHub PR reviews |
+  | 4 | Required automated tests pass | [PARTIAL] — not comprehensive |
+  | 5 | Security controls implemented | [DONE] |
+  | 6 | Legal/compliance requirements complete | [PARTIAL] — deletion done; rights requests pending |
+  | 7 | Data Safety impact reviewed | [PENDING] |
+  | 8 | Logging/monitoring without unnecessary PII | [DONE] |
+  | 9 | Dependencies and SDKs approved | [PARTIAL] — registered but not fully approved |
+  | 10 | API and database docs updated | [PARTIAL] — api.md exists; schema docs in migrations |
+  | 11 | Operational procedures documented | [PARTIAL] — deletion + incident runbooks exist |
+  | 12 | Feature flags and rollback configured | [DONE] — billing/AI flags |
+  | 13 | No secrets in code/repo/logs/app | [DONE] |
+  | 14 | Product owner accepted functionality | [PENDING] — G4 gate not passed |
+
+  6 DONE · 6 PARTIAL · 2 PENDING
+
+10.11 Release Gate
+
+  The MVP release gate requires 9 conditions:
+
+  | # | Condition | Status |
+  |---|---|---|
+  | 1 | Approved PRD fully implemented | [DONE] — 12 items; billing/AI excluded per spec |
+  | 2 | All critical acceptance tests pass | [PENDING] |
+  | 3 | Compliance in Definition of Done | [PARTIAL] |
+  | 4 | Critical/High security findings resolved | [PENDING] — no security scan performed |
+  | 5 | User-control/deletion/rights/billing/support/cancel/refund operational | [PARTIAL] — deletion done; billing N/A; rest incomplete |
+  | 6 | Dependencies and SDKs documented and approved | [PARTIAL] |
+  | 7 | API, database, and operating procedures documented | [PARTIAL] |
+  | 8 | No secrets or embedded credentials | [DONE] |
+  | 9 | Monitoring, logging, feature flags, rollback operational | [PARTIAL] — logging+flags done; monitoring+rollback not |
+
+  → Release Gate: NOT PASSED (7 of 9 items partial or pending)
+
+10.12 Summary
+
+  Deliverable status across all phases:
+
+    16  [DONE]    Implemented
+    17  [PARTIAL] Some work done
+    12  [PENDING] Not started
+
+  The product features are substantially implemented. The key gaps are:
+
+  1. Automated security scanning (SAST/DAST/dependency/secret) — Plan 7 Gate 2
+  2. Data rights requests beyond deletion (access, correction, restriction, objection)
+  3. Production monitoring and alerting
+  4. Formal change review process (4-dimension gate)
+  5. Comprehensive automated test coverage for critical journeys

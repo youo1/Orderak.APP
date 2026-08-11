@@ -1,0 +1,791 @@
+Technical, Security, and Compliance Go-Live Test Plan
+1. Purpose
+This plan defines the technical, security, resilience, privacy, and compliance activities required before the application is approved for production launch.
+The objectives are to:
+•	Confirm that the application and APIs function correctly under normal and adverse conditions.
+•	Identify and remediate security vulnerabilities.
+•	Verify that actual data-processing practices match published policies and declarations.
+•	Validate backup, recovery, incident response, and cloud-resilience procedures.
+•	Document residual risks and obtain formal approval from accountable decision-makers.
+2. Scope
+The assessment should cover:
+•	Android mobile application.
+•	Public and internal APIs.
+•	Authentication and authorization services.
+•	Administrative portals and back-office systems.
+•	Databases, storage, queues, and supporting infrastructure.
+•	Production cloud accounts, networks, firewalls, and access controls.
+•	Third-party SDKs, analytics tools, payment providers, and external services.
+•	User account, consent, deletion, refund, reporting, and appeal workflows.
+•	Backup, disaster-recovery, logging, monitoring, and incident-response processes.
+3. Proposed Schedule
+The plan can normally be completed over five to six weeks, depending on application complexity and the number of findings.
+Phase	Activities	Indicative Duration
+1	Planning, scope confirmation, and test readiness	3–5 business days
+2	Functional, performance, compatibility, and resilience testing	1–2 weeks
+3	Security testing, scanning, and penetration testing	1–2 weeks
+4	Privacy and compliance audit	1 week
+5	Disaster-recovery and incident-response exercises	2–4 business days
+6	Remediation, retesting, risk acceptance, and go-live decision	1–2 weeks
+Testing activities may run in parallel where environments and resources allow.
+4. Roles and Responsibilities
+Role	Main Responsibilities
+Product Owner	Confirms business requirements, pricing, refunds, user journeys, and launch priorities
+QA Lead	Owns functional, compatibility, performance, and regression testing
+Security Lead	Owns security testing, penetration testing, vulnerability triage, and security sign-off
+Engineering Lead	Coordinates technical fixes and confirms deployment readiness
+DevOps/Cloud Lead	Reviews production configuration, network security, backups, recovery, and monitoring
+Privacy/Compliance Lead	Verifies privacy notices, consent, data flows, deletion, retention, and third-party transfers
+Legal Counsel	Reviews regulatory obligations, lawful retention, evidence handling, and formal exceptions
+Customer Support/Operations	Validates complaints, refunds, reporting, escalation, and incident procedures
+Executive Risk Owner	Accepts residual risks and authorizes or rejects production launch
+5. Phase 1: Planning and Test Readiness
+Activities
+1.	Confirm the systems, applications, APIs, environments, and third parties included in scope.
+2.	Prepare an architecture diagram showing:
+o	Application components.
+o	API connections.
+o	Databases and storage.
+o	Authentication services.
+o	Third-party SDKs.
+o	Data flows and transfer locations.
+3.	Prepare a data inventory and data-flow map covering:
+o	Personal and sensitive data collected.
+o	Purpose of collection.
+o	Storage location.
+o	Retention period.
+o	Third-party recipients.
+o	Transfers outside Egypt.
+4.	Confirm that a production-like test environment is available.
+5.	Prepare test accounts for different roles and permission levels.
+6.	Define severity classifications, escalation paths, and remediation deadlines.
+7.	Confirm access to:
+o	Source code.
+o	API documentation.
+o	Cloud configuration.
+o	Application builds.
+o	Logging and monitoring systems.
+o	Privacy policies and store declarations.
+o	Backup and recovery procedures.
+Entry Criteria
+Testing may begin when:
+•	The release candidate is stable and version-controlled.
+•	Test environments and accounts are available.
+•	Architecture and data-flow documentation has been provided.
+•	Known limitations are documented.
+•	Security testers have written authorization to test the systems.
+6. Phase 2: Technical QA and Resilience Testing
+6.1 Functional Testing
+Validate all critical user journeys, including:
+•	Account creation and verification.
+•	Login, logout, password reset, and OTP verification.
+•	Profile and account management.
+•	Core application functions.
+•	Payments, subscriptions, cancellations, and refunds, where applicable.
+•	Notifications and communications.
+•	User reporting, review, and appeal processes, where applicable.
+•	Account deletion through the application and web link.
+•	Customer-support and escalation paths.
+For each test, record:
+•	Test case ID.
+•	Preconditions.
+•	Steps performed.
+•	Expected result.
+•	Actual result.
+•	Evidence.
+•	Pass/fail status.
+•	Related defect ID.
+6.2 Performance and Load Testing
+Test:
+•	Expected normal traffic.
+•	Forecast peak traffic.
+•	Sudden traffic spikes.
+•	Sustained load.
+•	High API concurrency.
+•	Database-intensive operations.
+•	OTP and authentication service limits.
+•	Rate limiting and abuse controls.
+•	Recovery after overload.
+Record:
+•	Response times.
+•	Error rates.
+•	Throughput.
+•	Resource utilization.
+•	Queue depth.
+•	Database performance.
+•	Time required for the service to recover.
+Performance thresholds should be approved before testing begins.
+6.3 Network Interruption Testing
+Test application behavior during:
+•	Complete loss of connectivity.
+•	Slow or unstable connections.
+•	Switching between Wi-Fi and mobile data.
+•	Interrupted uploads or transactions.
+•	Duplicate requests caused by retries.
+•	Delayed API responses.
+•	Application termination during a transaction.
+Confirm that the application:
+•	Does not corrupt or duplicate data.
+•	Provides understandable error messages.
+•	Safely retries only appropriate operations.
+•	Does not expose sensitive information.
+•	Returns to a consistent state after connectivity is restored.
+6.4 Android Compatibility Testing
+Test representative combinations of:
+•	Supported Android versions.
+•	Different manufacturers.
+•	Low-, medium-, and high-specification devices.
+•	Different screen sizes and resolutions.
+•	Limited memory and storage.
+•	Battery-saving modes.
+•	Accessibility settings.
+•	Arabic and English layouts, including right-to-left display where applicable.
+•	Upgrade from the previous application version.
+•	Clean installation and reinstall scenarios.
+6.5 Technical QA Exit Criteria
+•	All planned critical test cases have been executed.
+•	All release-blocking defects have been closed and retested.
+•	No unresolved defect can cause data loss, unauthorized access, incorrect charges, or failure of a critical user journey.
+•	Remaining defects are documented in the Go-Live Risk Register.
+7. Phase 3: Security Assessment
+7.1 Authorization Testing
+Test both horizontal and vertical authorization.
+Horizontal authorization testing should verify that one user cannot access or modify another user’s:
+•	Profile.
+•	Orders.
+•	Transactions.
+•	Files.
+•	Messages.
+•	Support tickets.
+•	Reports.
+•	Other user-specific resources.
+Vertical authorization testing should verify that ordinary users cannot access:
+•	Administrative functions.
+•	Support-agent functions.
+•	Finance functions.
+•	Compliance functions.
+•	Internal APIs.
+•	Privileged data exports.
+•	Configuration or audit functions.
+7.2 IDOR Testing
+Test all object references used in:
+•	URLs.
+•	API paths.
+•	Request bodies.
+•	Query parameters.
+•	File identifiers.
+•	Download links.
+•	Internal record identifiers.
+Changing an identifier must not allow unauthorized viewing, modification, deletion, or download of another user’s information.
+7.3 Session Management Testing
+Test:
+•	Session creation and expiration.
+•	Logout invalidation.
+•	Token rotation.
+•	Refresh tokens.
+•	Concurrent sessions.
+•	Password-change invalidation.
+•	Account-deletion invalidation.
+•	Session fixation.
+•	Token storage on the device.
+•	Exposure of tokens in logs, URLs, or analytics.
+•	Replay of expired or revoked tokens.
+7.4 OTP Testing
+Test:
+•	OTP expiration.
+•	Maximum retry limits.
+•	Resend limits.
+•	Rate limiting.
+•	Brute-force resistance.
+•	OTP reuse.
+•	OTP interception risks.
+•	User enumeration.
+•	Verification bypass.
+•	Delivery to changed phone numbers or email addresses.
+•	Recovery and support-agent override processes.
+7.5 Automated Security Testing
+Perform and document:
+•	Static Application Security Testing, or SAST.
+•	Dynamic Application Security Testing, or DAST.
+•	Software Composition Analysis for dependencies.
+•	Secret scanning.
+•	Mobile application security scanning.
+•	Container and infrastructure scanning, where applicable.
+•	Cloud configuration assessment.
+•	API security scanning.
+Review findings for false positives and assign each confirmed issue an owner and remediation date.
+7.6 Penetration Testing
+Conduct risk-based penetration testing of:
+•	Android application.
+•	APIs.
+•	Authentication and account-recovery processes.
+•	Administrative interfaces.
+•	File upload and download functions.
+•	Payment-related functions.
+•	Cloud-facing services.
+•	Business-logic controls.
+•	Abuse and fraud scenarios.
+The penetration-test report should contain:
+•	Executive summary.
+•	Scope and limitations.
+•	Methodology.
+•	Findings and severity.
+•	Evidence.
+•	Business impact.
+•	Recommended remediation.
+•	Retest status.
+7.7 Production and Cloud Security Review
+Review:
+•	Production access permissions.
+•	Privileged and administrative accounts.
+•	Multi-factor authentication.
+•	Service accounts and API keys.
+•	Network segmentation.
+•	Firewall and security-group rules.
+•	Publicly exposed databases or storage.
+•	Database authentication and encryption.
+•	Encryption in transit and at rest.
+•	Secret-management practices.
+•	Logging and monitoring.
+•	Alerting rules.
+•	Cloud audit logs.
+•	Backup protection.
+•	Separation of production and non-production environments.
+•	Exposure of management interfaces.
+•	Default accounts and unnecessary services.
+7.8 Security Acceptance Standard
+The release must have no unresolved Critical or High security vulnerabilities.
+An exception may be accepted only when there is a written and formally approved risk-acceptance record containing:
+•	The vulnerability and affected assets.
+•	The reason immediate remediation is not possible.
+•	The assessed business and security impact.
+•	Alternative or compensating controls.
+•	The accountable risk owner.
+•	The person approving the exception.
+•	The target remediation date.
+•	Monitoring and escalation requirements.
+•	The conditions under which the exception must be reconsidered.
+8. Phase 4: Compliance and Privacy Audit
+8.1 Policy-to-Practice Comparison
+Compare actual system behavior with:
+•	Privacy policy.
+•	Terms and conditions.
+•	Data-flow map.
+•	Data-retention schedule.
+•	Consent records.
+•	Google Play Data Safety declaration.
+•	Internal security and privacy procedures.
+Any difference between declared and actual behavior must be corrected before launch or formally escalated.
+8.2 SDK and Endpoint Review
+Create an inventory of every:
+•	Mobile SDK.
+•	Analytics SDK.
+•	Advertising SDK.
+•	Crash-reporting SDK.
+•	Payment SDK.
+•	API endpoint.
+•	Tracking technology.
+•	External service integration.
+For each item, document:
+•	Provider.
+•	Data sent.
+•	Purpose.
+•	Trigger for transmission.
+•	Destination country or region.
+•	Whether data leaves Egypt.
+•	Whether the provider acts as a third party or processor.
+•	Contractual and privacy controls.
+•	Retention arrangements.
+•	User-consent requirements.
+Use network inspection to confirm what data is actually transmitted.
+8.3 Account Creation and Deletion Testing
+Test:
+•	Account creation from the application.
+•	Account deletion from the application.
+•	Account deletion through the required web link.
+•	Identity verification before deletion.
+•	Confirmation provided to the user.
+•	Removal of active access and sessions.
+•	Deletion or anonymization of associated data.
+•	Removal from marketing systems.
+•	Removal from analytics or downstream systems where required.
+•	Treatment of backups.
+•	Treatment of legally required retained records.
+Only data supported by a documented legal or operational retention requirement should remain after deletion.
+For retained data, document:
+•	Legal or business justification.
+•	Data fields retained.
+•	Retention period.
+•	Access restrictions.
+•	Final deletion process.
+8.4 Consent and Withdrawal Testing
+Test that:
+•	Consent is requested before relevant processing begins.
+•	Consent wording is clear and specific.
+•	Optional consent is not preselected.
+•	Refusal does not block unrelated services.
+•	Consent is recorded with date, version, and purpose.
+•	Users can withdraw consent.
+•	Withdrawal is applied to all relevant systems.
+•	Marketing stops after refusal or withdrawal.
+•	Previously collected data is handled according to the applicable policy and legal basis.
+8.5 Cancellation, Refund, Pricing, and Dark-Pattern Testing
+Validate the complete user journey for:
+•	Subscription cancellation.
+•	Order cancellation.
+•	Refund requests.
+•	Refund approval or rejection.
+•	Refund timing and status.
+•	Displayed prices.
+•	Taxes, fees, and additional charges.
+•	Renewal notices.
+•	Free-trial conversion.
+•	Confirmation before payment.
+Confirm that:
+•	Cancellation is not unnecessarily harder than enrollment.
+•	Fees are displayed before commitment.
+•	Optional purchases are not preselected.
+•	Buttons and wording are not misleading.
+•	Users are not pressured through false urgency.
+•	Important information is not hidden.
+•	Consent is not obtained through confusing interfaces.
+8.6 User-Generated Content Controls
+Where the service contains user-generated content, test:
+•	Content reporting.
+•	Acknowledgment of reports.
+•	Review and moderation.
+•	Escalation.
+•	Decision recording.
+•	Notification of the outcome.
+•	User appeal.
+•	Appeal review.
+•	Account restriction or reinstatement.
+•	Retention of moderation evidence.
+8.7 Legal Records and Chain of Custody
+Test the extraction of records for legal, regulatory, or investigative purposes.
+Confirm that:
+•	Only authorized personnel can request exports.
+•	The export includes only necessary information.
+•	Unrelated personal data is excluded.
+•	Every action is logged.
+•	Exported records are protected.
+•	File integrity can be verified.
+•	Dates and times are reliable.
+•	Custody transfers are documented.
+•	Original evidence is preserved.
+•	The process does not alter source records.
+9. Phase 5: Backup, Recovery, and Cloud Resilience
+9.1 Backup and Restore Testing
+Test:
+•	Database backups.
+•	File and object-storage backups.
+•	Configuration backups.
+•	Encryption-key recovery procedures, where applicable.
+•	Restoration to an isolated environment.
+•	Full and partial restoration.
+•	Recovery from accidental deletion.
+•	Recovery from corrupted data.
+•	Recovery of dependencies required to operate the service.
+Record:
+•	Recovery Point Objective.
+•	Recovery Time Objective.
+•	Actual data loss during the test.
+•	Actual recovery duration.
+•	Errors and manual steps.
+•	Validation that restored data is complete and usable.
+A backup should not be treated as successful until restoration has been tested.
+9.2 Cloud Provider or Region Failure
+Simulate the loss of:
+•	A single availability zone.
+•	The primary cloud region.
+•	A critical managed service.
+•	The cloud provider, where a provider-exit or alternative-hosting plan is required.
+Validate:
+•	Failover procedures.
+•	DNS changes.
+•	Access to backups from an alternative environment.
+•	Recovery of secrets and configuration.
+•	Communication procedures.
+•	Data integrity.
+•	Monitoring and alerting.
+•	Manual dependencies and decision authority.
+Document any reliance on a single provider, region, account, identity system, or administrator.
+10. Phase 6: Security Incident Simulation
+Conduct a tabletop or controlled technical simulation involving an incident such as:
+•	Unauthorized database access.
+•	Leaked API credentials.
+•	Compromised administrator account.
+•	Exposure of personal data.
+•	Malicious application release.
+•	Ransomware or destructive deletion.
+•	Third-party SDK data leak.
+The exercise should test:
+1.	Detection.
+2.	Initial triage.
+3.	Incident classification.
+4.	Technical containment.
+5.	Credential revocation.
+6.	Evidence preservation.
+7.	Internal escalation.
+8.	Legal and privacy assessment.
+9.	User or regulatory notification decision.
+10.	Service recovery.
+11.	Post-incident review.
+Record:
+•	Time the incident began.
+•	Time of detection.
+•	Time of acknowledgment.
+•	Time of containment.
+•	Time of escalation.
+•	Time of recovery.
+•	Decisions made.
+•	Decision-makers.
+•	Evidence used.
+•	Communications issued.
+•	Gaps identified.
+•	Corrective actions and owners.
+11. Defect and Finding Management
+All defects and findings should be recorded in one controlled register.
+Each record should include:
+•	Unique ID.
+•	Test source.
+•	Description.
+•	Affected component.
+•	Severity.
+•	Business impact.
+•	Evidence.
+•	Reproduction steps.
+•	Owner.
+•	Target remediation date.
+•	Current status.
+•	Fix reference.
+•	Retest result.
+•	Closure approval.
+Recommended statuses are:
+•	Open.
+•	Under Review.
+•	Confirmed.
+•	In Remediation.
+•	Ready for Retest.
+•	Closed.
+•	Risk Accepted.
+•	Duplicate.
+•	Not Applicable.
+A finding must not be marked closed without documented retest evidence.
+12. Required Deliverables
+12.1 QA Report and Closed Defect Register
+The QA package should contain:
+•	Test scope.
+•	Environment and build versions.
+•	Test cases executed.
+•	Passed and failed results.
+•	Performance results.
+•	Compatibility coverage.
+•	Defect list.
+•	Retest evidence.
+•	Remaining known limitations.
+•	QA Lead approval.
+12.2 Security and Penetration-Test Report
+The security package should contain:
+•	Security assessment scope.
+•	Tools and methodology.
+•	SAST, DAST, dependency, and secret-scan results.
+•	Penetration-test report.
+•	Cloud and production configuration review.
+•	Confirmed vulnerabilities.
+•	Remediation plan.
+•	Retest results.
+•	Approved security exceptions.
+•	Security Lead approval.
+12.3 Signed Compliance Audit
+The compliance package should contain:
+•	Policy-to-practice comparison.
+•	Data-flow and SDK inventory.
+•	Cross-border and third-party transfer review.
+•	Consent and withdrawal results.
+•	Deletion and retention results.
+•	Pricing, cancellation, and refund results.
+•	User-content controls, where applicable.
+•	Legal-record extraction results.
+•	Open compliance issues.
+•	Formal sign-off from Product, Privacy, Legal, Security, and the accountable business owner.
+12.4 Evidence Pack
+The evidence pack should include dated evidence for:
+•	Account deletion.
+•	Web deletion link.
+•	Consent collection.
+•	Consent withdrawal.
+•	Marketing suppression.
+•	Cancellation.
+•	Refund processing.
+•	Price and fee display.
+•	User reporting and appeals.
+•	Legal-record extraction.
+•	Backup restoration.
+•	Incident-response exercise.
+Evidence may include screenshots, logs, API responses, database verification, ticket records, and approved test scripts. Sensitive information should be masked.
+12.5 Go-Live Risk Register
+The final risk register should include:
+Field	Required Information
+Risk ID	Unique reference
+Risk Description	Clear description of the unresolved risk
+Source	QA, security, compliance, resilience, or operational testing
+Impact	Potential business, user, legal, or security consequence
+Likelihood	Assessed probability
+Overall Rating	Agreed risk level
+Existing Controls	Controls already in place
+Additional Actions	Planned remediation or monitoring
+Owner	Accountable individual
+Due Date	Target completion date
+Acceptance Authority	Person authorized to accept the risk
+Review Date	Date on which the risk must be reconsidered
+Status	Open, mitigated, accepted, or closed
+13. Go-Live Decision Criteria
+Go
+Production launch may proceed when:
+•	Critical user journeys pass.
+•	Release-blocking QA defects are closed.
+•	No unapproved Critical or High security vulnerabilities remain.
+•	Backup restoration has been successfully demonstrated.
+•	Production and cloud configuration reviews are complete.
+•	Deletion, consent, cancellation, refund, and legal-record processes pass.
+•	Required policies and store declarations match actual behavior.
+•	Incident-response and recovery exercises are complete.
+•	Required reports and evidence have been delivered.
+•	Residual risks have named owners and formal approval.
+Conditional Go
+A conditional launch may proceed only when:
+•	The remaining issues do not create an unacceptable risk to users, data, finances, or regulatory compliance.
+•	Compensating controls are active.
+•	Remediation dates are agreed.
+•	Monitoring and rollback conditions are documented.
+•	The authorized risk owner signs the exception.
+No-Go
+Launch must be stopped when:
+•	A Critical vulnerability remains unresolved.
+•	A High vulnerability remains without approved mitigation and written risk acceptance.
+•	Unauthorized data access is possible.
+•	Account deletion or consent withdrawal does not work.
+•	Pricing, charges, cancellation, or refunds are materially misleading or incorrect.
+•	Backups cannot be restored.
+•	Production databases or sensitive services are unnecessarily exposed.
+•	Actual data processing materially differs from the privacy policy or Data Safety declaration.
+•	A critical defect may cause data loss, incorrect charges, or widespread service failure.
+•	Required decision-makers have not signed the final approvals.
+14. Final Approval
+The final go-live approval should be signed by:
+•	Product Owner.
+•	Engineering Lead.
+•	QA Lead.
+•	Security Lead.
+•	DevOps or Cloud Lead.
+•	Privacy or Compliance Lead.
+•	Legal representative.
+•	Executive Risk Owner.
+The approval record should identify:
+•	Release version.
+•	Production deployment date.
+•	Approved residual risks.
+•	Conditions attached to approval.
+•	Rollback authority.
+•	Post-launch monitoring period.
+•	Dates for reviewing temporary exceptions.
+
+________________________________________
+15. IMPLEMENTATION STATUS CHECKLIST (updated 2026-07-19)
+
+This appendix tracks every test phase and deliverable against the current
+project state. The entire plan is a pre-launch QA/security/compliance gate —
+almost nothing is executed yet.
+
+Legend:
+  [DONE]     Fully implemented and tested
+  [PARTIAL]  Some work done, needs completion
+  [PENDING]  Not started
+
+15.1 Phase 1 — Planning and Test Readiness
+
+  [PENDING] §5.1 Architecture diagram with all components/APIs/data-flows
+            and transfer locations — docs/architecture/overview.md exists
+            but is not the full scope diagram the test plan requires.
+  [PENDING] §5.3 Data inventory and data-flow map with retention, third-
+            party recipients, and Egypt-exit transfers.
+  [PENDING] §5.4 Production-like test environment — no staging env exists
+            (only local/remote D1, no separate staging Worker).
+  [PENDING] §5.5 Test accounts for all roles — not created.
+  [PENDING] §5.6 Severity classifications and escalation paths — defined
+            in incident-response.md but not tested.
+  [PARTIAL] §5.7 Access to source/docs/cloud/logs/policies/backup
+            procedures — source and docs exist; cloud logging and backup
+            procedures are incomplete.
+  [PENDING] §5 Entry Criteria — release candidate stable and version-
+            controlled [DONE — 6a41dae]; test environments [PENDING];
+            architecture docs provided [PARTIAL]; known limitations
+            documented [PARTIAL]; written authorization to test [PENDING].
+
+  → Phase 1 Entry Criteria: NOT MET
+
+15.2 Phase 2 — Technical QA and Resilience Testing
+
+  [PENDING] §6.1 Functional Testing — critical user journeys not formally
+            tested end-to-end in production-like environment.
+  [PENDING] §6.2 Performance and Load Testing — no load/performance tests
+            exist. No approved performance thresholds.
+  [PENDING] §6.3 Network Interruption Testing — not performed.
+  [PARTIAL] §6.4 Android Compatibility Testing —
+            Localization tests exist (Arabic/English/RTL). Device matrix
+            and manufacturer coverage not tested. Accessibility not tested.
+            Upgrade/reinstall scenarios not tested.
+  [PENDING] §6.5 Technical QA Exit Criteria — not met.
+
+15.3 Phase 3 — Security Assessment
+
+  [PARTIAL] §7.1 Authorization Testing —
+            Store-scoped access enforced in code. No formal horizontal/
+            vertical authorization test suite.
+  [PENDING] §7.2 IDOR Testing — not performed.
+  [PENDING] §7.3 Session Management Testing — not systematically tested.
+  [DONE]    §7.4 OTP Testing —
+            Expiration, retry limits, rate limiting, reuse prevention
+            tested per auth-phase1-contract.md regression tests.
+  [PENDING] §7.5 Automated Security Testing (SAST/DAST/SCA/secret/mobile
+            scanning) — not implemented.
+  [PENDING] §7.6 Penetration Testing — not performed.
+  [PENDING] §7.7 Production and Cloud Security Review — not performed.
+  [PENDING] §7.8 Security Acceptance Standard — no Critical/High
+            vulnerability baseline exists; no risk-acceptance records.
+  [PARTIAL] Threat model exists (created 2026-07-18). 10 threats
+            assessed, 3 open remediation items.
+
+  → Phase 3: NOT STARTED (only OTP testing and threat model exist)
+
+15.4 Phase 4 — Compliance and Privacy Audit
+
+  [PENDING] §8.1 Policy-to-Practice Comparison — not performed.
+  [PARTIAL] §8.2 SDK and Endpoint Review —
+            Third-party register (TP-001 through TP-012) exists.
+            Network inspection not performed. Cross-border transfer
+            destinations not mapped.
+  [PENDING] §8.3 Account Creation and Deletion Testing —
+            Deletion flow code exists. Formal end-to-end deletion testing
+            in production-like environment not performed. Backup treatment
+            and downstream removal not verified.
+  [PENDING] §8.4 Consent and Withdrawal Testing — not formally tested.
+  [PENDING] §8.5 Cancellation, Refund, Pricing, and Dark-Pattern Testing —
+            N/A while billing is disabled. Pricing display tested via
+            integer-piasters tests.
+  [PENDING] §8.6 User-Generated Content Controls —
+            UGC workflow requirements frozen (phase4-content-controls.md).
+            Implementation and testing are G6/pilot blockers.
+  [PENDING] §8.7 Legal Records and Chain of Custody — not tested.
+
+  → Phase 4: NOT STARTED (only SDK register baseline exists)
+
+15.5 Phase 5 — Backup, Recovery, and Cloud Resilience
+
+  [PENDING] §9.1 Backup and Restore Testing — not performed.
+  [PENDING] §9.2 Cloud Provider or Region Failure —
+            Cloudflare single-region dependency (WEUR). No failover plan.
+            No provider-exit plan.
+  [DONE]    Encrypted database backups — D1 automated backups are running.
+
+  → Phase 5: NOT STARTED (only backup existence confirmed)
+
+15.6 Phase 6 — Security Incident Simulation
+
+  [PENDING] §10 Tabletop or controlled technical simulation — not
+            performed. Incident-response plan exists (created 2026-07-18)
+            but has not been exercised.
+
+15.7 Defect and Finding Management
+
+  [PENDING] §11 Controlled defect register — no formal register with
+            the specified fields (ID, source, severity, impact, owner,
+            remediation date, retest, closure approval) exists.
+  [PARTIAL] docs/governance/registers/findings-register.md has FND-001
+            through FND-005. Not aligned to the plan's severity/workflow.
+
+15.8 Required Deliverables (5 packages)
+
+  | # | Deliverable | Status | Evidence |
+  |---|---|---|---|
+  | 1 | QA Report and Closed Defect Register | [PENDING] | No testing performed |
+  | 2 | Security and Penetration-Test Report | [PENDING] | No security testing performed |
+  | 3 | Signed Compliance Audit | [PENDING] | No compliance audit performed |
+  | 4 | Evidence Pack (deletion, consent, refund, backup, incident) | [PENDING] | No evidence gathered |
+  | 5 | Go-Live Risk Register | [PENDING] | No formal risk register |
+
+15.9 Go-Live Decision Criteria
+
+  GO conditions (11 items):
+
+  | # | Condition | Status |
+  |---|---|---|
+  | 1 | Critical user journeys pass | [PENDING] |
+  | 2 | Release-blocking QA defects closed | [PENDING] |
+  | 3 | No unapproved Critical/High security findings | [PENDING] — no scan performed |
+  | 4 | Backup restoration demonstrated | [PENDING] |
+  | 5 | Production/cloud config review complete | [PENDING] |
+  | 6 | Deletion/consent/cancel/refund/legal-record processes pass | [PENDING] |
+  | 7 | Policies and store declarations match behavior | [PENDING] |
+  | 8 | Incident-response and recovery exercises complete | [PENDING] |
+  | 9 | Required reports and evidence delivered | [PENDING] |
+  | 10 | Residual risks have owners and approval | [PENDING] |
+
+  → GO criteria: 0 of 10 met. Launch blocked.
+
+  NO-GO conditions (automatic launch blockers):
+
+  | # | Condition | Present? |
+  |---|---|---|
+  | Critical vulnerability unresolved | Unknown — no scan |
+  | High vulnerability without mitigation | Unknown — no scan |
+  | Unauthorized data access possible | Unknown — no IDOR/authorization test |
+  | Account deletion does not work | ✅ Code implemented; not tested in production-like env |
+  | Consent withdrawal does not work | ⚠️ Not implemented as separate flow |
+  | Pricing/cancellation/refund misleading | ✅ Free launch; billing disabled |
+  | Backups cannot be restored | ⚠️ Not tested |
+  | Production DB/services exposed | Unknown — no cloud review |
+  | Privacy policy materially differs from practice | Unknown — no audit |
+  | Critical defect may cause data loss | Unknown — no comprehensive testing |
+  | Decision-makers not signed | ⚠️ G4 gate not passed (5 approvers pending) |
+
+15.10 Final Approval
+
+  All 8 roles must sign. Current status:
+
+  | Role | Status |
+  |---|---|
+  | Product Owner | [PENDING] — G4 gate |
+  | Engineering Lead | [PENDING] |
+  | QA Lead | [PENDING] — no QA performed |
+  | Security Lead | [PENDING] — no security testing |
+  | DevOps/Cloud Lead | [PENDING] |
+  | Privacy/Compliance Lead | [PENDING] — no audit |
+  | Legal Representative | [PENDING] |
+  | Executive Risk Owner | [PENDING] |
+
+15.11 Summary
+
+  Deliverable status across all phases:
+
+     2   [DONE]    (OTP testing, encrypted backups)
+     5   [PARTIAL] (architecture docs, SDK register, findings, compatibility, threat model)
+    38   [PENDING] (all testing, auditing, simulation, evidence)
+
+  This is the go-live gate — it is almost entirely unexecuted. The plan
+  represents the full QA/security/compliance validation required before
+  production launch. Key next steps:
+
+  1. Create a staging environment (Plan 7 Gate 2 blocker)
+  2. Execute functional testing of all critical user journeys
+  3. Commission SAST/DAST/dependency/secret scanning
+  4. Perform a restore test and document RPO/RTO
+  5. Conduct the compliance audit (policy-to-practice comparison)
+  6. Run the incident-response tabletop exercise
+  7. Build the Go-Live Risk Register with named owners
+
+  The codebase is ready for testing — deletion, retention, consent logging,
+  and security controls are all implemented. The testing itself has not been
+  performed.
+
