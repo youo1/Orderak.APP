@@ -1,0 +1,50 @@
+:root {
+  color-scheme: light;
+  font-family: var(--preview-font, system-ui, sans-serif);
+  background: var(--md-background, #f5f7fc);
+  color: var(--md-on-surface, #14141f);
+}
+:root[data-mode="dark"] { color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; background: var(--md-background); }
+button, input, select { min-height: var(--touch, 48px); font: inherit; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--md-primary); outline-offset: 2px; }
+header { display: flex; align-items: center; gap: 10px; padding: 14px 18px; color: var(--md-on-surface); background: var(--md-surface-container); border-bottom: 1px solid var(--md-outline-variant); }
+header .logo { width: 40px; height: 40px; display: grid; place-items: center; border-radius: var(--shape-sm); color: var(--md-on-primary); background: var(--md-primary); font-weight: 800; }
+header span { display: block; color: var(--md-on-surface-variant); font-size: 12px; }
+header nav { display: flex; gap: 4px; margin-inline-start: auto; }
+header nav button { border: 0; color: inherit; background: transparent; border-radius: var(--shape-sm); padding: 0 12px; }
+main { padding: var(--gap, 16px); }
+.preview-toolbar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+.preview-toolbar label { font-size: 11px; color: var(--md-on-surface-variant); }
+.preview-toolbar select { width: 100%; min-height: 36px; border: 1px solid var(--md-outline); border-radius: var(--shape-sm); color: var(--md-on-surface); background: var(--md-surface); }
+.hero, article { padding: 20px; border-radius: var(--shape-md); background: var(--md-surface); border: 1px solid var(--md-outline-variant); }
+.hero { background: var(--md-primary-container); color: var(--md-on-primary-container); }
+.hero h1 { margin: 10px 0 6px; font-size: 28px; line-height: 1.15; }
+.hero p { color: inherit; opacity: .85; }
+.chip, .status-grid > div, td span { display: inline-flex; padding: 5px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+.chip { color: var(--md-on-secondary-container); background: var(--md-secondary-container); }
+.actions { display: flex; gap: 8px; margin-top: 18px; }
+button { cursor: pointer; padding: 0 16px; border-radius: var(--shape-sm); }
+button.primary { border: 0; color: var(--md-on-primary); background: var(--md-primary); }
+button.secondary { color: var(--md-primary); background: transparent; border: 1px solid var(--md-outline); }
+.grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: var(--gap); margin-top: var(--gap); }
+article h2 { margin-top: 0; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 10px 4px; text-align: start; border-bottom: 1px solid var(--md-outline-variant); }
+th { color: var(--md-on-surface-variant); font-size: 12px; }
+article label { display: grid; gap: 5px; margin: 9px 0; color: var(--md-on-surface-variant); font-size: 12px; }
+article input, article select { width: 100%; padding: 0 10px; color: var(--md-on-surface); background: var(--md-surface-container-low); border: 1px solid var(--md-outline); border-radius: var(--shape-sm); }
+article .switch-line { display: flex; align-items: center; }
+article .switch-line input { width: auto; min-height: auto; }
+.success { color: var(--md-on-success-container); background: var(--md-success-container); }
+.warning { color: var(--md-on-warning-container); background: var(--md-warning-container); }
+.info { color: var(--md-on-information-container); background: var(--md-information-container); }
+.error { color: var(--md-on-error-container); background: var(--md-error-container); }
+.status-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: var(--gap); }
+.status-grid > div { justify-content: center; }
+.floating { margin-top: var(--gap); border: 1px solid var(--md-outline); color: var(--md-primary); background: var(--md-surface); }
+dialog { width: min(420px, calc(100% - 32px)); color: var(--md-on-surface); background: var(--md-surface); border: 1px solid var(--md-outline-variant); border-radius: var(--shape-md); }
+dialog::backdrop { background: color-mix(in srgb, var(--md-scrim), transparent 40%); }
+footer { margin-top: 20px; color: var(--md-on-surface-variant); font-size: 11px; text-align: center; }
+@media (max-width: 650px) { .grid { grid-template-columns: 1fr; }.status-grid { grid-template-columns: 1fr 1fr; }.preview-toolbar { grid-template-columns: 1fr; } }

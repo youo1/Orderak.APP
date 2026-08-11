@@ -1,0 +1,32 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "orderak-admin-edge",
+  "main": "src/edge/worker.ts",
+  "compatibility_date": "2026-07-29",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "admin.orderak.app",
+      "custom_domain": true
+    }
+  ],
+  "vars": {
+    "CANONICAL_HOST": "admin.orderak.app",
+    "THEME_ORIGIN": "https://api.orderak.app"
+  },
+  "services": [
+    { "binding": "ADMIN_WORKER", "service": "orderak-admin-worker" }
+  ],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/theme.css", "/theme-preview", "/theme-preview.html"]
+  },
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "head_sampling_rate": 0.1 },
+    "traces": { "enabled": true, "head_sampling_rate": 0.05 }
+  }
+}
