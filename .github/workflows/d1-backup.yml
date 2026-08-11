@@ -151,6 +151,15 @@ jobs:
           grep -q "CREATE TABLE" "$F" || { echo "ERROR: $F has no CREATE TABLE — export may be corrupt"; exit 1; }
           echo "$F: $(wc -c < "$F") bytes OK"
 
+      - name: Append index definitions — wrangler d1 export omits them entirely
+        working-directory: services/backend
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute "$DB" --remote --json \
+            --command "SELECT type, name, tbl_name, sql FROM sqlite_master WHERE type IN ('table','index')" \
+            > /tmp/schema-with-indexes.json
+          node scripts/d1-export-indexes.mjs < /tmp/schema-with-indexes.json >> "/tmp/${DB}.sql"
+
       - name: Fetch previous manifest for row-loss comparison
         working-directory: services/backend
         continue-on-error: true
@@ -305,6 +314,15 @@ jobs:
           [ -s "$F" ] || { echo "ERROR: $F is empty or missing — aborting backup"; exit 1; }
           grep -q "CREATE TABLE" "$F" || { echo "ERROR: $F has no CREATE TABLE — export may be corrupt"; exit 1; }
           echo "$F: $(wc -c < "$F") bytes OK"
+
+      - name: Append index definitions — wrangler d1 export omits them entirely
+        working-directory: services/backend
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute "$DB" --remote --json \
+            --command "SELECT type, name, tbl_name, sql FROM sqlite_master WHERE type IN ('table','index')" \
+            > /tmp/schema-with-indexes.json
+          node scripts/d1-export-indexes.mjs < /tmp/schema-with-indexes.json >> "/tmp/${DB}.sql"
 
       - name: Restore drill — prove the export is recoverable
         working-directory: services/backend
