@@ -201,6 +201,71 @@ After a successful run:
 - Record the deployed SHA and the GitHub Actions run URL in the appropriate
   release or governance evidence.
 
+## Rollback triggers
+
+A trigger without a number cannot fire. These are numeric thresholds, not
+adjectives, derived from a measured Staging baseline rather than assumed.
+
+**Measured baseline** (Staging, `k6 run --env PROFILE=smoke`, 2026-08-11,
+2 VUs / 30s / 480 requests against `api.staging.orderak.app`):
+
+| Metric | Measured | Trigger | Window |
+| --- | --- | --- | --- |
+| Error rate (`http_req_failed`) | 0.00% (0/480) | **> 1%** sustained | 5 minutes |
+| p95 latency | 150.61 ms | **> 500 ms** sustained | 10 minutes |
+| p99 latency | 222.57 ms | **> 1500 ms** sustained | 10 minutes |
+
+The p95/p99 triggers match the gates `quality/performance/k6/api-load.js`
+already enforces during load tests (`p(95)<500`, `p(99)<1500`) — the same
+bound serves both as a pre-release gate and a live rollback trigger, so
+promoting past the first never means shipping something that would already
+fail the second. The error-rate trigger is set above the script's own
+`rate<0.005` build gate, wide enough that a single transient blip does not
+fire it while a real regression still does inside the 5-minute window.
+
+**Not yet measurable with the tooling available:**
+
+- **Auth failure rate.** Staging carries no organic traffic before launch —
+  only the synthetic seller used by nightly contract fuzzing. There is
+  nothing to derive a rate from yet. Set this trigger from real traffic
+  during the pre-launch soak, before relying on it.
+- **Queue backlog / oldest-message age.** `wrangler queues info` reports
+  configuration (producers, consumers) but not depth. A real number needs
+  Cloudflare's GraphQL Analytics API or the dashboard, neither queried here.
+  Until then, treat **any message landing in a DLQ** as the trigger — the
+  DLQs exist precisely so backlog failures are visible as a queue depth
+  rather than a silent drop, and a non-empty DLQ is failure regardless of
+  what the healthy backlog number turns out to be.
+
+Re-measure the baseline before relying on these numbers for a real
+production rollback decision — this table is dated, not evergreen.
+
+### Rehearsed, not assumed
+
+The rollback path below was exercised end to end on Staging on 2026-08-11,
+before anything depended on it:
+
+1. Deployed an older commit (`4ea5f98`, four commits behind `main`) to
+   Staging via `workflow_dispatch` — both `validate` and `deploy` green.
+2. Rolled forward to `main` the same way — both green, `/health` and the
+   admin app back to `200`.
+
+Two things that surfaced only by doing it, worth knowing before a real
+incident:
+
+- **`workflow_dispatch` needs a ref that exists on the remote.** Passing a
+  bare commit SHA to `gh workflow run --ref` fails with
+  `HTTP 422: No ref found`. A rollback to an arbitrary older commit
+  therefore needs a branch or tag pushed at that commit first. Under
+  incident pressure that is an extra step nobody will remember — push a
+  tag at each known-good release so the ref already exists.
+- **A code rollback does not touch Durable Object state.** `RateLimiter`
+  instances keep their storage and class identity across the redeploy. That
+  is fine for a pure code regression, and it is exactly why a change to a
+  Durable Object's class name or storage layout is *not* rollback-safe: the
+  older code would meet newer state. Treat DO lifecycle changes as
+  forward-fix-only.
+
 ## Rollback and forward fixes
 
 For an application-code regression, run `Deploy Production` again with the last
