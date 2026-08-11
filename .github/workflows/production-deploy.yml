@@ -43,6 +43,11 @@ jobs:
         with:
           ref: ${{ inputs.release_sha }}
 
+      - name: Require deploy owner
+        uses: ./.github/actions/require-deploy-owner
+        with:
+          expected-owner: ${{ vars.DEPLOY_OWNER }}
+
       - name: Verify the exact SHA passed Staging
         env:
           GH_TOKEN: ${{ github.token }}
