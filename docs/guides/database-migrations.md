@@ -20,8 +20,8 @@ npx wrangler d1 migrations list orderak-db --local
 npx wrangler d1 migrations apply orderak-db --local
 npx wrangler d1 migrations list orderak-db --remote
 npx wrangler d1 migrations apply orderak-db --remote
-npx wrangler d1 migrations list orderak_db --env staging --remote
-npx wrangler d1 migrations apply orderak_db --env staging --remote
+npx wrangler d1 migrations list orderak-db-staging --env staging --remote
+npx wrangler d1 migrations apply orderak-db-staging --env staging --remote
 ```
 
 > Do not execute individual migration files with `wrangler d1 execute`. Some SQL

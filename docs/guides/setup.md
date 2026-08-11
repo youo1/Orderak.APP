@@ -472,8 +472,8 @@ Apply the two migration streams and deploy:
 
 ```cmd
 cd services/backend
-npx wrangler d1 migrations apply orderak_db --env staging --remote
-npx wrangler d1 migrations apply orderak_geo --env staging --remote
+npx wrangler d1 migrations apply orderak-db-staging --env staging --remote
+npx wrangler d1 migrations apply orderak-geo-staging --env staging --remote
 pnpm run deploy:staging
 pnpm run deploy:staging:admin
 

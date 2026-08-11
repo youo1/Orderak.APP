@@ -47,6 +47,23 @@ jobs:
       - name: Verify documentation claims about paths, scripts and resources
         run: node tooling/repository/verify-doc-claims.mjs
 
+      # The plan asks for a generated-doc drift check and there was none. Its
+      # absence let a real break go unnoticed: database-migrations.md is
+      # generated, so frontmatter added to it by hand survived only until the
+      # next regeneration — which would then have failed
+      # verify-doc-frontmatter.mjs with "no current document claims it", at
+      # whatever unrelated moment someone next touched a migration.
+      - name: Verify generated documentation is not stale
+        run: |
+          set -euo pipefail
+          node services/backend/scripts/generate-migration-docs.mjs
+          if ! git diff --quiet -- docs/guides/database-migrations.md; then
+            echo "::error::docs/guides/database-migrations.md is out of date. Run services/backend/scripts/generate-migration-docs.mjs and commit the result."
+            git diff --stat -- docs/guides/database-migrations.md
+            exit 1
+          fi
+          echo "Generated migration reference matches its generator."
+
       - name: Link check
         uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2
         with:
