@@ -1,0 +1,14 @@
+{
+	"extends": "../tsconfig.json",
+	"compilerOptions": {
+		// The `cloudflare:test` module declarations live under the package's
+		// `/types` export, not its root — pointing at the root resolves the
+		// *pool* types instead, which leaves test/env.d.ts shadowing the real
+		// module and hides every `env` / `SELF` / `createExecutionContext`.
+		"types": ["@cloudflare/vitest-pool-workers/types", "node"]
+	},
+	// ../src/env.d.ts carries the global `Env` interface that test/env.d.ts
+	// augments ProvidedEnv with; without it every `Env` reference is unresolved.
+	"include": ["./**/*.ts", "../src/env.d.ts", "../src/generated/*.d.ts"],
+	"exclude": []
+}

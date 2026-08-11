@@ -1,0 +1,109 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "orderak-admin-worker",
+	"main": "src/entrypoints/admin-worker.ts",
+	"compatibility_date": "2026-07-29",
+	"compatibility_flags": ["nodejs_compat"],
+	"workers_dev": false,
+	"preview_urls": false,
+	"upload_source_maps": true,
+	"observability": {
+		"enabled": true,
+		"logs": { "enabled": true, "head_sampling_rate": 0.1 },
+		"traces": { "enabled": true, "head_sampling_rate": 0.05 }
+	},
+	"vars": {
+		"DEPLOYMENT_ENVIRONMENT": "production",
+		"ADMIN_ORIGIN": "https://admin.orderak.app",
+		"BILLING_ENABLED": "false",
+		"GOOGLE_PLAY_LIFECYCLE_ENABLED": "false",
+		"AI_ASSISTANT_ENABLED": "false",
+		"ENTITLEMENTS_ENABLED": "false",
+		"AUTH_IDENTITY_ENABLED": "false",
+		"PHONE_CHANGE_ENABLED": "false",
+		"AI_MONTHLY_BUDGET_MICRO_USD": "0",
+		"GOOGLE_PLAY_PACKAGE_NAME": "app.orderak.seller"
+	},
+	"triggers": { "crons": ["* * * * *", "*/15 * * * *"] },
+	"d1_databases": [{
+		"binding": "orderak_db",
+		"database_name": "orderak-db",
+		"database_id": "db325720-89fa-4572-87f8-9767b02053d9"
+	}],
+	"r2_buckets": [
+		{ "binding": "orderak_media", "bucket_name": "orderak-media" },
+		{ "binding": "orderak_audit", "bucket_name": "orderak-admin-audit" }
+	],
+	"queues": {
+		"producers": [
+			{ "binding": "ADMIN_EXPORT_QUEUE", "queue": "orderak-admin-exports" },
+			{ "binding": "PLAY_BILLING_QUEUE", "queue": "orderak-play-billing" },
+			{ "binding": "EMAIL_QUEUE", "queue": "orderak-email" }
+		],
+		"consumers": [
+			{ "queue": "orderak-admin-exports", "max_batch_size": 5, "max_batch_timeout": 10, "max_retries": 3, "dead_letter_queue": "orderak-admin-exports-dlq" },
+			{ "queue": "orderak-admin-exports-dlq", "max_batch_size": 5, "max_batch_timeout": 5, "max_retries": 3 },
+			{
+				"queue": "orderak-play-billing",
+				"max_batch_size": 5,
+				"max_batch_timeout": 5,
+				"max_retries": 8,
+				"max_concurrency": 10,
+				"dead_letter_queue": "orderak-play-billing-dlq"
+			},
+			{ "queue": "orderak-play-billing-dlq", "max_batch_size": 5, "max_batch_timeout": 5, "max_retries": 3 }
+		]
+	},
+	"send_email": [{ "name": "EMAIL", "remote": true }],
+	"env": {
+		"staging": {
+			"name": "orderak-admin-worker-staging",
+			"workers_dev": false,
+			"preview_urls": false,
+			"vars": {
+				"DEPLOYMENT_ENVIRONMENT": "staging",
+				"ADMIN_ORIGIN": "https://admin.staging.orderak.app",
+				"ADMIN_TOTP_KEY_CURRENT": "1",
+				"BILLING_ENABLED": "false",
+				"GOOGLE_PLAY_LIFECYCLE_ENABLED": "false",
+				"AI_ASSISTANT_ENABLED": "false",
+				"ENTITLEMENTS_ENABLED": "false",
+				"AUTH_IDENTITY_ENABLED": "false",
+				"PHONE_CHANGE_ENABLED": "false",
+				"AI_MONTHLY_BUDGET_MICRO_USD": "0",
+				"GOOGLE_PLAY_PACKAGE_NAME": "app.orderak.seller"
+			},
+			"triggers": { "crons": ["* * * * *", "*/15 * * * *"] },
+			"d1_databases": [{
+				"binding": "orderak_db",
+				"database_name": "orderak-db-staging",
+				"database_id": "86871840-31c5-4ce0-8b33-5edfd6dc91d0"
+			}],
+			"r2_buckets": [
+				{ "binding": "orderak_media", "bucket_name": "orderak-media-staging" },
+				{ "binding": "orderak_audit", "bucket_name": "orderak-admin-audit-staging" }
+			],
+			"queues": {
+				"producers": [
+					{ "binding": "ADMIN_EXPORT_QUEUE", "queue": "orderak-admin-exports-staging" },
+					{ "binding": "PLAY_BILLING_QUEUE", "queue": "orderak-play-billing-staging" },
+					{ "binding": "EMAIL_QUEUE", "queue": "orderak-email-staging" }
+				],
+				"consumers": [
+					{ "queue": "orderak-admin-exports-staging", "max_batch_size": 5, "max_batch_timeout": 10, "max_retries": 3, "dead_letter_queue": "orderak-admin-exports-dlq-staging" },
+					{ "queue": "orderak-admin-exports-dlq-staging", "max_batch_size": 5, "max_batch_timeout": 5, "max_retries": 3 },
+					{
+						"queue": "orderak-play-billing-staging",
+						"max_batch_size": 5,
+						"max_batch_timeout": 5,
+						"max_retries": 8,
+						"max_concurrency": 10,
+						"dead_letter_queue": "orderak-play-billing-dlq-staging"
+					},
+					{ "queue": "orderak-play-billing-dlq-staging", "max_batch_size": 5, "max_batch_timeout": 5, "max_retries": 3 }
+				]
+			},
+			"send_email": [{ "name": "EMAIL", "remote": true }]
+		}
+	}
+}

@@ -1,0 +1,182 @@
+/**
+ * For more details on how to configure Wrangler, refer to:
+ * https://developers.cloudflare.com/workers/wrangler/configuration/
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "orderak-worker",
+	"main": "src/entrypoints/public-worker.ts",
+	"compatibility_date": "2026-07-29",
+	"observability": {
+		"enabled": true,
+		"logs": { "enabled": true, "head_sampling_rate": 0.1 },
+		"traces": { "enabled": true, "head_sampling_rate": 0.05 }
+	},
+	"upload_source_maps": true,
+	"vars": {
+		"DEPLOYMENT_ENVIRONMENT": "production",
+		"BILLING_ENABLED": "false",
+		"GOOGLE_PLAY_LIFECYCLE_ENABLED": "false",
+		"AI_ASSISTANT_ENABLED": "false",
+		"ENTITLEMENTS_ENABLED": "false",
+		"AUTH_IDENTITY_ENABLED": "true",
+		// Held closed until the release gates in docs/product/production-auth-plan.md
+		// are met — Play signing is still outstanding. Staging keeps these enabled
+		// so the flow stays testable. Flip together with those docs, not before.
+		"ONBOARDING_ENABLED": "false",
+		"PASSKEY_ENABLED": "false",
+		"PHONE_CHANGE_ENABLED": "true",
+		"STATIC_CITY_CATALOG_ENABLED": "true",
+		"BUSINESS_TAXONOMY_ENABLED": "true",
+		"AI_MONTHLY_BUDGET_MICRO_USD": "0",
+		"GOOGLE_PLAY_PACKAGE_NAME": "app.orderak.seller",
+		"LOCAL_JWT_VERIFICATION": "false",
+		"FIREBASE_PROJECT_ID": ""
+	},
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"triggers": {
+		"crons": ["17 2 * * *", "32 2 * * *", "47 2 * * *", "2 3 * * *"]
+	},
+	"routes": [
+		{ "pattern": "orderak.app", "custom_domain": true },
+		{ "pattern": "www.orderak.app", "custom_domain": true },
+		{ "pattern": "api.orderak.app", "custom_domain": true }
+	],
+	"durable_objects": {
+		"bindings": [
+			{ "name": "RATE_LIMITER", "class_name": "RateLimiter" }
+		]
+	},
+	"migrations": [
+		{ "tag": "v1", "new_sqlite_classes": ["RateLimiter"] }
+	],
+	"d1_databases": [
+		{
+			"binding": "orderak_db",
+			"database_name": "orderak-db",
+			"database_id": "db325720-89fa-4572-87f8-9767b02053d9"
+		},
+		{
+			"binding": "orderak_geo",
+			"database_name": "orderak-geo",
+			"database_id": "41891664-fe6b-48b2-97b1-3fa6c5b5ce0c",
+			"migrations_dir": "geo-migrations"
+			// Read replication is NOT a wrangler binding field — wrangler ignores it and warns
+			// "Unexpected fields found in d1_databases[1]". Enable per-database via the
+			// Cloudflare dashboard (D1 > orderak-geo > Settings) or REST API; the
+			// withSession("first-unconstrained") calls in catalog/geo.ts then take effect.
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "orderak_media",
+			"bucket_name": "orderak-media"
+		}
+	],
+	"queues": {
+		"producers": [
+			{ "binding": "PLAY_BILLING_QUEUE", "queue": "orderak-play-billing" },
+			{ "binding": "EMAIL_QUEUE", "queue": "orderak-email" }
+		],
+		"consumers": [
+			{
+				"queue": "orderak-email",
+				"max_batch_size": 10,
+				"max_batch_timeout": 5,
+				"max_retries": 5,
+				"max_concurrency": 10,
+				"dead_letter_queue": "orderak-email-dlq"
+			},
+			{ "queue": "orderak-email-dlq", "max_batch_size": 10, "max_batch_timeout": 5, "max_retries": 3 }
+		]
+	},
+	"send_email": [
+		{ "name": "EMAIL", "remote": true }
+	],
+	"assets": {
+		"directory": "./assets",
+		"not_found_handling": "none"
+	},
+	"env": {
+		"staging": {
+			"name": "orderak-worker-staging",
+			"workers_dev": true,
+			"preview_urls": false,
+			"vars": {
+				"DEPLOYMENT_ENVIRONMENT": "staging",
+				"BILLING_ENABLED": "false",
+				"GOOGLE_PLAY_LIFECYCLE_ENABLED": "false",
+				"AI_ASSISTANT_ENABLED": "false",
+				"ENTITLEMENTS_ENABLED": "false",
+				"AUTH_IDENTITY_ENABLED": "true",
+				"ONBOARDING_ENABLED": "true",
+				"PASSKEY_ENABLED": "true",
+				"PHONE_CHANGE_ENABLED": "true",
+				"STATIC_CITY_CATALOG_ENABLED": "true",
+				"BUSINESS_TAXONOMY_ENABLED": "true",
+				"AI_MONTHLY_BUDGET_MICRO_USD": "0",
+				"GOOGLE_PLAY_PACKAGE_NAME": "app.orderak.seller",
+				"LOCAL_JWT_VERIFICATION": "true",
+				"FIREBASE_PROJECT_ID": "orderak-staging"
+			},
+			"triggers": {
+				"crons": ["17 2 * * *", "32 2 * * *", "47 2 * * *", "2 3 * * *"]
+			},
+			"routes": [
+				{ "pattern": "staging.orderak.app", "custom_domain": true },
+				{ "pattern": "api.staging.orderak.app", "custom_domain": true }
+			],
+			"durable_objects": {
+				"bindings": [
+					{ "name": "RATE_LIMITER", "class_name": "RateLimiter" }
+				]
+			},
+			"d1_databases": [
+				{
+					"binding": "orderak_db",
+					"database_name": "orderak-db-staging",
+					"database_id": "86871840-31c5-4ce0-8b33-5edfd6dc91d0"
+				},
+				{
+					"binding": "orderak_geo",
+					"database_name": "orderak-geo-staging",
+					"database_id": "9472986d-38cb-4985-86e7-4dd82deb906d",
+					"migrations_dir": "geo-migrations"
+					// See production note above: enable read replication via dashboard/API, not here.
+				}
+			],
+			"r2_buckets": [
+				{
+					"binding": "orderak_media",
+					"bucket_name": "orderak-media-staging"
+				}
+			],
+			"queues": {
+				"producers": [
+					{ "binding": "PLAY_BILLING_QUEUE", "queue": "orderak-play-billing-staging" },
+					{ "binding": "EMAIL_QUEUE", "queue": "orderak-email-staging" }
+				],
+				"consumers": [
+					{
+						"queue": "orderak-email-staging",
+						"max_batch_size": 10,
+						"max_batch_timeout": 5,
+						"max_retries": 5,
+						"max_concurrency": 10,
+						"dead_letter_queue": "orderak-email-dlq-staging"
+					},
+					{ "queue": "orderak-email-dlq-staging", "max_batch_size": 10, "max_batch_timeout": 5, "max_retries": 3 }
+				]
+			},
+			"send_email": [
+				{ "name": "EMAIL", "remote": true }
+			],
+			"assets": {
+				"directory": "./assets",
+				"not_found_handling": "none"
+			}
+		}
+	}
+}

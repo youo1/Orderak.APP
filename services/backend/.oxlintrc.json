@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "oxc", "promise", "import"],
+  "rules": {
+    // The reason this file exists: async-correctness rules that need type
+    // information. `lint` passes --type-aware, backed by oxlint-tsgolint.
+    "typescript/no-floating-promises": "error",
+    "typescript/no-misused-promises": "error",
+    "promise/no-return-wrap": "error",
+
+    // --type-aware also pulls these in, and they fire ~370 times on a pattern
+    // that is intentional here: D1 rows are typed Record<string, unknown>, so
+    // every String(row.column) reads as a base-to-string violation. Re-enable
+    // once row types are modelled properly.
+    "typescript/no-base-to-string": "off",
+    "typescript/restrict-template-expressions": "off"
+  },
+  "ignorePatterns": ["src/generated/**", "dist/**"]
+}

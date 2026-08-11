@@ -1,0 +1,37 @@
+# Local development secrets for `wrangler dev`.
+# Copy this file to `.dev.vars` and fill in real values.
+# `.dev.vars` is git-ignored and must never be committed.
+
+# AI provider (DeepSeek, OpenAI-compatible). Without it, /api/v1/chat returns a stub.
+DEEPSEEK_API_KEY=your-deepseek-api-key-here
+
+# Admin control plane. Generate each value independently; never commit real values.
+ADMIN_API_KEY=choose-a-long-random-key
+ADMIN_JWT_SECRET=another-long-random-key
+ADMIN_SESSION_PEPPER=generate-at-least-32-random-bytes
+ADMIN_RECOVERY_PEPPER=generate-a-different-32-random-bytes
+ADMIN_TOTP_KEY_CURRENT=1
+ADMIN_TOTP_KEY_V1=base64url-encoded-32-byte-aes-key
+ADMIN_EXPORT_SIGNING_KEY=generate-another-32-random-bytes
+ADMIN_AUDIT_SIGNING_KEY=generate-an-independent-32-random-bytes
+BUYER_PRIVACY_PEPPER=generate-a-dedicated-32-random-bytes
+ADMIN_ORIGIN=https://admin.orderak.app
+
+# Billing: gateway webhook signature secret. Optional Stripe key (mock gateway if unset).
+PAYMENT_WEBHOOK_SECRET=another-random-key
+# STRIPE_SECRET_KEY=sk_test_...
+
+# Email (optional). Default From address + a verified inbox for inbound copies.
+# EMAIL_FROM=Orderak <no-reply@orderak.app>
+# FORWARD_TO=you@example.com
+FIREBASE_WEB_API_KEY=your-firebase-web-api-key
+# Passkey development must use a separately provisioned staging RP. The
+# Android origin is the exact base64url SHA-256 APK signing hash.
+# WEBAUTHN_RP_ID=staging.orderak.app
+# WEBAUTHN_ANDROID_ORIGINS=android:apk-key-hash:replace-with-staging-debug-origin
+# WEBAUTHN_WEB_ORIGIN=https://staging.orderak.app
+# ANDROID_RELEASE_SHA256_CERT_FINGERPRINTS=AA:BB:...,CC:DD:...
+# Required only when exercising deadline-due account deletion locally.
+# FIREBASE_PROJECT_ID=your-firebase-project-id
+# FIREBASE_SERVICE_ACCOUNT_EMAIL=orderak-deletion@your-project.iam.gserviceaccount.com
+# FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"

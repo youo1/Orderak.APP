@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 372" width="360" height="372" role="img" aria-label="Orderak — منظّم طلباتك على واتساب">
+  <title>Orderak — Modern Standard Arabic tagline</title>
+  <desc>Orderak logo with the Modern Standard Arabic tagline "munazzim talabatak ala WhatsApp".</desc>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@700;800&amp;family=Cairo:wght@600;700&amp;display=swap');
+    .en{font-family:'Poppins','Segoe UI',system-ui,sans-serif;font-weight:800;letter-spacing:-1px}
+    .ar{font-family:'Cairo','Segoe UI','Noto Kufi Arabic',sans-serif;font-weight:700}
+    .tag{font-family:'Cairo','Segoe UI','Noto Kufi Arabic',sans-serif;font-weight:600}
+  </style>
+
+  <g transform="translate(105,18) scale(1.25)">
+    <mask id="notchM"><rect width="120" height="120" fill="#fff"/><circle cx="100" cy="20" r="15" fill="#000"/></mask>
+    <path d="M42 14 H78 A26 26 0 0 1 104 40 V68 A26 26 0 0 1 78 94 H38 L14 110 L16 80 V40 A26 26 0 0 1 42 14 Z" fill="#1DAB61" mask="url(#notchM)"/>
+    <path d="M39 55 L53 69 L82 39" fill="none" stroke="#fff" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="100" cy="20" r="11" fill="#ED8936"/>
+  </g>
+
+  <text class="en" x="180" y="242" font-size="56" fill="#14342A" text-anchor="middle">Orderak</text>
+  <text class="ar" x="180" y="302" font-size="48" fill="#14342A" text-anchor="middle" direction="rtl">أوردرك</text>
+  <text class="tag" x="180" y="344" font-size="20" fill="#157F49" text-anchor="middle" direction="rtl">منظّم طلباتك على واتساب</text>
+</svg>

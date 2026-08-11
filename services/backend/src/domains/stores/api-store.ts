@@ -1,0 +1,994 @@
+// ============================================================
+// Store API — identity, Store Information, categories, product sync, media.
+//
+//   GET  /api/v1/slug/check                 (public) live slug availability
+//   POST /api/v1/register                   create / update a store
+//   GET  /api/v1/store                      read Store Information
+//   PUT  /api/v1/store                      update Store Information
+//   GET  /api/v1/categories                 list categories
+//   POST /api/v1/categories                 create category
+//   PUT  /api/v1/categories/{category_code} update category
+//   DELETE /api/v1/categories/{category_code} delete category
+//   GET  /api/v1/products                  pull the store's catalog (pull before mirror push)
+//   POST /api/v1/products/sync              mirror products (returns codes)
+//   POST /api/v1/media/upload               upload logo/cover/product image
+//
+// Internal UUIDs are never returned to the client. The app references stores by
+// public_identifier and categories/products by their immutable codes.
+// ============================================================
+
+import { jsonResponse, methodNotAllowed, readCreds, authSeller, hashSecret, checkRateLimit, revokeSellerCredential, type AuthenticatedSeller } from "../../platform/http/shared";
+import { uploadMedia } from "../../platform/storage/media";
+import { verifyFirebaseToken } from "../../platform/auth/local-jwt";
+import { t, pickLocale } from "../../platform/localization/i18n";
+import { getPlanLimit, limitReached } from "../commerce/plan-limits";
+import { refreshProductTranslations } from "../catalog/product-translations";
+import { ensureOrganizationForStore, entitlementLimitReached, resolveEntitlements } from "../commerce/entitlements";
+import { provisionDeviceSecret } from "../identity/seller-session";
+import { auditDb } from "../admin/admin-auth";
+import { requireTenantWrite, resolveTenantContextForStore, TenantWriteFencedError } from "../../platform/tenancy/tenant-routing";
+import {
+	newUuid,
+	newResourceCode,
+	uniqueStoreCode,
+	uniqueResourceCode,
+	slugify,
+	cleanSlug,
+	slugIsFree,
+	uniqueSlug,
+	slugSuggestions,
+	buildPublicIdentifier,
+	countryIsoFromPhone,
+	normalizeCountryIso,
+	storeUrl,
+	RESERVED_SLUGS,
+	findSellerByVerifiedIdentity,
+	newAccountFoundationStatements,
+	syncVerifiedFirebaseIdentity,
+} from "../identity/identity";
+
+type Row = Record<string, unknown>;
+const FRESH_FIREBASE_PROOF_SECONDS = 5 * 60;
+
+async function allowPreAuthAttempt(
+	env: Env,
+	request: Request,
+	prefix: string,
+	phone: string,
+	phoneLimit: number,
+	ipLimit: number,
+	windowSec: number,
+): Promise<boolean> {
+	const ip = request.headers.get("cf-connecting-ip")?.trim() || "unknown";
+	const phoneAllowed = await checkRateLimit(env, `${prefix}:phone:${phone}`, phoneLimit, windowSec);
+	const ipAllowed = await checkRateLimit(env, `${prefix}:ip:${ip}`, ipLimit, windowSec);
+	return phoneAllowed && ipAllowed;
+}
+
+async function currentLegalVersion(env: Env, slug: "terms" | "privacy", locale: string) {
+	return env.orderak_db.prepare(
+		`SELECT version, lang FROM content_page_versions
+		 WHERE slug=? AND status='published'
+		 ORDER BY CASE WHEN lang=? THEN 0 WHEN lang='en' THEN 1 ELSE 2 END, version DESC
+		 LIMIT 1`,
+	).bind(slug, locale).first<{ version: number; lang: string }>();
+}
+
+async function recordLegalAcceptance(
+	env: Env,
+	body: Row,
+	phone: string,
+	sellerId: string | null,
+	locale: string,
+): Promise<"ok" | "required" | "not_configured"> {
+	if (body.terms_accepted !== true) return "required";
+	const [terms, privacy] = await Promise.all([
+		currentLegalVersion(env, "terms", locale),
+		currentLegalVersion(env, "privacy", locale),
+	]);
+	if (!terms || !privacy) return "not_configured";
+	await env.orderak_db.prepare(
+		`INSERT INTO legal_acceptances
+		 (id,seller_id,phone_e164,terms_version,privacy_version,locale,source,app_version,marketing_consent)
+		 VALUES(?,?,?,?,?,?,?,?,?)`,
+	).bind(
+		newUuid(),
+		sellerId,
+		phone,
+		Number(terms.version),
+		Number(privacy.version),
+		locale,
+		"android_phone_auth",
+		String(body.app_version ?? "").slice(0, 40) || null,
+		body.marketing_consent === true ? 1 : 0,
+	).run();
+	return "ok";
+}
+
+/**
+ * Verify a Firebase ID token via Google Identity Toolkit and confirm the token's
+ * phone number matches `phone`. Returns the stable Firebase UID on success so
+ * privacy deletion can later remove the upstream identity as well.
+ */
+export interface FirebaseIdentity {
+	uid: string;
+	phone: string;
+	authTime?: number;
+}
+
+function tokenAuthTime(idToken: string): number | null {
+	try {
+		const payload = idToken.split(".")[1];
+		if (!payload) return null;
+		const normalized = payload.replaceAll("-", "+").replaceAll("_", "/").padEnd(Math.ceil(payload.length / 4) * 4, "=");
+		const claims = JSON.parse(atob(normalized)) as { auth_time?: unknown };
+		const value = Number(claims.auth_time);
+		return Number.isFinite(value) ? value : null;
+	} catch {
+		return null;
+	}
+}
+
+export async function verifyFirebasePhone(env: Env, idToken: string, phone: string): Promise<FirebaseIdentity | null> {
+	if (!env.FIREBASE_WEB_API_KEY || !idToken || !phone) return null;
+
+	// Local-first: verify with jose JWKS (removes Google network round-trip).
+	// Falls back to remote verification on failure — never fails open.
+	// Gate: set LOCAL_JWT_VERIFICATION="true" and FIREBASE_PROJECT_ID in wrangler vars.
+	const localEnabled = (env as unknown as Record<string, unknown>).LOCAL_JWT_VERIFICATION === "true";
+	if (localEnabled && (env as unknown as Record<string, unknown>).FIREBASE_PROJECT_ID) {
+		const projectId = String((env as unknown as Record<string, unknown>).FIREBASE_PROJECT_ID);
+		const claims = await verifyFirebaseToken(idToken, projectId);
+		if (claims) {
+			const verifiedPhone = claims.phone_number === phone;
+			if (claims.sub && verifiedPhone) {
+				return { uid: claims.sub, phone, authTime: claims.iat };
+			}
+		}
+		// Local verification failed — fall through to remote (safe-fallback).
+	}
+
+	// Remote verification (existing path).
+	try {
+		const res = await fetch(
+			`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(env.FIREBASE_WEB_API_KEY)}`,
+			{ method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ idToken }) },
+		);
+		if (!res.ok) return null;
+		const result = await res.json<{ users?: { localId?: string; phoneNumber?: string }[] }>();
+		const user = result.users?.[0];
+		const verifiedPhone = String(result.users?.[0]?.phoneNumber ?? "") === phone;
+		if (!user?.localId || !verifiedPhone) return null;
+		const authTime = tokenAuthTime(idToken);
+		return authTime == null ? { uid: user.localId, phone } : { uid: user.localId, phone, authTime };
+	} catch {
+		return null;
+	}
+}
+
+function hasFreshFirebaseProof(identity: FirebaseIdentity): boolean {
+	if (identity.authTime == null) return false;
+	const age = Math.floor(Date.now() / 1000) - identity.authTime;
+	return age >= 0 && age <= FRESH_FIREBASE_PROOF_SECONDS;
+}
+
+// Shape of the identity block returned after register / store reads. Read-only
+// fields (country_code, store_code, public_identifier, store_url) are derived,
+// never client-editable.
+function identityBlock(store: Row): Record<string, unknown> {
+	const pid = String(store.public_identifier);
+	return {
+		store_name: store.store_name,
+		slug: store.slug,
+		country_code: store.country_code,
+		store_code: store.store_code,
+		public_identifier: pid,
+		store_url: storeUrl(pid),
+	};
+}
+
+export async function handleStoreRoutes(
+	request: Request,
+	env: Env,
+	url: URL,
+	authenticatedSeller?: AuthenticatedSeller | null,
+): Promise<Response | null> {
+	const p = url.pathname;
+	const method = request.method;
+
+	if (method === "POST" && p === "/api/v1/auth/session") {
+		return restoreFirebaseSession(request, env);
+	}
+	if (method === "POST" && p === "/api/v1/auth/logout") {
+		return logoutSeller(request, env, url);
+	}
+
+	// ---- GET /api/v1/slug/check (no auth) ----
+	if (method === "GET" && p === "/api/v1/slug/check") {
+		const raw = url.searchParams.get("slug") ?? "";
+		const normalized = slugify(raw);
+		const valid = cleanSlug(raw) !== "";
+		const reserved = RESERVED_SLUGS.has(normalized);
+		const available = valid && (await slugIsFree(env, normalized));
+		return jsonResponse({
+			ok: true,
+			slug: normalized,
+			valid,
+			reserved,
+			available,
+			suggestions: available || !normalized ? [] : await slugSuggestions(env, normalized),
+		});
+	}
+
+	// ---- POST /api/v1/register ----
+	if (method === "POST" && p === "/api/v1/register") {
+		return handleRegister(request, env, url);
+	}
+
+	// Everything below requires an authenticated store.
+		const isStoreRoute =
+		p === "/api/v1/store" ||
+		p === "/api/v1/account/deletion-request" ||
+		p === "/api/v1/categories" ||
+		p.startsWith("/api/v1/categories/") ||
+		p === "/api/v1/products" ||
+		p === "/api/v1/products/sync" ||
+		p === "/api/v1/media/upload";
+	if (!isStoreRoute) return null;
+
+	const { phone, secret } = readCreds(request, url);
+	const store = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret);
+	if (!store) return jsonResponse({ error: "auth" }, 401);
+	const tenantMutation = method !== "GET" && (
+		p === "/api/v1/store" || p === "/api/v1/categories" || p.startsWith("/api/v1/categories/")
+		|| p === "/api/v1/products/sync" || p === "/api/v1/media/upload"
+	);
+	if (tenantMutation) {
+		try {
+			requireTenantWrite(await resolveTenantContextForStore(env, String(store.id)));
+		} catch (error) {
+			if (error instanceof TenantWriteFencedError) {
+				return jsonResponse({ error: "tenant_write_fenced", retryable: true }, 503, { "retry-after": String(error.retryAfterSeconds) });
+			}
+			throw error;
+		}
+	}
+
+	if (p === "/api/v1/account/deletion-request") {
+		if (method !== "POST") return methodNotAllowed("GET", "POST");
+		const existing = await env.orderak_db.prepare(
+			"SELECT id FROM deletion_requests WHERE phone_e164=? AND status IN ('pending','verified') LIMIT 1",
+		).bind(phone).first<{ id: string }>();
+		const id = existing?.id || newUuid();
+		if (existing) {
+			await env.orderak_db.prepare(
+				"UPDATE deletion_requests SET status='verified',source='android_authenticated',verified_at=datetime('now'),deadline_at=datetime('now','+90 days') WHERE id=?",
+			).bind(id).run();
+		} else {
+			await env.orderak_db.prepare(
+				`INSERT INTO deletion_requests
+				 (id,phone_e164,locale,source,status,deadline_at,verified_at)
+				 VALUES(?,?,?,'android_authenticated','verified',datetime('now','+90 days'),datetime('now'))`,
+			).bind(id, phone, pickLocale(request, url)).run();
+		}
+		await auditDb(env, null, "deletion.verified", {
+			entity: "deletion_request",
+			entity_id: id,
+			actor_type: "seller",
+			actor_id: store.id,
+		}, request);
+		return jsonResponse({ ok: true, request_id: id, deadline_days: 90 });
+	}
+
+	// ---- /api/v1/store ----
+	if (p === "/api/v1/store") {
+		if (method === "GET") return jsonResponse({ ok: true, store: fullStore(store) });
+		if (method === "PUT") return handleStoreUpdate(request, env, url, store);
+		return methodNotAllowed("GET", "PUT");
+	}
+
+	// ---- /api/v1/categories ----
+	if (p === "/api/v1/categories") {
+		if (method === "GET") return listCategories(env, store);
+		if (method === "POST") return createCategory(request, env, store);
+		return methodNotAllowed("GET", "POST");
+	}
+	if (p.startsWith("/api/v1/categories/")) {
+		const code = decodeURIComponent(p.slice("/api/v1/categories/".length));
+		if (method === "PUT") return updateCategory(request, env, store, code);
+		if (method === "DELETE") return deleteCategory(env, store, code);
+		return methodNotAllowed("PUT", "DELETE");
+	}
+
+		// ---- GET /api/v1/products (pull) ----
+	if (p === "/api/v1/products" && method === "GET") return pullProducts(env, store);
+
+	// ---- POST /api/v1/products/sync ----
+	if (p === "/api/v1/products/sync" && method === "POST") {
+		return syncProducts(request, env, store);
+	}
+
+	// ---- POST /api/v1/media/upload ----
+	if (p === "/api/v1/media/upload" && method === "POST") {
+		// Storage-abuse guard: 5 MB per file with no count limit would let one
+		// store fill R2. 60/hour comfortably covers a full first-sync of a large
+		// catalog while capping runaway/looping clients.
+		if (!(await checkRateLimit(env, `upload:${store.id}`, 60, 3600))) {
+			return jsonResponse({ error: "rate_limited" }, 429);
+		}
+		return uploadMedia(request, env, String(store.id));
+	}
+
+	if (p === "/api/v1/products") return methodNotAllowed("GET");
+	if (p === "/api/v1/products/sync") return methodNotAllowed("POST");
+	return methodNotAllowed("POST"); // /api/v1/media/upload
+}
+
+// ---- Register --------------------------------------------------------------
+
+async function handleRegister(request: Request, env: Env, url: URL): Promise<Response> {
+	const body = (await request.json().catch(() => ({}))) as Row;
+	const phone = String(body.phone ?? "");
+	const secret = String(body.secret ?? "");
+	if (!phone || !secret) return jsonResponse({ error: "auth" }, 401);
+	const lang = pickLocale(request, url);
+
+	// Independent phone and IP limits: phone is attacker-controlled pre-auth input.
+	if (!(await allowPreAuthAttempt(env, request, "register", phone, 10, 100, 60))) {
+		return jsonResponse({ error: "rate_limited" }, 429);
+	}
+
+	const secretHash = await hashSecret(secret);
+	const storeName = String(body.store_name ?? body.shop_name ?? "متجري").slice(0, 60);
+	const rawSlug = String(body.slug ?? "");
+	const manualSlug = cleanSlug(rawSlug);
+
+	const explicitIso = normalizeCountryIso(body.country_iso);
+	const countryIso = explicitIso !== "XX" ? explicitIso : countryIsoFromPhone(phone);
+	let firebaseIdentity: FirebaseIdentity | null = null;
+
+	let store = (await env.orderak_db.prepare("SELECT * FROM sellers WHERE phone = ?").bind(phone).first()) as Row | null;
+	if (store) {
+		// Existing store: only the owner (matching device secret) may update it.
+		if (!(await authSeller(env, phone, secret))) {
+			return jsonResponse({ error: "auth" }, 401);
+		}
+	} else if (!env.FIREBASE_WEB_API_KEY) {
+		// Creating a NEW store claims a phone number as public identity, which
+		// requires a verified Firebase OTP token. Without the key we FAIL CLOSED:
+		// a misconfigured production deploy must never let anyone claim any phone
+		// number. Local dev / tests opt in explicitly via
+		// ALLOW_UNVERIFIED_REGISTRATION="true" (never set in production).
+		if (env.ALLOW_UNVERIFIED_REGISTRATION !== "true") {
+			return jsonResponse({ error: "firebase_not_configured" }, 503);
+		}
+	} else {
+		// Require a verified Firebase OTP token for the phone so nobody can
+		// claim another person's number.
+		const idToken = String(body.id_token ?? "");
+		firebaseIdentity = await verifyFirebasePhone(env, idToken, phone);
+		if (!firebaseIdentity) {
+			return jsonResponse({ error: "auth" }, 401);
+		}
+		if (!hasFreshFirebaseProof(firebaseIdentity)) {
+			return jsonResponse({ error: "auth_stale" }, 401);
+		}
+		// A verified phone alone is not permission to create an account. The
+		// auth/session step records the exact published terms/privacy versions
+		// accepted by this phone before registration is allowed.
+		const acceptance = await env.orderak_db
+			.prepare("SELECT 1 AS accepted FROM legal_acceptances WHERE phone_e164=? LIMIT 1")
+			.bind(phone)
+			.first();
+		if (!acceptance) {
+			return jsonResponse({ error: "legal_acceptance_required" }, 400);
+		}
+	}
+
+	const baseSlug =
+		manualSlug || slugify(storeName) || `${countryIso.toLowerCase()}-store-${Math.random().toString(36).slice(2, 10)}`;
+
+	if (!store) {
+		// New store.
+		if (manualSlug && !(await slugIsFree(env, manualSlug))) {
+			return jsonResponse(
+				{ error: "slug_taken", message: t(lang, "slug.taken"), suggestions: await slugSuggestions(env, manualSlug) },
+				409,
+			);
+		}
+		let slug = await uniqueSlug(env, baseSlug);
+		const storeCode = await uniqueStoreCode(env);
+		for (let attempt = 0; attempt < 2; attempt++) {
+			const publicId = buildPublicIdentifier(countryIso, slug, storeCode);
+			const id = newUuid();
+			const organizationId = newUuid();
+			const memberId = newUuid();
+			try {
+				const sellerInsert = env.orderak_db.prepare(
+							`INSERT INTO sellers (id, phone, firebase_uid, store_name, slug, instapay, vfcash, secret,
+							   store_code, country_code, public_identifier)
+							 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+						)
+					.bind(
+						id,
+							phone,
+							firebaseIdentity?.uid ?? null,
+							storeName,
+						slug,
+						body.instapay ?? null,
+						body.vfcash ?? null,
+						secretHash,
+						storeCode,
+						countryIso,
+						publicId,
+					);
+				const foundation = await newAccountFoundationStatements(env, {
+					sellerId: id,
+					organizationId,
+					memberId,
+					phone,
+					firebaseUid: firebaseIdentity?.uid ?? null,
+					storeName,
+					locale: lang,
+				});
+				await env.orderak_db.batch([
+					sellerInsert,
+					...foundation,
+					env.orderak_db.prepare(
+						"UPDATE legal_acceptances SET seller_id=? WHERE phone_e164=? AND seller_id IS NULL",
+					).bind(id, phone),
+				]);
+				store = { id, store_name: storeName, slug, store_code: storeCode, country_code: countryIso, public_identifier: publicId };
+				break;
+			} catch {
+				slug = await uniqueSlug(env, baseSlug);
+				if (attempt === 1) return jsonResponse({ error: "slug_taken", message: t(lang, "slug.taken") }, 409);
+			}
+		}
+		return jsonResponse({ ok: true, ...identityBlock(store!) });
+	}
+
+	// Existing store re-registering. store_code is PERMANENT; country updates
+	// only if the client sends an explicit valid one.
+	let newSlug = String(store.slug ?? "");
+	if (manualSlug && manualSlug !== store.slug) {
+		if (!(await slugIsFree(env, manualSlug, String(store.id)))) {
+			return jsonResponse(
+				{ error: "slug_taken", message: t(lang, "slug.taken"), suggestions: await slugSuggestions(env, manualSlug) },
+				409,
+			);
+		}
+		newSlug = manualSlug;
+	} else if (!newSlug) {
+		newSlug = await uniqueSlug(env, baseSlug, String(store.id));
+	}
+
+	const storeCode = String(store.store_code ?? "") || (await uniqueStoreCode(env));
+	const countryCode = explicitIso !== "XX" ? explicitIso : String(store.country_code ?? "") || countryIso;
+	const publicId = buildPublicIdentifier(countryCode, newSlug, storeCode);
+
+	try {
+		await env.orderak_db
+			.prepare(
+				`UPDATE sellers SET store_name = ?, instapay = ?, vfcash = ?, slug = ?, secret = ?,
+				   store_code = ?, country_code = ?, public_identifier = ?, updated_at = datetime('now')
+				 WHERE id = ?`,
+			)
+			.bind(
+				storeName,
+				body.instapay ?? store.instapay,
+				body.vfcash ?? store.vfcash,
+				newSlug,
+				secretHash,
+				storeCode,
+				countryCode,
+				publicId,
+				store.id,
+			)
+			.run();
+	} catch {
+		return jsonResponse({ error: "slug_taken", message: t(lang, "slug.taken") }, 409);
+	}
+
+	if (env.ENTITLEMENTS_ENABLED === "true") await ensureOrganizationForStore(env, String(store.id), storeName, lang);
+	if (firebaseIdentity) await syncVerifiedFirebaseIdentity(env, String(store.id), firebaseIdentity.uid, phone);
+	return jsonResponse({
+		ok: true,
+		...identityBlock({ store_name: storeName, slug: newSlug, store_code: storeCode, country_code: countryCode, public_identifier: publicId }),
+	});
+}
+
+// ---- Store Information ------------------------------------------------------
+
+// Full Store Information object (editable fields + read-only identity block).
+export function fullStore(store: Row): Record<string, unknown> {
+	return {
+		...identityBlock(store),
+		description: store.description ?? "",
+		phone: store.phone ?? "",
+		whatsapp: store.whatsapp ?? "",
+		email: store.email ?? "",
+		website: store.website ?? "",
+		address: store.address ?? "",
+		instapay: store.instapay ?? "",
+		vfcash: store.vfcash ?? "",
+		logo_url: store.logo_url ?? "",
+		cover_url: store.cover_url ?? "",
+		business_category: store.business_category ?? "",
+		business_category_id: store.business_category_id ?? null,
+		business_subcategory_id: store.business_subcategory_id ?? null,
+		business_taxonomy_version: store.business_taxonomy_version ?? null,
+		city_geoname_id: store.city_geoname_id ?? null,
+		city_catalog_id: store.city_catalog_id ?? null,
+		city_catalog_version: store.city_catalog_version ?? null,
+		city_name: store.city_name ?? "",
+	};
+}
+
+async function handleStoreUpdate(request: Request, env: Env, url: URL, store: Row): Promise<Response> {
+	const body = (await request.json().catch(() => ({}))) as Row;
+	const lang = pickLocale(request, url);
+	const storeId = String(store.id);
+
+	// Store name (regenerates slug + public_identifier unless a manual slug is given).
+	const storeName =
+		body.store_name != null ? String(body.store_name).slice(0, 60) : String(store.store_name ?? "");
+
+	// Slug: explicit manual pick wins; else derive from the (possibly new) name.
+	let slug = String(store.slug ?? "");
+	const nameChanged = storeName !== String(store.store_name ?? "");
+	if (body.slug != null && String(body.slug).trim() !== "") {
+		const manual = cleanSlug(String(body.slug));
+		if (!manual) return jsonResponse({ error: "slug_invalid", message: t(lang, "slug.invalid") }, 400);
+		if (manual !== store.slug && !(await slugIsFree(env, manual, storeId))) {
+			return jsonResponse({ error: "slug_taken", message: t(lang, "slug.taken"), suggestions: await slugSuggestions(env, manual) }, 409);
+		}
+		slug = manual;
+	} else if (nameChanged || !slug) {
+		slug = await uniqueSlug(env, slugify(storeName) || slug, storeId);
+	}
+
+	// store_code + country are immutable here; public_identifier tracks the slug.
+	const countryCode = String(store.country_code ?? "EG");
+	const storeCode = String(store.store_code);
+	const publicId = buildPublicIdentifier(countryCode, slug, storeCode);
+
+	// Optional contact/media fields (undefined = keep current).
+	const pick = (k: string) => (body[k] != null ? String(body[k]).slice(0, 300) : store[k] ?? null);
+
+	// URL-bearing fields are validated when (and only when) they change:
+	// http(s) only; scheme-less input gets https:// prefixed. This blocks
+	// stored javascript:/data: URLs at the source — the catalog renderer
+	// (catalog.ts safeHttpUrl) also guards at output for legacy rows.
+	const urls: Record<string, string | null> = {};
+	for (const k of ["website", "logo_url", "cover_url"] as const) {
+		if (body[k] == null) {
+			urls[k] = (store[k] as string | null) ?? null;
+			continue;
+		}
+		const raw = String(body[k]).trim().slice(0, 300);
+		if (!raw) { urls[k] = null; continue; }
+		if (/^https?:\/\//i.test(raw)) { urls[k] = raw; continue; }
+		if (/^[a-z][a-z0-9+.-]*:/i.test(raw)) {
+			return jsonResponse({ error: "invalid_url", field: k }, 400);
+		}
+		urls[k] = "https://" + raw;
+	}
+
+	// Phone is the OTP-verified login identity, not an editable store-profile
+	// field. A future phone migration must be a dedicated re-verification flow
+	// that updates Firebase, D1, authorized devices, and the Android session
+	// atomically. General profile updates fail closed instead of locking users out.
+	const phone = String(store.phone);
+	if (body.phone != null && String(body.phone) !== phone) {
+		return jsonResponse({ error: "phone_change_requires_reverification" }, 409);
+	}
+
+	let businessCategory = store.business_category ?? null;
+	let businessCategoryId = store.business_category_id ?? null;
+	let businessSubcategoryId = store.business_subcategory_id ?? null;
+	let businessTaxonomyVersion = store.business_taxonomy_version ?? null;
+	if (body.business_category_id != null || body.business_subcategory_id != null) {
+		const requestedCategoryId = String(body.business_category_id ?? "").trim().slice(0, 80);
+		const requestedSubcategoryId = String(body.business_subcategory_id ?? "").trim().slice(0, 80);
+		if (!requestedCategoryId || !requestedSubcategoryId) {
+			return jsonResponse({ error: "invalid_business_category" }, 400);
+		}
+		const taxonomy = await env.orderak_db.prepare(
+			`SELECT c.id category_id,c.key category_key,s.id subcategory_id,c.version_id
+			 FROM business_categories c
+			 JOIN business_subcategories s
+			   ON s.category_id=c.id AND s.version_id=c.version_id
+			 JOIN business_taxonomy_versions v
+			   ON v.id=c.version_id AND v.status='active'
+			 WHERE c.id=? AND s.id=? AND c.active=1 AND s.active=1 LIMIT 1`,
+		).bind(requestedCategoryId, requestedSubcategoryId).first<{
+			category_id: string;
+			category_key: string;
+			subcategory_id: string;
+			version_id: number;
+		}>();
+		if (!taxonomy) return jsonResponse({ error: "invalid_business_category" }, 400);
+		businessCategory = taxonomy.category_key;
+		businessCategoryId = taxonomy.category_id;
+		businessSubcategoryId = taxonomy.subcategory_id;
+		businessTaxonomyVersion = taxonomy.version_id;
+	}
+
+	await env.orderak_db
+		.prepare(
+			`UPDATE sellers SET store_name = ?, slug = ?, public_identifier = ?, phone = ?,
+			   description = ?, whatsapp = ?, email = ?, website = ?, address = ?,
+			   instapay = ?, vfcash = ?, logo_url = ?, cover_url = ?,
+			   business_category = ?, business_category_id = ?,
+			   business_subcategory_id = ?, business_taxonomy_version = ?,
+			   updated_at = datetime('now')
+			 WHERE id = ?`,
+		)
+		.bind(
+			storeName,
+			slug,
+			publicId,
+			phone,
+			pick("description"),
+			pick("whatsapp"),
+			pick("email"),
+			urls.website,
+			pick("address"),
+			pick("instapay"),
+			pick("vfcash"),
+			urls.logo_url,
+			urls.cover_url,
+			businessCategory,
+			businessCategoryId,
+			businessSubcategoryId,
+			businessTaxonomyVersion,
+			storeId,
+		)
+		.run();
+
+	const updated = (await env.orderak_db.prepare("SELECT * FROM sellers WHERE id = ?").bind(storeId).first()) as Row;
+	return jsonResponse({ ok: true, store: fullStore(updated) });
+}
+
+// ---- Categories ------------------------------------------------------------
+
+async function listCategories(env: Env, store: Row): Promise<Response> {
+	const { results } = (await env.orderak_db
+		.prepare(
+			`SELECT c.category_code, c.name, c.slug, c.sort_order,
+			        (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id) AS product_count
+			 FROM categories c WHERE c.store_id = ? ORDER BY c.sort_order, c.name`,
+		)
+		.bind(store.id)
+		.all()) as { results: Row[] };
+	return jsonResponse({ ok: true, categories: results ?? [] });
+}
+
+async function createCategory(request: Request, env: Env, store: Row): Promise<Response> {
+	const limit = await getPlanLimit(env, String(store.id), "max_categories");
+	const body = (await request.json().catch(() => ({}))) as Row;
+	const name = String(body.name ?? "").trim().slice(0, 60);
+	if (!name) return jsonResponse({ error: "name_required" }, 400);
+	const slug = body.slug != null ? slugify(String(body.slug)) : slugify(name);
+	const sortOrder = Math.max(0, Math.floor(Number(body.sort_order) || 0));
+	const id = newUuid();
+	const code = await uniqueResourceCode(env, "c");
+	const insert = (candidateSlug: string | null) => env.ENTITLEMENTS_ENABLED === "true"
+		? env.orderak_db.prepare(
+			`INSERT INTO categories (id, store_id, category_code, name, slug, sort_order)
+			 SELECT ?,?,?,?,?,? WHERE ? IS NULL OR (
+			   SELECT COUNT(*) FROM categories c
+			   WHERE c.store_id IN (SELECT store_id FROM organization_stores WHERE organization_id=(
+			     SELECT organization_id FROM organization_stores WHERE store_id=?
+			   ))
+			 ) < ?`,
+		).bind(id, store.id, code, name, candidateSlug, sortOrder, limit, store.id, limit)
+		: env.orderak_db.prepare(
+			`INSERT INTO categories (id, store_id, category_code, name, slug, sort_order)
+			 SELECT ?,?,?,?,?,? WHERE ? IS NULL OR (SELECT COUNT(*) FROM categories WHERE store_id=?) < ?`,
+		).bind(id, store.id, code, name, candidateSlug, sortOrder, limit, store.id, limit);
+	let inserted: D1Result<unknown>;
+	try {
+		inserted = await insert(slug || null).run();
+	} catch {
+		// slug collision within the store — retry once with a suffixed slug.
+		inserted = await insert(`${slug || "cat"}-${code.slice(2).toLowerCase()}`).run();
+	}
+	if (!inserted.meta.changes) return limitReached("max_categories", Number(limit ?? 0), Number(limit ?? 0));
+	return jsonResponse({ ok: true, category: { category_code: code, name, slug: slug || null, sort_order: sortOrder } }, 201);
+}
+
+async function updateCategory(request: Request, env: Env, store: Row, code: string): Promise<Response> {
+	const body = (await request.json().catch(() => ({}))) as Row;
+	const existing = (await env.orderak_db
+		.prepare("SELECT id, name, slug, sort_order FROM categories WHERE store_id = ? AND category_code = ?")
+		.bind(store.id, code)
+		.first()) as Row | null;
+	if (!existing) return jsonResponse({ error: "not_found" }, 404);
+
+	const name = body.name != null ? String(body.name).trim().slice(0, 60) || String(existing.name) : String(existing.name);
+	const slug = body.slug != null ? slugify(String(body.slug)) || null : (existing.slug as string | null);
+	const sortOrder = body.sort_order != null ? Math.max(0, Math.floor(Number(body.sort_order) || 0)) : Number(existing.sort_order);
+
+	await env.orderak_db
+		.prepare("UPDATE categories SET name = ?, slug = ?, sort_order = ?, updated_at = datetime('now') WHERE id = ?")
+		.bind(name, slug, sortOrder, existing.id)
+		.run();
+	return jsonResponse({ ok: true, category: { category_code: code, name, slug, sort_order: sortOrder } });
+}
+
+async function deleteCategory(env: Env, store: Row, code: string): Promise<Response> {
+	const existing = (await env.orderak_db
+		.prepare("SELECT id FROM categories WHERE store_id = ? AND category_code = ?")
+		.bind(store.id, code)
+		.first()) as Row | null;
+	if (!existing) return jsonResponse({ error: "not_found" }, 404);
+	await env.orderak_db.batch([
+		env.orderak_db.prepare("UPDATE products SET category_id = NULL WHERE category_id = ?").bind(existing.id),
+		env.orderak_db.prepare("DELETE FROM categories WHERE id = ?").bind(existing.id),
+	]);
+	return jsonResponse({ ok: true });
+}
+
+// ---- Product pull (non-destructive read) -----------------------------------
+
+async function pullProducts(env: Env, store: Row): Promise<Response> {
+	const { results } = (await env.orderak_db
+		.prepare(
+			`SELECT p.id, p.app_id, p.product_code, p.name, p.slug, p.description,
+			        p.price_piasters, p.stock, p.stock_version, p.available, p.image_url,
+			        c.category_code
+			 FROM products p
+			 LEFT JOIN categories c ON c.id = p.category_id
+			 WHERE p.store_id = ?
+			 ORDER BY p.created_at DESC`,
+		)
+		.bind(store.id)
+		.all()) as { results: Row[] };
+	return jsonResponse({
+		ok: true,
+		products: (results ?? []).map((r: Row) => ({
+			app_id: Number(r.app_id),
+			product_code: String(r.product_code),
+			name: r.name,
+			slug: r.slug ?? null,
+			description: r.description ?? null,
+			price_piasters: Number(r.price_piasters),
+			stock: Number(r.stock),
+			stock_version: Number(r.stock_version ?? 0),
+			available: r.available === 1,
+			image_url: r.image_url ?? null,
+			category_code: r.category_code ?? null,
+		})),
+	});
+}
+
+// ---- Product sync ----------------------------------------------------------
+
+async function syncProducts(request: Request, env: Env, store: Row): Promise<Response> {
+	const body = (await request.json().catch(() => ({}))) as Row;
+	const requested = Array.isArray(body.products) ? (body.products as Row[]) : [];
+	const limit = await getPlanLimit(env, String(store.id), "max_products");
+	if (limit !== null) {
+		const validRequestedCount = requested.filter((product) => Number.isFinite(Number(product.app_id))).length;
+		let currentUsage = 0;
+		let projectedUsage = validRequestedCount;
+		if (env.ENTITLEMENTS_ENABLED === "true") {
+			const usage = await env.orderak_db.prepare(
+				`SELECT
+				   (SELECT COUNT(*) FROM products current_store WHERE current_store.store_id=?) AS store_count,
+				   COUNT(p.id) AS organization_count
+				 FROM organization_stores os
+				 LEFT JOIN products p ON p.store_id=os.store_id
+				 WHERE os.organization_id=(SELECT organization_id FROM organization_stores WHERE store_id=?)`,
+			).bind(store.id, store.id).first<{ store_count: number; organization_count: number }>();
+			const currentStoreCount = Number(usage?.store_count ?? 0);
+			currentUsage = Number(usage?.organization_count ?? currentStoreCount);
+			projectedUsage = currentUsage - currentStoreCount + validRequestedCount;
+		} else {
+			const usage = await env.orderak_db.prepare("SELECT COUNT(*) AS c FROM products WHERE store_id=?")
+				.bind(store.id).first<{ c: number }>();
+			currentUsage = Number(usage?.c ?? 0);
+			projectedUsage = validRequestedCount;
+		}
+
+		// Downgrades block growth, never maintenance. Sellers who are already
+		// above the new limit may edit or delete existing products as long as the
+		// submitted mirror does not increase organization-wide usage.
+		if (projectedUsage > limit && projectedUsage > currentUsage) {
+			if (env.ENTITLEMENTS_ENABLED === "true") {
+				return entitlementLimitReached(await resolveEntitlements(env, String(store.id)), "max_products");
+			}
+			return limitReached("max_products", limit, currentUsage);
+		}
+	}
+	const list = requested;
+	const storeId = String(store.id);
+
+	// Existing identity and stock revisions. Stock is optimistic-concurrency
+	// controlled separately from the catalog metadata upsert so a stale Android
+	// mirror can never restore inventory consumed by a newer buyer order.
+	const { results: existingRows } = (await env.orderak_db
+		.prepare("SELECT id, app_id, product_code, stock, stock_version FROM products WHERE store_id = ?")
+		.bind(storeId)
+		.all()) as { results: Row[] };
+	type ExistingProduct = { id: string; productCode: string; stock: number; stockVersion: number };
+	const existing = new Map<number, ExistingProduct>();
+	for (const r of existingRows ?? []) existing.set(Number(r.app_id), {
+		id: String(r.id), productCode: String(r.product_code), stock: Number(r.stock), stockVersion: Number(r.stock_version ?? 0),
+	});
+
+	const { results: catRows } = (await env.orderak_db
+		.prepare("SELECT id, category_code FROM categories WHERE store_id = ?")
+		.bind(storeId)
+		.all()) as { results: Row[] };
+	const catByCode = new Map<string, string>();
+	for (const c of catRows ?? []) catByCode.set(String(c.category_code), String(c.id));
+
+	const records: Array<{
+		id: string; categoryId: string | null; productCode: string; appId: number; name: string;
+		slug: string | null; description: string | null; price: number; stock: number;
+		available: number; imageUrl: string | null; categoryCode: string | null;
+		existed: boolean; stockDirty: boolean; expectedStockVersion: number | null;
+	}> = [];
+	const seenAppIds = new Set<number>();
+	const generatedCodes = new Set([...existing.values()].map((item) => item.productCode));
+
+	for (const raw of list) {
+		const appId = Number(raw.app_id);
+		if (!Number.isFinite(appId)) continue;
+		if (seenAppIds.has(appId)) return jsonResponse({ error: "duplicate_app_id", app_id: appId }, 400);
+		seenAppIds.add(appId);
+		const name = String(raw.name ?? "").slice(0, 80);
+		const price = Math.max(0, Math.floor(Number(raw.price_piasters) || 0));
+		const stock = Math.max(0, Math.floor(Number(raw.stock) || 0));
+		const available = raw.available ? 1 : 0;
+		const description = raw.description != null ? String(raw.description).slice(0, 500) : null;
+		const imageUrl = raw.image_url != null ? String(raw.image_url).slice(0, 500) : null;
+		const slug = name ? slugify(name) || null : null;
+		const categoryCode = raw.category_code != null ? String(raw.category_code) : null;
+		const categoryId = categoryCode ? catByCode.get(categoryCode) ?? null : null;
+
+		const previous = existing.get(appId);
+		let productCode = previous?.productCode;
+		if (!productCode) {
+			if (requested.length <= 20) productCode = await uniqueResourceCode(env, "p");
+			else do productCode = newResourceCode("p", 8); while (generatedCodes.has(productCode));
+			generatedCodes.add(productCode);
+		}
+		records.push({
+			id: previous?.id ?? newUuid(), categoryId, productCode, appId, name, slug, description,
+			price, stock, available, imageUrl, categoryCode, existed: previous != null,
+			stockDirty: raw.stock_dirty === true,
+			expectedStockVersion: raw.expected_stock_version != null && Number.isSafeInteger(Number(raw.expected_stock_version))
+				? Number(raw.expected_stock_version) : null,
+		});
+	}
+
+	// Keep every statement below D1's bound-parameter ceiling. Each chunk is one
+	// upsert query, so a 2,000-product catalog does not consume 2,000 queries.
+	const stmts: D1PreparedStatement[] = [];
+	for (let offset = 0; offset < records.length; offset += 8) {
+		const chunk = records.slice(offset, offset + 8);
+		const values = chunk.map(() => "(?,?,?,?,?,?,?,?,?,?,?,?)").join(",");
+		const bindings = chunk.flatMap((record) => [
+			record.id, storeId, record.categoryId, record.productCode, record.appId, record.name,
+			record.slug, record.description, record.price, record.stock, record.available, record.imageUrl,
+		]);
+		stmts.push(env.orderak_db.prepare(
+			`INSERT INTO products (id,store_id,category_id,product_code,app_id,name,slug,description,price_piasters,stock,available,image_url)
+			 VALUES ${values}
+			 ON CONFLICT(store_id,app_id) DO UPDATE SET
+			 category_id=excluded.category_id,name=excluded.name,slug=excluded.slug,description=excluded.description,
+			 price_piasters=excluded.price_piasters,available=excluded.available,
+			 image_url=excluded.image_url,updated_at=datetime('now')`,
+		).bind(...bindings));
+	}
+	const removedCodes = [...existing.entries()].filter(([appId]) => !seenAppIds.has(appId)).map(([, item]) => item.productCode);
+	for (let offset = 0; offset < removedCodes.length; offset += 90) {
+		const chunk = removedCodes.slice(offset, offset + 90);
+		stmts.push(env.orderak_db.prepare(`DELETE FROM products WHERE store_id=? AND product_code IN (${chunk.map(() => "?").join(",")})`)
+			.bind(storeId, ...chunk));
+	}
+	if (!records.length) stmts.push(env.orderak_db.prepare("DELETE FROM products WHERE store_id=?").bind(storeId));
+
+	if (stmts.length) await env.orderak_db.batch(stmts);
+
+	const stockRecords = records.filter((record) => record.existed && record.stockDirty);
+	const missingBaselines = stockRecords.filter((record) => record.expectedStockVersion == null).map((record) => record.appId);
+	let conflicts = [...missingBaselines];
+	const stockStatements = stockRecords
+		.filter((record) => record.expectedStockVersion != null)
+		.map((record) => env.orderak_db.prepare(
+			`UPDATE products SET stock=?,stock_version=stock_version+1,updated_at=datetime('now')
+			 WHERE store_id=? AND app_id=? AND stock_version=?`,
+		).bind(record.stock, storeId, record.appId, record.expectedStockVersion));
+	if (stockStatements.length) {
+		const results = await env.orderak_db.batch(stockStatements);
+		conflicts = conflicts.concat(stockRecords
+			.filter((record) => record.expectedStockVersion != null)
+			.filter((_, index) => Number(results[index]?.meta?.changes ?? 0) !== 1)
+			.map((record) => record.appId));
+	}
+
+	const { results: syncedRows } = (await env.orderak_db.prepare(
+		`SELECT p.id AS remote_uuid,p.app_id,p.product_code,p.stock,p.stock_version,c.category_code
+		 FROM products p LEFT JOIN categories c ON c.id=p.category_id
+		 WHERE p.store_id=?`,
+	).bind(storeId).all()) as { results: Row[] };
+	const mapping = (syncedRows ?? []).map((row) => ({
+		app_id: Number(row.app_id), product_code: String(row.product_code),
+		remote_uuid: String(row.remote_uuid), category_code: row.category_code == null ? null : String(row.category_code),
+		stock: Number(row.stock), stock_version: Number(row.stock_version ?? 0),
+	}));
+	await refreshProductTranslations(env, storeId);
+	if (conflicts.length) return jsonResponse({ ok: false, error: "stale_stock", conflicts, products: mapping }, 409);
+	return jsonResponse({ ok: true, count: mapping.length, products: mapping });
+}
+
+async function restoreFirebaseSession(request: Request, env: Env): Promise<Response> {
+	if (!env.FIREBASE_WEB_API_KEY) return jsonResponse({ error: "firebase_not_configured" }, 503);
+	const body = (await request.json().catch(() => ({}))) as Row;
+	const idToken = String(body.id_token ?? "");
+	const requestedPhone = String(body.phone ?? "");
+	const deviceSecret = String(body.device_secret ?? "");
+	if (!idToken || !requestedPhone || !deviceSecret) return jsonResponse({ error: "auth" }, 401);
+
+	// Abuse guard: independent phone + IP limits before the Google API call.
+	if (!(await allowPreAuthAttempt(env, request, "session", requestedPhone, 10, 100, 60))) {
+		return jsonResponse({ error: "rate_limited" }, 429);
+	}
+
+	const firebaseIdentity = await verifyFirebasePhone(env, idToken, requestedPhone);
+	if (!firebaseIdentity) return jsonResponse({ error: "auth" }, 401);
+	if (!hasFreshFirebaseProof(firebaseIdentity)) return jsonResponse({ error: "auth_stale" }, 401);
+	const verifiedPhone = requestedPhone;
+
+	let seller = await findSellerByVerifiedIdentity(env, firebaseIdentity.uid, verifiedPhone);
+	if (!seller && env.AUTH_IDENTITY_ENABLED === "true") {
+		// Same-phone verified recovery may present a newly issued Firebase subject.
+		// Ownership follows the active phone identity; sync below supersedes its
+		// prior subject without replacing the seller or organization.
+		seller = await env.orderak_db.prepare(
+			`SELECT s.* FROM seller_auth_identities i JOIN sellers s ON s.id=i.seller_id
+			 WHERE i.provider='firebase_phone' AND i.status='active' AND i.verified_phone_e164=?`,
+		).bind(verifiedPhone).first<Row>();
+	}
+	const consent = await recordLegalAcceptance(
+		env,
+		body,
+		verifiedPhone,
+		seller ? String(seller.id) : null,
+		pickLocale(request, new URL(request.url)),
+	);
+	if (consent === "required") return jsonResponse({ error: "legal_acceptance_required" }, 400);
+	if (consent === "not_configured") return jsonResponse({ error: "legal_not_configured" }, 503);
+	if (!seller) {
+		if (env.AUTH_IDENTITY_ENABLED === "true") {
+			const compatibility = await env.orderak_db.prepare("SELECT 1 found FROM sellers WHERE phone=?")
+				.bind(verifiedPhone).first();
+			if (compatibility) return jsonResponse({ error: "identity_not_ready" }, 503);
+		}
+		return jsonResponse({ ok: true, exists: false });
+	}
+	await syncVerifiedFirebaseIdentity(env, String(seller.id), firebaseIdentity.uid, verifiedPhone);
+	seller.firebase_uid = firebaseIdentity.uid;
+
+	// Logging back into an already-authorized device is available on every plan.
+	// Only adding a genuinely new device is a paid feature.
+	if (await authSeller(env, verifiedPhone, deviceSecret)) {
+		return jsonResponse({ ok: true, exists: true, store: fullStore(seller) });
+	}
+	const provisioned = await provisionDeviceSecret(env, seller, verifiedPhone, deviceSecret);
+	if (!provisioned.ok) return provisioned.response;
+	return jsonResponse({ ok: true, exists: true, store: fullStore(seller) });
+}
+
+async function logoutSeller(request: Request, env: Env, url: URL): Promise<Response> {
+	const { phone, secret } = readCreds(request, url);
+	const seller = await authSeller(env, phone, secret);
+	if (!seller) return jsonResponse({ error: "auth" }, 401);
+	const revoked = await revokeSellerCredential(env, String(seller.id), secret);
+	return revoked ? jsonResponse({ ok: true }) : jsonResponse({ error: "auth" }, 401);
+}

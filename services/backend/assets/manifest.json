@@ -1,0 +1,31 @@
+{
+	"name": "Orderak — أوردرك",
+	"short_name": "Orderak",
+	"description": "منظّم أوردراتك على الواتساب",
+	"lang": "ar",
+	"dir": "rtl",
+	"start_url": "/",
+	"display": "standalone",
+	"background_color": "#FAF8F5",
+	"theme_color": "#1DAB61",
+	"icons": [
+		{
+			"src": "/static/orderak-icon-192.png",
+			"sizes": "192x192",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/static/orderak-icon-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/static/orderak-playstore-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "maskable"
+		}
+	]
+}

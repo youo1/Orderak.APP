@@ -1,0 +1,101 @@
+import { entitlementLimitReached, resolveEntitlements } from "../commerce/entitlements";
+import {
+	authSeller,
+	hasPrimarySellerCredential,
+	hashSecret,
+} from "../../platform/http/shared";
+
+export type DeviceProvisionResult =
+	| { ok: true }
+	| { ok: false; response: Response };
+
+/**
+ * Authorize a client-generated device secret after strong proof (OTP/passkey).
+ * This is the single implementation used by legacy OTP, onboarding V2, and
+ * passkey sign-in so plan caps and single-device recovery cannot drift.
+ */
+export async function provisionDeviceSecret(
+	env: Env,
+	seller: Record<string, unknown>,
+	phone: string,
+	deviceSecret: string,
+): Promise<DeviceProvisionResult> {
+	if (!phone || !deviceSecret) {
+		return { ok: false, response: Response.json({ error: "auth" }, { status: 401 }) };
+	}
+	if (await authSeller(env, phone, deviceSecret)) return { ok: true };
+
+	const secretHash = await hashSecret(deviceSecret);
+	const sellerId = String(seller.id);
+	const hasPrimaryCredential = hasPrimarySellerCredential(seller);
+	const deviceLimit = env.ENTITLEMENTS_ENABLED === "true"
+		? (await resolveEntitlements(env, sellerId)).entitlements.max_concurrent_devices
+		: null;
+
+	if (deviceLimit) {
+		const cap = deviceLimit.mode === "unlimited" ? null : Number(deviceLimit.value ?? 0);
+		const extra = await env.orderak_db
+			.prepare("SELECT COUNT(*) AS c FROM seller_devices WHERE seller_id=?")
+			.bind(sellerId)
+			.first<{ c: number }>();
+		const used = (hasPrimaryCredential ? 1 : 0) + Number(extra?.c ?? 0);
+		if (!hasPrimaryCredential) {
+			await setPrimary(env, sellerId, secretHash);
+			seller.secret = secretHash;
+		} else if (cap === 1) {
+			await replaceAllDevices(env, sellerId, secretHash);
+		} else if (cap !== null && used >= cap) {
+			const snapshot = await resolveEntitlements(env, sellerId);
+			return {
+				ok: false,
+				response: entitlementLimitReached(snapshot, "max_concurrent_devices"),
+			};
+		} else {
+			await addDevice(env, sellerId, secretHash);
+		}
+		return { ok: true };
+	}
+
+	const plan = await env.orderak_db.prepare(
+		`SELECT p.multi_device_enabled FROM subscriptions s JOIN plans p ON p.id=s.plan_id
+		 WHERE s.seller_id=? AND s.status='active' AND p.active=1
+		 ORDER BY s.id DESC LIMIT 1`,
+	).bind(sellerId).first<{ multi_device_enabled: number }>();
+	const freePlan = plan
+		? null
+		: await env.orderak_db
+			.prepare("SELECT multi_device_enabled FROM plans WHERE id='free'")
+			.first<{ multi_device_enabled: number }>();
+
+	if (!hasPrimaryCredential) {
+		await setPrimary(env, sellerId, secretHash);
+		seller.secret = secretHash;
+	} else if (Number(plan?.multi_device_enabled ?? freePlan?.multi_device_enabled ?? 0) === 1) {
+		await addDevice(env, sellerId, secretHash);
+	} else {
+		// Verified recovery on a single-device plan replaces every old session.
+		await replaceAllDevices(env, sellerId, secretHash);
+	}
+	return { ok: true };
+}
+
+async function setPrimary(env: Env, sellerId: string, hash: string): Promise<void> {
+	await env.orderak_db
+		.prepare("UPDATE sellers SET secret=?,updated_at=datetime('now') WHERE id=?")
+		.bind(hash, sellerId)
+		.run();
+}
+
+async function addDevice(env: Env, sellerId: string, hash: string): Promise<void> {
+	await env.orderak_db
+		.prepare("INSERT OR IGNORE INTO seller_devices(seller_id,secret_hash) VALUES(?,?)")
+		.bind(sellerId, hash)
+		.run();
+}
+
+async function replaceAllDevices(env: Env, sellerId: string, hash: string): Promise<void> {
+	await env.orderak_db.batch([
+		env.orderak_db.prepare("UPDATE sellers SET secret=? WHERE id=?").bind(hash, sellerId),
+		env.orderak_db.prepare("DELETE FROM seller_devices WHERE seller_id=?").bind(sellerId),
+	]);
+}

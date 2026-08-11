@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 150" width="420" height="150" role="img" aria-label="Orderak — أوردرك">
+  <title>Orderak — horizontal lockup</title>
+  <desc>Orderak logo in a horizontal arrangement: the bubble-and-check mark on the left, the Latin and Arabic wordmarks stacked on the right.</desc>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@700;800&amp;family=Cairo:wght@600;700&amp;display=swap');
+    .en{font-family:'Poppins','Segoe UI',system-ui,sans-serif;font-weight:800;letter-spacing:-1px}
+    .ar{font-family:'Cairo','Segoe UI','Noto Kufi Arabic',sans-serif;font-weight:700}
+  </style>
+
+  <g transform="translate(18,18) scale(1.0)">
+    <mask id="notchH"><rect width="120" height="120" fill="#fff"/><circle cx="100" cy="20" r="15" fill="#000"/></mask>
+    <path d="M42 14 H78 A26 26 0 0 1 104 40 V68 A26 26 0 0 1 78 94 H38 L14 110 L16 80 V40 A26 26 0 0 1 42 14 Z" fill="#1DAB61" mask="url(#notchH)"/>
+    <path d="M39 55 L53 69 L82 39" fill="none" stroke="#fff" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="100" cy="20" r="11" fill="#ED8936"/>
+  </g>
+
+  <text class="en" x="158" y="72" font-size="50" fill="#14342A" text-anchor="start">Orderak</text>
+  <text class="ar" x="158" y="112" font-size="34" fill="#157F49" text-anchor="start" direction="rtl">أوردرك</text>
+</svg>

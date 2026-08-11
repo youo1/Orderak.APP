@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120" role="img" aria-label="Orderak">
+  <title>Orderak icon</title>
+  <desc>Green chat bubble with a white check mark and an orange notification badge.</desc>
+  <mask id="notchI"><rect width="120" height="120" fill="#fff"/><circle cx="100" cy="20" r="15" fill="#000"/></mask>
+  <path d="M42 14 H78 A26 26 0 0 1 104 40 V68 A26 26 0 0 1 78 94 H38 L14 110 L16 80 V40 A26 26 0 0 1 42 14 Z" fill="#1DAB61" mask="url(#notchI)"/>
+  <path d="M39 55 L53 69 L82 39" fill="none" stroke="#fff" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="100" cy="20" r="11" fill="#ED8936"/>
+</svg>

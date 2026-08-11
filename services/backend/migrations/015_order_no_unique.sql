@@ -1,0 +1,14 @@
+-- 015: enforce per-store order number uniqueness.
+--
+-- handleCatalogOrder computes order_no as MAX(order_no)+1 outside a
+-- transaction, so two concurrent buyer orders could get the same number —
+-- which breaks the Android sync cursor (remoteId is unique locally, so the
+-- second order would be silently skipped). The code retries once with a
+-- recomputed number when this index rejects a duplicate.
+--
+-- NOTE: if this migration fails on an existing database, there are already
+-- duplicate (store_id, order_no) pairs; find them with:
+--   SELECT store_id, order_no, COUNT(*) c FROM orders
+--   GROUP BY store_id, order_no HAVING c > 1;
+-- and renumber the extras before re-running.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_store_orderno ON orders(store_id, order_no);
