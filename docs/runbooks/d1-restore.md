@@ -9,7 +9,11 @@
 > production removes the option to try again.
 
 Use this runbook to recover a D1 database from the R2 backups produced by the
-`.github/workflows/d1-backup.yml` workflow.
+`.github/workflows/d1-backup.yml` workflow. To prove a backup is recoverable
+without doing a real restore, dispatch
+`.github/workflows/restore-drill.yml` instead — it runs the same decrypt and
+verify steps below under a reviewer-gated environment, without touching any
+live database.
 
 For accidental writes within the Time Travel window, prefer
 [Time Travel](#appendix-time-travel) — it is faster and loses nothing. Use this
@@ -61,26 +65,40 @@ Affected indexes:
 
 ## 2. Select and verify a backup
 
-List the available backups:
+Backups are encrypted. Every object under `d1/` is AGE ciphertext — the
+export never touches R2 in plaintext. List the available backups:
 
 ```bash
 npx wrangler r2 object get orderak-backups/pointers/orderak-db/latest.manifest.json --file=./latest.manifest.json --remote
 ```
 
-Backups are keyed `d1/<database>/<TIMESTAMP>.sql`, each with a `.sql.sha256`
-and a `.manifest.json` beside it. Download the chosen set:
+Backups are keyed `d1/<database>/<TIMESTAMP>.sql.age`, each with a
+`.sql.age.sha256` beside it. Download the chosen set:
 
 ```bash
 TS=2026-08-08T0200Z
-npx wrangler r2 object get "orderak-backups/d1/orderak-db/${TS}.sql" --file=./restore.sql --remote
-npx wrangler r2 object get "orderak-backups/d1/orderak-db/${TS}.sql.sha256" --file=./restore.sql.sha256 --remote
+npx wrangler r2 object get "orderak-backups/d1/orderak-db/${TS}.sql.age" --file=./restore.sql.age --remote
+npx wrangler r2 object get "orderak-backups/d1/orderak-db/${TS}.sql.age.sha256" --file=./restore.sql.age.sha256 --remote
 npx wrangler r2 object get "orderak-backups/d1/orderak-db/${TS}.manifest.json" --file=./restore.manifest.json --remote
 ```
 
-Verify the checksum before trusting the file:
+Verify the checksum on the ciphertext before decrypting anything:
 
 ```bash
-sha256sum --check restore.sql.sha256
+sha256sum --check restore.sql.age.sha256
+```
+
+**Decrypt.** The private key is not in this checkout, this machine's normal
+environment, or any workflow the backup job can reach. It lives only as the
+`AGE_IDENTITY` secret in the `backup-restore-staging` /
+`backup-restore-production` GitHub Environment, both of which require a
+reviewer to release it. Retrieve it there (Settings → Environments → the
+matching `backup-restore-*` environment), save it to a file that never gets
+committed, and decrypt:
+
+```bash
+age -d -i ./age-identity.txt -o ./restore.sql ./restore.sql.age
+shred -u ./age-identity.txt   # or `rm -f` if shred is unavailable
 ```
 
 Then prove it is restorable *before* creating anything in the account:
@@ -91,7 +109,8 @@ node scripts/verify-d1-restore.mjs ../../restore.sql --compare ../../restore.man
 ```
 
 Stop if this fails. A backup that does not replay is not a recovery option, and
-you still have Time Travel.
+you still have Time Travel. Delete `restore.sql` once the drill or the actual
+restore is done — it is plaintext containing seller phone numbers.
 
 ## 3. Restore into a NEW database
 
@@ -191,6 +210,63 @@ Two consequences worth knowing before changing anything here:
 What is still missing: a copy outside this Cloudflare account. The lock defends
 against deletion within the account; it does not defend against losing the
 account.
+
+## Appendix: encryption key custody and rotation
+
+Every backup is encrypted with [age](https://age-encryption.org) to a
+recipient (public key) held by the backup job. Staging and production use
+**separate keypairs** — a staging identity cannot decrypt a production
+backup, and vice versa.
+
+| | Backup job (`d1-backup.yml`) | Restore drill / manual restore |
+| --- | --- | --- |
+| Holds | `AGE_RECIPIENT` (public key) — a GitHub **variable**, `staging` and `production` environments | `AGE_IDENTITY` (private key) — a GitHub **secret**, `backup-restore-staging` and `backup-restore-production` environments |
+| Can | Encrypt new backups | Decrypt existing backups |
+| Cannot | Decrypt anything — the public key alone cannot | Write backups — no D1 or R2-write credential in scope |
+| Gated by | Whatever already gates the backup job | A **required reviewer** on the `backup-restore-*` environment — every decrypt is a deliberate, reviewed act, never an automatic one |
+
+This split is the actual control. If the backup job's credentials leak, the
+attacker can write bogus future backups but cannot read a single past one —
+recipient-only access grants no decryption capability. If the restore
+environment's reviewer gate is ever bypassed, that is what exposes history,
+which is why it is a separate, narrower-audience environment rather than a
+convenience shared with the nightly job.
+
+### Rotating a key
+
+Rotation applies going forward only — age has no re-encryption-in-place.
+Existing objects stay decryptable with the old identity until they age out
+under the 30-day lock; there is nothing to migrate.
+
+1. Generate a fresh keypair for the affected environment:
+
+   ```bash
+   age-keygen -o new-identity.txt
+   ```
+
+2. Update the GitHub **variable** `AGE_RECIPIENT` (staging or production
+   environment) to the new public key printed above.
+3. Update the GitHub **secret** `AGE_IDENTITY` in the matching
+   `backup-restore-*` environment to the full contents of `new-identity.txt`.
+4. Securely delete the local `new-identity.txt` once both are set —
+   `shred -u new-identity.txt` or equivalent.
+5. Dispatch `d1-backup.yml` once for the affected environment and confirm the
+   run succeeds — that proves the new recipient is live.
+6. Keep the **old** identity file in offline custody (a password manager or
+   equivalent, never in this repository or any Action) until every backup
+   encrypted under it has aged past the 30-day lock and a fresh backup exists
+   under the new key. Only then is the old identity safe to discard — losing
+   it earlier makes every backup still under the old key unrecoverable.
+
+### Recovery: what happens if the identity is lost
+
+An encrypted backup whose only private key is gone is equivalent to no
+backup. There is no recovery path around this — it is why step 6 above exists,
+and why the identity's offline copy is a real requirement, not a suggestion.
+If both the GitHub secret and the offline copy are lost simultaneously, every
+backup encrypted to that recipient is permanently unreadable; the next
+successful backup under a freshly rotated key is the first recoverable point
+going forward.
 
 ## Appendix: Time Travel
 

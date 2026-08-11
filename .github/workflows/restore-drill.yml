@@ -1,0 +1,140 @@
+name: D1 Backup Restore Drill
+
+# Proves what is actually stored in R2 is recoverable — not just what was
+# produced locally before encryption. d1-backup.yml's own restore drill runs
+# against the plaintext export before it is encrypted and uploaded; that is a
+# quality gate against a corrupt export, not proof of what ends up in R2.
+# This workflow downloads the encrypted object, verifies its checksum,
+# decrypts it, and runs the same restore verification against the decrypted
+# output.
+#
+# Manual, not scheduled, and reviewer-gated: the environment
+# (backup-restore-staging / backup-restore-production) has a required
+# reviewer, and holds the only copy of the AGE private key that can ever
+# leave this repository's control. The backup job itself never sees it — it
+# only holds the public recipient. If the backup job's credentials leak, an
+# attacker gets write access to future backups, not decrypt access to every
+# past one.
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Which environment's backups to restore-drill
+        type: choice
+        default: staging
+        options:
+          - staging
+          - production
+      object_timestamp:
+        description: 'Backup timestamp exactly as printed in the backup job upload log, e.g. 2026-08-11T0200Z'
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: d1-restore-drill
+  cancel-in-progress: false
+
+jobs:
+  restore-drill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: ${{ inputs.target == 'production' && 'backup-restore-production' || 'backup-restore-staging' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        database: >-
+          ${{ inputs.target == 'production'
+              && fromJSON('["orderak-db","orderak-geo"]')
+              || fromJSON('["orderak-db-staging","orderak-geo-staging"]') }}
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_RESTORE_READ_TOKEN }}
+      DB: ${{ matrix.database }}
+      TS: ${{ inputs.object_timestamp }}
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Preflight required restore credentials
+        env:
+          AGE_IDENTITY_PRESENT: ${{ secrets.AGE_IDENTITY != '' }}
+        run: |
+          set -euo pipefail
+          missing=0
+          if [ -z "${CLOUDFLARE_API_TOKEN}" ]; then
+            echo "ERROR: CLOUDFLARE_RESTORE_READ_TOKEN is not set in this restore environment."
+            missing=1
+          fi
+          if [ -z "${CLOUDFLARE_ACCOUNT_ID}" ]; then
+            echo "ERROR: CLOUDFLARE_ACCOUNT_ID is not set."
+            missing=1
+          fi
+          if [ "${AGE_IDENTITY_PRESENT}" != "true" ]; then
+            echo "ERROR: AGE_IDENTITY is not set in this restore environment."
+            missing=1
+          fi
+          [ "$missing" = "0" ] || exit 1
+          echo "Restore-drill credentials are present."
+
+      - name: Install age (pinned, checksum-verified)
+        run: |
+          set -euo pipefail
+          curl -fsSL -o /tmp/age.tar.gz \
+            "https://github.com/FiloSottile/age/releases/download/v1.3.1/age-v1.3.1-linux-amd64.tar.gz"
+          echo "bdc69c09cbdd6cf8b1f333d372a1f58247b3a33146406333e30c0f26e8f51377  /tmp/age.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/age.tar.gz -C /tmp
+          sudo mv /tmp/age/age /tmp/age/age-keygen /usr/local/bin/
+          age --version
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+        working-directory: services/backend
+
+      - name: Download encrypted backup and checksum from R2
+        working-directory: services/backend
+        run: |
+          set -euo pipefail
+          npx wrangler r2 object get "orderak-backups/d1/${DB}/${TS}.sql.age" \
+            --file="/tmp/${DB}.sql.age" --remote
+          npx wrangler r2 object get "orderak-backups/d1/${DB}/${TS}.sql.age.sha256" \
+            --file="/tmp/${DB}.sql.age.sha256" --remote
+
+      - name: Verify the stored checksum before decrypting anything
+        run: |
+          set -euo pipefail
+          cd /tmp
+          sha256sum -c "${DB}.sql.age.sha256"
+
+      - name: Decrypt
+        env:
+          AGE_IDENTITY_CONTENT: ${{ secrets.AGE_IDENTITY }}
+        run: |
+          set -euo pipefail
+          IDENTITY_FILE=$(mktemp)
+          trap 'shred -u "$IDENTITY_FILE" 2>/dev/null || rm -f "$IDENTITY_FILE"' EXIT
+          printf '%s' "$AGE_IDENTITY_CONTENT" > "$IDENTITY_FILE"
+          age -d -i "$IDENTITY_FILE" -o "/tmp/${DB}.sql" "/tmp/${DB}.sql.age"
+          echo "Decrypted: ${DB}.sql ($(wc -c < "/tmp/${DB}.sql") bytes)"
+
+      - name: Restore drill against the decrypted object — proves what R2 actually holds
+        working-directory: services/backend
+        run: |
+          set -euo pipefail
+          node scripts/verify-d1-restore.mjs "/tmp/${DB}.sql" \
+            --manifest "/tmp/${DB}.drill-manifest.json" --min-tables 1
+
+      - name: Wipe decrypted and encrypted material from the runner
+        if: always()
+        run: |
+          shred -u "/tmp/${DB}.sql" 2>/dev/null || rm -f "/tmp/${DB}.sql"
+          shred -u "/tmp/${DB}.sql.age" 2>/dev/null || rm -f "/tmp/${DB}.sql.age"
