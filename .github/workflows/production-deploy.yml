@@ -98,8 +98,8 @@ jobs:
       - name: Apply production database migrations
         working-directory: services/backend
         run: |
-          npx wrangler d1 migrations apply orderak_db --remote
-          npx wrangler d1 migrations apply orderak_geo --remote
+          npx wrangler d1 migrations apply orderak-db --remote
+          npx wrangler d1 migrations apply orderak-geo --remote
 
       - name: Deploy production API and Admin Worker
         working-directory: services/backend
