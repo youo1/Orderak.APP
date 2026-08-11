@@ -127,8 +127,8 @@ and closure evidence. Archived plans do not create new implementation scope.
 
 | File | Purpose |
 | ------ | --------- |
-| [Project README](https://github.com/youo1/Orderak/blob/main/README.md) | Project landing page and quick start |
-| [Contribution guide](https://github.com/youo1/Orderak/blob/main/CONTRIBUTING.md) | Development workflow, testing, and documentation checklist |
-| [Changelog](https://github.com/youo1/Orderak/blob/main/CHANGELOG.md) | Version history in Keep a Changelog format |
-| [Security policy](https://github.com/youo1/Orderak/blob/main/SECURITY.md) | Vulnerability reporting, secret handling, and key rotation |
-| [Repository instructions](https://github.com/youo1/Orderak/blob/main/AGENTS.md) | AI-assistant and contributor rules |
+| [Project README](https://github.com/youo1/Orderak.APP/blob/main/README.md) | Project landing page and quick start |
+| [Contribution guide](https://github.com/youo1/Orderak.APP/blob/main/CONTRIBUTING.md) | Development workflow, testing, and documentation checklist |
+| [Changelog](https://github.com/youo1/Orderak.APP/blob/main/CHANGELOG.md) | Version history in Keep a Changelog format |
+| [Security policy](https://github.com/youo1/Orderak.APP/blob/main/SECURITY.md) | Vulnerability reporting, secret handling, and key rotation |
+| [Repository instructions](https://github.com/youo1/Orderak.APP/blob/main/AGENTS.md) | AI-assistant and contributor rules |

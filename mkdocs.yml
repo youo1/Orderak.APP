@@ -1,6 +1,6 @@
 site_name: Orderak Documentation
 site_description: Internal documentation for the Orderak platform
-repo_url: https://github.com/youo1/Orderak
+repo_url: https://github.com/youo1/Orderak.APP
 edit_uri: ''
 
 theme:

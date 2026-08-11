@@ -46,7 +46,7 @@ This guide assumes a **fresh machine with nothing pre-installed**. You need:
 | Requirement | Purpose | Notes |
 | ----------- | ------- | ----- |
 | **Git** | Clone and manage the repository | Any recent version |
-| **Node.js 20 LTS or newer** | Runs Wrangler, tests, and backend tooling | Includes `npm`/`npx` |
+| **Node.js 22.13 or newer** | Runs Wrangler, tests, and backend tooling | pnpm 11 imports `node:sqlite`, which Node 20 does not have — CI runs Node 24 |
 | **Android Studio** (latest stable) | Builds the Android app | Bundles the Android SDK **and JDK 17** — no separate JDK install needed |
 | **Cloudflare account** | Hosts Workers, D1, R2, Queues, and Email | **Workers Paid** plan is required for Email Sending (Section 8) |
 | **Firebase project** | Phone (SMS) authentication for the app | Phone sign-in method must be enabled |
@@ -77,10 +77,14 @@ Open **Command Prompt (CMD)** on Windows and confirm each tool responds:
 ```cmd
 git --version
 node --version
-npm --version
+corepack enable
+pnpm --version
 ```
 
-(`npx wrangler --version` will work after Section 3's `npm install`.)
+`corepack enable` (bundled with Node 22+) reads `packageManager` in the root
+`package.json` and installs the exact pinned pnpm version automatically — no
+separate `npm install -g pnpm` step. (`npx wrangler --version` will work
+after Section 3's `pnpm install`.)
 
 ---
 
@@ -92,7 +96,7 @@ git clone <your-orderak-repository-url> Orderak
 cd Orderak
 ```
 
-All backend commands below run from `Orderak\backend`; all Android commands
+All backend commands below run from `Orderak\services\backend`; all Android commands
 run from `Orderak\apps\seller-android`.
 
 ---
@@ -103,7 +107,7 @@ run from `Orderak\apps\seller-android`.
 
 ```cmd
 cd services/backend
-npm install
+pnpm install
 ```
 
 This installs Wrangler, Vitest, TypeScript, and the Worker's runtime
@@ -228,10 +232,10 @@ store completed evidence under `docs/governance/evidence/`.
 
 ### 3.4 Admin frontend and private Worker
 
-Install and build the frontend from `apps/admin-web` with `npm ci`,
-`npm run lint`, `npm test -- --run`, and `npm run build`. Deploy the API-only
-Worker with `npm run deploy:production:admin` from `services/backend`, then run
-`npm run deploy:production` from `apps/admin-web`. The Admin Edge Worker serves
+Install and build the frontend from `apps/admin-web` with `pnpm install --frozen-lockfile`,
+`pnpm run lint`, `pnpm test -- --run`, and `pnpm run build`. Deploy the API-only
+Worker with `pnpm run deploy:production:admin` from `services/backend`, then run
+`pnpm run deploy:production` from `apps/admin-web`. The Admin Edge Worker serves
 `dist/` through Workers Static Assets and forwards only `/api/admin/v1/*` over
 its `ADMIN_WORKER` service binding to `orderak-admin-worker`. Do not add a route
 or enable `workers.dev`/preview URLs for the private Admin Worker.
@@ -247,17 +251,17 @@ checks pass.
 > **Canonical migration rule:** always apply schema changes with
 > `npx wrangler d1 migrations apply`. It runs every file in
 > `services/backend/migrations/` (currently `001_init` through
-> `040_cloudflare_scalability_hardening`, including both intentionally distinct
-> `015_*` files and the forward-repair migration `039b_repair_email_schema_drift`)
-> exactly once and records them in the
+> `042_email_outbox`, including both intentionally distinct `015_*` files and
+> the forward-repair migration `039b_repair_email_schema_drift`) exactly once
+> and records them in the
 > migrations ledger. **Never** run individual migration files with
 > `wrangler d1 execute` — that bypasses the ledger and can cause a migration
 > to run twice. Details: [`guides/database-migrations.md`](./database-migrations.md).
 
-### 3.4 Run the test suite
+### 3.5 Run the test suite
 
 ```cmd
-npm test
+pnpm test
 ```
 
 All tests must pass before you continue.
@@ -266,21 +270,21 @@ Install and validate the pre-release OpenAPI contracts from the repository root:
 
 ```cmd
 cd contracts/openapi
-npm ci
-npm run check
+pnpm install --frozen-lockfile
+pnpm run check
 ```
 
 For Android parallel development, start Prism from the repository root:
 
 ```cmd
-npm run mock:seller-v1
+pnpm run mock:seller-v1
 ```
 
 Prism listens on `http://localhost:4010`; the Android `mockDebug` variant uses
 `http://10.0.2.2:4010`. That flavor has no release variant, and cleartext is
 enabled only by its manifest overlay.
 
-### 3.5 Start the local Worker
+### 3.6 Start the local Worker
 
 ```cmd
 npx wrangler dev
@@ -309,7 +313,7 @@ npx wrangler login
 ### 4.2 Create the cloud resources
 
 The Workers (configured in
-[`services/backend/wrangler.jsonc`](https://github.com/youo1/Orderak/blob/main/services/backend/wrangler.jsonc))
+[`services/backend/wrangler.jsonc`](https://github.com/youo1/Orderak.APP/blob/main/services/backend/wrangler.jsonc))
 bind D1, R2, and dedicated queues. On a fresh account, create each one and copy the IDs
 Wrangler prints into `wrangler.jsonc`:
 
@@ -381,7 +385,7 @@ Verify all default-off values in the deployment configuration before every
 free-launch deployment.
 
 ```cmd
-npm run deploy:production
+pnpm run deploy:production
 ```
 
 #### 4.5.1 Account-level edge controls
@@ -428,12 +432,12 @@ To make them live:
 ### 4.7 Regenerate types after any binding change
 
 ```cmd
-npm run cf-typegen
-npm run cf-types:check
+pnpm run cf-typegen
+pnpm run cf-types:check
 
 cd ..\..\apps\admin-web
-npm run cf-typegen
-npm run cf-types:check
+pnpm run cf-typegen
+pnpm run cf-types:check
 ```
 
 ### 4.8 Staging environment
@@ -462,14 +466,14 @@ Apply the two migration streams and deploy:
 cd services/backend
 npx wrangler d1 migrations apply orderak_db --env staging --remote
 npx wrangler d1 migrations apply orderak_geo --env staging --remote
-npm run deploy:staging
-npm run deploy:staging:admin
+pnpm run deploy:staging
+pnpm run deploy:staging:admin
 
 cd apps\admin-web
-npm install
-npm run build
-npm run deploy:staging
-npm run deploy:staging:edge
+pnpm install
+pnpm run build
+pnpm run deploy:staging
+pnpm run deploy:staging:edge
 ```
 
 Set Staging Worker secrets with `--env staging`; Admin Worker secrets also need
@@ -627,7 +631,7 @@ credential provider performs local user verification.
 
    ```cmd
    npx wrangler d1 migrations apply orderak-geo --remote
-   npm run geo:build-import
+   pnpm run geo:build-import
    npx wrangler d1 execute orderak-geo --remote --file generated/cities-v3.2-export.6.sql
    ```
 
@@ -755,7 +759,7 @@ any production release:
 ```cmd
 :: Backend
 cd services/backend
-npm test
+pnpm test
 
 :: Android
 cd apps\seller-android
@@ -889,12 +893,12 @@ deploy the public and admin Workers, then run the idempotent revision-1
 bootstrap:
 
 ```cmd
-npm.cmd install
-npm.cmd run design-system:check
-npx.cmd wrangler d1 migrations apply orderak-db --remote
-npm.cmd run deploy
-npm.cmd run deploy:admin
-npm.cmd run design-system:seed
+pnpm install
+pnpm run design-system:check
+npx wrangler d1 migrations apply orderak-db --remote
+pnpm run deploy:production
+pnpm run deploy:production:admin
+pnpm run design-system:seed
 ```
 
 Revision 1 reads the effective `settings.theme_colors` projection so the
@@ -935,6 +939,6 @@ Configure a Cloudflare log alert for repeated
 | [`guides/database-migrations.md`](./database-migrations.md) | Section-by-section explanation of every migration |
 | [`production-auth-plan.md`](../product/production-auth-plan.md) | Production Firebase/auth console checklist |
 | [`localization-architecture.md`](../architecture/localization-architecture.md) | Protected localization architecture contract |
-| [Android README](https://github.com/youo1/Orderak/blob/main/apps/seller-android/README.md) | Android build, localization QA, and screenshot testing |
-| [Backend README](https://github.com/youo1/Orderak/blob/main/services/backend/README.md) | Backend-specific notes |
-| [Repository instructions](https://github.com/youo1/Orderak/blob/main/AGENTS.md) | Contributor and AI-assistant rules |
+| [Android README](https://github.com/youo1/Orderak.APP/blob/main/apps/seller-android/README.md) | Android build, localization QA, and screenshot testing |
+| [Backend README](https://github.com/youo1/Orderak.APP/blob/main/services/backend/README.md) | Backend-specific notes |
+| [Repository instructions](https://github.com/youo1/Orderak.APP/blob/main/AGENTS.md) | Contributor and AI-assistant rules |

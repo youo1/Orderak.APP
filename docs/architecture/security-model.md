@@ -495,7 +495,7 @@ runbook and immediate session/recovery-code revocation.
 - [`production-auth-plan.md`](../product/production-auth-plan.md) — production Firebase
   console checklist, environment separation, SMS policy, Play Integrity, and
   the migration target for immutable account IDs + revocable tokens.
-- [Security policy](https://github.com/youo1/Orderak/blob/main/SECURITY.md) —
+- [Security policy](https://github.com/youo1/Orderak.APP/blob/main/SECURITY.md) —
   vulnerability reporting, key rotation, and dependency update policy.
 
 ## Static city-selection boundary
