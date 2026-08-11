@@ -1,0 +1,135 @@
+name: Android CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test-lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up Java 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
+        with:
+          cache-provider: basic
+
+      - name: Create CI Firebase configuration
+        run: bash .github/scripts/write-ci-google-services.sh
+
+      - name: Assemble staging application
+        working-directory: apps/seller-android
+        run: bash ./gradlew :app:assembleStagingDebug --stacktrace
+
+      - name: Verify versioned safety and seller API contracts
+        working-directory: apps/seller-android
+        run: >
+          bash ./gradlew
+          :app:verifyAuthPhase1Contract
+          :app:verifyLocalizationContract
+          :app:verifySellerApiContract
+          --stacktrace
+
+      - name: Run staging and production URL contract tests
+        working-directory: apps/seller-android
+        run: bash ./gradlew :app:testStagingDebugUnitTest :app:testProductionDebugUnitTest --stacktrace
+
+      - name: Run Android staging lint
+        working-directory: apps/seller-android
+        run: bash ./gradlew :app:lintStagingDebug --stacktrace
+
+  screenshot-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
+        with:
+          cache-provider: basic
+      - name: Create CI Firebase configuration
+        run: bash .github/scripts/write-ci-google-services.sh
+      - name: Validate Compose screenshot tests
+        working-directory: apps/seller-android
+        run: bash ./gradlew :app:validateStagingDebugScreenshotTest --stacktrace
+      - name: Upload screenshot diff report
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: screenshot-diffs
+          path: apps/seller-android/app/build/screenshot-test/**/*.png
+          retention-days: 7
+
+  apk-size:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
+        with:
+          cache-provider: basic
+      - name: Create CI Firebase configuration
+        run: bash .github/scripts/write-ci-google-services.sh
+      - name: Build staging bundle
+        working-directory: apps/seller-android
+        run: bash ./gradlew :app:bundleStagingDebug --stacktrace
+      - name: Check APK size
+        run: |
+          SIZE=$(stat -c%s apps/seller-android/app/build/outputs/bundle/stagingDebug/app-staging-debug.aab 2>/dev/null || echo 0)
+          echo "Bundle size: $SIZE bytes"
+          # Start generous at 50 MB, tighten over time
+          if [ "$SIZE" -gt 52428800 ]; then echo "ERROR: Bundle exceeds 50 MB threshold"; exit 1; fi
+        shell: bash
+
+  localization-drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Check localization key parity
+        run: |
+          BASE="apps/seller-android/app/src/main/res/values/strings.xml"
+          for LOCALE in ar en fr; do
+            # translatable="false" marks a string deliberately not localized —
+            # app_name is "Orderak" in every locale. Counting those as missing
+            # translations fails the check on strings that are correct by design,
+            # which is exactly what happened the first time this job ran.
+            BASE_KEYS=$(grep -v 'translatable="false"' "$BASE" | grep -oP 'name="\K[^"]+' | sort)
+            LOC_KEYS=$(grep -oP 'name="\K[^"]+' "apps/seller-android/app/src/main/res/values-${LOCALE}/strings.xml" | sort)
+            MISSING=$(comm -23 <(echo "$BASE_KEYS") <(echo "$LOC_KEYS"))
+            EXTRA=$(comm -13 <(echo "$BASE_KEYS") <(echo "$LOC_KEYS"))
+            if [ -n "$MISSING" ]; then echo "ERROR: values-${LOCALE} missing keys: $MISSING"; exit 1; fi
+            if [ -n "$EXTRA" ]; then echo "WARNING: values-${LOCALE} has extra keys: $EXTRA"; fi
+          done
+          echo "All locales match base key set."
+        shell: bash
+
+  # connectedStagingDebugAndroidTest — instrumented locale matrix (ar, en, fr, en-XA, ar-XB).
+  # Not currently run in CI — requires an Android emulator. This is a local-only gate
+  # documented in AGENTS.md. To enable: add an emulator job with
+  # reactivecircus/android-emulator-runner and run:
+  #   bash ./gradlew :app:connectedStagingDebugAndroidTest --stacktrace

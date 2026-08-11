@@ -1,0 +1,50 @@
+name: Distribute Android Staging
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: orderak-android-staging-distribution
+  cancel-in-progress: false
+
+jobs:
+  distribute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: staging
+    env:
+      FIREBASE_STAGING_GOOGLE_SERVICES_JSON: ${{ secrets.FIREBASE_STAGING_GOOGLE_SERVICES_JSON }}
+      FIREBASE_APP_DISTRIBUTION_CREDENTIALS: ${{ secrets.FIREBASE_APP_DISTRIBUTION_CREDENTIALS }}
+      FIREBASE_APP_DISTRIBUTION_GROUPS: ${{ vars.FIREBASE_APP_DISTRIBUTION_GROUPS }}
+      GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/.firebase-app-distribution.json
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
+
+      - name: Validate Firebase distribution secrets
+        run: |
+          test -n "$FIREBASE_STAGING_GOOGLE_SERVICES_JSON"
+          test -n "$FIREBASE_APP_DISTRIBUTION_CREDENTIALS"
+          test -n "$FIREBASE_APP_DISTRIBUTION_GROUPS"
+
+      - name: Materialize ephemeral Firebase configuration
+        working-directory: apps/seller-android
+        run: |
+          printf '%s' "$FIREBASE_STAGING_GOOGLE_SERVICES_JSON" > app/src/staging/google-services.json
+          printf '%s' "$FIREBASE_APP_DISTRIBUTION_CREDENTIALS" > "$GOOGLE_APPLICATION_CREDENTIALS"
+
+      - name: Build, verify, and distribute Staging APK
+        working-directory: apps/seller-android
+        run: |
+          ./gradlew verifyAuthPhase1Contract verifyLocalizationContract
+          ./gradlew :app:assembleStagingDebug :app:testStagingDebugUnitTest
+          ./gradlew :app:appDistributionUploadStagingDebug --groups="$FIREBASE_APP_DISTRIBUTION_GROUPS"

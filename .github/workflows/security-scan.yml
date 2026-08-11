@@ -1,0 +1,81 @@
+name: Security Scan
+
+# Two checks that catch the mistakes no reviewer reliably catches:
+#
+#   * gitleaks — a committed credential. `.dev.vars` is gitignored and has
+#     never been committed, but that is a convention, not a control. This is
+#     the control.
+#   * dependency-review — a dependency introduced by a pull request that
+#     carries a known vulnerability, before it is merged rather than after.
+#
+# Scoped to pull requests and to main so every route into the default branch is
+# covered. Runs on every path deliberately: a secret can be committed into any
+# file, so a paths filter here would be a hole rather than an optimisation.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-scan-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      # gitleaks-action reports findings through the API. With only contents:read
+      # it fails before scanning with
+      #   RequestError [HttpError]: Resource not accessible by integration (403)
+      # which reads like a scan failure but is a permissions one.
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # gitleaks compares against history, so a shallow clone would miss a
+          # secret added in an earlier commit on the same branch.
+          fetch-depth: 0
+
+      - name: Scan for committed secrets
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          # The action writes results.sarif only when it finds something, then
+          # tries to upload it unconditionally - so a clean scan fails the job
+          # with "File results.sarif does not exist". A pass looking exactly like
+          # a failure is worse than no check at all. Findings are still reported
+          # as PR comments and still fail the job through its exit code; only the
+          # artifact upload is off.
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
+
+  dependency-review:
+    name: Dependency review
+    # Only meaningful on a pull request: the action diffs the base and head
+    # manifests, and there is no base to diff against on a push.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Review dependency changes
+        # Requires Dependency graph and GitHub Advanced Security on the
+        # repository. Without them the action exits with "Dependency review is
+        # not supported on this repository" on every single run. Non-blocking at
+        # the step rather than the job, because job-level continue-on-error still
+        # reports the check itself as failed. It stays in place so it starts
+        # working the moment those are enabled in Settings > Code security — a
+        # check that can never pass only teaches people to ignore a red tick.
+        continue-on-error: true
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: always

@@ -1,0 +1,105 @@
+name: OpenAPI Nightly Contract and Load
+
+# No schedule here yet — see the migration plan, Phase 3, on scheduled
+# workflows staying manual until cutover. The old repository's nightly run
+# stays authoritative until then; this also has no staging-contract-tests
+# environment or CONTRACT_SELLER_PHONE/_SECRET yet, so a real run would fail
+# preflight regardless.
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_pre_release:
+        description: Run 200-case contract suite and pilot/spike/soak profiles
+        type: boolean
+        default: false
+
+concurrency:
+  group: openapi-nightly-staging
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: staging-contract-tests
+    strategy:
+      fail-fast: false
+      # Cloudflare's staging edge applies a shared rolling request window. The
+      # live config keeps the complete run below that sustained boundary. Run
+      # one shard at a time so concurrent jobs cannot multiply that rate; each
+      # job still gets an isolated report and runner.
+      max-parallel: 1
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: pipx install schemathesis==4.24.3
+      # Live staging is fuzzed against an opt-in allowlist of read-only operations only.
+      #
+      # Unfiltered, this job exercised all 68 seller operations - 37 of them mutating -
+      # against real staging with --checks all and the stateful phase. That set includes
+      # account deletion, passkey deletion, category deletion, email resend, Google Play
+      # verification, DeepSeek chat, and media upload. A synthetic seller does not make
+      # any of that safe; it only decides whose account gets deleted.
+      #
+      # Mutating operations are covered against the Prism mock in openapi-ci.yml, where
+      # side effects have nowhere to land. The filter script fails the job if the
+      # allowlist drifts from the spec or if a non-GET operation is ever added to it.
+      # Coverage's synthetic unexpected-method cases are also disabled by the live
+      # config. Cloudflare rejects TRACE before the Worker, and trying other undocumented
+      # methods against live staging would violate this job's read-only safety boundary.
+      - name: Resolve live-safe operation allowlist
+        id: allowlist
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          set -euo pipefail
+          FILTER="$(node contracts/openapi/scripts/live-fuzz-filter.mjs contracts/openapi/src/seller-v1.json "$SHARD" 8)"
+          echo "filter=${FILTER}" >> "$GITHUB_OUTPUT"
+
+      - name: Sanitized seller contract run on Staging (allowlisted operations)
+        env:
+          MAX_EXAMPLES: ${{ inputs.run_pre_release && '200' || '50' }}
+          CONTRACT_SELLER_PHONE: ${{ secrets.CONTRACT_SELLER_PHONE }}
+          CONTRACT_SELLER_SECRET: ${{ secrets.CONTRACT_SELLER_SECRET }}
+          OPERATION_FILTER: ${{ steps.allowlist.outputs.filter }}
+        run: >-
+          schemathesis --config-file contracts/openapi/schemathesis-live.toml run contracts/openapi/src/seller-v1.json
+          --url https://api.staging.orderak.app
+          --phases examples,coverage,fuzzing,stateful
+          --max-examples "$MAX_EXAMPLES"
+          --include-operation-id-regex "$OPERATION_FILTER"
+          --header "x-orderak-phone:$CONTRACT_SELLER_PHONE"
+          --header "x-orderak-secret:$CONTRACT_SELLER_SECRET"
+          --checks all
+          --generation-deterministic
+          --report junit,har
+          --report-dir schemathesis-report
+          --output-sanitize true
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: schemathesis-nightly-sanitized-${{ matrix.shard }}
+          path: schemathesis-report
+          retention-days: 14
+
+  staging-load:
+    runs-on: ubuntu-latest
+    environment: staging-contract-tests
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: grafana/setup-k6-action@db07bd9765aac508ef18982e52ab937fe633a065 # v1
+      - name: Low nightly load
+        if: ${{ !inputs.run_pre_release }}
+        run: k6 run quality/performance/k6/api-load.js
+        env:
+          BASE_URL: https://api.staging.orderak.app
+          PROFILE: smoke
+      - name: Pre-release pilot, spike, and soak
+        if: ${{ inputs.run_pre_release }}
+        shell: bash
+        run: |
+          PROFILE=pilot BASE_URL=https://api.staging.orderak.app k6 run quality/performance/k6/api-load.js
+          PROFILE=spike BASE_URL=https://api.staging.orderak.app k6 run quality/performance/k6/api-load.js
+          PROFILE=soak BASE_URL=https://api.staging.orderak.app k6 run quality/performance/k6/api-load.js

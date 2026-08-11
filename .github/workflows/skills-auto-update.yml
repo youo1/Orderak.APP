@@ -1,0 +1,81 @@
+name: Skills Auto Update
+
+on:
+  schedule:
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  # Repository Settings > Actions > General must allow GITHUB_TOKEN to create
+  # pull requests. The workflow validates updates and never merges them.
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: skills-auto-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Update metadata-tracked upstream skills
+        id: update
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! gh skill update --help >/dev/null 2>&1; then
+            echo "::warning::This runner's GitHub CLI does not yet provide 'gh skill update'."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          gh skill update --all --dir .github/skills
+          if git diff --quiet -- .github/skills; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate updated skills
+        if: steps.update.outputs.changed == 'true'
+        run: |
+          node .github/skills/orderak-agent-improvement/scripts/record-learning.mjs --check
+          node .github/skills/orderak-agent-improvement/scripts/validate-customizations.mjs
+          node --test \
+            .github/hooks/scripts/hooks.test.mjs \
+            .github/skills/orderak-agent-improvement/scripts/record-learning.test.mjs \
+            .github/skills/orderak-verification/scripts/verify.test.mjs
+
+      - name: Open review pull request
+        if: steps.update.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch="codex/skills-auto-update-${GITHUB_RUN_ID}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add .github/skills
+          git commit -m "chore: update imported Copilot skills"
+          git push origin "$branch"
+          gh pr create \
+            --base "$GITHUB_REF_NAME" \
+            --head "$branch" \
+            --title "chore: update imported Copilot skills" \
+            --body "Automated update of metadata-tracked upstream skills. Skills without upstream metadata are skipped. Validation passed; review is required before merge."

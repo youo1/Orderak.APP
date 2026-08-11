@@ -1,0 +1,203 @@
+name: OpenAPI Contract CI
+
+on:
+  pull_request:
+    paths:
+      - 'contracts/openapi/**'
+      - 'services/backend/src/**'
+      - 'apps/seller-android/app/src/**'
+      - 'quality/performance/**'
+      - '.github/workflows/openapi-ci.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: openapi-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  specification:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: contracts/openapi
+      - run: pnpm audit --audit-level high
+        working-directory: contracts/openapi
+      - run: pnpm run check
+        working-directory: contracts/openapi
+      - name: Install pinned oasdiff
+        env:
+          GOBIN: ${{ runner.temp }}/oasdiff-bin
+        run: |
+          mkdir -p "$GOBIN"
+          go install github.com/oasdiff/oasdiff@v1.17.0
+          echo "$GOBIN" >> "$GITHUB_PATH"
+          "$GOBIN/oasdiff" --version
+      - name: Draft changelog or stable breaking-change gate
+        shell: bash
+        env:
+          BASE_REF: ${{ github.base_ref || 'main' }}
+        run: |
+          set -euo pipefail
+          BASE_DIR="${RUNNER_TEMP}/oasdiff-base"
+          mkdir -p "$BASE_DIR"
+          git archive "origin/${BASE_REF}" contracts/openapi/src | tar -x -C "$BASE_DIR"
+          for spec in seller-v1 admin-v1 integrations-v1; do
+            BASE_SPEC="${BASE_DIR}/contracts/openapi/src/${spec}.json"
+            if [[ -f "$BASE_SPEC" ]]; then
+              oasdiff changelog --format githubactions "$BASE_SPEC" "contracts/openapi/src/${spec}.json"
+              if grep -q '"x-stability": "stable"' "contracts/openapi/src/${spec}.json"; then
+                oasdiff breaking --fail-on WARN --format githubactions "$BASE_SPEC" "contracts/openapi/src/${spec}.json"
+              fi
+            fi
+          done
+
+  prism-android-contract:
+    runs-on: ubuntu-latest
+    needs: specification
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@48b5f213c81028ace310571dc5ec0fbbca0b2947 # v4
+      # google-services.json is gitignored, so processMockDebugGoogleServices
+      # fails with "File google-services.json is missing" without this. The mock
+      # flavour declares no applicationIdSuffix, so it builds under the base
+      # package the shared placeholder already covers.
+      - name: Create CI Firebase configuration
+        run: bash .github/scripts/write-ci-google-services.sh
+      - run: ./gradlew testMockDebugUnitTest verifySellerApiContract
+        working-directory: apps/seller-android
+
+  schemathesis-changed:
+    runs-on: ubuntu-latest
+    needs: specification
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # Keep the existing eight check names stable while every changed
+        # operation receives examples + schema coverage and constrained
+        # operations additionally receive three deterministic fuzz cases.
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: contracts/openapi
+      - name: Start Prism seller mock
+        shell: bash
+        run: |
+          pnpm --filter ./contracts/openapi run mock:seller-v1 > /tmp/prism.log 2>&1 &
+          for _ in {1..30}; do curl -fsS http://127.0.0.1:4010/api/v1/theme >/dev/null && exit 0; sleep 1; done
+          cat /tmp/prism.log
+          exit 1
+      - run: pipx install schemathesis==4.24.3
+      # This PR job targets Prism, not the real API. The draft has 33 request
+      # bodies declared only as
+      # {type: object, additionalProperties: true}. Fuzzing arbitrary JSON for
+      # those placeholders is neither contract coverage nor stable at Prism's
+      # Node HTTP boundary. Every changed operation still gets examples and the
+      # coverage phase; deterministic fuzzing is added where the contract is
+      # constrained. The mock-only codec + hook keep that transport printable.
+      # This is not a NUL-byte filter, and the real staging suite remains broad.
+      - name: Fixed critical-operation smoke
+        if: matrix.shard == 0
+        timeout-minutes: 8
+        env:
+          SCHEMATHESIS_HOOKS: contracts/openapi/scripts/schemathesis_prism_hooks.py
+        run: >-
+          schemathesis run contracts/openapi/src/seller-v1.json
+          --url http://127.0.0.1:4010
+          --workers 1
+          --phases examples,coverage
+          --include-operation-id-regex '^(get_v1_theme|get_v1_plans|get_v1_billing_catalog|post_v1_auth_phone_complete|post_v1_onboarding_complete)$'
+          --checks not_a_server_error,status_code_conformance,content_type_conformance,response_schema_conformance
+          --output-sanitize true
+      - name: Examples and coverage for every changed operation
+        timeout-minutes: 8
+        shell: bash
+        env:
+          BASE_REF: ${{ github.base_ref || 'main' }}
+          SHARD: ${{ matrix.shard }}
+        run: |
+          FILTER=$(node contracts/openapi/scripts/changed-operation-shard.mjs contracts/openapi/src/seller-v1.json "$SHARD" 8 "origin/${BASE_REF}")
+          schemathesis run contracts/openapi/src/seller-v1.json \
+            --url http://127.0.0.1:4010 \
+            --workers 1 \
+            --phases examples,coverage \
+            --include-operation-id-regex "$FILTER" \
+            --checks not_a_server_error,status_code_conformance,content_type_conformance,response_schema_conformance \
+            --report junit,har \
+            --report-dir "schemathesis-report-${SHARD}/coverage" \
+            --output-sanitize true
+      - name: Three fuzz cases per constrained changed operation
+        timeout-minutes: 8
+        shell: bash
+        env:
+          SCHEMATHESIS_HOOKS: contracts/openapi/scripts/schemathesis_prism_hooks.py
+          BASE_REF: ${{ github.base_ref || 'main' }}
+          SHARD: ${{ matrix.shard }}
+        run: |
+          FILTER=$(node contracts/openapi/scripts/changed-operation-shard.mjs contracts/openapi/src/seller-v1.json "$SHARD" 8 "origin/${BASE_REF}" fuzz-safe)
+          schemathesis run contracts/openapi/src/seller-v1.json \
+            --url http://127.0.0.1:4010 \
+            --workers 1 \
+            --phases fuzzing \
+            --generation-deterministic \
+            --generation-codec ascii \
+            --max-examples 3 \
+            --include-operation-id-regex "$FILTER" \
+            --checks not_a_server_error,status_code_conformance,content_type_conformance,response_schema_conformance \
+            --report junit,har \
+            --report-dir "schemathesis-report-${SHARD}/fuzz" \
+            --output-sanitize true
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: schemathesis-pr-${{ matrix.shard }}
+          path: schemathesis-report-${{ matrix.shard }}
+          retention-days: 14
+
+  performance-smoke:
+    runs-on: ubuntu-latest
+    needs: specification
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: contracts/openapi
+      - name: Start Prism
+        shell: bash
+        run: |
+          pnpm --filter ./contracts/openapi run mock:seller-v1 > prism.log 2>&1 &
+          for _ in {1..30}; do curl -fsS http://127.0.0.1:4010/api/v1/theme >/dev/null && exit 0; sleep 1; done
+          cat prism.log
+          exit 1
+      - uses: grafana/setup-k6-action@db07bd9765aac508ef18982e52ab937fe633a065 # v1
+      - run: k6 run quality/performance/k6/api-load.js
+        env:
+          BASE_URL: http://127.0.0.1:4010
+          PROFILE: smoke

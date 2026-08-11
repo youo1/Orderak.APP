@@ -1,0 +1,51 @@
+name: AI Customizations CI
+
+on:
+  pull_request:
+    paths:
+      - 'AGENTS.md'
+      - '.github/agents/**'
+      - '.github/skills/**'
+      - '.github/instructions/**'
+      - '.github/hooks/**'
+      - '.github/copilot/**'
+      - '.github/plugin/**'
+      - '.github/mcp.json'
+      - '.github/copilot-instructions.md'
+      - '.github/workflows/ai-customizations-ci.yml'
+      - '.github/workflows/skills-auto-update.yml'
+      - '.vscode/mcp.json'
+      - '.vscode/settings.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-customizations-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Validate customization structure
+        run: node .github/skills/orderak-agent-improvement/scripts/validate-customizations.mjs
+
+      - name: Test hook and verification helpers
+        run: >
+          node --test
+          .github/hooks/scripts/hooks.test.mjs
+          .github/skills/orderak-agent-improvement/scripts/record-learning.test.mjs
+          .github/skills/orderak-verification/scripts/verify.test.mjs

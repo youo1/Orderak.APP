@@ -1,0 +1,273 @@
+name: D1 Backup
+
+# Produces a verified, restorable export of every D1 database and stores it in
+# R2 alongside a checksum and a row-count manifest.
+#
+# TWO FAILURES THIS WORKFLOW PREVIOUSLY HAD, BOTH SILENT:
+#
+#   1. It passed `--json` to `wrangler d1 export`. That flag does not exist —
+#      wrangler printed usage and exported nothing.
+#   2. Even without it, a plain export of these databases fails:
+#        D1_ERROR: cannot export databases with Virtual Tables (fts5)
+#      orderak-db has geo_city_search and business_taxonomy_search; orderak-geo
+#      has city_catalog_search. An explicit table allowlist is the supported
+#      way around this (see scripts/d1-exportable-tables.mjs).
+#
+# Because both failures happened before the validation steps, the job could
+# never have produced an artifact. The restore drill below exists so that a
+# green run means "this backup was replayed into a real database", not "a file
+# was written".
+#
+# FTS5 indexes are deliberately not backed up: they are derived data. The
+# restore runbook rebuilds them — see docs/runbooks/d1-restore.md.
+
+on:
+  # No schedule here. This repository holds no deploy credentials yet, and a
+  # scheduled run against the shared production/staging D1 would be pointless
+  # until then anyway. The old repository's nightly cron stays authoritative
+  # until Phase 7a removes its deploy token and this one takes over — see
+  # the migration plan, Phase 3: "Deploy, backup, drift, nightly and every
+  # scheduled workflow stay disabled or manual until cutover."
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Which environment to export
+        type: choice
+        default: production
+        options:
+          - production
+          - staging
+          - both
+
+permissions:
+  contents: read
+
+concurrency:
+  group: d1-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    # A manual dispatch used to run the production backup unconditionally, with staging
+    # merely added on top. That made it impossible to exercise the staging path — for
+    # example when testing backup encryption — without also touching production. The
+    # scheduled run still covers production every night; a dispatch now goes exactly
+    # where it is aimed.
+    if: >-
+      ${{ github.event_name != 'workflow_dispatch'
+          || inputs.target == 'production'
+          || inputs.target == 'both' }}
+    strategy:
+      # One database failing must not mask the status of the others.
+      fail-fast: false
+      matrix:
+        database: [orderak-db, orderak-geo]
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_D1_BACKUP_TOKEN }}
+      DB: ${{ matrix.database }}
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Preflight required production credentials
+        run: |
+          set -euo pipefail
+          missing=0
+          if [ -z "${CLOUDFLARE_API_TOKEN}" ]; then
+            echo "ERROR: CLOUDFLARE_D1_BACKUP_TOKEN is not set in the 'production' environment."
+            missing=1
+          fi
+          if [ -z "${CLOUDFLARE_ACCOUNT_ID}" ]; then
+            echo "ERROR: CLOUDFLARE_ACCOUNT_ID is not set in the 'production' environment."
+            missing=1
+          fi
+          [ "$missing" = "0" ] || exit 1
+          echo "Production backup credentials are present."
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          # node:sqlite — used by the restore drill — is stable on Node 24 and
+          # still behind --experimental-sqlite on 22.
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+        working-directory: services/backend
+
+      - name: Compute exportable table allowlist
+        working-directory: services/backend
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute "$DB" --remote --json \
+            --command "SELECT name, sql FROM sqlite_master WHERE type='table'" \
+            > /tmp/schema.json
+          TABLES=$(node scripts/d1-exportable-tables.mjs < /tmp/schema.json)
+          echo "TABLE_ARGS=$TABLES" >> "$GITHUB_ENV"
+
+      - name: Export ${{ matrix.database }}
+        working-directory: services/backend
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC2086 # TABLE_ARGS is a deliberate word-split list
+          npx wrangler d1 export "$DB" --remote $TABLE_ARGS --output="/tmp/${DB}.sql"
+
+      - name: Validate export is non-empty and contains schema
+        run: |
+          set -euo pipefail
+          F="/tmp/${DB}.sql"
+          [ -s "$F" ] || { echo "ERROR: $F is empty or missing — aborting backup"; exit 1; }
+          grep -q "CREATE TABLE" "$F" || { echo "ERROR: $F has no CREATE TABLE — export may be corrupt"; exit 1; }
+          echo "$F: $(wc -c < "$F") bytes OK"
+
+      - name: Fetch previous manifest for row-loss comparison
+        working-directory: services/backend
+        continue-on-error: true
+        run: |
+          npx wrangler r2 object get "orderak-backups/pointers/${DB}/latest.manifest.json" \
+            --file="/tmp/${DB}.previous.json" --remote
+
+      - name: Restore drill — prove the export is recoverable
+        working-directory: services/backend
+        run: |
+          set -euo pipefail
+          ARGS=""
+          if [ -s "/tmp/${DB}.previous.json" ]; then
+            ARGS="--compare /tmp/${DB}.previous.json"
+            echo "Comparing against the previous backup's manifest."
+          else
+            echo "No previous manifest found — skipping row-loss comparison (first run)."
+          fi
+          # shellcheck disable=SC2086
+          node scripts/verify-d1-restore.mjs "/tmp/${DB}.sql" \
+            --manifest "/tmp/${DB}.manifest.json" \
+            --min-tables 1 $ARGS
+
+      - name: Checksum
+        run: |
+          set -euo pipefail
+          cd /tmp
+          sha256sum "${DB}.sql" > "${DB}.sql.sha256"
+          cat "${DB}.sql.sha256"
+
+      - name: Upload to R2 (orderak-backups bucket)
+        working-directory: services/backend
+        run: |
+          set -euo pipefail
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H%MZ)
+          for artifact in "sql" "sql.sha256" "manifest.json"; do
+            npx wrangler r2 object put "orderak-backups/d1/${DB}/${TIMESTAMP}.${artifact}" \
+              --file="/tmp/${DB}.${artifact}" --content-type="application/octet-stream" --remote
+            echo "Uploaded: d1/${DB}/${TIMESTAMP}.${artifact}"
+          done
+          # Stable pointer so the next run can detect row loss. Deliberately outside
+          # d1/: that prefix carries a retention lock and a locked object cannot be
+          # overwritten, so mutable state kept there would fail every run after the
+          # first. Immutable and mutable data do not share a prefix.
+          npx wrangler r2 object put "orderak-backups/pointers/${DB}/latest.manifest.json" \
+            --file="/tmp/${DB}.manifest.json" --content-type="application/json" --remote
+
+      - name: Check export size against D1 limits
+        run: |
+          set -euo pipefail
+          # D1's import path caps at 100 MB per file. Warn before we get there.
+          LIMIT_MB=95
+          SIZE_MB=$(( $(wc -c < "/tmp/${DB}.sql") / 1048576 ))
+          if [ "$SIZE_MB" -gt "$LIMIT_MB" ]; then
+            echo "WARNING: /tmp/${DB}.sql is ${SIZE_MB} MB — approaching the 100 MB import limit. Consider per-table exports."
+          else
+            echo "/tmp/${DB}.sql: ${SIZE_MB} MB — within limits"
+          fi
+
+  backup-staging:
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch'
+          && (inputs.target == 'staging' || inputs.target == 'both') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: staging
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [orderak-db-staging, orderak-geo-staging]
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_D1_BACKUP_TOKEN }}
+      DB: ${{ matrix.database }}
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Preflight required staging credentials
+        run: |
+          set -euo pipefail
+          missing=0
+          if [ -z "${CLOUDFLARE_API_TOKEN}" ]; then
+            echo "ERROR: CLOUDFLARE_D1_BACKUP_TOKEN is not set in the 'staging' environment."
+            missing=1
+          fi
+          if [ -z "${CLOUDFLARE_ACCOUNT_ID}" ]; then
+            echo "ERROR: CLOUDFLARE_ACCOUNT_ID is not set in the 'staging' environment."
+            missing=1
+          fi
+          [ "$missing" = "0" ] || exit 1
+          echo "Staging backup credentials are present."
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+        working-directory: services/backend
+
+      - name: Compute exportable table allowlist
+        working-directory: services/backend
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute "$DB" --remote --json \
+            --command "SELECT name, sql FROM sqlite_master WHERE type='table'" \
+            > /tmp/schema.json
+          TABLES=$(node scripts/d1-exportable-tables.mjs < /tmp/schema.json)
+          echo "TABLE_ARGS=$TABLES" >> "$GITHUB_ENV"
+
+      - name: Export ${{ matrix.database }}
+        working-directory: services/backend
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC2086
+          npx wrangler d1 export "$DB" --remote $TABLE_ARGS --output="/tmp/${DB}.sql"
+
+      - name: Validate staging export is non-empty and contains schema
+        run: |
+          set -euo pipefail
+          F="/tmp/${DB}.sql"
+          [ -s "$F" ] || { echo "ERROR: $F is empty or missing — aborting backup"; exit 1; }
+          grep -q "CREATE TABLE" "$F" || { echo "ERROR: $F has no CREATE TABLE — export may be corrupt"; exit 1; }
+          echo "$F: $(wc -c < "$F") bytes OK"
+
+      - name: Restore drill — prove the export is recoverable
+        working-directory: services/backend
+        run: |
+          set -euo pipefail
+          node scripts/verify-d1-restore.mjs "/tmp/${DB}.sql" \
+            --manifest "/tmp/${DB}.manifest.json" --min-tables 1
+
+      - name: Upload staging to R2
+        working-directory: services/backend
+        run: |
+          set -euo pipefail
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H%MZ)
+          cd /tmp && sha256sum "${DB}.sql" > "${DB}.sql.sha256" && cd - >/dev/null
+          for artifact in "sql" "sql.sha256" "manifest.json"; do
+            npx wrangler r2 object put "orderak-backups/d1/${DB}/${TIMESTAMP}.${artifact}" \
+              --file="/tmp/${DB}.${artifact}" --content-type="application/octet-stream" --remote
+            echo "Uploaded: d1/${DB}/${TIMESTAMP}.${artifact}"
+          done

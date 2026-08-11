@@ -1,0 +1,50 @@
+name: Authentication Safety Contract
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  protected-auth-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Reject contract suspension or bypass paths
+        run: node tooling/repository/verify-contract-guards.mjs
+
+      - name: Set up Java 17
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@48b5f213c81028ace310571dc5ec0fbbca0b2947 # v4
+
+      - name: Create CI Firebase configuration
+        run: bash .github/scripts/write-ci-google-services.sh
+
+      - name: Verify versioned contracts and Android behavioral tests
+        working-directory: apps/seller-android
+        run: >
+          ./gradlew
+          verifyAuthPhase1Contract
+          verifyLocalizationContract
+          verifySellerApiContract
+          testStagingDebugUnitTest
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Verify Worker authentication tests
+        working-directory: services/backend
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm test -- --run test/firebase-auth.spec.ts test/identity-v2.spec.ts test/api-versioning.spec.ts
