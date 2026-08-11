@@ -1,0 +1,15 @@
+#:schema https://raw.githubusercontent.com/schemathesis/schemathesis/master/src/schemathesis/config/schema.json
+
+# The staging edge enforces a shared rolling window. Live HAR evidence recorded
+# the first block at 406 visible requests in ten minutes, consistent with a
+# 400-request ceiling. Keep the run at 300 per window (25% margin) so valid
+# traffic reaches the Worker. 429 conformance stays in focused tests.
+workers = 1
+rate-limit = "30/m"
+
+# Live staging is deliberately read-only. Unsupported-method coverage may emit TRACE,
+# which Cloudflare rejects before the Worker, or mutating verbs that must never be sent
+# to a live environment merely to prove that the application rejects them. Worker-level
+# tests own 405/Allow compliance; the Prism suite retains general contract coverage.
+[phases.coverage]
+unexpected-methods = []

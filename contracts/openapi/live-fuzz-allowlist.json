@@ -1,0 +1,41 @@
+{
+  "$comment": [
+    "Operations schemathesis is allowed to exercise against LIVE staging.",
+    "Opt-in only. A new endpoint is NEVER added automatically - it must be reviewed and listed here.",
+    "Excluded by policy: anything that sends email, takes payment, deletes data, writes catalog,",
+    "changes auth state, uploads media, or calls an external service (Google Play, DeepSeek).",
+    "Full-spec coverage including mutating operations runs against the Prism mock, not staging."
+  ],
+  "reviewed_on": "2026-08-10",
+  "allow": [
+    "get_theme_file",
+    "get_v1_account_deletion_request",
+    "get_v1_account_status",
+    "get_v1_ads_active",
+    "get_v1_announcements",
+    "get_v1_auth_passkeys",
+    "get_v1_billing_catalog",
+    "get_v1_billing_verifications_id",
+    "get_v1_catalog_business_categories",
+    "get_v1_catalog_business_subcategories",
+    "get_v1_catalog_translations",
+    "get_v1_categories",
+    "get_v1_categories_category_code",
+    "get_v1_config",
+    "get_v1_devices",
+    "get_v1_entitlements",
+    "get_v1_geo_cities",
+    "get_v1_media_upload",
+    "get_v1_onboarding_slug_check",
+    "get_v1_orders",
+    "get_v1_plans",
+    "get_v1_products",
+    "get_v1_referral_stats",
+    "get_v1_slug_check",
+    "get_v1_store",
+    "get_v1_subscription_status",
+    "get_v1_support_tickets",
+    "get_v1_support_tickets_id",
+    "get_v1_theme"
+  ]
+}

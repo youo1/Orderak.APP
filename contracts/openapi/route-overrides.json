@@ -1,0 +1,86 @@
+[
+  {
+    "method": "GET",
+    "path": "/api/v1/config"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/entitlements"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/billing/verifications/{id}"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/auth/passkeys/{id}"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/auth/passkeys/{id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/categories/{category_code}"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/categories/{category_code}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/support/tickets/{id}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/support/tickets/{id}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/announcements/{id}/read"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/catalog/translations/{product_code}/{language}"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/catalog/translations/{product_code}/{language}"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/devices/{id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/catalog/business-categories"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/catalog/business-subcategories"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/chat"
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/v1/exports/{id}/file"
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/v1/plan-revisions/{id}/impact"
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/v1/plan-revisions/{id}/impact"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/admin/v1/announcements/{id}"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/admin/v1/announcements/{id}"
+  }
+]

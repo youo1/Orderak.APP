@@ -1,0 +1,224 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schemas": {
+    "Problem": {
+      "type": "object",
+      "required": [
+        "type",
+        "title",
+        "status",
+        "code",
+        "detail",
+        "request_id"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "format": "uri",
+          "examples": [
+            "https://developers.orderak.app/problems/validation_failed"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "examples": [
+            "Validation Failed"
+          ]
+        },
+        "status": {
+          "type": "integer",
+          "minimum": 400,
+          "maximum": 599,
+          "examples": [
+            400
+          ]
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "examples": [
+            "validation_failed"
+          ]
+        },
+        "detail": {
+          "type": "string",
+          "examples": [
+            "One or more fields are invalid."
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "examples": [
+            "018f-example"
+          ]
+        },
+        "field_errors": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "retryable": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": true
+    },
+    "GenericSuccess": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "const": true
+        }
+      },
+      "additionalProperties": true,
+      "examples": [
+        {
+          "ok": true
+        }
+      ]
+    },
+    "CursorPage": {
+      "type": "object",
+      "required": [
+        "items",
+        "next_cursor",
+        "has_more"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {}
+        },
+        "next_cursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "has_more": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "parameters": {
+    "RequestId": {
+      "name": "X-Request-ID",
+      "in": "header",
+      "required": false,
+      "schema": {
+        "type": "string",
+        "maxLength": 128
+      },
+      "description": "Opaque client correlation identifier. The response always carries X-Request-ID."
+    },
+    "IdempotencyKey": {
+      "name": "Idempotency-Key",
+      "in": "header",
+      "required": true,
+      "schema": {
+        "type": "string",
+        "minLength": 8,
+        "maxLength": 128
+      },
+      "description": "Required for retry-safe mutations that can create financial or durable state."
+    },
+    "Cursor": {
+      "name": "cursor",
+      "in": "query",
+      "required": false,
+      "schema": {
+        "type": "string"
+      }
+    },
+    "Limit": {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100,
+        "default": 20
+      }
+    },
+    "ClientPlatform": {
+      "name": "x-orderak-platform",
+      "in": "header",
+      "required": false,
+      "schema": {
+        "type": "string",
+        "enum": [
+          "android",
+          "ios",
+          "desktop"
+        ]
+      },
+      "description": "Client platform identifier used for compatibility telemetry; it never grants authorization."
+    },
+    "AppVersion": {
+      "name": "x-orderak-app-version",
+      "in": "header",
+      "required": false,
+      "schema": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64
+      },
+      "description": "Human-readable client version used for compatibility telemetry; it never grants authorization."
+    }
+  },
+  "headers": {
+    "RequestId": {
+      "required": true,
+      "schema": {
+        "type": "string"
+      },
+      "description": "Opaque request correlation id."
+    },
+    "RetryAfter": {
+      "required": false,
+      "schema": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "description": "Seconds before retry."
+    },
+    "Location": {
+      "description": "Absolute URL of the content-addressed stylesheet to fetch instead.",
+      "required": true,
+      "schema": {
+        "type": "string",
+        "format": "uri"
+      },
+      "example": "https://api.orderak.app/api/theme/4b3be89b0430b2975b9654e8ef4cabe7bb25c714a455683e23eecff839e83c05.css"
+    }
+  },
+  "securitySchemes": {
+    "sellerDevice": {
+      "type": "apiKey",
+      "in": "header",
+      "name": "x-orderak-secret",
+      "description": "Seller device credential; phone/session context is supplied by the Android transport contract."
+    },
+    "adminSession": {
+      "type": "apiKey",
+      "in": "cookie",
+      "name": "orderak_admin_session"
+    },
+    "googleOidc": {
+      "type": "http",
+      "scheme": "bearer",
+      "bearerFormat": "OIDC JWT"
+    },
+    "webhookSignature": {
+      "type": "apiKey",
+      "in": "header",
+      "name": "x-webhook-signature"
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "@orderak/openapi",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "inventory": "node scripts/inventory.mjs",
+    "bootstrap": "node scripts/bootstrap-specs.mjs",
+    "lint": "spectral lint src/*.json",
+    "validate": "redocly lint --config redocly.yaml src/seller-v1.json src/admin-v1.json src/integrations-v1.json",
+    "examples": "node scripts/check-examples.mjs",
+    "coverage": "node scripts/route-coverage.mjs",
+    "live-policy": "node scripts/live-fuzz-filter.mjs && node scripts/verify-live-fuzz-shards.mjs && node scripts/verify-live-fuzz-rate.mjs",
+    "bundle": "redocly bundle --config redocly.yaml src/seller-v1.json -o dist/seller-v1.json && redocly bundle --config redocly.yaml src/admin-v1.json -o dist/admin-v1.json && redocly bundle --config redocly.yaml src/integrations-v1.json -o dist/integrations-v1.json",
+    "public": "node scripts/build-public-bundle.mjs",
+    "cloudflare": "node scripts/build-cloudflare-oas30.mjs",
+    "portals": "node scripts/build-portals.mjs",
+    "check": "npm run lint && npm run validate && npm run examples && npm run coverage && npm run live-policy && npm run bundle && npm run public && npm run cloudflare && npm run portals",
+    "mock:seller-v1": "prism mock src/seller-v1.json --host 0.0.0.0 --port 4010 --dynamic"
+  },
+  "devDependencies": {
+    "@redocly/cli": "^2.5.0",
+    "@stoplight/prism-cli": "^5.14.2",
+    "@stoplight/spectral-cli": "^6.15.0"
+  }
+}

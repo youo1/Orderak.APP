@@ -1,0 +1,23 @@
+# Scoped exceptions to Redocly lint rules: one rule, one location, one reason each.
+#
+# operation-2xx-response on GET /api/theme.css
+#
+#   The rule catches operations that forgot to document a success response. This one
+#   did not forget: it has no 2xx to document. /api/theme.css always answers 302 with
+#   a Location header pointing at the content-addressed stylesheet
+#   (/api/theme/{contentHash}.css), and publicDesignSystemCss in
+#   services/backend/src/domains/admin/admin-theme.ts:518-526 has no code path that
+#   reaches a 200 when called without a hash.
+#
+#   That indirection is deliberate: the redirect carries max-age=60 so a theme change
+#   is picked up within a minute, while the hashed target carries
+#   max-age=31536000, immutable, so clients never revalidate the stylesheet itself.
+#
+#   Suppressed here rather than left as a standing warning. A warning that nobody can
+#   ever clear is a warning everybody learns to scroll past, and the next real one
+#   would scroll past with it.
+#
+# See https://redocly.com/docs/cli/ for the file format.
+src/seller-v1.json:
+  operation-2xx-response:
+    - '#/paths/~1api~1theme.css/get/responses'

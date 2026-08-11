@@ -1,0 +1,14 @@
+apis:
+  seller@v1:
+    root: ./src/seller-v1.json
+  admin@v1:
+    root: ./src/admin-v1.json
+  integrations@v1:
+    root: ./src/integrations-v1.json
+extends:
+  - recommended
+rules:
+  no-unused-components: warn
+  operation-4xx-response: error
+  security-defined: error
+  no-server-example.com: off

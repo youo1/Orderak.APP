@@ -1,0 +1,36 @@
+extends:
+  - spectral:oas
+rules:
+  operation-operationId: error
+  operation-description: error
+  operation-tags: error
+  orderak-owner:
+    description: Every operation must have an accountable owner.
+    given: $.paths.*[get,post,put,patch,delete]
+    severity: error
+    then:
+      field: x-owner
+      function: truthy
+  orderak-data-classification:
+    description: Every operation must carry an approved or pending data classification.
+    given: $.paths.*[get,post,put,patch,delete]
+    severity: error
+    then:
+      field: x-data-classification
+      function: pattern
+      functionOptions:
+        match: '^(L0|L1|L2|L3|pending-review)$'
+  orderak-stability:
+    given: $.paths.*[get,post,put,patch,delete]
+    severity: error
+    then:
+      field: x-stability
+      function: pattern
+      functionOptions:
+        match: '^(draft|beta|stable)$'
+  orderak-rate-limit:
+    given: $.paths.*[get,post,put,patch,delete]
+    severity: error
+    then:
+      field: x-rate-limit
+      function: truthy

@@ -1,0 +1,515 @@
+{
+  "openapi": "3.1.2",
+  "info": {
+    "title": "Orderak Integrations API",
+    "version": "1.0.0-draft",
+    "description": "First pre-release production contract. Breaking changes are allowed while x-stability is draft and must be recorded in the API changelog.",
+    "contact": {
+      "name": "Orderak Engineering",
+      "url": "https://docs.orderak.app"
+    },
+    "license": {
+      "name": "Proprietary — internal pre-release",
+      "url": "https://docs.orderak.app/legal/terms-of-service/"
+    }
+  },
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "servers": [
+    {
+      "url": "https://api.orderak.app",
+      "description": "Production"
+    },
+    {
+      "url": "https://api.staging.orderak.app",
+      "description": "Staging"
+    }
+  ],
+  "tags": [
+    {
+      "name": "integrations",
+      "description": "integrations v1 operations"
+    }
+  ],
+  "paths": {
+    "/api/integrations/v1/google-play/rtdn": {
+      "post": {
+        "operationId": "post_integrations_v1_google_play_rtdn",
+        "tags": [
+          "integrations"
+        ],
+        "summary": "POST /api/integrations/v1/google-play/rtdn",
+        "description": "Pre-release integrations v1 operation. Detailed domain schemas replace the generic bootstrap schema during API-first review.",
+        "x-owner": "Backend Integrations",
+        "x-data-classification": "L3",
+        "x-rate-limit": "integrations-authenticated-default",
+        "x-stability": "draft",
+        "security": [
+          {
+            "googleOidc": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "./components/common.json#/parameters/RequestId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "examples": {
+                "valid": {
+                  "value": {}
+                },
+                "validation_failure": {
+                  "value": {
+                    "unexpected": "review-schema"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/GenericSuccess"
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "ok": true
+                    }
+                  },
+                  "empty": {
+                    "value": {
+                      "ok": true,
+                      "items": [],
+                      "has_more": false
+                    }
+                  },
+                  "pagination": {
+                    "value": {
+                      "ok": true,
+                      "items": [
+                        {
+                          "id": "example"
+                        }
+                      ],
+                      "next_cursor": "opaque-cursor",
+                      "has_more": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failure",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/validation_failed",
+                      "title": "Validation Failed",
+                      "status": 400,
+                      "code": "validation_failed",
+                      "detail": "One or more fields are invalid.",
+                      "request_id": "018f-example",
+                      "field_errors": {
+                        "field": "invalid"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/auth",
+                      "title": "Auth",
+                      "status": 401,
+                      "code": "auth",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/forbidden",
+                      "title": "Forbidden",
+                      "status": 403,
+                      "code": "forbidden",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              },
+              "Retry-After": {
+                "$ref": "./components/common.json#/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/rate_limited",
+                      "title": "Rate Limited",
+                      "status": 429,
+                      "code": "rate_limited",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example",
+                      "retryable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Retryable dependency failure",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              },
+              "Retry-After": {
+                "$ref": "./components/common.json#/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/temporarily_unavailable",
+                      "title": "Temporarily Unavailable",
+                      "status": 503,
+                      "code": "temporarily_unavailable",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example",
+                      "retryable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integrations/v1/payment": {
+      "post": {
+        "operationId": "post_integrations_v1_payment",
+        "tags": [
+          "integrations"
+        ],
+        "summary": "POST /api/integrations/v1/payment",
+        "description": "Pre-release integrations v1 operation. Detailed domain schemas replace the generic bootstrap schema during API-first review.",
+        "x-owner": "Backend Integrations",
+        "x-data-classification": "L3",
+        "x-rate-limit": "integrations-authenticated-default",
+        "x-stability": "draft",
+        "security": [
+          {
+            "webhookSignature": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "./components/common.json#/parameters/RequestId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "examples": {
+                "valid": {
+                  "value": {}
+                },
+                "validation_failure": {
+                  "value": {
+                    "unexpected": "review-schema"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/GenericSuccess"
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "ok": true
+                    }
+                  },
+                  "empty": {
+                    "value": {
+                      "ok": true,
+                      "items": [],
+                      "has_more": false
+                    }
+                  },
+                  "pagination": {
+                    "value": {
+                      "ok": true,
+                      "items": [
+                        {
+                          "id": "example"
+                        }
+                      ],
+                      "next_cursor": "opaque-cursor",
+                      "has_more": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failure",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/validation_failed",
+                      "title": "Validation Failed",
+                      "status": 400,
+                      "code": "validation_failed",
+                      "detail": "One or more fields are invalid.",
+                      "request_id": "018f-example",
+                      "field_errors": {
+                        "field": "invalid"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/auth",
+                      "title": "Auth",
+                      "status": 401,
+                      "code": "auth",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/forbidden",
+                      "title": "Forbidden",
+                      "status": 403,
+                      "code": "forbidden",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              },
+              "Retry-After": {
+                "$ref": "./components/common.json#/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/rate_limited",
+                      "title": "Rate Limited",
+                      "status": 429,
+                      "code": "rate_limited",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example",
+                      "retryable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Retryable dependency failure",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              },
+              "Retry-After": {
+                "$ref": "./components/common.json#/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/temporarily_unavailable",
+                      "title": "Temporarily Unavailable",
+                      "status": 503,
+                      "code": "temporarily_unavailable",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example",
+                      "retryable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "googleOidc": {
+        "$ref": "./components/common.json#/securitySchemes/googleOidc"
+      },
+      "webhookSignature": {
+        "$ref": "./components/common.json#/securitySchemes/webhookSignature"
+      }
+    }
+  },
+  "x-stability": "draft",
+  "x-api-prefix": "/api/integrations/v1"
+}
