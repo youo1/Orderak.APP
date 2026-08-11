@@ -1,13 +1,29 @@
 name: Deploy Staging
 
-# No push trigger yet. The migration plan (Phase 3) is explicit: "Deploy,
-# backup, drift, nightly and every scheduled workflow stay disabled or
-# manual until cutover. Never copy schedules and leave both repositories
-# acting on the same resources." The old repository still owns the push-to-
-# staging path; this one gets it back — and its trigger restored — only
-# after Phase 7a removes the old repository's staging deploy token.
+# This repository owns staging deploys as of Phase 7a (2026-08-11).
+#
+# The push trigger was held back while both repositories could still reach
+# the same Workers — the plan's rule was "never copy schedules and leave
+# both repositories acting on the same resources." That condition no longer
+# holds: youo1/Orderak's staging deploy credential was removed, and its own
+# staging-deploy.yml is now break-glass only, dispatch-gated behind a typed
+# confirmation and a required reviewer. One repository deploys staging, and
+# it is this one.
+#
+# Restored with the same path filters the source repository used, so a docs
+# or Android-only change still does not redeploy the Workers.
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/backend/**'
+      - 'apps/admin-web/**'
+      - 'contracts/openapi/**'
+      - 'apps/seller-android/app/build.gradle.kts'
+      - 'tooling/repository/verify-deployment-map.mjs'
+      - 'docs/architecture/deployment-environment-map.md'
+      - '.github/workflows/staging-deploy.yml'
   workflow_dispatch:
 
 permissions:
