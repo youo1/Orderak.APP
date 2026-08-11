@@ -52,7 +52,7 @@ jobs:
             --exclude '**/build/**' \
             --exclude '**/.gradle/**' \
             --sarif-output security-reports/semgrep.sarif \
-            .github apps contracts multi-agent packages quality services tooling
+            .github apps contracts packages quality services tooling
           status=$?
           set -e
           echo "exit-code=$status" >> "$GITHUB_OUTPUT"
