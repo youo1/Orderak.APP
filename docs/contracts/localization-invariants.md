@@ -1,3 +1,10 @@
+---
+status: current
+generated: false
+owner: product
+applies_to: [production, staging]
+authoritative_for: [localization-invariants]
+---
 # Localization Invariants
 
 **Contract version:** 1  

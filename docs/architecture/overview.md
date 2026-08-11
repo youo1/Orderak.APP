@@ -1,3 +1,10 @@
+---
+status: current
+generated: false
+owner: governance
+applies_to: [production, staging]
+authoritative_for: [system-architecture]
+---
 # Architecture Overview
 
 > **Status:** Current repository architecture; inactive/future integrations are

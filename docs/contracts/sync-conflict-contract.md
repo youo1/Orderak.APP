@@ -1,3 +1,10 @@
+---
+status: current
+generated: false
+owner: backend
+applies_to: [production, staging]
+authoritative_for: [sync-conflict]
+---
 # Seller Sync and Conflict Contract
 
 **Contract version:** 1

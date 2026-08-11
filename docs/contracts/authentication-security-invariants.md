@@ -1,3 +1,10 @@
+---
+status: current
+generated: false
+owner: security
+applies_to: [production, staging]
+authoritative_for: [auth-security-invariants]
+---
 # Authentication Security Invariants
 
 **Contract version:** 1  

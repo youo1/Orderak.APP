@@ -1,3 +1,11 @@
+---
+status: current
+generated: false
+owner: governance
+last_verified: 2026-08-11
+applies_to: [production, staging, internal]
+authoritative_for: [environment-setup]
+---
 <!-- PROTECTED SETUP: Any modifications to this documented setup must be reviewed and approved. Unapproved changes are strictly prohibited. -->
 
 > **⚠️ PROTECTED SETUP**

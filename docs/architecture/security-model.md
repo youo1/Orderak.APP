@@ -1,3 +1,10 @@
+---
+status: current
+generated: false
+owner: security
+applies_to: [production, staging]
+authoritative_for: [security-model]
+---
 # Security Model
 
 > **Status:** Current implemented controls plus explicit open risks

@@ -1,3 +1,10 @@
+---
+status: current
+generated: false
+owner: android
+applies_to: [production, staging]
+authoritative_for: [localization-architecture]
+---
 # Localization Architecture Contract
 
 **Contract version:** 3

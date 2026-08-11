@@ -1,3 +1,10 @@
+---
+status: current
+generated: false
+owner: backend
+applies_to: [production, staging]
+authoritative_for: [deployment-environments]
+---
 # Deployment Environment Map
 
 **Status:** source-of-truth for repository deployment names

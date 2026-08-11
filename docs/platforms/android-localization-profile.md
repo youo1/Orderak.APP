@@ -1,3 +1,10 @@
+---
+status: current
+generated: false
+owner: android
+applies_to: [production, staging]
+authoritative_for: [android-localization-profile]
+---
 # Android Localization Profile
 
 **Profile version:** 1  

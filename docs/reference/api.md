@@ -1,3 +1,10 @@
+---
+status: current
+generated: false
+owner: backend
+applies_to: [production, staging]
+authoritative_for: [api-reference]
+---
 # Orderak API Notes
 
 > **Status:** Pre-release v1 draft; there are no production clients or users

@@ -1,0 +1,83 @@
+{
+  "$comment": [
+    "The registry of subjects a document may claim authority over via `authoritative_for`.",
+    "",
+    "WHY A REGISTRY AND NOT FREE TEXT",
+    "  Free-text subjects cannot be validated. Two documents could each claim to be the",
+    "  source of truth on authentication under slightly different spellings, and nothing",
+    "  would notice. Every subject here is a closed value: verify-doc-frontmatter.mjs",
+    "  fails on an unregistered subject, on two current claimants for one subject, and on",
+    "  a registered subject with no claimant at all.",
+    "",
+    "WHAT BELONGS HERE",
+    "  A subject earns an entry when exactly one document should be the place a reader",
+    "  goes to be *sure* about it, and being wrong about it has a real cost. Subjects are",
+    "  deliberately narrow: 'localization' would have three plausible claimants, so it is",
+    "  split into the outcomes contract, the architecture contract, and the Android",
+    "  implementation profile - which is why that split exists as three entries below.",
+    "",
+    "  Referencing a subject is always allowed. Only claiming it is controlled."
+  ],
+  "subjects": [
+    {
+      "id": "auth-contract",
+      "description": "The versioned seller authentication contract: which auth flows are supported, their versions, and what may not change without approval."
+    },
+    {
+      "id": "auth-security-invariants",
+      "description": "The security properties authentication must hold regardless of implementation - token handling, session boundaries, replay and enumeration resistance."
+    },
+    {
+      "id": "api-compatibility",
+      "description": "The seller API's route-versioning and compatibility policy: what v1 guarantees, how routes are retired, what a client may rely on."
+    },
+    {
+      "id": "sync-conflict",
+      "description": "Which side wins on a sync conflict, and which data the backend is authoritative for versus the client."
+    },
+    {
+      "id": "localization-invariants",
+      "description": "Platform-agnostic localization outcomes every seller surface must satisfy - key parity, fallback behavior, RTL, dynamic-content authority."
+    },
+    {
+      "id": "localization-architecture",
+      "description": "The localization architecture decisions: default locale, supported locale set, per-app language API, bundle-split policy, translation lifecycle."
+    },
+    {
+      "id": "android-localization-profile",
+      "description": "How the current Android app implements the localization contracts - resource layout, locale APIs, screenshot baselines."
+    },
+    {
+      "id": "security-model",
+      "description": "The system's trust boundaries, threat model, and the controls at each boundary."
+    },
+    {
+      "id": "system-architecture",
+      "description": "The component map: which service owns which responsibility and which data, and how requests flow between them."
+    },
+    {
+      "id": "deployment-environments",
+      "description": "Which Workers, databases, buckets, queues and hostnames exist per environment, and which repository deploys them."
+    },
+    {
+      "id": "release-workflow",
+      "description": "How a change reaches staging and then production: gates, promotion, verification, rollback triggers and rehearsal."
+    },
+    {
+      "id": "database-migrations",
+      "description": "The migration ledger and what each migration does. Generated from the SQL files - never hand-edited."
+    },
+    {
+      "id": "environment-setup",
+      "description": "How to go from a fresh machine to a running local environment, and from a fresh Cloudflare account to a deployed Worker."
+    },
+    {
+      "id": "api-reference",
+      "description": "The backend HTTP surface: endpoints, request and response shapes, auth requirements, error semantics."
+    },
+    {
+      "id": "d1-restore",
+      "description": "How to recover a D1 database from backup, including decryption, index and trigger rebuild, and the FTS5 caveat."
+    }
+  ]
+}

@@ -1,3 +1,10 @@
+---
+status: current
+generated: false
+owner: security
+applies_to: [production, staging]
+authoritative_for: [auth-contract]
+---
 # Versioned Seller Authentication Contract
 
 **Contract version:** 7

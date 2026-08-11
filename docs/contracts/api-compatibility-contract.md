@@ -1,3 +1,10 @@
+---
+status: current
+generated: false
+owner: backend
+applies_to: [production, staging]
+authoritative_for: [api-compatibility]
+---
 # Seller API Compatibility Contract
 
 **Contract version:** 2  

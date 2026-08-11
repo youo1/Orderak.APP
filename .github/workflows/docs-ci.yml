@@ -41,6 +41,9 @@ jobs:
       - name: Verify local documentation links
         run: node tooling/repository/verify-doc-links.mjs
 
+      - name: Verify documentation frontmatter and subject authority
+        run: node tooling/repository/verify-doc-frontmatter.mjs
+
       - name: Link check
         uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2
         with:
