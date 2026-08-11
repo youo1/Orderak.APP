@@ -151,14 +151,14 @@ jobs:
           grep -q "CREATE TABLE" "$F" || { echo "ERROR: $F has no CREATE TABLE — export may be corrupt"; exit 1; }
           echo "$F: $(wc -c < "$F") bytes OK"
 
-      - name: Append index definitions — wrangler d1 export omits them entirely
+      - name: Append index and trigger definitions — wrangler d1 export omits them entirely
         working-directory: services/backend
         run: |
           set -euo pipefail
           npx wrangler d1 execute "$DB" --remote --json \
-            --command "SELECT type, name, tbl_name, sql FROM sqlite_master WHERE type IN ('table','index')" \
+            --command "SELECT type, name, tbl_name, sql FROM sqlite_master WHERE type IN ('table','index','trigger')" \
             > /tmp/schema-with-indexes.json
-          node scripts/d1-export-indexes.mjs < /tmp/schema-with-indexes.json >> "/tmp/${DB}.sql"
+          node scripts/d1-export-schema-extras.mjs < /tmp/schema-with-indexes.json >> "/tmp/${DB}.sql"
 
       - name: Fetch previous manifest for row-loss comparison
         working-directory: services/backend
@@ -315,14 +315,14 @@ jobs:
           grep -q "CREATE TABLE" "$F" || { echo "ERROR: $F has no CREATE TABLE — export may be corrupt"; exit 1; }
           echo "$F: $(wc -c < "$F") bytes OK"
 
-      - name: Append index definitions — wrangler d1 export omits them entirely
+      - name: Append index and trigger definitions — wrangler d1 export omits them entirely
         working-directory: services/backend
         run: |
           set -euo pipefail
           npx wrangler d1 execute "$DB" --remote --json \
-            --command "SELECT type, name, tbl_name, sql FROM sqlite_master WHERE type IN ('table','index')" \
+            --command "SELECT type, name, tbl_name, sql FROM sqlite_master WHERE type IN ('table','index','trigger')" \
             > /tmp/schema-with-indexes.json
-          node scripts/d1-export-indexes.mjs < /tmp/schema-with-indexes.json >> "/tmp/${DB}.sql"
+          node scripts/d1-export-schema-extras.mjs < /tmp/schema-with-indexes.json >> "/tmp/${DB}.sql"
 
       - name: Restore drill — prove the export is recoverable
         working-directory: services/backend
