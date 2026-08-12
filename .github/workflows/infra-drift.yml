@@ -75,3 +75,26 @@ jobs:
           else
             node scripts/verify-cloudflare-drift.mjs
           fi
+
+      # Queue depth is not in `wrangler queues info`; it exists only in the
+      # GraphQL Analytics API. Without this there was no measured number behind
+      # the queue-backlog rollback trigger, and the stand-in was "any message in
+      # a DLQ" — a real signal, but a late one: by the time a message
+      # dead-letters, the backlog that caused it already happened.
+      #
+      # Reports only for now. It gains --max-messages once a baseline exists;
+      # setting a bound before measuring is how you get a trigger that either
+      # never fires or always does.
+      - name: Report queue backlog
+        working-directory: services/backend
+        continue-on-error: true
+        env:
+          CLOUDFLARE_ANALYTICS_TOKEN: ${{ secrets.CLOUDFLARE_ANALYTICS_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CLOUDFLARE_ANALYTICS_TOKEN}" ]; then
+            echo "CLOUDFLARE_ANALYTICS_TOKEN is not set — skipping the backlog report."
+            echo "It needs Account Analytics:Read, which the deploy and backup tokens do not carry."
+            exit 0
+          fi
+          node scripts/queue-backlog-report.mjs --hours 24
