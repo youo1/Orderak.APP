@@ -26,8 +26,15 @@ on:
         options:
           - staging
           - production
+      database:
+        description: Which database to drill (one per run — each has its own backup timestamp)
+        type: choice
+        default: primary
+        options:
+          - primary
+          - geo
       object_timestamp:
-        description: 'Backup timestamp exactly as printed in the backup job upload log, e.g. 2026-08-11T0200Z'
+        description: 'Backup timestamp for THAT database, exactly as printed in its upload log, e.g. 2026-08-11T1430Z'
         type: string
         required: true
 
@@ -43,17 +50,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: ${{ inputs.target == 'production' && 'backup-restore-production' || 'backup-restore-staging' }}
-    strategy:
-      fail-fast: false
-      matrix:
-        database: >-
-          ${{ inputs.target == 'production'
-              && fromJSON('["orderak-db","orderak-geo"]')
-              || fromJSON('["orderak-db-staging","orderak-geo-staging"]') }}
+    # One database per run, deliberately — this was a matrix over both.
+    #
+    # Each database is backed up by its own matrix leg of d1-backup.yml, and
+    # those legs finish minutes apart, so their object keys carry different
+    # timestamps: on 2026-08-11 the primary was 1430Z and geo was 1431Z. A
+    # single object_timestamp input applied to a matrix of two therefore
+    # guaranteed one leg reported object_missing every run. Found by dispatching
+    # it for the first time and reading the keys, not by re-reading the file.
+    #
+    # A restore drill is a reviewed, deliberate act on one database. Choosing
+    # that database explicitly is also the honest shape for it.
     env:
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_RESTORE_READ_TOKEN }}
-      DB: ${{ matrix.database }}
+      DB: >-
+        ${{ inputs.target == 'production'
+            && (inputs.database == 'geo' && 'orderak-geo' || 'orderak-db')
+            || (inputs.database == 'geo' && 'orderak-geo-staging' || 'orderak-db-staging') }}
       TS: ${{ inputs.object_timestamp }}
 
     steps:
