@@ -5,11 +5,12 @@ owner: backend
 last_verified: 2026-08-12
 applies_to: [production, staging]
 ---
-# Phase 5b — backend code review
+# Phase 5b — code review, all four deployable units
 
 Phase 5b lists six criteria per deployable unit. Two were satisfied during
 Phase 4 and recorded there; the other four had not been done. This is that
-work for `services/backend`, the unit where all six actually bite.
+work for `services/backend`, where all six bite, followed by the other three
+units.
 
 **Governing Rule 1 applies throughout:** migration preserves behaviour, and
 modernization happens after cutover. Findings below are therefore *recorded*
@@ -132,7 +133,60 @@ versioning work, alongside 222 passing tests across 35 files.
 | 5 — dry-run clean | Pass |
 | 6 — type-check clean | Pass |
 
-The other three deployable units — `apps/admin-web`, `apps/seller-android`,
-`contracts` — have not had this review. Criteria 3 and 4 are backend-shaped
-and largely do not apply to the contracts unit, but that is a reason to
-scope the review per unit, not to skip it.
+## The other three units
+
+### apps/admin-web
+
+**Criterion 4 — structured logs: not applicable, and passes trivially.** Zero
+`console.*` calls across 46 source files.
+
+**Criterion 3 — PII: the real surface is not logging.** `src/app/main.tsx`
+initialises Sentry with `replayIntegration()`, and Session Replay records the
+DOM. In an admin panel that DOM contains seller phone numbers and buyer
+contact data — L2 under `logging-standard.md` §2. The sample rates are
+`replaysSessionSampleRate: 0.01` and **`replaysOnErrorSampleRate: 1.0`**, so
+every session that hits an error is captured in full.
+
+Three facts that together make this a recorded risk rather than a live leak:
+
+1. **Text is masked by default.** `maskAllText = true` is the constructor
+   default in the installed `@sentry/replay` (verified by reading
+   `node_modules/@sentry/replay/build/npm/cjs/index.js`, not from the docs).
+2. **No masking option is set in our config.** The protection is entirely the
+   SDK default, with nothing written down that would survive an SDK upgrade
+   changing it.
+3. **Nothing is being sent.** `dsn: import.meta.env.VITE_SENTRY_DSN`, and no
+   Sentry variable or secret exists in any environment, so `Sentry.init` is
+   inert.
+
+The exposure is therefore latent, not active — but it activates the moment
+someone sets `VITE_SENTRY_DSN`, with no review gate between that and 100%
+error-session DOM capture. Recorded as a prerequisite on enabling Sentry:
+set the masking options explicitly first, rather than inheriting them.
+
+### apps/seller-android
+
+**Criteria 3 and 4: pass.** Ten `Log.*` call sites in `app/src/main`. None
+carries a phone number, token, OTP or password.
+
+The one that looked like it might, `FirebaseAuthRepository.kt:97`, logs
+`"OTP send failed: ${failure.failure.name}"` — a failure *category* enum, not
+a code — and is wrapped in `if (BuildConfig.DEBUG)`. The rest are ad-loading
+state, a feature/plan/status line in `UsageLogger`, generic passkey failure
+messages, and a routing line carrying trigger name, decision name and a
+duration in milliseconds.
+
+### contracts
+
+**Criteria 3 and 4 do not apply.** The unit is OpenAPI specifications and
+generated TypeScript types; it has no runtime, no logging, and no Durable
+Objects. Criteria 5 and 6 are covered by `pnpm run openapi:check`, which
+lints, validates, checks examples and route coverage, and rebuilds the
+bundles — executed and passing in the Phase 5a pass.
+
+## Remaining
+
+Criterion 2 — error handling, retries, idempotency and timeouts documented
+where they exist — is outstanding for **all four** units. It needs a
+per-surface reading rather than a scan, and is the one criterion this pass
+did not attempt.

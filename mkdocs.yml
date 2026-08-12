@@ -71,7 +71,7 @@ nav:
     - Repository Restructure Review: governance/evidence/repository-restructure-review-2026-08-01.md
     - Pre-Cutover Baseline: governance/evidence/2026-08-12-pre-cutover-baseline.md
     - Phase 5a Documented Commands: governance/evidence/2026-08-12-phase5a-documented-commands.md
-    - Phase 5b Backend Review: governance/evidence/2026-08-12-phase5b-backend-review.md
+    - Phase 5b Code Review: governance/evidence/2026-08-12-phase5b-backend-review.md
     - Tenant Shard Migration Rehearsal: governance/evidence/tenant-shard-migration-rehearsal-template.md
     - Initial G0 Gate Review: governance/evidence/gate-g0-20260718-v0.1.md
   - Decisions:
