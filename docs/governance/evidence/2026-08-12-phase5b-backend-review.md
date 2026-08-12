@@ -58,12 +58,150 @@ protects it". It therefore satisfies the criterion's own escape clause:
 **explained as deliberately dead.** Left in place under Rule 1; a candidate
 for deletion in Phase 10.
 
-## 2. Error handling, retries, idempotency, timeouts — NOT DONE
+## 2. Error handling, retries, idempotency, timeouts
 
-This criterion is not satisfied and is not claimed to be. It needs a
-per-surface reading rather than a scan, and the honest position is that it
-remains outstanding rather than partially inferred from the code that
-happened to be opened for the other criteria.
+The criterion is "documented **where they exist**". The finding is that they
+exist far more thoroughly than the absence of documentation suggested: the
+reliability work was done and tested, and simply never written down in one
+place. What follows is that record, plus three genuine gaps the reading
+surfaced.
+
+### Retries — queue consumers
+
+Both consumers retry explicitly per message; neither uses `retryAll()`.
+
+| Surface | Backoff | Ceiling |
+| --- | --- | --- |
+| Play verification (`admin-worker.ts:136`) | server-supplied `retryAfterSeconds` | 6 h, floor 30 s |
+| Play consumer, unexpected throw (`:146`) | flat 30 s | — |
+| Admin export (`:175`) | `30 × 2^(attempts-1)` | 1 h |
+| Email (`public-worker.ts:503`) | `30 × 2^(attempts-1)` | 1 h |
+
+Attempt counts are bounded by the platform, not the code, and **every
+consumer sets the bound explicitly — none inherits the default**:
+
+| Queue | `max_retries` | DLQ |
+| --- | --- | --- |
+| `orderak-play-billing` | **8** | `orderak-play-billing-dlq` |
+| `orderak-email` | 5 | `orderak-email-dlq` |
+| `orderak-admin-exports` | 3 | `orderak-admin-exports-dlq` |
+| all three DLQs | 3 | — (terminal) |
+
+The gradient is the design: Play billing is the money path and gets the most
+attempts, admin exports are operator-initiated and re-runnable so they get
+the fewest. Each `-staging` variant carries identical settings, so a staging
+rehearsal exercises the same retry behaviour production will.
+
+Exhaustion routes to a DLQ whose consumer's only job is to record the
+terminal state —
+`markPlayVerificationDeadLetter`, `markExportDeadLetter` — then `ack()`. A
+dead-lettered Play job is recoverable by an operator: `google-play.ts:856`
+requeues it, and refuses unless the job is genuinely in `dead_lettered`.
+
+**Malformed messages are acked, not retried** (`admin-worker.ts:127`,
+`:160`). Correct — a message that fails to parse will fail identically on
+every attempt, so retrying it only delays the batch. Likewise an unknown
+queue name acks the whole batch after logging `unknown_admin_queue`, rather
+than poisoning a queue this Worker cannot service.
+
+### Idempotency
+
+Four distinct mechanisms, each matched to its surface:
+
+1. **Client-supplied key** — billing checkout reads `x-idempotency-key`,
+   falling back to a body field (`billing.ts:228`), then looks up
+   `subscriptions WHERE idempotency_key = ? AND seller_id = ?` and returns
+   the *same* subscription rather than creating a second. Scoping the lookup
+   by seller means one seller's key cannot collide with another's.
+2. **Entitlement ledger keys** — `entitlements.ts:519-560` keys a delta on
+   `(organization_id, entitlement_key, idempotency_key)`.
+3. **Terminal-state guards** — Play verification refuses to re-process a job
+   already in `succeeded`, `terminal_failed`, `superseded` or
+   `dead_lettered` (`google-play.ts:649`, and again at `:663` after the
+   external call, closing the window where two isolates raced).
+4. **`ON CONFLICT` upserts** — 15 modules, including the RTDN message-ID
+   dedupe.
+
+The buyer-facing order form is idempotent too, and from the *client* side:
+the generated catalogue page sends `idempotency-key: orderKey`
+(`catalog.ts:217`), so a double-tap on a flaky mobile connection cannot
+create two orders.
+
+### Leases and crash recovery
+
+Long-running work is claimed under a lease rather than a lock, so a Worker
+that dies mid-job does not strand it. `billing-reliability.spec.ts` covers
+exactly this: one atomic claimant wins, an active lease reads as
+unavailable, an expired lease is reclaimed, and the original holder's
+now-stale claim token is rejected as a zombie. A cron sweep
+(`dispatchPendingPlayJobs`, `sweepUndispatchedEmails`) redispatches anything
+that was claimed but never completed.
+
+Email uses an outbox: the job is committed to D1 **before** it is queued, and
+the message carries only an id. `email-outbox.spec.ts` pins the two
+properties that matter — a failed `Queue.send` keeps the job instead of
+losing it, and the consumer sends *what the record says, not what the message
+says*, so a forged or stale message body cannot redirect an email.
+
+### Circuit breaker
+
+`platform/resilience/provider-circuit.ts` guards `google_play` and
+`deepseek`. State lives in D1 rather than in memory, deliberately — the
+comment states the reason: D1 is the shared authority across isolates, so
+one isolate's open circuit is not re-learned independently by every other.
+Opens after five retryable failures, allows exactly one half-open probe under
+a lease, and returns `retryAfter` to the caller. Verified by test, not by
+reading: `"opens after five retryable failures and allows one half-open
+recovery probe"`.
+
+### Timeouts — and the three gaps
+
+Outbound calls that are bounded: DeepSeek at 20 s (`deepseek.ts:156`), and
+every Google Play call through `timeoutSignal()`, also 20 s
+(`google-play.ts:127`).
+
+Three server-side calls carry **no timeout at all**:
+
+| Call | File | Context |
+| --- | --- | --- |
+| Firebase OAuth token | `deletion.ts:373` | cron |
+| `accounts:lookup` | `deletion.ts:392` | cron |
+| `accounts:delete` | `deletion.ts:402` | cron |
+
+A fourth, `api-store.ts:153` (`accounts:lookup` for remote ID-token
+verification), is also unbounded and is the one in a **request** path. Its
+blast radius is limited by a `try/catch` that returns `null` — the request
+fails closed as unauthenticated rather than hanging open — but the hang
+itself is unbounded until the platform kills it.
+
+The `deletion.ts` three run under `runObservedJob(env, "deletions", …)` on
+cron, so a hang stalls the deletion sweep rather than a user request. That
+still matters: deletion carries a 90-day statutory deadline, and the sweep is
+what meets it. **Recorded, not fixed** — adding a timeout changes runtime
+behaviour on a compliance path, which is precisely what Rule 1 defers past
+cutover. Flagged for Phase 10 with the note that `timeoutSignal()` already
+exists and is the obvious import.
+
+Two things checked that turned out *not* to be gaps: `catalog.ts:217` is
+browser JavaScript inside a generated HTML page, not Worker code, so a
+server-side timeout is not the applicable control; and `auth-v2.ts:664,749`
+`timeout: 60_000` is the **WebAuthn ceremony** timeout passed to the
+authenticator, not a network timeout. Both match a `grep` for timeouts and
+neither belongs in this table.
+
+### One documented claim that the code does not clearly support
+
+`deletion.ts:126-128` carries the comment: *"The operation treats an
+already-absent user as success, making retries safe."* That holds on one
+path — when the UID is unknown, `accounts:lookup` returns no user and the
+function returns early. It is **not** evident on the other: when
+`seller.firebase_uid` is already known, the code calls `accounts:delete`
+directly and throws on any non-OK response (`:406`). Whether Google returns
+OK for deleting an already-deleted UID decides whether the comment is true,
+and that was **not verified here** — asserting either way without testing
+against the live Identity Toolkit would be exactly the assumption this review
+is meant to avoid. Recorded as a claim requiring verification, not as a
+defect.
 
 ## 3. No PII in logs, queues, or Durable Object names
 
@@ -127,7 +265,7 @@ versioning work, alongside 222 passing tests across 35 files.
 | Criterion | Result |
 | --- | --- |
 | 1 — exports reachable or explained | Pass, with 71 over-exported symbols logged for Phase 10 |
-| 2 — error handling documented | **Outstanding** |
+| 2 — error handling documented | Pass — documented above; 4 unbounded fetches and 1 unverified comment logged for Phase 10 |
 | 3 — no PII in logs/queues/DO names | Pass |
 | 4 — structured logs only | **Violated** — 20 sites, recorded for Phase 10 |
 | 5 — dry-run clean | Pass |
@@ -184,9 +322,67 @@ Objects. Criteria 5 and 6 are covered by `pnpm run openapi:check`, which
 lints, validates, checks examples and route coverage, and rebuilds the
 bundles — executed and passing in the Phase 5a pass.
 
+## Criterion 2 for the other three units
+
+### apps/admin-web
+
+Retries are TanStack Query's, configured once in `main.tsx:24`:
+`retry: 1`, `staleTime: 30_000`, `refetchOnWindowFocus: false`. One
+automatic retry per query — deliberate for an admin panel, where a silently
+re-fired mutation is worse than a visible error.
+
+Error handling is uniform and user-facing rather than swallowed: every page
+renders `<ErrorState error={…} retry={() => query.refetch()} />`, so a failed
+read is always recoverable by the operator without a reload. Destructive
+actions are gated behind `confirm()` — deletion retry, job runs, invitation
+revocation.
+
+**No timeout is set on the fetch wrapper.** A hung admin request spins
+indefinitely; the query never rejects, so `ErrorState` never renders. Same
+class of gap as `api-store.ts`, lower stakes, recorded for Phase 10.
+
+There is no client-side idempotency key on admin mutations. It is not needed
+for reads, and the one mutation where duplication would matter — deletion
+retry — is guarded server-side by the deadline and verification checks the
+button's own confirm text names.
+
+### apps/seller-android
+
+The most complete of the four, because it is the one that runs on an unreliable
+network by default.
+
+**Timeouts are explicit**, set once in `NetworkModule.kt:23-25`: connect,
+read and write all 30 s, with `cache(null)`. Nothing relies on OkHttp's
+defaults.
+
+**Retries are WorkManager's**, and the two workers bound them differently
+on purpose:
+
+- `SyncWorker` bounds by attempt count — `Result.retry()` only while
+  `runAttemptCount < 3` (`:24`, `:32`), then gives up.
+- `BillingVerificationWorker` does **not** bound by count. It retries under
+  `BackoffPolicy.EXPONENTIAL` from 15 s (`:53`) and stops only when the
+  *server* says to: `decideBillingVerification` returns `Succeeded`,
+  `Retry` or `Terminal`, and only `Retry` re-enqueues (`:93-110`).
+
+That asymmetry is right, not an oversight. A sync that fails three times is
+a client problem; a purchase awaiting Google's verification must not be
+abandoned by a client-side counter while the entitlement is still pending —
+the authority on when to stop is the backend, which is the position
+`adr-006-authoritative-play-verification.md` takes. Idempotency is the
+`verificationId`, persisted in `sessionStore` with its `retryAt`, so a
+process death resumes the same verification rather than starting a new one.
+
+### contracts
+
+Not applicable. No runtime, no outbound calls, nothing to retry.
+
 ## Remaining
 
-Criterion 2 — error handling, retries, idempotency and timeouts documented
-where they exist — is outstanding for **all four** units. It needs a
-per-surface reading rather than a scan, and is the one criterion this pass
-did not attempt.
+Nothing on criterion 2. The Phase 10 backlog it produced:
+
+1. Four unbounded outbound fetches — `deletion.ts:373,392,402` and
+   `api-store.ts:153`. `timeoutSignal()` already exists in the codebase.
+2. No timeout on the admin-web fetch wrapper.
+3. Verify whether `accounts:delete` on an already-deleted UID returns OK,
+   and either keep or correct the retry-safety comment at `deletion.ts:126`.
