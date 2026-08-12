@@ -89,6 +89,7 @@ nav:
     - Design System Recovery: runbooks/design-system-recovery.md
     - Firebase Auth Outage: runbooks/firebase-auth-outage.md
     - Google Play Billing DLQ: runbooks/play-billing-dlq.md
+    - Worker Secret Rotation: runbooks/secret-rotation.md
     - Tenant Shard Migration: runbooks/tenant-shard-migration.md
   - Guides:
     - Documentation: guides/documentation.md
