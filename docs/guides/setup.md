@@ -259,7 +259,7 @@ checks pass.
 > **Canonical migration rule:** always apply schema changes with
 > `npx wrangler d1 migrations apply`. It runs every file in
 > `services/backend/migrations/` (currently `001_init` through
-> `042_email_outbox`, including both intentionally distinct `015_*` files and
+> `043_audit_signing_key_version`, including both intentionally distinct `015_*` files and
 > the forward-repair migration `039b_repair_email_schema_drift`) exactly once
 > and records them in the
 > migrations ledger. **Never** run individual migration files with

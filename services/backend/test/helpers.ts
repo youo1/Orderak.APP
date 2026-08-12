@@ -298,7 +298,8 @@ const SCHEMA: string[] = [
 	`CREATE TABLE IF NOT EXISTS admin_audit_exports (
 	  id TEXT PRIMARY KEY, first_audit_id INTEGER, last_audit_id INTEGER, event_count INTEGER,
 	  object_key TEXT, content_hash TEXT, signature TEXT, previous_hash TEXT, status TEXT DEFAULT 'written',
-	  created_at TEXT DEFAULT (datetime('now')), verified_at TEXT)` ,
+	  created_at TEXT DEFAULT (datetime('now')), verified_at TEXT,
+	  signing_key_version INTEGER NOT NULL DEFAULT 1)` ,
 	`CREATE TABLE IF NOT EXISTS admin_users (
 	  id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT NOT NULL UNIQUE, name TEXT, password_hash TEXT NOT NULL,
 	  role TEXT NOT NULL DEFAULT 'readonly', lang TEXT NOT NULL DEFAULT 'en', timezone TEXT DEFAULT 'Africa/Cairo',

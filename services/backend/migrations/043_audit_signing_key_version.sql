@@ -1,0 +1,24 @@
+-- Records which signing key produced each audit archive's HMAC.
+--
+-- WHY
+--   admin_audit_exports stored `signature` with no indication of which key
+--   made it. Rotating ADMIN_AUDIT_SIGNING_KEY therefore made every existing
+--   archive unverifiable, with no way to tell which key to try - 21 archives
+--   in production, 5 in staging at the time of writing. The archive silently
+--   stopped being evidence, and only at the moment someone tried to rely on
+--   it.
+--
+--   Recording the version turns rotation from destructive into ordinary: an
+--   archive written under version 1 stays verifiable with version 1 after the
+--   Worker has moved on to version 2.
+--
+-- DEFAULT 1 IS THE COMPATIBILITY DECISION
+--   Every existing row was signed with ADMIN_AUDIT_SIGNING_KEY. Version 1
+--   resolves to that same value (see keyForAuditVersion in
+--   admin-control-plane.ts), so existing archives verify unchanged and
+--   nothing needs re-signing. A new key becomes version 2.
+--
+-- Additive and idempotent-safe: one nullable-with-default column, no
+-- backfill of existing data beyond the default, no index change.
+
+ALTER TABLE admin_audit_exports ADD COLUMN signing_key_version INTEGER NOT NULL DEFAULT 1;

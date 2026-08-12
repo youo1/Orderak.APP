@@ -184,6 +184,9 @@ const descriptions = {
   "042_email_outbox.sql": [
     "Adds payload and dispatched_at to outbound_email_jobs so an email is committed to D1 before it is queued and can be recovered when a Queue send fails.",
   ],
+  "043_audit_signing_key_version.sql": [
+    "Adds signing_key_version to admin_audit_exports so an audit archive records which key signed it. Without it, rotating ADMIN_AUDIT_SIGNING_KEY made every existing archive unverifiable with no way to tell which key to try. Defaults to 1, which resolves to the pre-existing ADMIN_AUDIT_SIGNING_KEY, so history verifies unchanged and nothing is re-signed.",
+  ],
 };
 
 function anchor(name) {

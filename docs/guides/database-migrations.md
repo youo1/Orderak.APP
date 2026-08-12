@@ -83,6 +83,7 @@ trigger's final semicolon when replaying a fresh remote D1 database.
 - [040_cloudflare_scalability_hardening.sql](#040_cloudflare_scalability_hardeningsql)
 - [041_restore_referential_integrity.sql](#041_restore_referential_integritysql)
 - [042_email_outbox.sql](#042_email_outboxsql)
+- [043_audit_signing_key_version.sql](#043_audit_signing_key_versionsql)
 
 ## 001_init.sql
 
@@ -5858,4 +5859,41 @@ ALTER TABLE outbound_email_jobs ADD COLUMN dispatched_at TEXT;
 -- The sweep's query: queued, never dispatched, oldest first.
 CREATE INDEX IF NOT EXISTS idx_outbound_email_jobs_undispatched
   ON outbound_email_jobs(status, dispatched_at, created_at);
+```
+
+## 043_audit_signing_key_version.sql
+
+**Source:** `services/backend/migrations/043_audit_signing_key_version.sql`
+
+### What it does
+
+- Adds signing_key_version to admin_audit_exports so an audit archive records which key signed it. Without it, rotating ADMIN_AUDIT_SIGNING_KEY made every existing archive unverifiable with no way to tell which key to try. Defaults to 1, which resolves to the pre-existing ADMIN_AUDIT_SIGNING_KEY, so history verifies unchanged and nothing is re-signed.
+
+### Exact SQL
+
+```sql
+-- Records which signing key produced each audit archive's HMAC.
+--
+-- WHY
+--   admin_audit_exports stored `signature` with no indication of which key
+--   made it. Rotating ADMIN_AUDIT_SIGNING_KEY therefore made every existing
+--   archive unverifiable, with no way to tell which key to try - 21 archives
+--   in production, 5 in staging at the time of writing. The archive silently
+--   stopped being evidence, and only at the moment someone tried to rely on
+--   it.
+--
+--   Recording the version turns rotation from destructive into ordinary: an
+--   archive written under version 1 stays verifiable with version 1 after the
+--   Worker has moved on to version 2.
+--
+-- DEFAULT 1 IS THE COMPATIBILITY DECISION
+--   Every existing row was signed with ADMIN_AUDIT_SIGNING_KEY. Version 1
+--   resolves to that same value (see keyForAuditVersion in
+--   admin-control-plane.ts), so existing archives verify unchanged and
+--   nothing needs re-signing. A new key becomes version 2.
+--
+-- Additive and idempotent-safe: one nullable-with-default column, no
+-- backfill of existing data beyond the default, no index change.
+
+ALTER TABLE admin_audit_exports ADD COLUMN signing_key_version INTEGER NOT NULL DEFAULT 1;
 ```

@@ -716,9 +716,106 @@ export async function handleExportFile(request: Request, env: AdminWorkerEnv, ur
 	return new Response(object.body, { headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="orderak-${row.export_type}-${match[1]}.csv"`, "cache-control": "no-store", "x-content-type-options": "nosniff" } });
 }
 
+/**
+ * The audit signing key for a given version.
+ *
+ * Version 1 is ADMIN_AUDIT_SIGNING_KEY, which predates versioning. Every
+ * archive written before migration 043 was signed with it and carries version
+ * 1 by that migration's default, so version 1 must keep resolving to that
+ * exact value or history stops verifying.
+ *
+ * Mirrors keyForVersion in admin-auth.ts, which does the same job for TOTP.
+ */
+function keyForAuditVersion(env: AdminWorkerEnv, version: number): string | undefined {
+	if (version === 1) return env.ADMIN_AUDIT_SIGNING_KEY;
+	if (version === 2) return env.ADMIN_AUDIT_KEY_V2;
+	return undefined;
+}
+
+/** The version new archives are signed with. Defaults to 1. */
+function currentAuditKeyVersion(env: AdminWorkerEnv): number {
+	const parsed = Number(env.ADMIN_AUDIT_KEY_CURRENT ?? "1");
+	return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
+}
+
+async function hmacHex(key: string, payload: string): Promise<string> {
+	const hmacKey = await crypto.subtle.importKey("raw", new TextEncoder().encode(key), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+	const signed = await crypto.subtle.sign("HMAC", hmacKey, new TextEncoder().encode(payload));
+	return [...new Uint8Array(signed)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+export type AuditArchiveVerification = {
+	id: string;
+	object_key: string;
+	signing_key_version: number;
+	ok: boolean;
+	reason?: "object_missing" | "key_unavailable" | "hash_mismatch" | "signature_mismatch";
+};
+
+/**
+ * Read archives back out of R2 and prove they are what was written.
+ *
+ * There was no verification path at all before this. `admin_audit_exports`
+ * carried a `verified_at` column that nothing ever wrote, and a `signature`
+ * nothing ever checked — so the hash chain was being produced but never
+ * relied on, which is indistinguishable from not having one until the day it
+ * matters.
+ *
+ * Each archive is verified with the key version recorded against it, not with
+ * whatever key is current. That is the whole point of migration 043: after
+ * rotating to version 2, archives written under version 1 still verify.
+ *
+ * Content hash is checked before the signature. A mismatch there means the
+ * stored object no longer matches what was recorded, which is a different
+ * failure from a signature that does not match, and conflating them would
+ * hide which one happened.
+ */
+export async function verifyAuditArchives(env: AdminWorkerEnv, limit = 20): Promise<AuditArchiveVerification[]> {
+	const bucket = env.orderak_audit;
+	if (!bucket) return [];
+	const rows = await env.orderak_db.prepare(
+		"SELECT id,object_key,content_hash,signature,signing_key_version FROM admin_audit_exports WHERE status='written' ORDER BY last_audit_id DESC LIMIT ?",
+	).bind(Math.min(100, Math.max(1, limit))).all<{ id: string; object_key: string; content_hash: string; signature: string; signing_key_version: number }>();
+
+	const results: AuditArchiveVerification[] = [];
+	for (const row of rows.results) {
+		const version = Number(row.signing_key_version) || 1;
+		const base = { id: row.id, object_key: row.object_key, signing_key_version: version };
+
+		const object = await bucket.get(row.object_key);
+		if (!object) {
+			results.push({ ...base, ok: false, reason: "object_missing" });
+			continue;
+		}
+		const payload = await object.text();
+
+		if (await sha256Hex(payload) !== row.content_hash) {
+			results.push({ ...base, ok: false, reason: "hash_mismatch" });
+			continue;
+		}
+
+		const key = keyForAuditVersion(env, version);
+		if (!key) {
+			// The key for this archive's version is not configured. Reported as
+			// its own reason rather than a signature failure: the archive may be
+			// perfectly intact, and treating "we cannot check" as "it is wrong"
+			// would provoke an incident response to a configuration gap.
+			results.push({ ...base, ok: false, reason: "key_unavailable" });
+			continue;
+		}
+
+		const ok = await hmacHex(key, payload) === row.signature;
+		results.push({ ...base, ok, ...(ok ? {} : { reason: "signature_mismatch" as const }) });
+		if (ok) {
+			await env.orderak_db.prepare("UPDATE admin_audit_exports SET verified_at=datetime('now') WHERE id=?").bind(row.id).run();
+		}
+	}
+	return results;
+}
+
 export async function archiveAuditBatch(env: AdminWorkerEnv): Promise<void> {
 	if (!env.orderak_audit) return;
-	if (!env.ADMIN_AUDIT_SIGNING_KEY) throw new Error("admin_audit_signing_key_missing");
+	if (!keyForAuditVersion(env, currentAuditKeyVersion(env))) throw new Error("admin_audit_signing_key_missing");
 	const holder = crypto.randomUUID();
 	const lease = await env.orderak_db.prepare(
 		`INSERT INTO operational_leases(job_key,holder,lease_expires_at)
@@ -749,12 +846,18 @@ async function archiveOneAuditPage(env: AdminWorkerEnv): Promise<boolean> {
 	const end = Number(rows.results.at(-1)?.id);
 	const payload = JSON.stringify({ version: 1, previous_hash: last?.content_hash ?? null, first_id: first, last_id: end, events: rows.results });
 	const hash = await sha256Hex(payload);
-	const hmacKey = await crypto.subtle.importKey("raw", new TextEncoder().encode(env.ADMIN_AUDIT_SIGNING_KEY), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-	const signature = [...new Uint8Array(await crypto.subtle.sign("HMAC", hmacKey, new TextEncoder().encode(payload)))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+	const keyVersion = currentAuditKeyVersion(env);
+	const signingKey = keyForAuditVersion(env, keyVersion);
+	if (!signingKey) throw new Error("admin_audit_signing_key_missing");
+	const signature = await hmacHex(signingKey, payload);
 	const objectKey = `audit/${new Date().toISOString().slice(0, 10)}/${first}-${end}-${hash.slice(0, 16)}.json`;
-	await bucket.put(objectKey, payload, { httpMetadata: { contentType: "application/json" }, customMetadata: { sha256: hash, hmacSha256: signature, previousHash: last?.content_hash ?? "genesis" } });
-	await env.orderak_db.prepare("INSERT INTO admin_audit_exports(id,first_audit_id,last_audit_id,event_count,object_key,content_hash,signature,previous_hash) VALUES(?,?,?,?,?,?,?,?)")
-		.bind(crypto.randomUUID(), first, end, rows.results.length, objectKey, hash, signature, last?.content_hash ?? null).run();
+	// The version goes into R2 metadata as well as D1. Either store alone is a
+	// single point of failure for verifiability: if the D1 row is lost the
+	// object still says how to check it, and if the object's metadata is
+	// stripped the row still does.
+	await bucket.put(objectKey, payload, { httpMetadata: { contentType: "application/json" }, customMetadata: { sha256: hash, hmacSha256: signature, previousHash: last?.content_hash ?? "genesis", signingKeyVersion: String(keyVersion) } });
+	await env.orderak_db.prepare("INSERT INTO admin_audit_exports(id,first_audit_id,last_audit_id,event_count,object_key,content_hash,signature,previous_hash,signing_key_version) VALUES(?,?,?,?,?,?,?,?,?)")
+		.bind(crypto.randomUUID(), first, end, rows.results.length, objectKey, hash, signature, last?.content_hash ?? null, keyVersion).run();
 	return true;
 }
 

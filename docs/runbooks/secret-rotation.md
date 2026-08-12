@@ -46,7 +46,7 @@ rotate.
 | `BUYER_PRIVACY_PEPPER` | Same tables as above | **Safe**, with the hazard below |
 | `ADMIN_RECOVERY_PEPPER` | `admin_recovery_codes` (10 rows) | **Schedule it.** Rotating invalidates all ten codes; every admin must regenerate. Not dangerous, but not silent either |
 | `ADMIN_TOTP_KEY_V1` | `admin_users.totp_secret_ciphertext` (1 enrolled, all on version 1) | **Rotate into V2** — see below |
-| `ADMIN_AUDIT_SIGNING_KEY` | `admin_audit_exports` (5 rows, **no key-version column**) | **BLOCKED** — see below |
+| `ADMIN_AUDIT_SIGNING_KEY` | `admin_audit_exports` (5 rows, each recording its key version since migration 043) | **Rotate into V2**, keeping V1 set — see below |
 
 ## Two hazards that are not obvious from the key names
 
@@ -87,31 +87,48 @@ code change is needed. But the active version is chosen by
 If both slots were ever in use at once there would be no free version, and
 adding V3 is a code change. That is not the case today.
 
-## The one that is blocked
+## The audit signing key, and why it needed code before it could rotate
 
 `ADMIN_AUDIT_SIGNING_KEY` HMAC-signs each hash-chained audit archive.
-`admin_audit_exports` has 5 rows, and its schema is:
+`admin_audit_exports` recorded the signature and nothing about which key
+produced it, so rotating the key made every existing archive unverifiable
+with no way to know which key to try — 5 archives in Staging, 21 in
+Production. The archive stopped being evidence quietly, and only at the
+moment someone tried to rely on it.
 
-```text
-id, first_audit_id, last_audit_id, event_count, object_key,
-content_hash, signature, previous_hash, status, created_at, verified_at
-```
+Worse, and not visible from the schema: **there was no verification path at
+all.** The `verified_at` column was never written by any code, and the
+`signature` was never checked. The chain was being produced and never used,
+which is indistinguishable from not having one until it matters.
 
-**There is no key-version column.** Rotating the key makes those five
-signatures unverifiable with no way to know which key signed which — the
-archive stops being evidence, quietly, and only when someone tries to verify
-it.
+Both are now fixed (migration `043_audit_signing_key_version`):
 
-Making this rotatable is a code and schema change, not an operational step:
+- `signing_key_version` on `admin_audit_exports`, defaulting to `1`, and the
+  same version in the R2 object's `customMetadata`. Either store alone can
+  reconstruct how to check an archive.
+- `verifyAuditArchives()` reads each object back, recomputes the content hash
+  and the HMAC **with the key version recorded against that archive**, and
+  stamps `verified_at`.
+- Version 1 resolves to the existing `ADMIN_AUDIT_SIGNING_KEY`, so the 26
+  existing archives verify unchanged. Nothing is re-signed.
 
-- a migration adding a key-version column, and the same version in the R2
-  object metadata;
-- a verification path that accepts the current and the previous key, selected
-  by that version;
-- a test that verifies a **pre-rotation** archive after rotating.
+### Rotating it
 
-Until that ships, `ADMIN_AUDIT_SIGNING_KEY` is not rotatable without
-destroying existing audit evidence. Recorded rather than worked around.
+1. `wrangler secret put ADMIN_AUDIT_KEY_V2`.
+2. Set `ADMIN_AUDIT_KEY_CURRENT` to `"2"` in `wrangler.admin.jsonc`, deploy.
+3. **Keep `ADMIN_AUDIT_SIGNING_KEY` set.** It is version 1, and every archive
+   written before the rotation still needs it. Removing it too early makes
+   verification report `key_unavailable` — deliberately a distinct outcome
+   from `signature_mismatch`, so a configuration gap is not mistaken for
+   tampering.
+4. Version 1 becomes removable only once no archive under it is still within
+   its retention window.
+
+`test/admin-audit-key-rotation.spec.ts` holds the property this exists for:
+an archive written under version 1 still verifies after the Worker has moved
+to version 2. It also covers tampering, signature swaps, the
+missing-key case, and refusing to archive at all when the current version has
+no key configured.
 
 ## Order of work
 
@@ -128,7 +145,7 @@ new version:
    TOTP challenge.
 4. **Scheduled separately:** `ADMIN_RECOVERY_PEPPER`, once admins are told to
    regenerate their codes.
-5. **Blocked:** `ADMIN_AUDIT_SIGNING_KEY`.
+5. `ADMIN_AUDIT_SIGNING_KEY` into V2, keeping V1 set.
 
 Generate only locally-random secrets with `openssl rand -base64 32`. It does
 **not** apply to provider credentials, service-account JSON, or version
@@ -173,8 +190,10 @@ before.
 | `sellers` / `orders` | 1 / 0 | — |
 
 Every verdict in the Staging table above holds for Production, with one
-difference in degree: `ADMIN_AUDIT_SIGNING_KEY` is blocked on **21** archives
-rather than 5. The blocker is the same missing key-version column.
+difference in degree: `ADMIN_AUDIT_SIGNING_KEY` covers **21** archives
+rather than 5. Migration 043 must be applied to Production before rotating it —
+until then those rows carry no version and the rotation would leave them
+unverifiable, which is the failure the migration exists to prevent.
 
 ### Secrets set on Production but not Staging
 
@@ -220,7 +239,7 @@ Same grouping as Staging, plus the provider credentials:
    with a sandbox event before considering it done.
 5. TOTP into V2, keeping V1 set, then `ADMIN_TOTP_KEY_CURRENT` to `"2"`.
 6. `ADMIN_RECOVERY_PEPPER` once admins are scheduled to regenerate.
-7. `ADMIN_AUDIT_SIGNING_KEY` — still blocked.
+7. `ADMIN_AUDIT_SIGNING_KEY` — now rotatable, using the four steps above.
 
 Then the production soak, on the rotated configuration.
 

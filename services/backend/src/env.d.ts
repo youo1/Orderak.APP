@@ -13,10 +13,26 @@ interface OrderakSecrets {
 	ADMIN_SESSION_PEPPER?: string;
 	ADMIN_RECOVERY_PEPPER?: string;
 	ADMIN_TOTP_KEY_CURRENT?: string;
+	/**
+	 * Which audit signing key version new archives are signed with. Defaults
+	 * to 1. Mirrors ADMIN_TOTP_KEY_CURRENT deliberately: the same
+	 * version-selector-as-a-var idiom already exists in this codebase for
+	 * TOTP, and a second mechanism for the same shape of problem would be one
+	 * more thing to learn for no benefit.
+	 */
+	ADMIN_AUDIT_KEY_CURRENT?: string;
 	ADMIN_TOTP_KEY_V1?: string;
 	ADMIN_TOTP_KEY_V2?: string;
 	ADMIN_EXPORT_SIGNING_KEY?: string;
+	/**
+	 * Version 1 of the audit archive signing key. Named without a version
+	 * suffix because it predates versioning and every archive written before
+	 * migration 043 was signed with it — renaming would have required
+	 * re-signing history to keep it verifiable.
+	 */
 	ADMIN_AUDIT_SIGNING_KEY?: string;
+	/** Version 2. Set this, then move ADMIN_AUDIT_KEY_CURRENT to "2". */
+	ADMIN_AUDIT_KEY_V2?: string;
 	BUYER_PRIVACY_PEPPER?: string;
 	PAYMENT_WEBHOOK_SECRET?: string;
 	STRIPE_SECRET_KEY?: string;
