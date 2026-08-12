@@ -15,18 +15,22 @@
 //   Account Analytics:Read token. This reads it.
 //
 // WHAT IT REPORTS
-//   Per queue, over the window: peak and mean backlog in messages, and peak
-//   backlog in bytes. Peak is what a trigger fires on; mean is what tells you
-//   whether the peak was a spike or a plateau.
+//   Per queue, over the window: average backlog in messages and in bytes.
+//
+//   The dataset exposes `avg` only — there is no `max`. An average over the
+//   window hides a short spike, so any threshold derived from this detects a
+//   sustained plateau rather than a burst. That limit belongs to the metric,
+//   not to this script, and is stated here so a trigger built on it is never
+//   mistaken for a peak alarm.
 //
 // EXIT CODE
-//   Non-zero only when --max-messages is given and a queue's peak exceeds it,
-//   so the same script serves as a report while a baseline is being
-//   established and as a gate once a number is chosen.
+//   Non-zero only when --max-avg-messages is given and a queue's average
+//   exceeds it, so the same script serves as a report while a baseline is
+//   being established and as a gate once a number is chosen.
 //
 // Usage:
 //   CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_ANALYTICS_TOKEN=... \
-//     node scripts/queue-backlog-report.mjs [--hours 24] [--max-messages N]
+//     node scripts/queue-backlog-report.mjs [--hours 24] [--max-avg-messages N]
 // ============================================================
 
 const account = process.env.CLOUDFLARE_ACCOUNT_ID;
@@ -44,25 +48,31 @@ const readFlag = (name, fallback) => {
 	return index === -1 ? fallback : Number(args[index + 1]);
 };
 const hours = readFlag("--hours", 24);
-const maxMessages = readFlag("--max-messages", null);
+const maxAvgMessages = readFlag("--max-avg-messages", null);
 
 const until = new Date();
 const since = new Date(until.getTime() - hours * 3600 * 1000);
 
-// queuesBacklogAdaptiveGroups — plural "queues", and the dimension is queueID
-// with a capital D. Both are easy to get wrong and the API answers a wrong
-// field name with an error rather than an empty result, which is the good case.
+// queueBacklogAdaptiveGroups — SINGULAR "queue". Taken from Cloudflare's own
+// documentation at developers.cloudflare.com/queues/observability/metrics/,
+// after a third-party schema dump's plural "queuesBacklogAdaptiveGroups" was
+// rejected with `unknown field`.
+//
+// The dataset exposes `avg` only — there is no `max`. That is a real limit on
+// what this can measure: an average over the window hides a short spike
+// entirely, so a threshold set from it is a plateau detector, not a spike
+// detector. Recorded rather than worked around, because pretending to have a
+// peak would be worse than not having one.
 const query = `
 query Backlog($account: String!, $since: Time!, $until: Time!) {
   viewer {
     accounts(filter: { accountTag: $account }) {
-      queuesBacklogAdaptiveGroups(
-        limit: 100
+      queueBacklogAdaptiveGroups(
+        limit: 1000
         filter: { datetime_geq: $since, datetime_leq: $until }
       ) {
-        dimensions { queueID }
-        max { messages bytes }
-        avg { messages }
+        dimensions { queueId }
+        avg { messages bytes }
       }
     }
   }
@@ -84,10 +94,33 @@ const payload = await response.json();
 if (payload.errors?.length) {
 	console.error("FAIL: GraphQL reported errors.");
 	for (const error of payload.errors) console.error(`  - ${error.message}`);
+
+	// An unknown field means the dataset is named something else on this
+	// account. Guessing again is how you burn another run, so ask the schema
+	// what queue datasets actually exist and print them. Published field names
+	// drift between Cloudflare's docs, third-party schema dumps, and what a
+	// given account is entitled to; introspection is the only source that is
+	// true here and now.
+	if (payload.errors.some((error) => /unknown field/i.test(error.message ?? ""))) {
+		const introspection = await fetch("https://api.cloudflare.com/client/v4/graphql", {
+			method: "POST",
+			headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+			body: JSON.stringify({
+				query: `{ __type(name: "Account") { fields { name } } }`,
+			}),
+		});
+		const schema = await introspection.json().catch(() => null);
+		const fields = schema?.data?.__type?.fields?.map((field) => field.name) ?? [];
+		const queueFields = fields.filter((name) => /queue/i.test(name));
+		console.error("");
+		console.error(queueFields.length
+			? `Queue datasets this account actually exposes:\n${queueFields.map((name) => `  - ${name}`).join("\n")}`
+			: `Schema introspection returned ${fields.length} account field(s) and none matched /queue/. The token may lack Account Analytics:Read, or this account has no Queues analytics entitlement.`);
+	}
 	process.exit(1);
 }
 
-const groups = payload.data?.viewer?.accounts?.[0]?.queuesBacklogAdaptiveGroups ?? [];
+const groups = payload.data?.viewer?.accounts?.[0]?.queueBacklogAdaptiveGroups ?? [];
 
 console.log(`Queue backlog over the last ${hours}h (${since.toISOString()} .. ${until.toISOString()})`);
 if (groups.length === 0) {
@@ -100,16 +133,15 @@ if (groups.length === 0) {
 
 let worst = 0;
 for (const group of groups) {
-	const peak = group.max?.messages ?? 0;
 	const mean = group.avg?.messages ?? 0;
-	const bytes = group.max?.bytes ?? 0;
-	worst = Math.max(worst, peak);
-	console.log(`  ${String(group.dimensions?.queueID ?? "unknown").padEnd(36)} peak=${String(peak).padStart(6)} msgs   mean=${String(mean).padStart(6)}   peak=${bytes} bytes`);
+	const bytes = group.avg?.bytes ?? 0;
+	worst = Math.max(worst, mean);
+	console.log(`  ${String(group.dimensions?.queueId ?? "unknown").padEnd(36)} avg=${String(mean).padStart(8)} msgs   avg=${bytes} bytes`);
 }
 
-console.log(`\npeak backlog across all queues: ${worst} message(s)`);
+console.log(`\nhighest average backlog across all queues: ${worst} message(s)`);
 
-if (maxMessages !== null && worst > maxMessages) {
-	console.error(`FAIL: peak backlog ${worst} exceeds the configured bound of ${maxMessages}.`);
+if (maxAvgMessages !== null && worst > maxAvgMessages) {
+	console.error(`FAIL: average backlog ${worst} exceeds the configured bound of ${maxAvgMessages}.`);
 	process.exit(1);
 }
