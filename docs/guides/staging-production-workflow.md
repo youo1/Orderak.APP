@@ -237,13 +237,27 @@ fire it while a real regression still does inside the 5-minute window.
   only the synthetic seller used by nightly contract fuzzing. There is
   nothing to derive a rate from yet. Set this trigger from real traffic
   during the pre-launch soak, before relying on it.
-- **Queue backlog / oldest-message age.** `wrangler queues info` reports
-  configuration (producers, consumers) but not depth. A real number needs
-  Cloudflare's GraphQL Analytics API or the dashboard, neither queried here.
-  Until then, treat **any message landing in a DLQ** as the trigger — the
-  DLQs exist precisely so backlog failures are visible as a queue depth
-  rather than a silent drop, and a non-empty DLQ is failure regardless of
-  what the healthy backlog number turns out to be.
+- **Queue backlog.** Now measurable, and measured — but still not settable.
+
+  `wrangler queues info` reports producers and consumers, not depth. Depth
+  lives only in the GraphQL Analytics API, so `infra-drift.yml` now queries it
+  every run via `services/backend/scripts/queue-backlog-report.mjs`.
+
+  The 2026-08-12 reading over a 24-hour window: **no backlog samples at all —
+  no queue carried traffic.** There is nothing to derive a threshold from,
+  which is the same pre-launch problem as the auth-failure rate. The
+  difference is that the number now appears automatically the moment traffic
+  exists, instead of waiting for someone to remember to go looking.
+
+  **Two limits worth knowing before setting a bound from it.** The dataset
+  exposes `avg` only — there is no `max` — so an average over the window hides
+  a short spike, and any threshold built on it detects a sustained plateau
+  rather than a burst. And oldest-message age is not in this dataset at all.
+
+  Until a number exists, the trigger remains **any message landing in a DLQ**.
+  That is a late signal — by the time a message dead-letters, the backlog that
+  caused it already happened — but it is unambiguous, and a non-empty DLQ is a
+  failure regardless of what the healthy backlog number turns out to be.
 
 Re-measure the baseline before relying on these numbers for a real
 production rollback decision — this table is dated, not evergreen.
