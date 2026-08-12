@@ -76,5 +76,5 @@ D1, R2, Queues/DLQs, cron triggers, service bindings, secret names, compatibilit
 dates, and latest deployment SHAs. It must produce a drift report only: no resource is
 created, deleted, renamed, rebound, or migrated automatically.
 
-Run `npm run verify:deployment-map` for the repository-level source check. Any live
+Run `pnpm run verify:deployment-map` for the repository-level source check. Any live
 drift requires a separate approved change with rollback steps.

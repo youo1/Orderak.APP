@@ -783,7 +783,7 @@ gradlew.bat verifyAuthPhase1Contract verifyLocalizationContract verifySellerApiC
 - Only run `updateStagingDebugScreenshotTest` after visually reviewing an intentional
   UI change — it replaces the approved golden screenshots.
 
-For a production release: both `npm test` and the Android build must pass,
+For a production release: both `pnpm test` and the Android build must pass,
 then apply pending remote migrations and deploy:
 
 ```cmd
@@ -927,7 +927,7 @@ Approved WOFF2 files and OFL license copies live in
 intentional pinned generator change with:
 
 ```cmd
-npm.cmd run design-system:generate
+pnpm run design-system:generate
 cd apps\seller-android
 gradlew.bat verifyDesignSystemContract
 ```

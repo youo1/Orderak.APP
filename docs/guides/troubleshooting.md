@@ -56,7 +56,7 @@ table-rebuild migrations against production data.
 3. Try `npx wrangler dev --ip 0.0.0.0` if you need to reach the Worker
    from another device on the network.
 
-### `npm test` fails after a dependency update
+### `pnpm test` fails after a dependency update
 
 **Cause:** Vitest or Wrangler dependency mismatch.
 
@@ -64,8 +64,8 @@ table-rebuild migrations against production data.
 
 ```cmd
 cd services/backend
-npm ci
-npm test
+pnpm install --frozen-lockfile
+pnpm test
 ```
 
 ## Android

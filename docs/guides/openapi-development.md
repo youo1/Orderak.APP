@@ -24,8 +24,8 @@ content-hashed theme CSS are intentionally outside these contracts.
    data classification.
 3. Add success, empty/pagination, validation, authentication, rate-limit, and
    retryable examples where applicable.
-4. Run `npm run openapi:check` from the repository root.
-5. Run `npm run mock:seller-v1`; Android Emulator uses
+4. Run `pnpm run openapi:check` from the repository root.
+5. Run `pnpm run mock:seller-v1`; Android Emulator uses
    `http://10.0.2.2:4010` through the non-releasable `mockDebug` variant.
 6. Implement Android DTOs and Worker routes, then rerun Worker, Android, and
    route/spec coverage tests.
@@ -39,13 +39,21 @@ start in the OpenAPI source, not in route discovery.
 
 ## Local commands
 
+From the repository root:
+
 ```powershell
-npm --prefix contracts/openapi ci
-npm run openapi:check
-npm run mock:seller-v1
+pnpm install --frozen-lockfile
+pnpm run openapi:check
+pnpm run mock:seller-v1
 .\apps\seller-android\gradlew.bat -p apps/seller-android testMockDebugUnitTest verifySellerApiContract verifyAuthPhase1Contract
-npm --prefix services/backend test -- --run
+pnpm --filter ./services/backend test -- --run
 ```
+
+The install is a **root** install, not a per-package one. `pnpm-workspace.yaml`
+sets `nodeLinker: hoisted`, so dependencies land in the root `node_modules` and
+`contracts/openapi/node_modules` never exists — filtering the install to that
+one package reports "Already up to date" and leaves nothing where a reader
+would look for it.
 
 The internal portal may expose Swagger UI with Local Prism and Staging servers
 behind Cloudflare Access. A future public Redoc build uses only
@@ -97,8 +105,25 @@ the same profile before and after Cloudflare Schema Validation and use
 
 ## Cloudflare Schema Validation
 
-OpenAPI 3.1.2 remains authoritative. `npm run cloudflare` creates an explicit
-OAS 3.0.3 projection in `contracts/openapi/dist/` for API Shield import. Enable it on
+OpenAPI 3.1.2 remains authoritative. From `contracts/openapi/`:
+
+```powershell
+pnpm run bundle
+pnpm run cloudflare
+```
+
+This creates an explicit OAS 3.0.3 projection in `contracts/openapi/dist/` for
+API Shield import.
+
+Both steps are required and in that order. `cloudflare` reads
+`dist/seller-v1.json`, which `bundle` produces and which is git-ignored build
+output — so on a clean checkout, running `cloudflare` alone fails with
+`ENOENT: no such file or directory ... dist\seller-v1.json`. `pnpm run check`
+runs the whole chain and is the usual entry point; the two commands above are
+for when only the Cloudflare projection is wanted.
+
+Neither script is declared in the workspace root, so both fail with
+"script not found" if run from there. Enable it on
 Staging endpoint-by-endpoint, in log mode first when available. If only blocking
 mode is available, wait until contract and load evidence passes. Do not add Kong
 or AWS API Gateway.

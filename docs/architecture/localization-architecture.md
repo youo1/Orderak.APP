@@ -109,9 +109,9 @@ gradlew.bat connectedStagingDebugAndroidTest
 From `services/backend/`:
 
 ```cmd
-npm.cmd test -- --run
-npx.cmd tsc --noEmit
-npx.cmd wrangler d1 migrations list orderak-db --remote
+pnpm test -- --run
+npx tsc --noEmit
+npx wrangler d1 migrations list orderak-db --remote
 ```
 
 Expected results:

@@ -80,7 +80,7 @@ planned and link it to the relevant product plan or architecture decision.
 From the repository root, run the Markdown checks used by CI:
 
 ```cmd
-npm run lint:markdown
+pnpm run lint:markdown
 ```
 
 CI also checks links with Lychee and builds the documentation site in strict
