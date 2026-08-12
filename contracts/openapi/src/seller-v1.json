@@ -6327,8 +6327,10 @@
             "required": true,
             "schema": {
               "type": "string",
-              "minLength": 1
-            }
+              "pattern": "^[pP]-[A-HJ-NP-Za-hj-np-z2-9]{6,8}$",
+              "example": "p-R4XT9B"
+            },
+            "description": "Immutable product code: `p-` followed by 6 or 8 characters from an unambiguous alphabet (no I, O, 0 or 1). Matched case-insensitively."
           },
           {
             "name": "language",
@@ -6562,8 +6564,10 @@
             "required": true,
             "schema": {
               "type": "string",
-              "minLength": 1
-            }
+              "pattern": "^[pP]-[A-HJ-NP-Za-hj-np-z2-9]{6,8}$",
+              "example": "p-R4XT9B"
+            },
+            "description": "Immutable product code: `p-` followed by 6 or 8 characters from an unambiguous alphabet (no I, O, 0 or 1). Matched case-insensitively."
           },
           {
             "name": "language",
@@ -7277,8 +7281,10 @@
             "required": true,
             "schema": {
               "type": "string",
-              "minLength": 1
-            }
+              "pattern": "^[cC]-[A-HJ-NP-Za-hj-np-z2-9]{6,8}$",
+              "example": "c-K7M2QP"
+            },
+            "description": "Immutable category code: `c-` followed by 6 or 8 characters from an unambiguous alphabet (no I, O, 0 or 1). Matched case-insensitively."
           }
         ],
         "responses": {
@@ -7503,8 +7509,10 @@
             "required": true,
             "schema": {
               "type": "string",
-              "minLength": 1
-            }
+              "pattern": "^[cC]-[A-HJ-NP-Za-hj-np-z2-9]{6,8}$",
+              "example": "c-K7M2QP"
+            },
+            "description": "Immutable category code: `c-` followed by 6 or 8 characters from an unambiguous alphabet (no I, O, 0 or 1). Matched case-insensitively."
           }
         ],
         "responses": {
@@ -7744,8 +7752,10 @@
             "required": true,
             "schema": {
               "type": "string",
-              "minLength": 1
-            }
+              "pattern": "^[cC]-[A-HJ-NP-Za-hj-np-z2-9]{6,8}$",
+              "example": "c-K7M2QP"
+            },
+            "description": "Immutable category code: `c-` followed by 6 or 8 characters from an unambiguous alphabet (no I, O, 0 or 1). Matched case-insensitively."
           }
         ],
         "requestBody": {
@@ -7991,8 +8001,10 @@
             "required": true,
             "schema": {
               "type": "string",
-              "minLength": 1
-            }
+              "pattern": "^[cC]-[A-HJ-NP-Za-hj-np-z2-9]{6,8}$",
+              "example": "c-K7M2QP"
+            },
+            "description": "Immutable category code: `c-` followed by 6 or 8 characters from an unambiguous alphabet (no I, O, 0 or 1). Matched case-insensitively."
           }
         ],
         "requestBody": {
