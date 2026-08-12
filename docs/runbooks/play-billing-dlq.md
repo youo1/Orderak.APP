@@ -1,3 +1,10 @@
+---
+status: current
+generated: false
+owner: backend
+last_verified: 2026-08-12
+applies_to: [production, staging]
+---
 # Google Play billing DLQ runbook
 
 Use this runbook for any `play_verification_dlq` or

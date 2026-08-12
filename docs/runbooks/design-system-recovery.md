@@ -1,3 +1,10 @@
+---
+status: current
+generated: false
+owner: backend
+last_verified: 2026-08-12
+applies_to: [production, staging]
+---
 # Design-system fallback and rollback runbook
 
 ## Trigger
@@ -46,7 +53,7 @@ If the active revision is corrupt:
    applies it.
 
 If the revision tables are empty immediately after migration 035, deploy the
-Worker and run `npm.cmd run design-system:seed` from `services/backend/`. The bootstrap is
+Worker and run `pnpm run design-system:seed` from `services/backend/`. The bootstrap is
 idempotent and derives revision 1 from the effective legacy `theme_colors`.
 
 If bootstrap created an invalid active snapshot, preserve that immutable
@@ -54,10 +61,10 @@ revision and create a corrective revision from a reviewed local source file:
 
 1. Save the reviewed source JSON outside version control; do not include secrets.
 2. From `services/backend/`, run
-   `npm.cmd run design-system:recovery-sql -- <input.json> <output.sql>`.
+   `pnpm run design-system:recovery-sql -- <input.json> <output.sql>`.
 3. Review the generated hash, validation summary, base revision, and SQL.
 4. Apply it with
-   `npx.cmd wrangler d1 execute orderak-db --remote --file <output.sql>`.
+   `npx wrangler d1 execute orderak-db --remote --file <output.sql>`.
 5. Delete the local input and generated SQL after confirming the new revision.
 6. Verify the public JSON/CSS, active pointer, validation status, and audit logs.
 

@@ -1,3 +1,10 @@
+---
+status: current
+generated: false
+owner: backend
+last_verified: 2026-08-12
+applies_to: [production, staging]
+---
 # D1 migration drift
 
 > **Status:** Restricted production-recovery procedure
