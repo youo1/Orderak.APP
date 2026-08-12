@@ -146,6 +146,84 @@ a value.
 - A buyer-restriction match, proving both Workers still share one pepper.
 - `wrangler secret list` on both Workers, confirming nothing was dropped.
 
+## Production (Phase 7c)
+
+Read-only evidence gathered 2026-08-12. **Nothing below has been rotated** —
+production rotation happens inside the cutover window and is followed by its
+own soak.
+
+### Why it waits for the cutover window
+
+A soak validates one specific combination of code, configuration and secrets.
+Rotating a secret after a soak invalidates the soak — the thing that was
+proven healthy is no longer the thing that is running. So production rotation
+goes **inside** the window, and the production soak runs **after** it, never
+before.
+
+### Measured production state
+
+| | Production | Staging |
+| --- | --- | --- |
+| `buyer_restrictions` / `buyer_privacy_requests` | 0 / 0 | 0 / 0 |
+| `admin_users` with TOTP enrolled | 1, all on key version 1 | 1, version 1 |
+| `admin_audit_exports` | **21** | 5 |
+| `admin_sessions` | 0 | 0 |
+| `admin_recovery_codes` | 10 | 10 |
+| `play_purchases` | 0 | 0 |
+| `sellers` / `orders` | 1 / 0 | — |
+
+Every verdict in the Staging table above holds for Production, with one
+difference in degree: `ADMIN_AUDIT_SIGNING_KEY` is blocked on **21** archives
+rather than 5. The blocker is the same missing key-version column.
+
+### Secrets set on Production but not Staging
+
+Production's public Worker carries five secrets Staging's does not:
+`ADMIN_API_KEY`, `ADMIN_JWT_SECRET`, `DEEPSEEK_API_KEY`, `FORWARD_TO`,
+`PAYMENT_WEBHOOK_SECRET`.
+
+`DEEPSEEK_API_KEY` and `PAYMENT_WEBHOOK_SECRET` are real provider credentials
+and are genuine rotation targets — `PAYMENT_WEBHOOK_SECRET` must change at the
+provider and on the Worker in the same window, or webhook signature
+verification fails in between.
+
+**`ADMIN_API_KEY` and `ADMIN_JWT_SECRET` on the public Worker appear to be
+vestigial.** Every admin route is defined in `entrypoints/admin-worker.ts`;
+the public Worker mounts none of them, and the only code reading these values
+is `domains/admin/admin-auth.ts`, which the public Worker does not reach.
+Staging's public Worker does not have them, which is consistent with them
+being left over from when the admin panel was served by the main Worker.
+
+`ADMIN_API_KEY` is the bootstrap/break-glass credential for creating the first
+admin owner. Nothing on that Worker uses it, so it is not exploitable through
+the application — but it is a high-value credential sitting on the
+internet-facing Worker for no reason, and anyone able to read that Worker's
+secrets gets it.
+
+**Proposed, not done:** delete both from the production public Worker with
+`wrangler secret delete`, after confirming against production traffic that no
+request path reaches admin-auth there. That is a production change and needs
+its own go-ahead; it is recorded here rather than performed.
+
+### Production rotation order
+
+Same grouping as Staging, plus the provider credentials:
+
+1. `BUYER_PRIVACY_PEPPER` on **both** Workers in one window — the same
+   two-Worker hazard applies, and production's dependent tables are also
+   empty today.
+2. Admin Worker: `ADMIN_SESSION_PEPPER`, `ADMIN_EXPORT_SIGNING_KEY`,
+   `ADMIN_API_KEY` together.
+3. `DEEPSEEK_API_KEY` — revoke the old key in the DeepSeek dashboard after
+   the new one is live, not before.
+4. `PAYMENT_WEBHOOK_SECRET` — provider and Worker in the same window; test
+   with a sandbox event before considering it done.
+5. TOTP into V2, keeping V1 set, then `ADMIN_TOTP_KEY_CURRENT` to `"2"`.
+6. `ADMIN_RECOVERY_PEPPER` once admins are scheduled to regenerate.
+7. `ADMIN_AUDIT_SIGNING_KEY` — still blocked.
+
+Then the production soak, on the rotated configuration.
+
 ## Declaring required secrets
 
 Wrangler supports a `secrets.required` list that fails `wrangler deploy` when
