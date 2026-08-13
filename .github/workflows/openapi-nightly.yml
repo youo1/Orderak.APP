@@ -102,4 +102,9 @@ jobs:
         run: |
           PROFILE=pilot BASE_URL=https://api.staging.orderak.app k6 run quality/performance/k6/api-load.js
           PROFILE=spike BASE_URL=https://api.staging.orderak.app k6 run quality/performance/k6/api-load.js
-          PROFILE=soak BASE_URL=https://api.staging.orderak.app k6 run quality/performance/k6/api-load.js
+          # CACHE_BUST=1 on the soak only. /api/v1/theme is served from
+          # Cloudflare's edge cache, so without this the soak measures the CDN
+          # and never invokes the Worker — see the comment in api-load.js.
+          # A soak exists to produce a number a rollback trigger can be set
+          # from, and that trigger has to fire when the Worker regresses.
+          CACHE_BUST=1 PROFILE=soak BASE_URL=https://api.staging.orderak.app k6 run quality/performance/k6/api-load.js
