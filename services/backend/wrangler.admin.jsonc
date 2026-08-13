@@ -63,7 +63,17 @@
 			"vars": {
 				"DEPLOYMENT_ENVIRONMENT": "staging",
 				"ADMIN_ORIGIN": "https://admin.staging.orderak.app",
-				"ADMIN_TOTP_KEY_CURRENT": "1",
+				// Rotated to version 2 on 2026-08-13 (Phase 7b, staging only).
+				// V1 stays set: existing ciphertext records the version it was
+				// encrypted under, and keyForVersion() resolves it, so the
+				// enrolled admin keeps working. Only NEW enrolments use V2.
+				"ADMIN_TOTP_KEY_CURRENT": "2",
+				// Same pattern for audit archive signing. Previously undeclared,
+				// which the code read as "1" by default. Declared explicitly now
+				// so the active version is visible in config rather than implied
+				// by a fallback. Archives written before this carry
+				// signing_key_version=1 and verify against ADMIN_AUDIT_SIGNING_KEY.
+				"ADMIN_AUDIT_KEY_CURRENT": "2",
 				"BILLING_ENABLED": "false",
 				"GOOGLE_PLAY_LIFECYCLE_ENABLED": "false",
 				"AI_ASSISTANT_ENABLED": "false",
