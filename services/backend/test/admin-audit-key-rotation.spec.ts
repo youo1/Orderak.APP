@@ -1,6 +1,16 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { archiveAuditBatch, verifyAuditArchives } from "../src/domains/admin/admin-control-plane";
-import { createSchema, env } from "./helpers";
+import { signJwt, type AdminRole } from "../src/domains/identity/auth";
+import adminWorker from "../src/entrypoints/admin-worker";
+import { callWorker, createSchema, env } from "./helpers";
+
+async function adminFetch(path: string, role: AdminRole, init: RequestInit = {}): Promise<Response> {
+	const token = await signJwt({ sub: 1, email: `${role}@example.test`, role }, env.ADMIN_JWT_SECRET || "test-admin-secret");
+	const headers = new Headers(init.headers);
+	headers.set("authorization", `Bearer ${token}`);
+	headers.set("content-type", "application/json");
+	return callWorker(adminWorker, new Request(`https://admin.orderak.app${path}`, { ...init, headers }), env);
+}
 
 /**
  * Rotating ADMIN_AUDIT_SIGNING_KEY used to destroy the verifiability of every
@@ -136,5 +146,73 @@ describe("audit archive signing key rotation", () => {
 		// Failing loudly here beats writing an unsigned or wrongly-signed
 		// archive that only reveals itself at verification time.
 		await expect(archiveAuditBatch(env)).rejects.toThrow("admin_audit_signing_key_missing");
+	});
+});
+
+/**
+ * The function above was correct and tested from the day it was written, and
+ * still did nothing on a live system, because no route called it. These tests
+ * cover the wiring rather than the logic — the gap Phase 7b exposed when the
+ * rotation runbook asked for a verification that could not be run.
+ */
+describe("audit archive verification endpoint", () => {
+	beforeEach(async () => {
+		await createSchema();
+		env.ADMIN_AUDIT_SIGNING_KEY = KEY_V1;
+		env.ADMIN_AUDIT_KEY_V2 = undefined;
+		env.ADMIN_AUDIT_KEY_CURRENT = undefined;
+	});
+
+	it("is reachable and reports a passing archive", async () => {
+		await seedAuditEvents(3);
+		await archiveAuditBatch(env);
+
+		const response = await adminFetch("/api/admin/v1/security/audit-archives/verify", "owner", { method: "POST" });
+		expect(response.status).toBe(200);
+		const body = await response.json<{ checked: number; failed: number; results: { ok: boolean }[] }>();
+		expect(body.checked).toBe(1);
+		expect(body.failed).toBe(0);
+		expect(body.results[0].ok).toBe(true);
+	});
+
+	it("stamps verified_at through the endpoint, not just the function", async () => {
+		await seedAuditEvents(3);
+		await archiveAuditBatch(env);
+		await adminFetch("/api/admin/v1/security/audit-archives/verify", "owner", { method: "POST" });
+
+		const row = await env.orderak_db.prepare("SELECT verified_at FROM admin_audit_exports").first<{ verified_at: string | null }>();
+		expect(row?.verified_at).toBeTruthy();
+	});
+
+	it("verifies a pre-rotation archive through the endpoint after rotating to v2", async () => {
+		await seedAuditEvents(3);
+		await archiveAuditBatch(env);
+
+		// Rotate exactly as staging did in Phase 7b: add V2, make it current,
+		// keep V1 set.
+		env.ADMIN_AUDIT_KEY_V2 = KEY_V2;
+		env.ADMIN_AUDIT_KEY_CURRENT = "2";
+
+		const response = await adminFetch("/api/admin/v1/security/audit-archives/verify", "owner", { method: "POST" });
+		const body = await response.json<{ failed: number; results: { ok: boolean; signing_key_version: number }[] }>();
+		expect(body.failed).toBe(0);
+		expect(body.results[0].signing_key_version).toBe(1);
+	});
+
+	it("reports integrity failures as 200 with a reason, not as a server error", async () => {
+		await seedAuditEvents(3);
+		await archiveAuditBatch(env);
+		await env.orderak_db.prepare("UPDATE admin_audit_exports SET signature=?").bind("00".repeat(32)).run();
+
+		const response = await adminFetch("/api/admin/v1/security/audit-archives/verify", "owner", { method: "POST" });
+		// A 5xx here would read as "the endpoint is broken" and get muted.
+		expect(response.status).toBe(200);
+		const body = await response.json<{ failed: number; results: { reason?: string }[] }>();
+		expect(body.failed).toBe(1);
+		expect(body.results[0].reason).toBe("signature_mismatch");
+	});
+
+	it("is gated on security:manage", async () => {
+		expect((await adminFetch("/api/admin/v1/security/audit-archives/verify", "readonly", { method: "POST" })).status).toBe(403);
 	});
 });

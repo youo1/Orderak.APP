@@ -32655,6 +32655,240 @@
         }
       }
     },
+    "/api/admin/v1/security/audit-archives/verify": {
+      "post": {
+        "operationId": "post_admin_v1_security_audit_archives_verify",
+        "tags": [
+          "admin"
+        ],
+        "summary": "POST /api/admin/v1/security/audit-archives/verify",
+        "description": "Re-reads recent audit archives from object storage and proves each one matches the content hash and signature recorded for it. Each archive is checked with the key version stored against it, so archives written before a signing-key rotation still verify. Returns 200 with per-archive results even when an archive fails, so an integrity finding is not mistaken for the endpoint being unavailable.",
+        "x-owner": "Platform Engineering",
+        "x-data-classification": "L1",
+        "x-rate-limit": "admin-authenticated-default",
+        "x-stability": "draft",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "./components/common.json#/parameters/RequestId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "examples": {
+                "valid": {
+                  "value": {}
+                },
+                "validation_failure": {
+                  "value": {
+                    "unexpected": "review-schema"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/GenericSuccess"
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "ok": true
+                    }
+                  },
+                  "empty": {
+                    "value": {
+                      "ok": true,
+                      "items": [],
+                      "has_more": false
+                    }
+                  },
+                  "pagination": {
+                    "value": {
+                      "ok": true,
+                      "items": [
+                        {
+                          "id": "example"
+                        }
+                      ],
+                      "next_cursor": "opaque-cursor",
+                      "has_more": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failure",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/validation_failed",
+                      "title": "Validation Failed",
+                      "status": 400,
+                      "code": "validation_failed",
+                      "detail": "One or more fields are invalid.",
+                      "request_id": "018f-example",
+                      "field_errors": {
+                        "field": "invalid"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/auth",
+                      "title": "Auth",
+                      "status": 401,
+                      "code": "auth",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/forbidden",
+                      "title": "Forbidden",
+                      "status": 403,
+                      "code": "forbidden",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              },
+              "Retry-After": {
+                "$ref": "./components/common.json#/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/rate_limited",
+                      "title": "Rate Limited",
+                      "status": 429,
+                      "code": "rate_limited",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example",
+                      "retryable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Retryable dependency failure",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              },
+              "Retry-After": {
+                "$ref": "./components/common.json#/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/temporarily_unavailable",
+                      "title": "Temporarily Unavailable",
+                      "status": 503,
+                      "code": "temporarily_unavailable",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example",
+                      "retryable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/v1/settings": {
       "get": {
         "operationId": "get_admin_v1_settings",

@@ -75,6 +75,8 @@ cp.delete(`${B}/access/sessions/:id`, (c) =>
 cp.get(`${B}/security`, (c) => c.get("gate")("security:view") ?? securityWorkspace(c.env));
 cp.patch(`${B}/security/alerts/:id`, (c) =>
 	c.get("gate")("security:manage") ?? updateAlert(c.req.raw, c.env, c.req.param("id"), c.get("admin")));
+cp.post(`${B}/security/audit-archives/verify`, (c) =>
+	c.get("gate")("security:manage") ?? runArchiveVerification(c.req.raw, c.env, c.get("admin")));
 cp.post(`${B}/action-authorizations`, (c) => c.get("gate")("security:manage") ?? authorizeAction(c.req.raw, c.env, c.get("admin")));
 
 cp.get(`${B}/support-macros`, (c) => c.get("gate")("support:view") ?? supportMacros(c.env));
@@ -422,6 +424,36 @@ async function securityWorkspace(env: AdminWorkerEnv): Promise<Response> {
 		env.orderak_db.prepare("SELECT * FROM admin_audit_exports ORDER BY last_audit_id DESC LIMIT 20").all(),
 	]);
 	return jsonResponse({ alerts: alerts.results, sessions: sessionsResult, invitations: invites, recent_critical_actions: critical.results, audit_archives: archive.results });
+}
+
+/**
+ * Run archive verification and report per-archive results.
+ *
+ * verifyAuditArchives() has had tests since migration 043 landed, but nothing
+ * outside the test suite ever called it. So on a live system `verified_at` was
+ * still never written and no signature was ever checked — the exact gap the
+ * function was written to close, reproduced one level up.
+ *
+ * Phase 7b is what surfaced it. The secret-rotation runbook names
+ * "verification of an archive written before the rotation" as the check that
+ * proves an additive key rotation actually worked, and after rotating staging
+ * to key version 2 there was no way to run it.
+ *
+ * POST, not GET: it writes `verified_at` on success and reads every listed
+ * object out of R2.
+ */
+async function runArchiveVerification(request: Request, env: AdminWorkerEnv, admin: AdminClaims): Promise<Response> {
+	const results = await verifyAuditArchives(env);
+	const failed = results.filter((result) => !result.ok);
+	await auditDb(env, admin, "admin.audit_archives_verified", {
+		entity: "admin_audit_export",
+		checked: results.length,
+		failed: failed.length,
+	}, request);
+	// 200 even when archives fail. The request succeeded; the finding is in the
+	// body. Returning 5xx would make a real integrity failure look like the
+	// endpoint being broken, which is the reading that gets it ignored.
+	return jsonResponse({ checked: results.length, failed: failed.length, results });
 }
 
 async function updateAlert(request: Request, env: AdminWorkerEnv, id: string, admin: AdminClaims): Promise<Response> {
