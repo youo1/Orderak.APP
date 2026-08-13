@@ -55,11 +55,53 @@
 		]
 	},
 	"send_email": [{ "name": "EMAIL", "remote": true }],
+	// Deploy fails if any of these is missing, instead of the first request
+	// that needs it failing at runtime. Every name below was confirmed present
+	// on the Production Worker with `wrangler secret list` on 2026-08-13 —
+	// declaring a secret that is not set breaks the next deploy, so this list
+	// is measured, not aspirational.
+	//
+	// Deliberately absent: ADMIN_JWT_SECRET, which the admin Worker reads only
+	// when LOCAL_ADMIN_ENABLED is "true" (admin-auth.ts:180). That variable is
+	// set nowhere, so the path is closed and the secret is inert. It is not on
+	// Production at all, and requiring it would fail a Production deploy for a
+	// value nothing reads. ADMIN_BREAK_GLASS_IP_ALLOWLIST is likewise absent on
+	// Production and optional in code.
+	"secrets": {
+		"required": [
+			"ADMIN_API_KEY",
+			"ADMIN_AUDIT_SIGNING_KEY",
+			"ADMIN_EXPORT_SIGNING_KEY",
+			"ADMIN_RECOVERY_PEPPER",
+			"ADMIN_SESSION_PEPPER",
+			"ADMIN_TOTP_KEY_V1",
+			"BUYER_PRIVACY_PEPPER"
+		]
+	},
 	"env": {
 		"staging": {
 			"name": "orderak-admin-worker-staging",
 			"workers_dev": false,
 			"preview_urls": false,
+			// Staging carries the two version-2 keys Production does not, and
+			// both are now the CURRENT version here — a deploy without them
+			// would leave currentTotpKey() and currentAuditKeyVersion()
+			// resolving to unset keys, which fails TOTP and audit archiving
+			// closed. Requiring them makes that a deploy error rather than a
+			// first-request error. Confirmed present 2026-08-13.
+			"secrets": {
+				"required": [
+					"ADMIN_API_KEY",
+					"ADMIN_AUDIT_SIGNING_KEY",
+					"ADMIN_AUDIT_KEY_V2",
+					"ADMIN_EXPORT_SIGNING_KEY",
+					"ADMIN_RECOVERY_PEPPER",
+					"ADMIN_SESSION_PEPPER",
+					"ADMIN_TOTP_KEY_V1",
+					"ADMIN_TOTP_KEY_V2",
+					"BUYER_PRIVACY_PEPPER"
+				]
+			},
 			"vars": {
 				"DEPLOYMENT_ENVIRONMENT": "staging",
 				"ADMIN_ORIGIN": "https://admin.staging.orderak.app",

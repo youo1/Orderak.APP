@@ -99,11 +99,38 @@
 		"directory": "./assets",
 		"not_found_handling": "none"
 	},
+	// Confirmed present on the Production Worker 2026-08-13.
+	//
+	// Production also carries ADMIN_API_KEY and ADMIN_JWT_SECRET on this
+	// Worker. They are NOT required here on purpose: no admin route is mounted
+	// on the public Worker, nothing reads either value, and they are recorded
+	// in docs/runbooks/secret-rotation.md as candidates for deletion. Declaring
+	// them required would make a vestigial credential permanent by turning its
+	// removal into a deploy failure.
+	"secrets": {
+		"required": [
+			"BUYER_PRIVACY_PEPPER",
+			"DEEPSEEK_API_KEY",
+			"FIREBASE_WEB_API_KEY",
+			"FORWARD_TO",
+			"PAYMENT_WEBHOOK_SECRET"
+		]
+	},
 	"env": {
 		"staging": {
 			"name": "orderak-worker-staging",
 			"workers_dev": true,
 			"preview_urls": false,
+			// Staging runs with billing, AI and email forwarding off, and
+			// carries only these two. Requiring Production's provider
+			// credentials here would fail every staging deploy for services
+			// this environment does not call.
+			"secrets": {
+				"required": [
+					"BUYER_PRIVACY_PEPPER",
+					"FIREBASE_WEB_API_KEY"
+				]
+			},
 			"vars": {
 				"DEPLOYMENT_ENVIRONMENT": "staging",
 				"BILLING_ENABLED": "false",

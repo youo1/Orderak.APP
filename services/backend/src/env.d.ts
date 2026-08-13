@@ -25,6 +25,18 @@ interface OrderakSecrets {
 	ADMIN_TOTP_KEY_V2?: string;
 	ADMIN_EXPORT_SIGNING_KEY?: string;
 	/**
+	 * Read only when LOCAL_ADMIN_ENABLED is "true" (admin-auth.ts:180), a
+	 * bearer-token path for local development. That variable is set in no
+	 * environment, so the path is closed and this value is inert on deployed
+	 * Workers. It is deliberately absent from `secrets.required` in both
+	 * wrangler configs — it is not set on Production at all, and requiring it
+	 * would fail a deploy over a value nothing reads.
+	 *
+	 * Declared here rather than inferred from wrangler-types.env, which stopped
+	 * feeding type generation the moment `secrets` was defined.
+	 */
+	ADMIN_JWT_SECRET?: string;
+	/**
 	 * Version 1 of the audit archive signing key. Named without a version
 	 * suffix because it predates versioning and every archive written before
 	 * migration 043 was signed with it — renaming would have required
@@ -85,13 +97,32 @@ type CommonBindings = Pick<
  * Worker. Both PublicWorkerEnv and AdminWorkerEnv are assignable to it, so shared helpers
  * keep taking `Env` unchanged.
  */
-type Env = CommonBindings & OrderakSecrets;
+type Env = Omit<CommonBindings, keyof OrderakSecrets> & OrderakSecrets;
 
-/** The public Worker's bindings — adds orderak_geo, RATE_LIMITER, and the onboarding flags. */
-type PublicWorkerEnv = PublicWorkerBindings & OrderakSecrets;
+/**
+ * Secrets come from OrderakSecrets, never from the generated bindings.
+ *
+ * Declaring `secrets.required` in the wrangler configs made `wrangler types`
+ * emit every required secret as a non-optional `string`. Intersecting that with
+ * OrderakSecrets would make them required here too — and that is the wrong
+ * model for this code. `secrets.required` is a **deploy-time** guarantee: it
+ * fails the deploy when a secret is unset. It says nothing about a Worker
+ * already running, and it deliberately does not cover secrets that exist in
+ * only one environment (ADMIN_AUDIT_KEY_V2 and ADMIN_TOTP_KEY_V2 are on
+ * Staging but not Production).
+ *
+ * The runtime guards are real and must stay type-checked: keyForAuditVersion()
+ * returning undefined is how verification reports `key_unavailable` instead of
+ * mistaking an unconfigured key for a bad signature. Typing these as always
+ * present would make those branches look dead and invite their removal.
+ *
+ * So Omit the secret names from the generated side and take them from the
+ * hand-written declaration, which models them as optional.
+ */
+type PublicWorkerEnv = Omit<PublicWorkerBindings, keyof OrderakSecrets> & OrderakSecrets;
 
 /** The admin Worker's bindings — adds orderak_audit, ADMIN_EXPORT_QUEUE, ADMIN_ORIGIN, ADMIN_TOTP_KEY_CURRENT. */
-type AdminWorkerEnv = AdminWorkerBindings & OrderakSecrets;
+type AdminWorkerEnv = Omit<AdminWorkerBindings, keyof OrderakSecrets> & OrderakSecrets;
 
 // Interface merging: adds the secrets to the `Cloudflare.Env` that the two
 // generated binding files already contribute to.

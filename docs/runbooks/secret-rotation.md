@@ -256,3 +256,76 @@ Note the known first-deploy problem
 on a Worker that does not exist yet, `secret put` cannot run, and only
 `wrangler deploy --secrets-file` works. That does not affect these Workers,
 which already exist.
+
+## `secrets.required` — configured 2026-08-13
+
+Both wrangler configs now declare `secrets.required`, per environment. A deploy
+fails naming the missing secret, instead of the first request that needs it
+failing at runtime.
+
+The lists are **measured, not aspirational** — every name was confirmed present
+with `wrangler secret list` on the Worker it applies to, on 2026-08-13.
+Declaring a secret that is not set breaks the next deploy, so an aspirational
+list is worse than none.
+
+| Config | Production | Staging |
+| --- | --- | --- |
+| `wrangler.jsonc` | 5 | 2 |
+| `wrangler.admin.jsonc` | 7 | 9 |
+
+Staging's admin list carries `ADMIN_AUDIT_KEY_V2` and `ADMIN_TOTP_KEY_V2`,
+which Production does not have. Both are the **current** version on Staging, so
+a deploy without them would leave `currentTotpKey()` and
+`currentAuditKeyVersion()` resolving to unset keys — TOTP and audit archiving
+would fail closed at first use.
+
+Staging's public list omits Production's `DEEPSEEK_API_KEY`, `FORWARD_TO` and
+`PAYMENT_WEBHOOK_SECRET`: staging runs with billing, AI and email forwarding
+off and does not call those services.
+
+### Deliberately not required
+
+- **`ADMIN_JWT_SECRET`** — read only when `LOCAL_ADMIN_ENABLED` is `"true"`
+  (`admin-auth.ts:180`). That variable is set in no environment, so the path is
+  closed and the value is inert. It is absent from the Production admin Worker
+  entirely; requiring it would fail a Production deploy over a value nothing
+  reads.
+- **`ADMIN_API_KEY` and `ADMIN_JWT_SECRET` on the public Worker** — recorded
+  above as vestigial and candidates for deletion. Requiring them would make
+  their removal a deploy failure, cementing a credential that should go.
+- **`ADMIN_BREAK_GLASS_IP_ALLOWLIST`** — absent on Production, optional in code.
+
+### The guard was observed failing
+
+A gate never seen failing is not a gate. Negative-tested by adding
+`DEFINITELY_NOT_SET_ANYWHERE` to Staging's admin list:
+
+```text
+X [ERROR] The following required secrets have not been set: DEFINITELY_NOT_SET_ANYWHERE
+```
+
+**`wrangler deploy --dry-run` does not perform this check** — it bundles
+locally and never contacts the API, so it exits cleanly with a missing required
+secret. The validation runs on `wrangler deploy` and `wrangler versions upload`.
+Do not treat a clean dry-run as evidence that secrets are configured.
+
+### It changes type generation
+
+Defining `secrets` at any config level makes `wrangler types` stop inferring
+secret names from `.dev.vars` / `--env-file` and generate them from
+`secrets.required` instead, as **non-optional** strings. `wrangler-types.env`
+therefore no longer feeds type generation.
+
+`src/env.d.ts` deliberately keeps secrets optional, by `Omit`-ing the secret
+names from the generated bindings and taking them from `OrderakSecrets`:
+
+```ts
+type AdminWorkerEnv = Omit<AdminWorkerBindings, keyof OrderakSecrets> & OrderakSecrets;
+```
+
+`secrets.required` is a deploy-time guarantee; it says nothing about a Worker
+already running, and it does not cover secrets present in only one environment.
+The runtime guards that depend on a key possibly being absent — the
+`key_unavailable` branch of archive verification is the clearest — must stay
+type-checked. Typing secrets as always present would make those branches look
+dead and invite their removal.

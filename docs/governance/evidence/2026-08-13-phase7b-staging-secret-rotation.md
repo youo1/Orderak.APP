@@ -146,10 +146,19 @@ this call it was 0 of 6, and had been 0 for the lifetime of the table.
 ### Stage 3 — sign-in and TOTP
 
 Sign-in succeeded on the first attempt, which is itself the check: the session
-was issued under the rotated `ADMIN_JWT_SECRET` and `ADMIN_SESSION_PEPPER`, and
-the TOTP challenge passed for the one enrolled admin whose secret is encrypted
-under **version 1** while `ADMIN_TOTP_KEY_CURRENT` is now `"2"`. Additive
-rotation confirmed on the TOTP path as well as the audit path.
+was issued under the rotated `ADMIN_SESSION_PEPPER`, and the TOTP challenge
+passed for the one enrolled admin whose secret is encrypted under **version 1**
+while `ADMIN_TOTP_KEY_CURRENT` is now `"2"`. Additive rotation confirmed on the
+TOTP path as well as the audit path.
+
+**Correction.** An earlier version of this record said the session was issued
+under the rotated `ADMIN_JWT_SECRET` as well. That is wrong. On the admin
+Worker `ADMIN_JWT_SECRET` is read only when `LOCAL_ADMIN_ENABLED` is `"true"`
+(`admin-auth.ts:180`), a bearer-token path for local development.
+`LOCAL_ADMIN_ENABLED` is set in no environment, so the path is closed and the
+value is **inert** on the deployed Worker — it is not on Production at all.
+Rotating it was harmless but proved nothing, and sign-in did not exercise it.
+Sessions are cookie-based and peppered with `ADMIN_SESSION_PEPPER`.
 
 ### Stage 4 — one pepper across two Workers
 
