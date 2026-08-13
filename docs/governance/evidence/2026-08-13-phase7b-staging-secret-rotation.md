@@ -87,11 +87,13 @@ Closed by `POST /api/admin/v1/security/audit-archives/verify`, gated on
 `security:manage`, audited as `admin.audit_archives_verified`, with five tests
 covering the wiring rather than the logic.
 
-## What was verified, and what was not
+## Verification
 
-**Verified independently — no secret required.** All five staging archives
-still match the content hash recorded in D1. Each object was downloaded from
-`orderak-admin-audit-staging` and its SHA-256 recomputed:
+### Stage 1 — content hashes, before any admin session existed
+
+All five archives then present still matched the content hash recorded in D1.
+Each object was downloaded from `orderak-admin-audit-staging` and its SHA-256
+recomputed independently of the Worker:
 
 ```text
 HASH OK  audit/2026-08-01/9-11-d1f2163977a84fb4.json  v1  (693 bytes)
@@ -103,23 +105,86 @@ HASH OK  audit/2026-07-31/1-1-d237631b6bb09d7c.json   v1  (270 bytes)
 content-hash verification: 5 pass, 0 fail
 ```
 
-All five are `signing_key_version = 1`, written before the rotation. Their
-objects are intact after it.
+This proves the objects were not altered. It cannot prove they were written by
+something holding the signing key — only the HMAC does that, and the key lives
+inside the Worker.
 
-**Not verified — requires the signing key or an admin session:**
+### Stage 2 — signatures, through the new endpoint
 
-1. **HMAC signature** of those five archives. The content hash proves the
-   object was not altered; only the signature proves it was written by
-   something holding the key. That check lives inside the Worker, which is why
-   the endpoint was needed, and it has not been called yet.
-2. Admin sign-in under the new `ADMIN_JWT_SECRET` and `ADMIN_SESSION_PEPPER`.
-3. A TOTP challenge by the one enrolled admin, proving V1 ciphertext still
-   decrypts after `ADMIN_TOTP_KEY_CURRENT` moved to 2.
-4. A recovery-code use.
-5. A buyer-restriction round trip, proving both Workers received the same
-   `BUYER_PRIVACY_PEPPER`. Cannot be checked from outside: computing the hash
-   requires the pepper, and confirming a match requires driving a restriction
-   through the admin Worker and an order through the public one.
+The repository owner signed in to the staging panel and the endpoint was
+called against that session. **Password and TOTP code were entered by the
+owner; the assistant neither saw nor entered either.**
+
+`POST /api/admin/v1/security/audit-archives/verify` → `200`:
+
+```text
+checked: 6   failed: 0
+
+audit/2026-08-13/12-12-c120914842d2ea92.json   v2   ok
+audit/2026-08-01/9-11-d1f2163977a84fb4.json    v1   ok
+audit/2026-07-31/7-8-f835e20ce75e8e01.json     v1   ok
+audit/2026-07-31/4-6-26ee44295fb34baa.json     v1   ok
+audit/2026-07-31/2-3-88d7c53bb0583282.json     v1   ok
+audit/2026-07-31/1-1-d237631b6bb09d7c.json     v1   ok
+```
+
+**Six, not five.** A new archive was written on 2026-08-13 under
+`signing_key_version = 2` — the rotation's first output, produced by the
+audit events from this session's own activity.
+
+That makes the result stronger than the check was designed to be. It proves
+both directions in one call:
+
+- five archives signed under **version 1** still verify after the Worker moved
+  to version 2, which is the property migration 043 exists for; and
+- a new archive signed under **version 2** verifies, so the rotated key is
+  live and correct rather than merely configured.
+
+`admin_audit_exports.verified_at` is now populated for **6 of 6** rows. Before
+this call it was 0 of 6, and had been 0 for the lifetime of the table.
+
+### Stage 3 — sign-in and TOTP
+
+Sign-in succeeded on the first attempt, which is itself the check: the session
+was issued under the rotated `ADMIN_JWT_SECRET` and `ADMIN_SESSION_PEPPER`, and
+the TOTP challenge passed for the one enrolled admin whose secret is encrypted
+under **version 1** while `ADMIN_TOTP_KEY_CURRENT` is now `"2"`. Additive
+rotation confirmed on the TOTP path as well as the audit path.
+
+### Stage 4 — one pepper across two Workers
+
+A restriction was created through the **admin** Worker for `+201555000111`,
+then an order was submitted to the **public** Worker for the same number.
+
+| Request | Result |
+| --- | --- |
+| restricted number | `403 buyer_restricted` |
+| a different number (control) | `400 products` |
+| restricted number, after revoke | `400 products` |
+
+The control matters. Without it, a `403` proves only that the order was
+rejected, not *why*. A different number reaching `400 products` — a later
+failure, at product resolution — shows the `403` was specifically the
+restriction matching, which can only happen if the hash the admin Worker wrote
+equals the hash the public Worker computed. **Both Workers hold the same
+`BUYER_PRIVACY_PEPPER`.**
+
+The third row confirms the revoke took effect, so the check cleaned up after
+itself. `buyer_restrictions` is back to 0 active; the revoked row is retained
+deliberately, as the audit trail of the restriction having existed.
+
+The order used a deliberately non-existent `product_code`, because the staging
+store has zero products. The restriction check runs *before* product
+resolution, so the two outcomes stay distinguishable without seeding data.
+
+### Not performed — recovery code
+
+The runbook lists a recovery-code use. **Deliberately skipped.**
+`ADMIN_RECOVERY_PEPPER` was not rotated, so the ten stored codes are untouched
+by this rotation and the check would prove nothing about it. The session such a
+login issues uses the same `ADMIN_JWT_SECRET` and `ADMIN_SESSION_PEPPER` that
+stage 3 already exercised, and using a code consumes one of ten. It belongs to
+the rotation of that pepper, not this one.
 
 ### A probe that did not work
 
@@ -138,10 +203,26 @@ A known-bad path returns 401 as well, so the probe proves nothing about
 routing. Recorded because the same technique will be reached for again, and it
 is only valid on the public Worker.
 
-## Residual state
+## Outcome
 
-Staging is running on rotated secrets with both key versions live. The
-rotation is **not fully proven** until the five checks above are performed by
-someone holding an admin session. Until then the strongest statement supported
-by evidence is: the secrets are in place, the version selectors are live in the
-deployed Worker, and archive contents are intact.
+**Phase 7b is complete for staging.** Every check the runbook names was
+performed except the recovery-code use, which is deferred with a stated reason
+rather than skipped silently.
+
+What the evidence supports, stated at full strength:
+
+- Seven secrets rotated; both prior key versions retained and still in use.
+- Archives signed under version 1 verify after the move to version 2, and a
+  new archive signed under version 2 verifies. Rotation proven in both
+  directions.
+- `verified_at` is written on a live system for the first time.
+- Sign-in and TOTP work under the rotated secrets.
+- Both Workers demonstrably share one `BUYER_PRIVACY_PEPPER`, established with
+  a control rather than a single positive.
+
+Outstanding, and tracked elsewhere:
+
+- `ADMIN_RECOVERY_PEPPER` rotation, once admins are scheduled to regenerate
+  their ten codes. The recovery-code check belongs to that work.
+- Phase 7c, production. Not started; the plan holds production untouched until
+  cutover.
