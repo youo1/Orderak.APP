@@ -24,15 +24,25 @@ inputs:
 runs:
   using: composite
   steps:
+    # Values reach the script through env, never through ${{ }} interpolation
+    # into the shell text. Interpolation splices the value into the script
+    # before bash parses it, so a value containing shell metacharacters becomes
+    # code rather than data. Neither input here is attacker-supplied today —
+    # expected-owner comes from a repository variable and github.repository is
+    # the slug — but the safe form costs nothing and does not depend on that
+    # staying true.
     - shell: bash
+      env:
+        EXPECTED_OWNER: ${{ inputs.expected-owner }}
+        ACTUAL_REPOSITORY: ${{ github.repository }}
       run: |
         set -euo pipefail
-        if [ -z "${{ inputs.expected-owner }}" ]; then
+        if [ -z "$EXPECTED_OWNER" ]; then
           echo "::error::DEPLOY_OWNER is not set for this environment. Refusing to deploy without an explicit owner."
           exit 1
         fi
-        if [ "${{ inputs.expected-owner }}" != "${{ github.repository }}" ]; then
-          echo "::error::This environment is owned by '${{ inputs.expected-owner }}', not '${{ github.repository }}'. Refusing to deploy."
+        if [ "$EXPECTED_OWNER" != "$ACTUAL_REPOSITORY" ]; then
+          echo "::error::This environment is owned by '$EXPECTED_OWNER', not '$ACTUAL_REPOSITORY'. Refusing to deploy."
           exit 1
         fi
-        echo "Deploy owner check passed: ${{ github.repository }} is authorized for this environment."
+        echo "Deploy owner check passed: $ACTUAL_REPOSITORY is authorized for this environment."
