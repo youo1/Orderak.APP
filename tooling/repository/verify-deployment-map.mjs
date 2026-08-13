@@ -144,7 +144,12 @@ for (const [relative, expectedServers] of Object.entries(serverExpectations)) {
 // inbound-email admin operations, the public theme CSS endpoints, and the
 // expanded verify/retry and activate/rollback paths were all absent from the
 // spec despite being implemented and serving traffic.
-if (operationCount !== 245) fail(`OpenAPI operation inventory changed: expected 245, found ${operationCount}.`);
+// Raised to 246 on 2026-08-13 for POST /api/admin/v1/security/audit-archives/verify,
+// which made verifyAuditArchives() reachable. The function and its tests already
+// existed; nothing called them, so on a live system verified_at was never written.
+// Phase 7b needed it to prove that archives signed under audit key version 1 still
+// verify after staging moved to version 2.
+if (operationCount !== 246) fail(`OpenAPI operation inventory changed: expected 246, found ${operationCount}.`);
 const seller = JSON.parse(read("contracts/openapi/src/seller-v1.json"));
 for (const [route, pathItem] of Object.entries(seller.paths)) {
   for (const method of ["get", "post", "put", "patch", "delete"]) {
