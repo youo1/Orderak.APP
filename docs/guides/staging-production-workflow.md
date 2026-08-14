@@ -2,7 +2,7 @@
 status: current
 generated: false
 owner: governance
-last_verified: 2026-08-11
+last_verified: 2026-08-13
 applies_to: [production, staging]
 authoritative_for: [release-workflow]
 ---
@@ -214,14 +214,39 @@ After a successful run:
 A trigger without a number cannot fire. These are numeric thresholds, not
 adjectives, derived from a measured Staging baseline rather than assumed.
 
-**Measured baseline** (Staging, `k6 run --env PROFILE=smoke`, 2026-08-11,
-2 VUs / 30s / 480 requests against `api.staging.orderak.app`):
+**Measured baseline** — Staging, `CACHE_BUST=1 PROFILE=soak`, 2026-08-13.
+**60 minutes at a sustained 20 rps, 71,992 requests, cache-busted so every one
+reached the Worker and D1.** All four k6 thresholds passed; the run completed
+with 0 interrupted iterations.
 
-| Metric | Measured | Trigger | Window |
-| --- | --- | --- | --- |
-| Error rate (`http_req_failed`) | 0.00% (0/480) | **> 1%** sustained | 5 minutes |
-| p95 latency | 150.61 ms | **> 500 ms** sustained | 10 minutes |
-| p99 latency | 222.57 ms | **> 1500 ms** sustained | 10 minutes |
+| Metric | Measured | Trigger | Headroom | Window |
+| --- | --- | --- | --- | --- |
+| Error rate (`http_req_failed`) | **0.00%** (0 / 71,992) | **> 1%** sustained | — | 5 minutes |
+| p95 latency | **145.48 ms** | **> 500 ms** sustained | 3.4x | 10 minutes |
+| p99 latency | **274.90 ms** | **> 1500 ms** sustained | 5.5x | 10 minutes |
+
+Supporting distribution: min 76.01 ms, median 121.24 ms, p90 131.34 ms,
+mean 125.23 ms. 143,984 checks, 100% passed.
+
+**This baseline replaces a 30-second, 2-VU, 480-request smoke run** that
+previously stood in for it. That earlier figure measured an idle system, and
+worse, it measured Cloudflare's edge cache rather than the application — see
+"What the soak was actually measuring" below. The numbers above are the first
+that describe this system under sustained load on the path a rollback trigger
+needs to watch.
+
+Two honest limits on the figures:
+
+- **The tail is wider than the percentiles suggest.** `max` was 4.15 s. One
+  request in 71,992 took 28x the p95. A 10-minute sustained window is what
+  keeps that from firing a rollback, and is the reason the trigger is
+  specified as sustained rather than as a single-sample bound.
+- **Nine iterations were dropped** (0.0025/s) — the generator could not start
+  them on schedule. That is a load-generator artifact, not a server response,
+  and is excluded from the latency figures rather than counted as a failure.
+
+Measured from a single client location against a single endpoint. It is a
+real sustained measurement of one read path, not a representative traffic mix.
 
 The p95/p99 triggers match the gates `quality/performance/k6/api-load.js`
 already enforces during load tests (`p(95)<500`, `p(99)<1500`) — the same
@@ -262,38 +287,62 @@ fire it while a real regression still does inside the 5-minute window.
 Re-measure the baseline before relying on these numbers for a real
 production rollback decision — this table is dated, not evergreen.
 
-### The smoke baseline does not survive sustained load
+### What the soak was actually measuring
 
-A 60-minute soak was run against Staging on 2026-08-11 at the `soak` profile
-(20 requests/second) and stopped after ~36 minutes and 43,890 requests. It
-did not fail the way a soak is supposed to fail:
+The first soak, 2026-08-11, reported **p95 1117.50 ms** — 2.2x its own
+trigger — with zero errors across 43,890 requests. That was read as evidence
+the latency triggers were unusable. It was not. The soak was not measuring
+this application.
 
-| Metric | Smoke (2 VUs, 30s) | Soak (20 rps, ~36 min) | Trigger |
-| --- | --- | --- | --- |
-| Error rate | 0.00% | **0.00%** | > 1% |
-| Failed checks | 0 | **0 of 87,780** | any |
-| p95 latency | 150.61 ms | **1117.50 ms** | > 500 ms |
-| max latency | 363.9 ms | 5190.86 ms | — |
+`GET /api/v1/theme` is edge-cacheable, and both Staging and Production serve
+it from Cloudflare's cache: 30 consecutive requests returned
+`CF-Cache-Status: HIT`. The Worker was never invoked and D1 was never queried.
+Zero errors across 43,890 requests is what a CDN serving a cached object looks
+like — a Worker that had regressed badly would not have appeared in the
+numbers at all.
 
-Zero errors, zero failed checks, and **p95 2.2x over its own trigger**. The
-`p(95)<500` and `p(99)<1500` thresholds both reported breached.
+A two-arm experiment on 2026-08-13 separated the CDN from the application.
+Same generator, same network path, 20 rps for 60 s each. The arms were
+confirmed to differ before the numbers were trusted: the plain URL returns
+`CF-Cache-Status: HIT` with an `Age` header, the cache-busted URL returns
+neither and carries the Worker's own `public, no-cache`.
 
-Two things follow, and neither is "raise the threshold":
+| Arm | n | median | p95 | max | failed |
+| --- | --- | --- | --- | --- | --- |
+| Cached URL (what the old soak hit) | 1,201 | 108.0 ms | 128.9 ms | 251 ms | 0.00% |
+| Cache-busted, reaches Worker + D1 | 1,201 | 110.9 ms | 131.4 ms | 225 ms | 0.00% |
 
-1. **The p95 and p99 numbers in the table above were derived from a 30-second
-   two-user smoke run.** That is a measurement of an idle system, not a
-   baseline. Any trigger set from it describes behaviour that does not occur
-   under load.
-2. **This says nothing yet about Production.** Staging is not provisioned to
-   match it, and 20 rps sustained against Staging may simply be past what
-   Staging is sized for — self-inflicted, not a defect. Distinguishing the two
-   requires load figures from Production, which do not exist pre-launch.
+**2.5 ms apart.** The application is not the slow part, and the 1117 ms was
+the GitHub Actions runner acting as load generator, not Orderak. The 500 ms
+trigger was never the problem; the measurement behind it was.
 
-So the latency triggers are **not usable for a production rollback decision
-as they stand**, and are marked as such rather than quietly widened until the
-observed number fits underneath. The error-rate trigger is unaffected: zero
-failures across 43,890 sustained requests is a real result and the 1% bound
-holds.
+`quality/performance/k6/api-load.js` now takes `CACHE_BUST=1`, set on the soak
+profile only. The CI smoke gate keeps hitting the plain URL, which is right
+for checking that the endpoint answers. A soak exists to produce a number a
+rollback trigger can be set from, and that trigger has to fire when the
+*Worker* regresses — which requires reaching it.
+
+### Getting a full hour to complete
+
+The corrected soak took five attempts. Three were killed by session teardown,
+each time with the system under test healthy — steady at 20 iterations/second
+with zero interrupted iterations right up to the kill.
+
+| Run | Duration | Requests | p95 | Failed | Outcome |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 36 min | 43,890 | 1117.50 ms | 0.00% | killed; measured the CDN, not the app |
+| 2 | 23 min | 27,638 | — | — | killed before k6 wrote a summary |
+| 3 | 8.6 min | 10,351 | 195.13 ms | 0.00% | killed; summary salvaged |
+| 4 | 8.0 min | 9,601 | 105.22 ms | 0.00% | completed (foreground) |
+| 5 | **60 min** | **71,992** | **145.48 ms** | **0.00%** | **completed, all thresholds passed** |
+
+Runs 3 to 5 span 105–195 ms p95 at identical load. That spread is client
+network variance, not application variance — the two-arm experiment put the
+application's own contribution at 2.5 ms.
+
+The durable place to run this is `openapi-nightly.yml`, which cannot run in
+`Orderak.APP` until the missing `staging-contract-tests` environment exists.
+See `docs/governance/evidence/2026-08-13-missing-github-environments.md`.
 
 ### What the parity check actually covered, and what it could not
 
