@@ -2,7 +2,7 @@
 status: current
 generated: false
 owner: security
-last_verified: 2026-08-12
+last_verified: 2026-08-15
 applies_to: [production, staging]
 ---
 # Worker secret rotation runbook
@@ -177,6 +177,37 @@ proven healthy is no longer the thing that is running. So production rotation
 goes **inside** the window, and the production soak runs **after** it, never
 before.
 
+### Migration 043 is a hard prerequisite, and it is not applied
+
+Measured 2026-08-15:
+
+```text
+d1_migrations ledger    production 44    staging 45
+admin_audit_exports.signing_key_version    absent on production
+```
+
+Rotating `ADMIN_AUDIT_SIGNING_KEY` on production before 043 lands would leave
+its **21 existing archives** carrying no key version, and therefore
+unverifiable — precisely the failure the migration was written to prevent.
+
+The migration file exists **only in `Orderak.APP`**, which does not deploy
+production. Two routes were considered:
+
+| | Route | Verdict |
+| --- | --- | --- |
+| a | Port 043 into the old repository so its next production deploy applies it | **Rejected** |
+| b | Apply it from `Orderak.APP` inside the cutover window, as the first step of 7c | **Chosen 2026-08-15** |
+
+Route (a) was rejected because it makes a production schema change happen as a
+side effect of copying a file: the migration would run on whichever production
+deploy came next, for whatever unrelated reason that deploy was triggered.
+Nobody would have decided to change production's schema at that moment. Route
+(b) keeps it a deliberate, scheduled step with the rest of the rotation, in a
+window where someone is watching.
+
+**7c therefore begins by applying 043 to production, before any secret is
+touched.**
+
 ### Measured production state
 
 | | Production | Staging |
@@ -226,11 +257,18 @@ its own go-ahead; it is recorded here rather than performed.
 
 ### Production rotation order
 
-Same grouping as Staging, plus the provider credentials:
+Same grouping as Staging, plus the provider credentials.
+
+**Step 0, before any secret is touched: apply migration 043 to production and
+confirm `admin_audit_exports.signing_key_version` exists.** The audit key
+cannot be rotated until it does, and it is absent today. Re-verify the ledger
+reads 45, not 44.
 
 1. `BUYER_PRIVACY_PEPPER` on **both** Workers in one window — the same
    two-Worker hazard applies, and production's dependent tables are also
-   empty today.
+   empty today. **Re-measure those tables in the window rather than trusting
+   this line** — it was true on 2026-08-12, and the whole reason direct
+   rotation is safe is that they are empty.
 2. Admin Worker: `ADMIN_SESSION_PEPPER`, `ADMIN_EXPORT_SIGNING_KEY`,
    `ADMIN_API_KEY` together.
 3. `DEEPSEEK_API_KEY` — revoke the old key in the DeepSeek dashboard after
