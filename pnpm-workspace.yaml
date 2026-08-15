@@ -25,8 +25,15 @@ allowBuilds:
 # the tree - contracts/openapi had one for lodash and the workspace still
 # resolved a vulnerable copy alongside the patched one.
 #
-# Both entries are dev and build-time dependencies (the OpenAPI mock server and
-# miniflare via wrangler), not anything the production Workers ship.
+# All three entries are dev and build-time dependencies (the OpenAPI mock
+# server, miniflare via wrangler, and Vite's PostCSS pipeline), not anything the
+# production Workers ship.
 overrides:
   lodash@<4.17.24: ">=4.17.24"
   undici@<7.29.0: ">=7.29.0"
+  # GHSA-2v37-7h3g-55p8 — custom generators can loop indefinitely at size zero.
+  # Reaches the tree only through apps/admin-web as vite > postcss > nanoid, so
+  # it runs during the Admin build and never in a Worker. Added 2026-08-15 when
+  # the advisory was published: Supply Chain went from success to failure across
+  # commits that changed only documentation and a k6 script.
+  nanoid@<3.3.18: ">=3.3.18"
