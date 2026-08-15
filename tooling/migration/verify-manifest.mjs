@@ -27,6 +27,7 @@
  */
 import { readFileSync, existsSync, statSync } from "node:fs";
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 
 const [manifestPath, destinationRoot = process.cwd()] = process.argv.slice(2);
@@ -45,6 +46,33 @@ function fail(row, message) {
 
 function sha256Of(absolutePath) {
 	return createHash("sha256").update(readFileSync(absolutePath)).digest("hex");
+}
+
+/**
+ * The manifest's hashes come from git objects — build-manifest.mjs says so in
+ * its own header, and never reads the working tree. Its sibling assumption was
+ * that the destination would be checked out "on Linux CI with LF", so a digest
+ * of the file on disk would match.
+ *
+ * On a Windows checkout it does not. git materialises CRLF for files covered by
+ * `.gitattributes` text rules, so `gradlew.bat` and the two `.ps1` scripts
+ * hashed differently on disk while their git blobs were byte-identical between
+ * the two repositories. Three false failures out of 705, reported as content
+ * changes that had not happened.
+ *
+ * So compare what the manifest actually recorded: the blob id. It is exact and
+ * platform-independent. `sha256` stays the fallback for the case it was added
+ * for — checking a destination without git in the loop.
+ */
+function blobIdOf(absolutePath) {
+	try {
+		return execFileSync("git", ["hash-object", "--", absolutePath], {
+			encoding: "utf8",
+			stdio: ["ignore", "pipe", "ignore"],
+		}).trim();
+	} catch {
+		return null;
+	}
 }
 
 for (const row of manifest.files) {
@@ -67,9 +95,19 @@ for (const row of manifest.files) {
 				fail(row, "missing from the destination");
 				break;
 			}
-			const actual = sha256Of(target);
-			if (actual !== row.sha256) {
-				fail(row, `content changed (expected ${row.sha256.slice(0, 12)}, found ${actual.slice(0, 12)})`);
+			// Blob id first — it is what the manifest recorded and it does not
+			// move with the checkout's line endings. sha256-on-disk only when
+			// git is unavailable or the manifest predates blob ids.
+			const actualBlob = row.blob ? blobIdOf(target) : null;
+			if (actualBlob) {
+				if (actualBlob !== row.blob) {
+					fail(row, `content changed (expected blob ${row.blob.slice(0, 12)}, found ${actualBlob.slice(0, 12)})`);
+				}
+			} else {
+				const actual = sha256Of(target);
+				if (actual !== row.sha256) {
+					fail(row, `content changed (expected ${row.sha256.slice(0, 12)}, found ${actual.slice(0, 12)})`);
+				}
 			}
 			// Executable bit: only meaningful where the filesystem reports it. On Windows
 			// git sets core.filemode=false and the mode is carried in the index instead,
