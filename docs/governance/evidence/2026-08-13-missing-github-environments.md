@@ -2,7 +2,7 @@
 status: current
 generated: false
 owner: backend
-last_verified: 2026-08-13
+last_verified: 2026-08-15
 applies_to: [staging, production]
 ---
 # Orderak.APP is missing five GitHub environments its workflows reference
@@ -40,22 +40,47 @@ cutover — but it means the new repository's copies of those workflows have
 `CLOUDFLARE_D1_BACKUP_TOKEN`, with `AGE_RECIPIENT`, `CLOUDFLARE_ACCOUNT_ID` and
 `DEPLOY_OWNER` as variables.
 
-## The part that is a hazard, not just a gap
+## The auto-create hazard — tested 2026-08-15
 
 GitHub creates an environment on first reference if it does not exist, with **no
-protection rules and no secrets**. For most of these that fails safely:
-`infra-drift.yml` carries a credentials preflight that exits with a clear error
-when the token is empty, which is exactly the case it was written for.
+protection rules and no secrets**.
 
-`restore-drill.yml` is different. Its entire safety model is a protected
-environment with required reviewers — a human approving before a restore runs.
-If dispatching it auto-creates `backup-restore-staging` unprotected, the drill
-would proceed **with no approval gate at all**, and the protection would be
-absent precisely when someone believed it was there.
+An earlier version of this record said `restore-drill.yml` would therefore
+"proceed with no approval gate at all". **That was wrong, and the test proves
+it.** The drill was dispatched against `staging` with a deliberately
+non-existent backup timestamp:
 
-This has not been tested, and deliberately so: verifying it means dispatching a
-restore drill in a repository where the gate may not exist. The documented
-GitHub behaviour is enough to treat it as real.
+```text
+Set up job
+Run actions/checkout
+Preflight required restore credentials   <- failed here
+Wipe decrypted and encrypted material from the runner
+Post Run actions/checkout
+Complete job
+```
+
+Both halves of the concern are now measured, and they point opposite ways:
+
+1. **The auto-create is real.** The repository went from 1 environment to 2.
+   `backup-restore-staging` was created by the dispatch, and querying it
+   returned `"protection_rules": []` — no required reviewers, exactly as
+   feared.
+2. **The consequence is contained.** The existing credentials preflight checks
+   `CLOUDFLARE_RESTORE_READ_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` and `AGE_IDENTITY`,
+   and an auto-created environment has none of them. The job stopped there. age
+   was never installed, no R2 object was downloaded, no D1 database was
+   touched. The runner-wipe step still ran.
+
+So the drill **fails closed**, and the approval gate's absence cannot by itself
+cause an unapproved restore. The residual risk is narrower and worth stating
+precisely: if someone later populates that environment with the three
+credentials but forgets required reviewers, the preflight passes and nothing
+else stops the restore. Reviewers are a configuration step, not an enforced
+one.
+
+The auto-created environment was **deleted** after the test. Leaving an
+unprotected environment in place is the trap itself — it would let a future
+secret-setting step silently produce a reviewer-less drill.
 
 ## Required before cutover
 
