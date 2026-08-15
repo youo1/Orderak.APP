@@ -2,7 +2,7 @@
 status: current
 generated: false
 owner: governance
-last_verified: 2026-08-13
+last_verified: 2026-08-15
 applies_to: [staging, production]
 ---
 # Plan vs. reality — full audit of Orderak.APP
@@ -28,18 +28,24 @@ The 34 findings are files that were to move byte-identical and have since been
 edited. 31 have follow-up commits in `Orderak.APP` explaining them — this
 session's `secrets.required`, key-version, soak, OpenAPI and documentation work.
 
-The remaining three are a **defect in `verify-manifest.mjs`, not in the
+The remaining three were a **defect in `verify-manifest.mjs`, not in the
 migration**: `gradlew.bat`, `fix-scheduled.ps1`, `patch-scheduled.ps1`. Their
 git blobs are byte-identical between the two repositories
 (`a51ec4f5…`, `e89c2cab…`, `6c9c9af2…`). The manifest recorded hashes of git
-blob content (LF), while the verifier hashes the working-tree file, which git
-checks out with CRLF on Windows. Stripping CR reproduces the manifest's expected
-hash exactly in all three cases. The tool reports a difference that does not
-exist.
+blob content (LF), while the verifier hashed the working-tree file, which git
+checks out with CRLF on Windows. Stripping CR reproduced the manifest's expected
+hash exactly in all three cases.
 
-The manifest itself lives only in the old repository
-(`tooling/migration/manifests/pre-migration-freeze.json`), so `Orderak.APP`
-cannot run its own Phase 1 gate.
+**Both fixed 2026-08-15.** The verifier now compares the blob id the manifest
+already records — exact and platform-independent — keeping the sha256 digest as
+the documented fallback for checking a destination without git. Findings drop
+from 34 to **32**, and every remaining one is a genuine content change with a
+commit in this repository explaining it.
+
+`pre-migration-freeze.json` also existed only in the old repository, so
+`Orderak.APP` could not run the gate that proves nothing was lost in its own
+move. It is now carried at
+`tooling/migration/manifests/pre-migration-freeze.json` here.
 
 ## Phase 2 — foundation: complete
 
@@ -63,12 +69,39 @@ each was checked and contains **zero** references to Cloudflare, wrangler, or
 any shared resource. They scan the repository they run in. Recorded as a
 deliberate reading, not an oversight.
 
-**Outstanding: the `DEPLOY_OWNER` negative test.** The plan requires it be
-"proven by a negative test: run the deploy workflow from the non-owning
-repository and record that it fails at the gate with nothing deployed", and
-`require-deploy-owner/action.yml` says the same in its own header. It has not
-been done. By the plan's own standard — a gate never observed failing is not a
-gate — this control is currently unproven.
+**The `DEPLOY_OWNER` negative test — done 2026-08-15.** The gate was observed
+failing, which the plan and the action's own header both require before it
+counts as a gate.
+
+`DEPLOY_OWNER` on the `staging` environment was temporarily set to
+`youo1/Orderak`, `Deploy Staging` was dispatched from `youo1/Orderak.APP`, and
+the variable was restored immediately afterwards.
+
+```text
+##[error]This environment is owned by 'youo1/Orderak', not 'youo1/Orderak.APP'. Refusing to deploy.
+##[error]Process completed with exit code 1.
+```
+
+**Nothing deployed.** The `deploy` job's entire step list was:
+
+```text
+Set up job
+Run actions/checkout
+Require deploy owner        <- failed here
+Post Run actions/checkout
+Complete job
+```
+
+No wrangler invocation, no migration, no deploy step ran. The `validate` job
+succeeded, so the failure was the gate and not a broken build.
+
+**What this does and does not prove.** It proves the gate's logic fires: the
+step compares `vars.DEPLOY_OWNER` against `github.repository` and stops the job
+before any Cloudflare call. It does **not** exercise the cross-repository
+scenario end to end, because that would require the old repository to hold a
+usable staging deploy token — which it deliberately does not, that being the
+actual control the plan names. The variable is defence in depth, and defence in
+depth is what was tested.
 
 ## Phase 4 — deployable baselines: complete
 
@@ -132,14 +165,15 @@ cutover window.
 ## The outstanding list
 
 1. **61 non-archive documents missing frontmatter** (Phase 5c).
-2. **`DEPLOY_OWNER` negative test never run** (Phase 3) — the control is
-   unproven by the plan's own standard.
+2. ~~`DEPLOY_OWNER` negative test~~ — **done 2026-08-15**, gate observed
+   failing with nothing deployed.
 3. **Five GitHub environments missing from `Orderak.APP`** — see
    `2026-08-13-missing-github-environments.md`. Blocks the nightly soak, and
    `restore-drill.yml`'s reviewer gate would be absent on first dispatch.
-4. **`verify-manifest.mjs` reports three false positives** from CRLF handling.
-5. **The migration manifest lives only in the old repository**, so
-   `Orderak.APP` cannot run its own Phase 1 gate.
+4. ~~`verify-manifest.mjs` CRLF false positives~~ — **fixed 2026-08-15**, now
+   compares blob ids.
+5. ~~Manifest missing from `Orderak.APP`~~ — **fixed 2026-08-15**, carried at
+   `tooling/migration/manifests/pre-migration-freeze.json`.
 6. **`ADMIN_RECOVERY_PEPPER` rotation** — needs admins scheduled.
 7. **Migration 043 is absent from the repository that deploys Production**, and
    is a prerequisite for 7c.
