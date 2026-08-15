@@ -44,6 +44,9 @@ jobs:
       - name: Verify documentation frontmatter and subject authority
         run: node tooling/repository/verify-doc-frontmatter.mjs
 
+      - name: Verify documentation encoding
+        run: node tooling/repository/verify-doc-encoding.mjs
+
       - name: Verify documentation claims about paths, scripts and resources
         run: node tooling/repository/verify-doc-claims.mjs
 

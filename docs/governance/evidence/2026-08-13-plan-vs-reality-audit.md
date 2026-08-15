@@ -126,12 +126,45 @@ and the repository that currently deploys Production does not have it.
   `2026-08-12-phase5a-documented-commands.md`.
 - **5b — code review:** all six criteria closed across all four units in
   `2026-08-12-phase5b-backend-review.md`. Criterion 2 was completed 2026-08-13.
-- **5c — documentation: incomplete.** 146 tracked `.md` matches the plan's
-  count. Of 97 under `docs/`, **25 carry frontmatter and 72 do not**. Excluding
-  `docs/archive/` (11), **61 non-archive documents are missing frontmatter.**
-  The frontmatter verifier passes because it validates documents that *have*
-  frontmatter; it does not require it. This is the largest single piece of
-  unfinished work in the plan.
+- **5c — documentation: complete.** All eleven errors in the plan's
+  "Verified errors to fix" table are corrected, each confirmed by reading the
+  file rather than by assuming an earlier pass did it:
+
+  | Error | State |
+  | --- | --- |
+  | `setup.md` `npm ci` | gone |
+  | `setup.md` migrations "001–040" | gone; the remaining range is a dated production-status note |
+  | `setup.md` "Node 20 or newer" | now "Node.js 22.13 or newer", with the `node:sqlite` reason |
+  | `threat-model.md` cites `package-lock.json` | now states there is none and cites `pnpm-lock.yaml` |
+  | `threat-model.md` "no automated dependency scanning" | gone; lists the actual controls |
+  | `overview.md` "two-component system" | gone |
+  | `application-structure.md` OpenAPI path | corrected |
+  | `CONTRIBUTING.md` hand-edit a generated file | reversed, and says so |
+  | `SECURITY.md` Dependabot | now states Renovate is used and there is no Dependabot config |
+  | `README.md` KV / admin worker | gone |
+  | `testing.md` suspended guards, 4-of-16 workflows | gone |
+
+  **An earlier draft of this audit called "61 documents without frontmatter"
+  the largest piece of unfinished work. That was wrong**, and worth recording
+  as an error rather than quietly deleting. The plan's 5c gate is
+  *"per-directory frontmatter **validation**"*, not universal application, and
+  `verify-doc-frontmatter.mjs` says in its own header why: *"A mechanically
+  stamped `owner:` that nobody chose is metadata theatre — it looks like a
+  decision was made and records that nothing was."* Mass-stamping 61 files —
+  and dating `last_verified` on documents nobody had read — would have been
+  worse than leaving them bare, and would have written a false claim of
+  verification into each one.
+
+  Gates from the plan's list, all wired in `docs-ci.yml`: markdownlint, link
+  checking (twice — local and external), frontmatter validation,
+  `authoritative_for` conflict detection, generated-doc drift, and the
+  built-site archive assertion.
+
+  **The UTF-8/mojibake scan was the one gate missing** and is now
+  `tooling/repository/verify-doc-encoding.mjs`, wired into `docs-ci.yml`. The
+  content was already clean — 160 documents, all valid UTF-8, no BOMs, no
+  mojibake — so the property held by luck, with nothing to report it breaking.
+  Negative-tested: a deliberately corrupted file is caught and named.
 
 All six repository verifiers pass: `verify-built-site`,
 `verify-contract-guards`, `verify-deployment-map`, `verify-doc-claims`,
@@ -164,7 +197,7 @@ cutover window.
 
 ## The outstanding list
 
-1. **61 non-archive documents missing frontmatter** (Phase 5c).
+1. ~~61 documents missing frontmatter~~ — **not a gap**; the plan requires frontmatter *validation*, not universal stamping. Phase 5c is complete, and the missing UTF-8/mojibake gate is now wired.
 2. ~~`DEPLOY_OWNER` negative test~~ — **done 2026-08-15**, gate observed
    failing with nothing deployed.
 3. **Five GitHub environments missing from `Orderak.APP`** — see
