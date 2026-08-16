@@ -12,10 +12,21 @@ Captured 2026-08-15, read-only. This is the state a rollback would target.
 
 ## Production Worker versions
 
-| Worker | Version ID | Deployed |
-| --- | --- | --- |
-| `orderak-worker` | `31e55a78-0309-4c37-81f7-9646a2bc3807` | 2026-08-01T19:40:52Z |
-| `orderak-admin-worker` | `032d9193-6713-4287-93cf-c73b4237d9b9` | 2026-08-01T19:41:41Z |
+| Worker | Config | Version ID | Deployed |
+| --- | --- | --- | --- |
+| `orderak-worker` | `services/backend/wrangler.jsonc` | `31e55a78-0309-4c37-81f7-9646a2bc3807` | 2026-08-01T19:40:52Z |
+| `orderak-admin-worker` | `services/backend/wrangler.admin.jsonc` | `032d9193-6713-4287-93cf-c73b4237d9b9` | 2026-08-01T19:41:41Z |
+| `orderak-admin-edge` | `apps/admin-web/wrangler.edge.jsonc` | `3ed87dfc-5a62-408f-9a1a-08889a932fd4` | 2026-08-01T19:42:36Z |
+
+**The first capture of this table listed two Workers and production has three.**
+`orderak-admin-edge` lives under `apps/admin-web/`, not beside the other two,
+and was missed by a sweep of `services/backend/wrangler*.jsonc`. A rollback set
+that is missing a member is worse than none, because it looks complete. Found
+by reading what `production-deploy.yml` actually deploys rather than by
+listing config files in one directory.
+
+All three carry `Source: Unknown (deployment)` and the same author, so the
+provenance finding below applies to the whole set.
 
 ## Source and toolchain
 
