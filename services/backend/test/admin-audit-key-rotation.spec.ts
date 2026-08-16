@@ -216,3 +216,47 @@ describe("audit archive verification endpoint", () => {
 		expect((await adminFetch("/api/admin/v1/security/audit-archives/verify", "readonly", { method: "POST" })).status).toBe(403);
 	});
 });
+
+/**
+ * Coverage reporting. The endpoint bounds its work with a limit, which is
+ * reasonable; reporting "failed: 0" over an unstated subset is not. Production
+ * returned "checked 20, failed 0" against 22 archives, and the two skipped were
+ * the oldest, because the query orders by last_audit_id DESC.
+ */
+describe("audit archive verification coverage", () => {
+	beforeEach(async () => {
+		await createSchema();
+		env.ADMIN_AUDIT_SIGNING_KEY = KEY_V1;
+		env.ADMIN_AUDIT_KEY_V2 = undefined;
+		env.ADMIN_AUDIT_KEY_CURRENT = undefined;
+	});
+
+	it("reports written and unchecked, not just checked", async () => {
+		for (let i = 0; i < 3; i++) {
+			await seedAuditEvents(2);
+			await archiveAuditBatch(env);
+		}
+
+		const response = await adminFetch("/api/admin/v1/security/audit-archives/verify?limit=2", "owner", { method: "POST" });
+		const body = await response.json<{ written: number; checked: number; unchecked: number; failed: number }>();
+
+		expect(body.written).toBe(3);
+		expect(body.checked).toBe(2);
+		// The number that was missing before: a caller can now see the run was
+		// partial without having to know the default limit.
+		expect(body.unchecked).toBe(1);
+		expect(body.failed).toBe(0);
+	});
+
+	it("reports unchecked as zero when the limit covers everything", async () => {
+		await seedAuditEvents(3);
+		await archiveAuditBatch(env);
+
+		const response = await adminFetch("/api/admin/v1/security/audit-archives/verify?limit=100", "owner", { method: "POST" });
+		const body = await response.json<{ written: number; checked: number; unchecked: number }>();
+
+		expect(body.written).toBe(1);
+		expect(body.checked).toBe(1);
+		expect(body.unchecked).toBe(0);
+	});
+});

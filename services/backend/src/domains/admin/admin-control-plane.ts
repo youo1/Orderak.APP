@@ -443,17 +443,36 @@ async function securityWorkspace(env: AdminWorkerEnv): Promise<Response> {
  * object out of R2.
  */
 async function runArchiveVerification(request: Request, env: AdminWorkerEnv, admin: AdminClaims): Promise<Response> {
-	const results = await verifyAuditArchives(env);
+	// `limit` is bounded work, but a partial run must never read as a complete
+	// one. On 2026-08-16 this endpoint returned "checked 20, failed 0" against
+	// production's 22 archives: the default limit silently skipped two, and
+	// because the query orders by last_audit_id DESC, the two skipped were the
+	// OLDEST — the ones most likely to have lost their key or rotted in storage.
+	// "failed: 0" over an unstated subset is the shape of a check that reassures
+	// without verifying.
+	const requested = Number(new URL(request.url).searchParams.get("limit") ?? "");
+	const limit = Number.isFinite(requested) && requested > 0 ? requested : 20;
+	const total = await env.orderak_db
+		.prepare("SELECT COUNT(*) AS n FROM admin_audit_exports WHERE status='written'")
+		.first<{ n: number }>();
+	const written = Number(total?.n ?? 0);
+
+	const results = await verifyAuditArchives(env, limit);
 	const failed = results.filter((result) => !result.ok);
+	const unchecked = Math.max(0, written - results.length);
 	await auditDb(env, admin, "admin.audit_archives_verified", {
 		entity: "admin_audit_export",
 		checked: results.length,
 		failed: failed.length,
+		unchecked,
 	}, request);
 	// 200 even when archives fail. The request succeeded; the finding is in the
 	// body. Returning 5xx would make a real integrity failure look like the
 	// endpoint being broken, which is the reading that gets it ignored.
-	return jsonResponse({ checked: results.length, failed: failed.length, results });
+	// `written` and `unchecked` are reported whether or not anything failed, so
+	// coverage is always visible rather than something the caller has to know to
+	// ask about. Raise it with ?limit=N.
+	return jsonResponse({ written, checked: results.length, unchecked, failed: failed.length, results });
 }
 
 async function updateAlert(request: Request, env: AdminWorkerEnv, id: string, admin: AdminClaims): Promise<Response> {
