@@ -80,7 +80,7 @@ does not apply.
 | # | Blocker | State |
 | --- | --- | --- |
 | 1 | `Orderak.APP` has no `production` environment | **CLEARED** |
-| 1b | Production backups never proven restorable | **OPEN** |
+| 1b | Production backups never proven restorable | **CLEARED** |
 | 2 | No production rollback credential | **CLEARED** |
 | 3 | Migration 043 not applied to production | Open — it is step 0 *inside* the window, by decision |
 | 4 | Four remaining environments missing | Partially — `production` now exists; `backup-restore-*`, `staging-contract-tests`, `staging-rollback` still absent |
@@ -193,9 +193,33 @@ safety story, and for production it is currently an assumption rather than a
 tested capability. The staging drill proves the *mechanism* works; it does not
 prove production's objects decrypt with production's identity.
 
-**Add `CLOUDFLARE_RESTORE_READ_TOKEN` to `backup-restore-production` and run
-the drill once against production before the window opens.** The token needs
-R2 read on `orderak-backups` and D1 access for the target database.
+### Cleared 2026-08-16 — the production drill ran and passed
+
+`CLOUDFLARE_RESTORE_READ_TOKEN` was added to `backup-restore-production`, and
+the drill was dispatched against production
+(`DB: orderak-db`, `TS: 2026-08-14T0404Z`, run `31934298081`):
+
+```text
+RESTORE DRILL PASSED — this export is recoverable.
+```
+
+**The gap this closes is precisely the one that was open.** Object presence,
+encryption and checksum integrity had already been verified from outside. What
+could not be checked without the private key — whether the `AGE_IDENTITY` in
+`backup-restore-production` actually opens *that* recipient — is now proven. The
+drill decrypted the object, walked its table census, wrote a drill manifest and
+shredded the plaintext.
+
+Two things worth noting about the run:
+
+1. **It waited for approval.** The job sat in `waiting` until the reviewer
+   approved it, which is the `backup-restore-production` reviewer gate working
+   on a live dispatch rather than in theory.
+2. **The drill never touches a database.** It downloads, verifies the checksum,
+   decrypts to `/tmp`, runs `verify-d1-restore.mjs` over the SQL, and shreds.
+   Checked before dispatching rather than after — the name "restore drill"
+   suggests something destructive, and against production that distinction had
+   to be established first, not assumed.
 
 ### 2. There is no production rollback credential path
 
