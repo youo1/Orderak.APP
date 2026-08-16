@@ -9,8 +9,32 @@ applies_to: [production]
 
 Moving production ownership from `youo1/Orderak` to `youo1/Orderak.APP`.
 
-**Nothing in this runbook has been executed.** It is the procedure and the
-readiness assessment, written before the window rather than during it.
+> **Phase 8 has NOT started, and this document does not start it.**
+>
+> The plan holds it closed: *"No production change is in scope right now …
+> Phases 7c, 8 and 9 are **documented but deliberately not started**, and
+> require a **separate explicit go-ahead**."* Writing the procedure is the
+> "documented" half. The go-ahead is a decision, and it has not been given.
+>
+> Nothing here has been executed. Production was last deployed 2026-08-01; its
+> migration ledger reads 44 and its admin Worker carries 7 secrets, all
+> unchanged.
+
+## What was done while preparing this, and why each was in scope
+
+Distinguishing this precisely matters, because "we started the cutover" and
+"we prepared for a cutover we have not started" are different claims and only
+the second is true.
+
+| Action | Scope |
+| --- | --- |
+| Production row counts and migration ledger | The plan's own named exception: *"read-only production evidence-gathering … which reads and writes nothing"* |
+| Reading both repositories' GitHub settings | Read-only |
+| **Enabling required status checks on `Orderak.APP`** | **Phase 3**, not Phase 8 — *"Required checks are enabled only once the job names actually appear in the new repo"*. A change to the new repository, not to production |
+| Writing this runbook | The "documented" half of "documented but deliberately not started" |
+
+No production secret was set, no production deploy ran, no production schema
+changed.
 
 ## Evidence Register, re-run 2026-08-15
 
@@ -50,6 +74,12 @@ path-filtered required check *"never reports and blocks merges permanently"*.
 Checked before enabling: all four workflows trigger on bare `pull_request:`
 with **no `paths:` filter**, so each reports on every pull request and the trap
 does not apply.
+
+## Before any of the below: the go-ahead itself
+
+The plan requires a **separate explicit go-ahead** for Phases 7c, 8 and 9. The
+blockers listed next are what must be true *once that decision is taken*. They
+are not a checklist that, once ticked, opens the window on its own.
 
 ## Blockers — the window cannot open until these are cleared
 
