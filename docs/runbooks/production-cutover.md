@@ -75,6 +75,37 @@ Checked before enabling: all four workflows trigger on bare `pull_request:`
 with **no `paths:` filter**, so each reports on every pull request and the trap
 does not apply.
 
+## Blocker status — updated 2026-08-15
+
+| # | Blocker | State |
+| --- | --- | --- |
+| 1 | `Orderak.APP` has no `production` environment | **CLEARED** |
+| 1b | Production backups never proven restorable | **OPEN** |
+| 2 | No production rollback credential | **CLEARED** |
+| 3 | Migration 043 not applied to production | Open — it is step 0 *inside* the window, by decision |
+| 4 | Four remaining environments missing | Partially — `production` now exists; `backup-restore-*`, `staging-contract-tests`, `staging-rollback` still absent |
+
+**Blocker 1 was cleared by the repository owner**, and cleared correctly. The
+`production` environment on `Orderak.APP` now carries all four Cloudflare
+secrets, all three variables, and — the part most likely to have been skipped —
+**`required_reviewers` with `youo1` set**, before any dispatch.
+
+`AGE_RECIPIENT` was **copied, not regenerated**. Verified by comparing the two
+repositories' values directly: they are identical, so every existing production
+backup remains decryptable. Regenerating it was the one irreversible mistake
+available at this step, and it was not made.
+
+**Blocker 2 was cleared** with a break-glass token scoped to a single
+permission row — `Account → Workers Scripts → Edit` — held in the owner's
+password manager and deliberately **not** in GitHub. Verified by listing
+production deployments with it and seeing version
+`31e55a78-0309-4c37-81f7-9646a2bc3807`, the current rollback target.
+
+The plan permits either offline custody or a protected break-glass environment.
+Offline custody was chosen because it survives the failure mode a GitHub-hosted
+credential cannot: rollback stays possible when Actions itself is unavailable,
+which is what *"a deliberate human act, not an automated path"* is protecting.
+
 ## Before any of the below: the go-ahead itself
 
 The plan requires a **separate explicit go-ahead** for Phases 7c, 8 and 9. The
