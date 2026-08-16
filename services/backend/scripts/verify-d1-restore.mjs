@@ -24,6 +24,40 @@ import { readFileSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+/**
+ * Tables the retention job deliberately prunes, read from the job itself.
+ *
+ * The row-loss check treats any decrease as data loss, which is right for
+ * durable tables and wrong for tables the system is designed to empty. On
+ * 2026-08-16 a production backup failed with:
+ *
+ *   FAIL: table "admin_auth_challenges" lost rows: 1 -> 0.
+ *
+ * That table holds MFA challenges with `expires_at` and `consumed_at`, and
+ * retention.ts deletes them a day after either. The row went to zero because
+ * the system worked. A guard that cannot tell that apart from real loss will
+ * eventually be muted, and then it protects nothing.
+ *
+ * Derived from `retention.ts` rather than copied into a list here, so adding a
+ * table to the retention job cannot leave this stale.
+ *
+ * On any problem — file moved, format changed, nothing matched — this returns
+ * an empty set, which restores the strict behaviour. Failing closed on a
+ * spurious backup failure is recoverable; silently exempting a table that
+ * genuinely lost rows is not.
+ */
+function prunedTables() {
+	try {
+		const source = readFileSync(new URL("../src/domains/identity/retention.ts", import.meta.url), "utf8");
+		const found = new Set([...source.matchAll(/DELETE FROM\s+([a-z_][a-z0-9_]*)/gi)].map((m) => m[1]));
+		if (found.size === 0) console.error("WARNING: retention.ts matched no DELETE FROM — every table will be treated as durable.");
+		return found;
+	} catch (error) {
+		console.error(`WARNING: could not read retention.ts (${error.message}); every table will be treated as durable.`);
+		return new Set();
+	}
+}
+
 function parseArgs(argv) {
 	const [file, ...rest] = argv;
 	const options = { file, manifest: null, compare: null, minTables: 1 };
@@ -126,17 +160,24 @@ try {
 
 	if (options.compare) {
 		const previous = JSON.parse(readFileSync(options.compare, "utf8"));
+		const pruned = prunedTables();
 		for (const [table, before] of Object.entries(previous.tables ?? {})) {
 			const now = counts[table];
 			if (now === undefined) {
+				// A table vanishing is always wrong, pruned or not — retention
+				// deletes rows, never the table.
 				console.error(`FAIL: table "${table}" was in the previous backup and is missing now.`);
 				failed = true;
 			} else if (now < before) {
-				console.error(`FAIL: table "${table}" lost rows: ${before} -> ${now}.`);
-				failed = true;
+				if (pruned.has(table)) {
+					console.log(`  note: "${table}" ${before} -> ${now}; retention prunes this table, so a decrease is expected.`);
+				} else {
+					console.error(`FAIL: table "${table}" lost rows: ${before} -> ${now}.`);
+					failed = true;
+				}
 			}
 		}
-		if (!failed) console.log(`Compared against ${options.compare}: no table lost rows.`);
+		if (!failed) console.log(`Compared against ${options.compare}: no durable table lost rows.`);
 	}
 } finally {
 	db?.close();
