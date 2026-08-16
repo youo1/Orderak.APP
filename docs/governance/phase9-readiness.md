@@ -120,9 +120,9 @@ backups, not of unfinished work.
 
 ---
 
-# Execution log
+## Execution log
 
-## 2026-08-16 — everything except the two gated steps
+### 2026-08-16 — everything except the two gated steps
 
 Phase 9 was executed as far as it can go without destroying a capability that
 cannot be rebuilt.
@@ -168,7 +168,7 @@ irreplaceable. A name match is not a capability match, in either direction.
 environment with nothing to use them — pure exposure, no function. Revoked. The
 underlying R2 API tokens should be deleted in Cloudflare too.
 
-## Deliberately still in place
+### Deliberately still in place
 
 | Environment | Kept | Until |
 | --- | --- | --- |
@@ -180,7 +180,7 @@ The contract-seller pair is the **only copy anywhere**. `Orderak.APP`'s
 be read back to move it — the same trap the age identity fell into. Revoking it
 here would force recreating the staging seller.
 
-## Remaining, and why each waits
+### Remaining, and why each waits
 
 1. **Archive the repository** — blocks Actions, which takes `restore-drill.yml`
    with it. This is the reason the whole phase waits, not a formality.

@@ -16,7 +16,7 @@ what the application asks for and what clients were told.
 
 `publicDesignSystemResponse` sets, deliberately:
 
-```
+```text
 cache-control:     public, no-cache
 cdn-cache-control: public, max-age=60, stale-while-revalidate=60
 ```
@@ -27,7 +27,7 @@ publish should reach clients quickly, while the edge absorbs the read volume.
 
 Responses actually arrived carrying:
 
-```
+```text
 Cache-Control: public, max-age=14400
 ```
 
