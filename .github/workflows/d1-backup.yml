@@ -34,11 +34,17 @@ name: D1 Backup
 # restore runbook rebuilds them — see docs/runbooks/d1-restore.md.
 
 on:
-  # No schedule here. This repository does not own the nightly backup yet —
-  # the old repository's cron stays authoritative until Phase 7a removes its
-  # deploy token and this one takes over. See the migration plan, Phase 3:
-  # "Deploy, backup, drift, nightly and every scheduled workflow stay
-  # disabled or manual until cutover."
+  schedule:
+    # Daily at 02:00 UTC. Moved here from the old repository on 2026-08-16 as
+    # part of the cutover: backups must now be encrypted to the NEW age
+    # recipient, and the old repository still carries the old one. Two
+    # repositories backing up the same databases on the same schedule is the
+    # duplication Phase 3 exists to prevent, so the old schedule is removed in
+    # the same change.
+    - cron: '0 2 * * *'
+  # This repository now owns the nightly backup. The comment that stood here
+  # said the opposite — that the old repository's cron was authoritative until
+  # cutover — which was true when written and stopped being true above.
   workflow_dispatch:
     inputs:
       target:
