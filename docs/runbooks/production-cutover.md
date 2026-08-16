@@ -115,6 +115,37 @@ today.
 any field is prohibited, without exception. The environment and its secrets
 must be created by the repository owner.
 
+### 1b. Production backups have never been proven restorable
+
+Found 2026-08-15 while answering "where does `AGE_RECIPIENT` come from".
+
+The backups themselves are healthy. `orderak-backups` holds current pointers
+for both databases, and `pointers/orderak-db/latest.manifest.json` is dated
+**2026-08-14T04:04:21Z** with per-table row counts.
+
+The restore path is not. Comparing the two restore environments in the old
+repository:
+
+| Environment | Secrets |
+| --- | --- |
+| `backup-restore-staging` | `AGE_IDENTITY`, **`CLOUDFLARE_RESTORE_READ_TOKEN`** |
+| `backup-restore-production` | `AGE_IDENTITY` only |
+
+`restore-drill.yml` preflights all three of `CLOUDFLARE_RESTORE_READ_TOKEN`,
+`CLOUDFLARE_ACCOUNT_ID` and `AGE_IDENTITY`, so a production drill fails closed
+before it starts. **The drill that passed was the staging one.** Production has
+encrypted backups, a private key to decrypt them, and no demonstrated path from
+one to the other.
+
+This matters for the cutover specifically: "restore from backup" is part of the
+safety story, and for production it is currently an assumption rather than a
+tested capability. The staging drill proves the *mechanism* works; it does not
+prove production's objects decrypt with production's identity.
+
+**Add `CLOUDFLARE_RESTORE_READ_TOKEN` to `backup-restore-production` and run
+the drill once against production before the window opens.** The token needs
+R2 read on `orderak-backups` and D1 access for the target database.
+
 ### 2. There is no production rollback credential path
 
 Phase 7a requires that when a repository's deploy credentials are withdrawn, a
@@ -149,6 +180,27 @@ replaces it.
    confirm it works by listing production Worker versions with it.
 2. **Create `production` in `Orderak.APP`** with the four tokens and the vars
    `CLOUDFLARE_ACCOUNT_ID`, `AGE_RECIPIENT`, `DEPLOY_OWNER=youo1/Orderak.APP`.
+
+   **`AGE_RECIPIENT` is copied, never regenerated.** It is a *public* key —
+   which is why it is a variable rather than a secret, and why its value can be
+   read straight across:
+
+   ```text
+   production  age179jkg4anwc37myta0knnvxgcyw7ptt2gyas7svhm5gpr0pfu9qpqs8hffn
+   staging     age1lky0gkvv47y9y66yelsuz87wwevku43r24rau4n8g6kzxm2mgvnqema9ze
+   ```
+
+   `Orderak.APP`'s `staging` already matches the old repository's, so a backup
+   taken by either is decryptable by the same identity. Generating a fresh
+   keypair for production would **orphan every existing production backup**:
+   they are encrypted to the recipient above, and only the matching
+   `AGE_IDENTITY` — held in the old repository's `backup-restore-production`
+   environment — can open them.
+
+   The four Cloudflare **secrets** are the opposite case: GitHub secrets cannot
+   be read back, so they are re-created as fresh least-privilege tokens rather
+   than copied. That is also cleaner, since the old repository's are revoked at
+   step 3 anyway.
 
    **Set required reviewers at the same time.** These are now available —
    the old constraint applied to private repositories and both repositories are
