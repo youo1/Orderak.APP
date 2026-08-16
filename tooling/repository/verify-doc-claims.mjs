@@ -109,6 +109,33 @@ const UNBOUND_RESOURCES = new Map([
 	["orderak-backups", "Backup bucket. Written by d1-backup.yml through `wrangler r2 object put`, never bound to a Worker - binding it would give the runtime read access to every backup."],
 ]);
 
+/**
+ * Cloudflare API **token names**, which are not resources at all.
+ *
+ * These are kept apart from UNBOUND_RESOURCES rather than folded into it,
+ * because that map means "a real resource that is deliberately not bound" and
+ * these are a different kind of thing entirely — a token is an account-level
+ * credential, never declared in a wrangler config and never bindable.
+ *
+ * They collide with the resource check only because they share the `orderak-`
+ * prefix, and one pair is genuinely confusable: `orderak-backups` is the R2
+ * bucket, `orderak-backup-production` is the token that writes to it.
+ *
+ * The authoritative list is docs/governance/cloudflare-token-inventory.md.
+ */
+const API_TOKEN_NAMES = new Set([
+	"orderak-deploy-staging",
+	"orderak-deploy-production",
+	"orderak-backup-staging",
+	"orderak-backup-production",
+	"orderak-drift-check",
+	"orderak-analytics",
+	"orderak-restore-read",
+	"orderak-restore-read-production",
+	"orderak-rollback-breakglass",
+	"orderak-production-rollback-breakglass",
+]);
+
 function pathClaims(text) {
 	const claims = new Set();
 	// A line that names the source repository is describing something over
@@ -172,7 +199,7 @@ for (const file of [...docs, ...rootDocs]) {
 		}
 	}
 	for (const claim of resourceClaims(text)) {
-		if (declaredResources.has(claim) || UNBOUND_RESOURCES.has(claim)) continue;
+		if (declaredResources.has(claim) || UNBOUND_RESOURCES.has(claim) || API_TOKEN_NAMES.has(claim)) continue;
 		findings.push({ kind: "undeclared-resource", file: where, claim });
 	}
 }
