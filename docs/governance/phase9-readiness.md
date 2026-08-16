@@ -117,3 +117,75 @@ is the same failure class as the Semgrep gate that had been red since 08-12.
 
 Phase 9 cannot start before **2026-09-15**, and the delay is a property of the
 backups, not of unfinished work.
+
+---
+
+# Execution log
+
+## 2026-08-16 — everything except the two gated steps
+
+Phase 9 was executed as far as it can go without destroying a capability that
+cannot be rebuilt.
+
+**Done:**
+
+| Step | Result |
+| --- | --- |
+| Point description at `Orderak.APP` | set, and states *why* the repository still exists |
+| README banner | added, naming the 2026-09-15 date and the reason |
+| Close or move open issues | none open (`open_issues_count: 0`) |
+| Revoke superseded secrets | 9 removed |
+
+Revoked from `youo1/Orderak`:
+
+```text
+production   CLOUDFLARE_ANALYTICS_TOKEN, CLOUDFLARE_D1_BACKUP_TOKEN, CLOUDFLARE_DRIFT_CHECK_TOKEN
+staging      CLOUDFLARE_D1_BACKUP_TOKEN, FIREBASE_APP_DISTRIBUTION_CREDENTIALS,
+             FIREBASE_STAGING_GOOGLE_SERVICES_JSON, R2_ACCESS_KEY_ID, R2_ENDPOINT,
+             R2_SECRET_ACCESS_KEY
+```
+
+Production answered 200 on both surfaces immediately afterwards.
+
+### A naive check that would have caused damage
+
+The first comparison asked "does `Orderak.APP` have a secret with this name",
+and reported that it lacked `CLOUDFLARE_ANALYTICS_TOKEN`,
+`CLOUDFLARE_D1_BACKUP_TOKEN`, `CLOUDFLARE_DRIFT_CHECK_TOKEN` and
+`CLOUDFLARE_RESTORE_READ_TOKEN`. All four were false: the secrets were **renamed**
+to `ORDERAK_*` earlier the same day, so the capability was present under a
+different name.
+
+Acting on that output would have concluded the opposite of the truth, and the
+one case where the naming coincidence is genuinely dangerous is `AGE_IDENTITY` —
+**the same name in both repositories holding different keys**, the old one
+irreplaceable. A name match is not a capability match, in either direction.
+
+### Three dead credentials found on the way
+
+`R2_ACCESS_KEY_ID`, `R2_ENDPOINT` and `R2_SECRET_ACCESS_KEY` are referenced by
+**no workflow in either repository**. S3-compatible R2 credentials sitting in an
+environment with nothing to use them — pure exposure, no function. Revoked. The
+underlying R2 API tokens should be deleted in Cloudflare too.
+
+## Deliberately still in place
+
+| Environment | Kept | Until |
+| --- | --- | --- |
+| `backup-restore-production` / `-staging` | `AGE_IDENTITY` (**old key**), `CLOUDFLARE_RESTORE_READ_TOKEN` | 2026-09-15 |
+| `staging-contract-tests` | `CONTRACT_SELLER_PHONE`, `CONTRACT_SELLER_SECRET` | until `Orderak.APP` holds its own copies |
+
+The contract-seller pair is the **only copy anywhere**. `Orderak.APP`'s
+`staging-contract-tests` environment exists but is empty, and the secret cannot
+be read back to move it — the same trap the age identity fell into. Revoking it
+here would force recreating the staging seller.
+
+## Remaining, and why each waits
+
+1. **Archive the repository** — blocks Actions, which takes `restore-drill.yml`
+   with it. This is the reason the whole phase waits, not a formality.
+2. **The history decision** — the repository is public and its history still
+   contains `.wrangler` cache files. Purge, or restrict, per retention policy.
+   This is a decision, not a task, and it has not been made.
+3. **Delete the five duplicate Cloudflare tokens** — after a restore drill
+   passes here against an old-key object.
