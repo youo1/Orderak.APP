@@ -15,6 +15,21 @@
 	"vars": {
 		"DEPLOYMENT_ENVIRONMENT": "production",
 		"ADMIN_ORIGIN": "https://admin.orderak.app",
+		// Phase 7c, 2026-08-16. Neither selector existed here before: the code
+		// read both through a `?? "1"` fallback, so version 1 was correct but
+		// implied rather than stated.
+		//
+		// V1 and ADMIN_AUDIT_SIGNING_KEY both remain set, and must. The one
+		// enrolled admin's TOTP ciphertext records version 1, and all 22 audit
+		// archives carry signing_key_version 1 — confirmed before flipping
+		// these, since migration 043 backfilled every row. Only NEW enrolments
+		// and NEW archives use version 2.
+		//
+		// The V2 secrets were confirmed present BEFORE this change. Reversing
+		// that order leaves currentTotpKey() resolving to an unset key and
+		// returning null, which fails TOTP closed on production.
+		"ADMIN_TOTP_KEY_CURRENT": "2",
+		"ADMIN_AUDIT_KEY_CURRENT": "2",
 		"BILLING_ENABLED": "false",
 		"GOOGLE_PLAY_LIFECYCLE_ENABLED": "false",
 		"AI_ASSISTANT_ENABLED": "false",
