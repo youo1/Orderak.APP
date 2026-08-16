@@ -1,12 +1,16 @@
 name: OpenAPI Nightly Contract and Load
 
-# No schedule here yet — see the migration plan, Phase 3, on scheduled
-# workflows staying manual until cutover. The old repository's nightly run
-# stays authoritative until then; this also has no staging-contract-tests
-# environment or CONTRACT_SELLER_PHONE/_SECRET yet, so a real run would fail
-# preflight regardless.
+# This repository owns the nightly run as of 2026-08-16. The comment here
+# previously said the opposite, and named its own two preconditions: no
+# staging-contract-tests environment, and no CONTRACT_SELLER_PHONE/_SECRET.
+# The environment now exists; the two secrets are the remaining gap, and until
+# they are set the contract job fails its preflight rather than running blind.
 
 on:
+  schedule:
+    # Nightly at 00:20 UTC. Moved from the old repository 2026-08-16, once
+    # staging-contract-tests existed here to hold CONTRACT_SELLER_*.
+    - cron: '20 0 * * *'
   workflow_dispatch:
     inputs:
       run_pre_release:

@@ -10,11 +10,15 @@ name: Infrastructure Drift
 # took production deploys down. The divergence existed the whole time and was
 # only ever going to surface as an unrelated deploy failing.
 #
-# No schedule here yet — see the migration plan, Phase 3, on scheduled
-# workflows staying manual until cutover. The old repository's daily run stays
-# authoritative until then.
+# This repository owns the daily drift check as of 2026-08-16, and removed it
+# from the old repository in the same change. It follows production: this
+# repository now deploys production, so it checks production for drift.
 
 on:
+  schedule:
+    # Daily at 06:00 UTC. Moved from the old repository 2026-08-16: this
+    # repository now owns production, so it owns the drift check against it.
+    - cron: '0 6 * * *'
   workflow_dispatch:
     inputs:
       strict:
