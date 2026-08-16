@@ -2,7 +2,7 @@
 status: current
 generated: false
 owner: backend
-last_verified: 2026-08-11
+last_verified: 2026-08-16
 applies_to: [production, staging]
 authoritative_for: [d1-restore]
 ---
@@ -256,8 +256,20 @@ under the 30-day lock; there is nothing to migrate.
    environment) to the new public key printed above.
 3. Update the GitHub **secret** `AGE_IDENTITY` in the matching
    `backup-restore-*` environment to the full contents of `new-identity.txt`.
-4. Securely delete the local `new-identity.txt` once both are set —
-   `shred -u new-identity.txt` or equivalent.
+4. **Put `new-identity.txt` into offline custody before deleting the local
+   copy** — a password manager entry, or equivalent storage outside this
+   repository and outside GitHub. Only then `shred -u new-identity.txt`.
+
+   > **This step was missing and it cost us the key.** Steps 4 and 6 previously
+   > said "delete the new identity" and "keep the *old* identity", which leaves
+   > the **current** private key existing in exactly one place: a GitHub secret,
+   > which cannot be read back. On 2026-08-16 that is precisely what was
+   > discovered — the identity decrypting every production backup was
+   > unrecoverable, so it could not be copied to the new repository and a fresh
+   > keypair had to be generated instead.
+   >
+   > A GitHub secret is a *deployment* mechanism, not *custody*. Write-only
+   > storage is not a backup of the thing that opens your backups.
 5. Dispatch `d1-backup.yml` once for the affected environment and confirm the
    run succeeds — that proves the new recipient is live.
 6. Keep the **old** identity file in offline custody (a password manager or
