@@ -51,26 +51,59 @@ RESTORE DRILL PASSED — this export is recoverable.
 That is the whole chain — new recipient encrypts, new identity opens — and it
 confirms the offline copy the owner saved is the matching key.
 
-**Production: not proven.** The production half of the same backup run failed
-before writing anything, because `orderak-backup-production` carries
-`D1 → Read` where `d1 export` needs `D1 → Edit`. So:
+**Production: proven, after two intervening failures.** Backup
+`2026-08-16T1114Z` (1,184,361 bytes) was written under the new recipient and
+the drill decrypted it:
+
+```text
+RESTORE DRILL PASSED — this export is recoverable.
+```
 
 | | staging | production |
 | --- | --- | --- |
 | New recipient set | yes | yes |
 | New identity in environment | yes | yes |
-| Backup under the new key | **yes** | **none** |
-| Drill passed | **yes** | **nothing to drill** |
+| Backup under the new key | **yes** | **yes** |
+| Drill passed | **yes** | **yes** |
 
-Production is therefore in a state worth naming precisely: **a new keypair
-configured but never exercised, and existing backups openable only by the old
-repository.** It is not broken, and it is not finished.
+### The two failures on the way, because neither was the age key
 
-## What must happen before this is closed
+**First: a token scope.** `orderak-backup-production` carried `D1 → Read`
+where `d1 export` needs `D1 → Edit` — the export is a job Cloudflare creates,
+not a read.
 
-1. Fix `orderak-backup-production` to `D1 → Edit`.
-2. Run a production backup — it encrypts to the new recipient.
-3. Run the drill against it. **Only that proves the production pair.**
+**Second: the row-loss guard, firing correctly on a wrong rule.**
+
+```text
+FAIL: table "admin_auth_challenges" lost rows: 1 -> 0.
+```
+
+Not data loss. That table holds MFA challenges with `expires_at` and
+`consumed_at`, and `retention.ts` deletes them a day after either. The row
+reached zero because the system worked. The guard compared every table against
+the previous manifest and treated any decrease as failure, which is right for
+`orders` and `sellers` and wrong for the fourteen tables retention deliberately
+empties. `verify-d1-restore.mjs` now reads that list from `retention.ts` at
+runtime, so it cannot go stale, and falls back to strict on any parse problem.
+
+`orderak-geo` succeeding in the same run as `orderak-db`'s guard failure is
+what separated the two causes — the token was already fixed by then.
+
+## All eight tokens are now exercised, not assumed
+
+| Token | Proven by |
+| --- | --- |
+| `orderak-deploy-staging` | staging deploys, 2026-08-16 |
+| `orderak-deploy-production` | production deploy, run 31935783379 |
+| `orderak-backup-staging` | staging backup `2026-08-16T0902Z` |
+| `orderak-backup-production` | production backup `2026-08-16T1114Z` |
+| `orderak-drift-check` | infra-drift, run 31944050943 |
+| `orderak-analytics` | queue backlog report in the same run |
+| `orderak-restore-read` | both restore drills |
+| `orderak-rollback-breakglass` | production deployment list, by the owner |
+
+Token permissions cannot be read back from Cloudflare, so every row above is a
+successful run rather than an inspection.
 
 ## The old repository cannot be retired yet
 
