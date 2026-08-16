@@ -83,6 +83,26 @@ are not a checklist that, once ticked, opens the window on its own.
 
 ## Blockers — the window cannot open until these are cleared
 
+### 0. Where the production credentials actually are
+
+Re-checked 2026-08-15 at every level, because the owner recalled adding them
+and a single narrow query is not evidence of absence:
+
+| | `Orderak.APP` | `Orderak` |
+| --- | --- | --- |
+| Repository-level secrets / variables | 0 / 0 | 0 / — |
+| Environments | **1** (`staging`) | 7 |
+| `production` environment | **does not exist** | 4 tokens + 2 vars |
+
+The recollection was right and the location was not. The four production tokens
+— `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_D1_BACKUP_TOKEN`,
+`CLOUDFLARE_DRIFT_CHECK_TOKEN`, `CLOUDFLARE_ANALYTICS_TOKEN` — are in the **old**
+repository, which is correct for now: it still owns production. Two of them
+were created during this migration, which is why adding them is a real memory.
+
+The query method was validated against a known-good case in the same pass: the
+same call returns `staging`'s two secrets and three variables in `Orderak.APP`.
+
 ### 1. `Orderak.APP` has no `production` environment
 
 The old repository's `production` environment holds four Cloudflare tokens:
@@ -129,6 +149,19 @@ replaces it.
    confirm it works by listing production Worker versions with it.
 2. **Create `production` in `Orderak.APP`** with the four tokens and the vars
    `CLOUDFLARE_ACCOUNT_ID`, `AGE_RECIPIENT`, `DEPLOY_OWNER=youo1/Orderak.APP`.
+
+   **Set required reviewers at the same time.** These are now available —
+   the old constraint applied to private repositories and both repositories are
+   public, verified on 2026-08-15 by creating a throwaway environment, having
+   the API accept a `reviewers` payload, and deleting it. Neither repository's
+   `production` environment uses them today; the old repository's carries only a
+   `branch_policy` rule.
+
+   Note also that the old repository has **no owner gate on production at all** —
+   no `.github/actions/` directory, no `DEPLOY_OWNER` variable on its
+   `production` environment. Its approval boundary is the typed
+   `DEPLOY_PRODUCTION` confirmation, which stops an accident but not a decision.
+   `Orderak.APP` should not inherit that gap.
 3. **Withdraw the old repository's production deploy credentials.** GitHub
    concurrency groups do not synchronise across repositories, so two
    repositories able to deploy the same Worker is the outage this step exists

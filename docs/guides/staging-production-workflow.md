@@ -71,11 +71,28 @@ The repository currently uses these controls:
 - A manual Production workflow requiring both a tested `release_ref` and the
   exact confirmation text `DEPLOY_PRODUCTION`.
 
-The current GitHub plan does not support Environment required reviewers for
-this private repository. Consequently, the typed confirmation and restricted
-manual dispatch are the current Production approval boundary. Do not describe
-the workflow as having a GitHub reviewer gate unless the plan and Environment
-configuration are changed and verified.
+**This paragraph used to say required reviewers were unavailable. That is no
+longer true, and the reason it changed is worth keeping.** The restriction
+applied to *private* repositories on the current plan. Both `youo1/Orderak` and
+`youo1/Orderak.APP` are now **public**, so environment required reviewers are
+available.
+
+Verified empirically on 2026-08-15 rather than inferred from the plan tier: a
+throwaway environment was created on `Orderak.APP` with a `reviewers` payload,
+the API accepted it and returned `protection_rules: ["required_reviewers"]`,
+and the environment was deleted immediately afterwards.
+
+**Neither repository's `production` environment uses them today.** The old
+repository's carries only a `branch_policy` rule, and the approval boundary in
+practice is still the typed `DEPLOY_PRODUCTION` confirmation plus restricted
+manual dispatch. That is weaker than a reviewer gate: it stops an accident, not
+a decision.
+
+So the accurate statement is now: a reviewer gate is **available and not
+configured**. It should be set on `production`, `backup-restore-staging`,
+`backup-restore-production` and `staging-rollback` when those environments are
+created in `Orderak.APP` at cutover — before their first dispatch, not after.
+Until then, do not describe the workflow as having a GitHub reviewer gate.
 
 ## Daily development workflow
 
