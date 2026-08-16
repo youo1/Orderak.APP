@@ -29,7 +29,7 @@ jobs:
       url: https://admin.orderak.app
     env:
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.ORDERAK_DEPLOY_PRODUCTION }}
       PRODUCTION_CONFIRM: ${{ inputs.confirm }}
       RELEASE_SHA: ${{ inputs.release_sha }}
     steps:

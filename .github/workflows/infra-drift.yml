@@ -45,7 +45,7 @@ jobs:
       # the backup token was correctly narrowed to D1+R2 only, this check silently lost
       # the D1/R2/Queues List access it actually needs. A single, dedicated read-only
       # token removes the ambiguity — see the migration plan's token-rotation notes.
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DRIFT_CHECK_TOKEN }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.ORDERAK_DRIFT_CHECK }}
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -93,11 +93,11 @@ jobs:
         working-directory: services/backend
         continue-on-error: true
         env:
-          CLOUDFLARE_ANALYTICS_TOKEN: ${{ secrets.CLOUDFLARE_ANALYTICS_TOKEN }}
+          CLOUDFLARE_ANALYTICS_TOKEN: ${{ secrets.ORDERAK_ANALYTICS }}
         run: |
           set -euo pipefail
           if [ -z "${CLOUDFLARE_ANALYTICS_TOKEN}" ]; then
-            echo "CLOUDFLARE_ANALYTICS_TOKEN is not set — skipping the backlog report."
+            echo "ORDERAK_ANALYTICS is not set — skipping the backlog report."
             echo "It needs Account Analytics:Read, which the deploy and backup tokens do not carry."
             exit 0
           fi

@@ -84,7 +84,7 @@ jobs:
         database: [orderak-db, orderak-geo]
     env:
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_D1_BACKUP_TOKEN }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.ORDERAK_BACKUP_PRODUCTION }}
       AGE_RECIPIENT: ${{ vars.AGE_RECIPIENT }}
       DB: ${{ matrix.database }}
 
@@ -96,7 +96,7 @@ jobs:
           set -euo pipefail
           missing=0
           if [ -z "${CLOUDFLARE_API_TOKEN}" ]; then
-            echo "ERROR: CLOUDFLARE_D1_BACKUP_TOKEN is not set in the 'production' environment."
+            echo "ERROR: ORDERAK_BACKUP_PRODUCTION is not set in the 'production' environment."
             missing=1
           fi
           if [ -z "${CLOUDFLARE_ACCOUNT_ID}" ]; then
@@ -250,7 +250,7 @@ jobs:
         database: [orderak-db-staging, orderak-geo-staging]
     env:
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_D1_BACKUP_TOKEN }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.ORDERAK_BACKUP_STAGING }}
       AGE_RECIPIENT: ${{ vars.AGE_RECIPIENT }}
       DB: ${{ matrix.database }}
 
@@ -262,7 +262,7 @@ jobs:
           set -euo pipefail
           missing=0
           if [ -z "${CLOUDFLARE_API_TOKEN}" ]; then
-            echo "ERROR: CLOUDFLARE_D1_BACKUP_TOKEN is not set in the 'staging' environment."
+            echo "ERROR: ORDERAK_BACKUP_STAGING is not set in the 'staging' environment."
             missing=1
           fi
           if [ -z "${CLOUDFLARE_ACCOUNT_ID}" ]; then
