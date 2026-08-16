@@ -119,9 +119,20 @@ must be created by the repository owner.
 
 Found 2026-08-15 while answering "where does `AGE_RECIPIENT` come from".
 
-The backups themselves are healthy. `orderak-backups` holds current pointers
-for both databases, and `pointers/orderak-db/latest.manifest.json` is dated
-**2026-08-14T04:04:21Z** with per-table row counts.
+**Verified 2026-08-15, and the backups are in better shape than "never proven"
+suggests.** Everything checkable without the private key checks out:
+
+| Check | Result |
+| --- | --- |
+| Pointer manifest present | `pointers/orderak-db/latest.manifest.json`, dated **2026-08-14T04:04:21Z**, 2,163 rows across the table census |
+| Backup object present | `d1/orderak-db/2026-08-14T0404Z.sql.age` — **1,181,190 bytes** |
+| Genuinely encrypted | header reads `age-encryption.org/v1` followed by an `X25519` recipient stanza — not a plaintext dump with a misleading extension |
+| Integrity | recorded `.sha256` matches the object pulled from R2, byte for byte |
+
+So the object exists, is real ciphertext, and has not been corrupted in
+storage. **The single unverified link is the decryption itself** — whether the
+`AGE_IDENTITY` held in `backup-restore-production` opens *this* recipient. That
+cannot be checked from here and should not be: it needs the private key.
 
 The restore path is not. Comparing the two restore environments in the old
 repository:
@@ -133,9 +144,18 @@ repository:
 
 `restore-drill.yml` preflights all three of `CLOUDFLARE_RESTORE_READ_TOKEN`,
 `CLOUDFLARE_ACCOUNT_ID` and `AGE_IDENTITY`, so a production drill fails closed
-before it starts. **The drill that passed was the staging one.** Production has
-encrypted backups, a private key to decrypt them, and no demonstrated path from
-one to the other.
+before it starts.
+
+Confirmed against the run history rather than inferred from the missing secret.
+`restore-drill.yml` has **three runs in total**, all on 2026-08-12:
+
+```text
+2026-08-12T09:50:34  success    orderak-db-staging
+2026-08-12T08:07:19  failure    orderak-db-staging
+2026-08-12T07:44:43  cancelled  (no target reached the log)
+```
+
+**Zero production drills, ever.** The drill that passed was the staging one.
 
 This matters for the cutover specifically: "restore from backup" is part of the
 safety story, and for production it is currently an assumption rather than a
