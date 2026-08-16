@@ -99,6 +99,11 @@ const EXPECTED_ABSENT = new Map([
 	["apps/seller-android/app/src/staging/google-services.json", "Staging Firebase client configuration. Same reason."],
 	["contracts/openapi/dist", "Build output of the OpenAPI bundle step. Gitignored."],
 	["contracts/openapi/dist/public-v1.json", "Build output. Gitignored."],
+	// Deliberately deleted by Phase 0 item 2, and cited in the governance record
+	// precisely to say it is gone. A path can be referenced because it is absent,
+	// not only because it is present, and the check has no way to tell those
+	// apart from the citation alone.
+	["docs/contracts/SUSPENDED.md", "Removed by Phase 0: a notice about a contract-suspension mechanism that no longer exists. Referenced in governance records as evidence of its removal."],
 ]);
 
 /**
