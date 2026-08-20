@@ -12,9 +12,20 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  # Stated here rather than inherited from the repository default. The default is
+  # read today, so this changes nothing now; it means a later change to that
+  # setting cannot silently widen the token this workflow runs with.
+  contents: read
+
+concurrency:
+  group: backend-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 

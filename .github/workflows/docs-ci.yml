@@ -4,11 +4,30 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  # Stated here rather than inherited from the repository default. The default is
+  # read today, so this changes nothing now; it means a later change to that
+  # setting cannot silently widen the token this workflow runs with.
+  contents: read
+
+concurrency:
+  group: docs-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint-and-links:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
+      # Full history, because verify-manifest.mjs asks how many commits have
+      # touched each path. Under the default depth-1 checkout every path looks
+      # like it has exactly one commit, which would turn every file legitimately
+      # changed since the migration into a reported defect. The verifier detects
+      # that case and stops with exit 2 rather than printing the false wall, so
+      # without this line the step cannot pass at all.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
 
       # The docs scripts are invoked through pnpm because they live in the root
       # package.json. Without this the job fails at the first step with
@@ -49,6 +68,18 @@ jobs:
 
       - name: Verify documentation claims about paths, scripts and resources
         run: node tooling/repository/verify-doc-claims.mjs
+
+      # Phase 1 built this manifest from git objects at the freeze tag, and until
+      # now nothing ran it — it was executed by hand when someone remembered.
+      # A verification nobody automates is a verification that stops happening.
+      #
+      # It fails on migration defects: a file missing from the destination, a
+      # dropped file that came over anyway, a row with no decision, a lost
+      # executable bit, or a "regenerate" row that was copied instead. Files
+      # changed by ordinary development since the migration are reported as drift
+      # and do not fail the run.
+      - name: Verify the migrated tree against the Phase 1 manifest
+        run: node tooling/migration/verify-manifest.mjs tooling/migration/manifests/pre-migration-freeze.json .
 
       # The plan asks for a generated-doc drift check and there was none. Its
       # absence let a real break go unnoticed: database-migrations.md is

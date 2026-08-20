@@ -2,7 +2,7 @@
 status: current
 generated: false
 owner: security
-last_verified: 2026-08-16
+last_verified: 2026-08-19
 applies_to: [production, staging]
 ---
 # Credential consolidation — twelve tokens to eight
@@ -51,19 +51,26 @@ That is what makes eight reachable today rather than next month.
 
 | Environment | Secrets | From |
 | --- | --- | --- |
-| `staging` | `CLOUDFLARE_API_TOKEN` | 1 |
-| | `CLOUDFLARE_D1_BACKUP_TOKEN` | 3 |
+| `staging` | `ORDERAK_DEPLOY_STAGING` | 1 |
+| | `ORDERAK_BACKUP_STAGING` | 3 |
 | | `FIREBASE_APP_DISTRIBUTION_CREDENTIALS`, `FIREBASE_STAGING_GOOGLE_SERVICES_JSON` | — |
-| `production` | `CLOUDFLARE_API_TOKEN` | 2 |
-| | `CLOUDFLARE_D1_BACKUP_TOKEN` | 4 |
-| | `CLOUDFLARE_DRIFT_CHECK_TOKEN` | 5 |
-| | `CLOUDFLARE_ANALYTICS_TOKEN` | 6 |
-| `backup-restore-*` | `AGE_IDENTITY` (new), `CLOUDFLARE_RESTORE_READ_TOKEN` | 7 |
+| `production` | `ORDERAK_DEPLOY_PRODUCTION` | 2 |
+| | `ORDERAK_BACKUP_PRODUCTION` | 4 |
+| | `ORDERAK_DRIFT_CHECK` | 5 |
+| | `ORDERAK_ANALYTICS` | 6 |
+| `backup-restore-*` | `AGE_IDENTITY` (new), `ORDERAK_RESTORE_READ` | 7 |
 | `staging-contract-tests` | `CONTRACT_SELLER_PHONE`, `CONTRACT_SELLER_SECRET` | — |
 
 Variables: `CLOUDFLARE_ACCOUNT_ID` everywhere; `AGE_RECIPIENT` and
 `DEPLOY_OWNER` on `staging` and `production`;
 `FIREBASE_APP_DISTRIBUTION_GROUPS` on `staging`.
+
+Secret names here follow the Cloudflare token they carry, so the mapping is
+readable from the name alone. The value is still read into the
+`CLOUDFLARE_API_TOKEN` environment variable in every workflow — see the
+[token inventory](./cloudflare-token-inventory.md#the-secret-name-and-the-environment-variable-are-not-the-same-string).
+The old repository was never renamed and keeps its `CLOUDFLARE_*` secret names,
+which is why the two tables below differ.
 
 ### GitHub — `youo1/Orderak`, reduced
 

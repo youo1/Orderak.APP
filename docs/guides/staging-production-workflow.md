@@ -2,7 +2,7 @@
 status: current
 generated: false
 owner: governance
-last_verified: 2026-08-13
+last_verified: 2026-08-19
 applies_to: [production, staging]
 authoritative_for: [release-workflow]
 ---
@@ -415,8 +415,23 @@ incident:
 
 `youo1/Orderak` no longer deploys Staging. Its `CLOUDFLARE_API_TOKEN` was
 removed from the `staging` environment, and its `staging-deploy.yml` is
-dispatch-only behind a typed `BREAK_GLASS` confirmation plus a required
-reviewer on the `staging-rollback` environment.
+dispatch-only behind a typed `BREAK_GLASS` confirmation.
+
+> **The required reviewer on `staging-rollback` is almost certainly gone, and
+> this procedure no longer relies on it.** Making `youo1/Orderak` private on
+> 2026-08-16 stripped `required_reviewers` from both its `backup-restore-*`
+> environments — measured before and after. Environment reviewers are not
+> available on private repositories under that plan, so the same applies to
+> `staging-rollback`. **That specific environment has not been re-queried**, so
+> this is stated as the consequence of a measured plan limit, not as its own
+> measurement. Confirm it before relying on the gate.
+>
+> What still holds is the stronger control, and it was always the real one: the
+> environment carries **no credential**, so the break-glass path cannot run until
+> a human deliberately puts one there. The reviewer was defence in depth on top
+> of that, not the thing preventing a deploy.
+
+That environment name still gates the dispatch, so the steps below are unchanged.
 
 **That environment deliberately holds no credential.** The plan's requirement
 is a rollback credential kept *outside* Actions — "a deliberate human act, not

@@ -1063,11 +1063,11 @@
       "sha256": "be89dfa6d6d67c3c5280ff393cfe551f87275a95e8e4f56c85b34d2b05beae32",
       "size": 248,
       "type": "code",
-      "decision": "verbatim",
-      "reason": "Moved as-is — no factual issue identified in this pass. Not a claim that every sentence was individually re-verified; scope was targeted at previously-flagged issues plus link/lint checks, not a full re-audit of all 79 files.",
-      "evidence": "Orderak.APP, docs/root-docs commit. markdownlint clean (90 files), verify-doc-links clean, credential scan clean.",
+      "decision": "drop",
+      "reason": "Editor workspace file, not migrated content. It named the source repository and carried that repository's VS Code settings; Orderak.APP keeps its own workspace file, which is a local editor artifact rather than something the migration carries. Dropped so the manifest asserts its absence instead of requiring a file the destination deliberately does not have.",
+      "evidence": "Absent from Orderak.APP. Its replacement, ORDERAK.APP.code-workspace, is a new local editor file with different settings and is not a migrated artifact, so it has no manifest row. Verified with verify-manifest.mjs: the drop row passes on absence.",
       "reviewer": "claude",
-      "reviewed_at": "2026-08-11"
+      "reviewed_at": "2026-08-19"
     },
     {
       "path": "README.md",

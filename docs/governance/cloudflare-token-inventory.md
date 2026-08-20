@@ -2,7 +2,7 @@
 status: current
 generated: false
 owner: security
-last_verified: 2026-08-16
+last_verified: 2026-08-19
 applies_to: [production, staging]
 ---
 # Cloudflare API token inventory
@@ -38,18 +38,37 @@ The splits that *do* reduce capability are the ones by **function**:
 
 ## The eight
 
-| # | Token | Permissions | Consumed as |
+| # | Token | Permissions | GitHub secret — environment |
 | --- | --- | --- | --- |
-| 1 | `orderak-deploy-staging` | **Account:** Workers Scripts `Edit`, D1 `Edit`, Queues `Edit`, Workers R2 Storage `Edit`<br>**Zone:** Workers Routes `Edit`, Zone `Read` | `CLOUDFLARE_API_TOKEN` — `staging` |
-| 2 | `orderak-deploy-production` | same as above | `CLOUDFLARE_API_TOKEN` — `production` |
-| 3 | `orderak-backup-staging` | **Account:** D1 `Edit`, Workers R2 Storage `Edit` | `CLOUDFLARE_D1_BACKUP_TOKEN` — `staging` |
-| 4 | `orderak-backup-production` | same as above | `CLOUDFLARE_D1_BACKUP_TOKEN` — `production` |
-| 5 | `orderak-drift-check` | **Account:** D1 `Read`, Workers Scripts `Read`, Queues `Read`, Workers R2 Storage `Read` | `CLOUDFLARE_DRIFT_CHECK_TOKEN` — `production` |
-| 6 | `orderak-analytics` | **Account:** Account Analytics `Read` | `CLOUDFLARE_ANALYTICS_TOKEN` — `production` |
-| 7 | `orderak-restore-read` | **Account:** Workers R2 Storage `Read`, D1 `Edit` | `CLOUDFLARE_RESTORE_READ_TOKEN` — `backup-restore-*` |
+| 1 | `orderak-deploy-staging` | **Account:** Workers Scripts `Edit`, D1 `Edit`, Queues `Edit`, Workers R2 Storage `Edit`<br>**Zone:** Workers Routes `Edit`, Zone `Read` | `ORDERAK_DEPLOY_STAGING` — `staging` |
+| 2 | `orderak-deploy-production` | same as above | `ORDERAK_DEPLOY_PRODUCTION` — `production` |
+| 3 | `orderak-backup-staging` | **Account:** D1 `Edit`, Workers R2 Storage `Edit` | `ORDERAK_BACKUP_STAGING` — `staging` |
+| 4 | `orderak-backup-production` | same as above | `ORDERAK_BACKUP_PRODUCTION` — `production` |
+| 5 | `orderak-drift-check` | **Account:** D1 `Read`, Workers Scripts `Read`, Queues `Read`, Workers R2 Storage `Read` | `ORDERAK_DRIFT_CHECK` — `production` |
+| 6 | `orderak-analytics` | **Account:** Account Analytics `Read` | `ORDERAK_ANALYTICS` — `production` |
+| 7 | `orderak-restore-read` | **Account:** Workers R2 Storage `Read`, D1 `Edit` | `ORDERAK_RESTORE_READ` — `backup-restore-*` |
 | 8 | `orderak-rollback-breakglass` | **Account:** Workers Scripts `Edit` | **offline custody only — never in GitHub** |
 
 `Zone` rows apply to the `orderak.app` zone.
+
+### The secret name and the environment variable are not the same string
+
+The column above is the **GitHub secret** each token value is stored in. It is
+not the name the workflow step sees. Every one of these is read into the
+environment variable **`CLOUDFLARE_API_TOKEN`**, because that is what wrangler
+looks for:
+
+```yaml
+CLOUDFLARE_API_TOKEN: ${{ secrets.ORDERAK_DEPLOY_STAGING }}
+```
+
+Only the `secrets.*` half was renamed. `CLOUDFLARE_ANALYTICS_TOKEN` is the one
+exception — `infra-drift.yml:96` keeps that environment variable name because the
+script reading it expects it, fed from `secrets.ORDERAK_ANALYTICS`.
+
+Conflating the two is not academic: it is what broke the first production backup
+after the rename, which failed with *"CLOUDFLARE_D1_BACKUP_TOKEN is not set"* — a
+true message about a secret that no longer existed under that name.
 
 ## Two permissions that look wrong and are not
 

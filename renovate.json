@@ -1,6 +1,9 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests"
+  ],
   "schedule": ["before 6am on Wednesday"],
   "timezone": "Africa/Cairo",
   "rangeStrategy": "pin",
@@ -8,13 +11,13 @@
   "packageRules": [
     {
       "description": "Android / Compose / Kotlin toolchain",
-      "matchPaths": ["apps/seller-android/**"],
+      "matchFileNames": ["apps/seller-android/**"],
       "groupName": "Android & Compose",
       "matchUpdateTypes": ["minor", "patch"]
     },
     {
       "description": "Kotlin & AGP — manual approval for majors",
-      "matchPaths": ["apps/seller-android/**"],
+      "matchFileNames": ["apps/seller-android/**"],
       "matchPackageNames": ["org.jetbrains.kotlin", "com.android.application", "org.jetbrains.kotlin.android"],
       "groupName": "Kotlin & AGP (review majors)",
       "matchUpdateTypes": ["major"],
@@ -22,24 +25,24 @@
     },
     {
       "description": "Cloudflare / Wrangler",
-      "matchPaths": ["services/backend/**", "apps/admin-web/**"],
-      "matchPackageNames": ["wrangler", "@cloudflare/*"],
+      "matchFileNames": ["services/backend/**", "apps/admin-web/**"],
+      "matchPackageNames": ["wrangler", "@cloudflare/**"],
       "groupName": "Cloudflare & Wrangler"
     },
     {
       "description": "React / Vite frontend",
-      "matchPaths": ["apps/admin-web/**"],
-      "matchPackageNames": ["react", "react-dom", "vite", "@vitejs/*", "tailwindcss"],
+      "matchFileNames": ["apps/admin-web/**"],
+      "matchPackageNames": ["react", "react-dom", "vite", "@vitejs/**", "tailwindcss"],
       "groupName": "React & Vite"
     },
     {
       "description": "Dev tooling (oxlint, vitest, playwright, tsx)",
-      "matchPackagePatterns": ["oxlint", "vitest", "playwright", "tsx", "@playwright/*"],
+      "matchPackageNames": ["/oxlint/", "/vitest/", "/playwright/", "/tsx/"],
       "groupName": "Dev Tooling"
     },
     {
       "description": "Sentry",
-      "matchPackagePatterns": ["@sentry/*"],
+      "matchPackageNames": ["@sentry/**"],
       "groupName": "Sentry"
     },
     {

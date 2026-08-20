@@ -2,6 +2,7 @@
 status: current
 generated: false
 owner: backend
+last_verified: 2026-08-19
 applies_to: [production, staging]
 authoritative_for: [deployment-environments]
 ---
@@ -57,9 +58,18 @@ Bindings remain identical across environments; their resource targets are isolat
 
 ## GitHub configuration to verify live
 
-Expected environments are `staging`, `production`, and `staging-contract-tests`.
-Repository workflows reference the variable name `CLOUDFLARE_ACCOUNT_ID` and secret
-name `CLOUDFLARE_API_TOKEN`; only their existence and scope may be audited. The live
+Workflows in this repository reference **five** environments — `staging`,
+`production`, `staging-contract-tests`, and the two `backup-restore-*`
+environments `restore-drill.yml` selects between. Earlier revisions of this
+paragraph listed only the first three and omitted the restore pair.
+
+They reference the **variable** `CLOUDFLARE_ACCOUNT_ID` and the **secrets**
+`ORDERAK_DEPLOY_STAGING`, `ORDERAK_DEPLOY_PRODUCTION`, `ORDERAK_BACKUP_STAGING`,
+`ORDERAK_BACKUP_PRODUCTION`, `ORDERAK_DRIFT_CHECK`, `ORDERAK_ANALYTICS` and
+`ORDERAK_RESTORE_READ`. Each is read into the `CLOUDFLARE_API_TOKEN` environment
+variable, which is what wrangler reads — the secret name and the variable name are
+different strings and only the secret name was renamed. Only their existence and
+scope may be audited. The live
 review must also confirm default branch, branch protection, required checks,
 CODEOWNERS, environment reviewers/wait rules, workflow permissions, concurrency,
 deployment URLs, and that Production approval cannot be provided solely by the change author.

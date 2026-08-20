@@ -2,23 +2,35 @@
 status: current
 generated: false
 owner: governance
-last_verified: 2026-08-15
+last_verified: 2026-08-19
 applies_to: [production]
 ---
 # Production cutover runbook — Phase 8
 
 Moving production ownership from `youo1/Orderak` to `youo1/Orderak.APP`.
 
-> **Phase 8 has NOT started, and this document does not start it.**
+> **Phase 8 was executed on 2026-08-16. This document is now the record of a
+> window that has closed, not a plan for one that has not opened.**
 >
-> The plan holds it closed: *"No production change is in scope right now …
-> Phases 7c, 8 and 9 are **documented but deliberately not started**, and
-> require a **separate explicit go-ahead**."* Writing the procedure is the
-> "documented" half. The go-ahead is a decision, and it has not been given.
+> Production is deployed from `youo1/Orderak.APP` through GitHub Actions.
+> Source SHA `e13aa9e`, deploy run `31935783379`, all three Workers, with
+> Version IDs and the lockfile hash recorded in
+> [post-cutover provenance](../governance/evidence/2026-08-16-post-cutover-provenance.md).
+> Production's migration ledger now reads **45** on `orderak-db`, and Phase 7c
+> rotated six admin Worker secrets after the deploy.
 >
-> Nothing here has been executed. Production was last deployed 2026-08-01; its
-> migration ledger reads 44 and its admin Worker carries 7 secrets, all
-> unchanged.
+> **Everything below this banner was written before the window opened and is
+> preserved unedited**, because the blocker findings and how each was cleared
+> are the evidence that the window was safe to open. Read
+> [Blocker status](#blocker-status--updated-2026-08-15) for what was cleared
+> before the window, and the post-cutover provenance record for what happened
+> inside it.
+>
+> The earlier text of this banner — *"Phase 8 has NOT started … Nothing here has
+> been executed. Production was last deployed 2026-08-01; its migration ledger
+> reads 44"* — was true when written on 2026-08-15 and false from 11:16 the next
+> morning. It survived the cutover by 37 minutes because this file was last
+> edited at 10:39 and nothing brought it forward.
 
 ## What was done while preparing this, and why each was in scope
 
@@ -114,6 +126,11 @@ are not a checklist that, once ticked, opens the window on its own.
 
 ## Blockers — the window cannot open until these are cleared
 
+> Historical, as recorded before the window. Every blocker below was cleared;
+> see [Blocker status](#blocker-status--updated-2026-08-15) above for 1 and 2,
+> the [Cleared 2026-08-16](#cleared-2026-08-16--the-production-drill-ran-and-passed)
+> section for 1b, and the post-cutover provenance record for 3 and 4.
+
 ### 0. Where the production credentials actually are
 
 Re-checked 2026-08-15 at every level, because the owner recalled adding them
@@ -140,7 +157,9 @@ The old repository's `production` environment holds four Cloudflare tokens:
 `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_D1_BACKUP_TOKEN`,
 `CLOUDFLARE_DRIFT_CHECK_TOKEN`, `CLOUDFLARE_ANALYTICS_TOKEN`. `Orderak.APP` has
 none of them, and no environment to put them in. It cannot deploy production
-today.
+today. **Superseded 2026-08-15**: the `production` environment was created with
+all four secrets, all three variables and `required_reviewers`, and it deployed
+production on 2026-08-16.
 
 **This step cannot be performed by the assistant.** Entering API tokens into
 any field is prohibited, without exception. The environment and its secrets
