@@ -162,6 +162,23 @@ for (const file of markdownFiles(docsRoot)) {
 		}
 	}
 
+	// A document that claims to be the one place a reader goes to be *sure*
+	// about something must say when that was last checked. Enforced only for
+	// subject claimants, not every current document: governance registers are
+	// event logs, legal policy is reviewed by counsel on its own cadence, and an
+	// ADR's meaningful date is the one it was decided, not "last verified".
+	// Requiring a date from those would buy fabricated dates, not accuracy.
+	if (
+		fields.status === "current" &&
+		(fields.authoritative_for ?? []).length > 0 &&
+		fields.last_verified === undefined
+	) {
+		problems.push(
+			`${relative(file)}: claims authority for ${(fields.authoritative_for ?? []).join(", ")} but has no last_verified — ` +
+				"verify it against the implementation and record the date, or drop the authority claim",
+		);
+	}
+
 	for (const subject of fields.authoritative_for ?? []) {
 		if (!registeredSubjects.has(subject)) {
 			problems.push(

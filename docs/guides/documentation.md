@@ -35,6 +35,23 @@ which belongs to an ADR. Each one claims a registered subject in
 [`../governance/subject-registry.json`](../governance/subject-registry.json), so
 a second document cannot quietly become a competing source of truth.
 
+### Claiming a subject requires a verification date
+
+`verify-doc-frontmatter.mjs` rejects a `status: current` document that carries
+`authoritative_for` without `last_verified`. If a document is the one place a
+reader goes to be *sure* about something, it must say when that was last
+checked against the implementation.
+
+Set the date to the day you actually verified the content — not the day you
+edited it, and never a guess. If you are not prepared to verify it, drop the
+authority claim instead; an unowned subject fails the check too, which is the
+signal that someone needs to pick it up.
+
+The rule deliberately does not apply to every current document. Governance
+registers are event logs, legal policy is reviewed by counsel on its own
+cadence, and an ADR's meaningful date is the day it was decided. Requiring a
+date there would produce fabricated dates, not accuracy.
+
 [`database-migrations.md`](./database-migrations.md) is generated and is an
 index, not a copy of the SQL. To change what it says about a migration, edit the
 `descriptions` map in `services/backend/scripts/generate-migration-docs.mjs` and

@@ -2,6 +2,7 @@
 status: current
 generated: false
 owner: security
+last_verified: 2026-08-21
 applies_to: [production, staging]
 authoritative_for: [auth-security-invariants]
 ---
