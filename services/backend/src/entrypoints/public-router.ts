@@ -113,7 +113,7 @@ async function handleCategory(env: PublicWorkerEnv, store: Store, code: string, 
 async function handleProduct(env: PublicWorkerEnv, store: Store, code: string, request: Request): Promise<Response> {
 	const product = (await env.orderak_db
 		.prepare(
-			`SELECT id, product_code, name, slug, description, price_piasters, stock, available, image_url
+			`SELECT id, product_code, name, slug, description, price_minor, stock, available, image_url
 			 FROM products WHERE store_id = ? AND product_code = ? COLLATE NOCASE`,
 		)
 		.bind(store.id, code)

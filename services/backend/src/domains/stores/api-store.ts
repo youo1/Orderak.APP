@@ -737,7 +737,7 @@ async function pullProducts(env: Env, store: Row): Promise<Response> {
 	const { results } = (await env.orderak_db
 		.prepare(
 			`SELECT p.id, p.app_id, p.product_code, p.name, p.slug, p.description,
-			        p.price_piasters, p.stock, p.stock_version, p.available, p.image_url,
+			        p.price_minor, p.stock, p.stock_version, p.available, p.image_url,
 			        c.category_code
 			 FROM products p
 			 LEFT JOIN categories c ON c.id = p.category_id
@@ -754,7 +754,8 @@ async function pullProducts(env: Env, store: Row): Promise<Response> {
 			name: r.name,
 			slug: r.slug ?? null,
 			description: r.description ?? null,
-			price_piasters: Number(r.price_piasters),
+			// Money travels as an object so the client can render it (ADR-009).
+			price: { amount_minor: Number(r.price_minor), currency: String(r.currency ?? "EGP") },
 			stock: Number(r.stock),
 			stock_version: Number(r.stock_version ?? 0),
 			available: r.available === 1,
@@ -841,7 +842,8 @@ async function syncProducts(request: Request, env: Env, store: Row): Promise<Res
 		if (seenAppIds.has(appId)) return jsonResponse({ error: "duplicate_app_id", app_id: appId }, 400);
 		seenAppIds.add(appId);
 		const name = String(raw.name ?? "").slice(0, 80);
-		const price = Math.max(0, Math.floor(Number(raw.price_piasters) || 0));
+		const rawPrice = (raw.price ?? {}) as { amount_minor?: unknown };
+		const price = Math.max(0, Math.floor(Number(rawPrice.amount_minor) || 0));
 		const stock = Math.max(0, Math.floor(Number(raw.stock) || 0));
 		const available = raw.available ? 1 : 0;
 		const description = raw.description != null ? String(raw.description).slice(0, 500) : null;
@@ -877,11 +879,11 @@ async function syncProducts(request: Request, env: Env, store: Row): Promise<Res
 			record.slug, record.description, record.price, record.stock, record.available, record.imageUrl,
 		]);
 		stmts.push(env.orderak_db.prepare(
-			`INSERT INTO products (id,store_id,category_id,product_code,app_id,name,slug,description,price_piasters,stock,available,image_url)
+			`INSERT INTO products (id,store_id,category_id,product_code,app_id,name,slug,description,price_minor,stock,available,image_url)
 			 VALUES ${values}
 			 ON CONFLICT(store_id,app_id) DO UPDATE SET
 			 category_id=excluded.category_id,name=excluded.name,slug=excluded.slug,description=excluded.description,
-			 price_piasters=excluded.price_piasters,available=excluded.available,
+			 price_minor=excluded.price_minor,available=excluded.available,
 			 image_url=excluded.image_url,updated_at=datetime('now')`,
 		).bind(...bindings));
 	}

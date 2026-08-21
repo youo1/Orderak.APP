@@ -53,9 +53,19 @@ data class RegisterRes(
     @SerialName("code") val error: String? = null,
 )
 
+/**
+ * Money on the wire: an amount in minor units plus its currency (ADR-009).
+ *
+ * Never a bare integer. A client that receives 15000 with no currency cannot
+ * render it — the same number is 150.00 EGP or 15.000 KWD — and one that infers
+ * the currency from its own locale is wrong for any seller trading abroad.
+ */
+@Serializable
+data class MoneyDto(val amount_minor: Long, val currency: String = "EGP")
+
 @Serializable
 data class ProductDto(
-    val app_id: Long, val name: String, val price_piasters: Long,
+    val app_id: Long, val name: String, val price: MoneyDto,
     val stock: Int, val available: Boolean,
     val description: String? = null,
     val image_url: String? = null,
@@ -376,7 +386,7 @@ data class RemoteItem(
     val product_id: String? = null,     // server product UUID
     val product_code: String? = null,   // immutable public code (maps to local product)
     val product_name: String,
-    val qty: Int, val price_piasters: Long,
+    val qty: Int, val price: MoneyDto,
 )
 
 @Serializable
@@ -385,7 +395,7 @@ data class RemoteOrder(
     val order_no: Long = 0,              // human-friendly per-store number (sync cursor)
     val buyer_phone: String, val buyer_name: String? = null,
     val status: String = "NEW", val pay_method: String = "COD",
-    val total_piasters: Long, val note: String? = null,
+    val total: MoneyDto, val note: String? = null,
     val created_at: String? = null, val items: List<RemoteItem> = emptyList(),
 )
 

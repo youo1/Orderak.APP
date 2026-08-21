@@ -145,10 +145,10 @@ interface CustomerDao {
     @Query(
         """SELECT c.phone AS phone, c.name AS name,
                   COUNT(o.id) AS ordersCount,
-                  COALESCE(SUM(o.totalPiasters), 0) AS totalPiasters
+                  COALESCE(SUM(o.totalMinor), 0) AS totalMinor
            FROM customers c
            LEFT JOIN orders o ON o.buyerPhone = c.phone AND o.status != 'CANCELLED'
-           GROUP BY c.phone ORDER BY totalPiasters DESC"""
+           GROUP BY c.phone ORDER BY totalMinor DESC"""
     )
     fun summaries(): Flow<List<CustomerSummary>>
 

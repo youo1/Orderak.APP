@@ -6,7 +6,7 @@
 // For the MVP we ship a `MockGateway`. To go live you write a `StripeGateway`
 // (or Paymob/Fawry) implementing the same interface and swap `getGateway()`.
 //
-// All amounts are integer piasters (EGP * 100). Never floats.
+// Amounts are integer minor units plus a currency (ADR-009). Never floats.
 // ============================================================
 
 export interface CheckoutRequest {

@@ -356,7 +356,7 @@ describe("POST /api/v1/products/sync", () => {
 			headers: authHeaders(r),
 			body: JSON.stringify({
 				products: [
-					{ app_id: 1, name: "Cola", price_piasters: 1500, stock: 10, available: true, category_code: cat.category.category_code },
+					{ app_id: 1, name: "Cola", price: { amount_minor: 1500, currency: "EGP" }, stock: 10, available: true, category_code: cat.category.category_code },
 				],
 			}),
 		});
@@ -373,14 +373,14 @@ describe("POST /api/v1/products/sync", () => {
 			await SELF.fetch(`${BASE}/api/v1/products/sync`, {
 				method: "POST",
 				headers: authHeaders(r),
-				body: JSON.stringify({ products: [{ app_id: 7, name: "Water", price_piasters: 500, stock: 3, available: true }] }),
+				body: JSON.stringify({ products: [{ app_id: 7, name: "Water", price: { amount_minor: 500, currency: "EGP" }, stock: 3, available: true }] }),
 			})
 		).json()) as { products: { product_code: string }[] };
 		const second = (await (
 			await SELF.fetch(`${BASE}/api/v1/products/sync`, {
 				method: "POST",
 				headers: authHeaders(r),
-				body: JSON.stringify({ products: [{ app_id: 7, name: "Water Bottle", price_piasters: 600, stock: 5, available: true }] }),
+				body: JSON.stringify({ products: [{ app_id: 7, name: "Water Bottle", price: { amount_minor: 600, currency: "EGP" }, stock: 5, available: true }] }),
 			})
 		).json()) as { products: { product_code: string }[] };
 		expect(second.products[0].product_code).toBe(first.products[0].product_code);
@@ -390,21 +390,21 @@ describe("POST /api/v1/products/sync", () => {
 		const r = await registerStore();
 		await SELF.fetch(`${BASE}/api/v1/products/sync`, {
 			method: "POST", headers: authHeaders(r),
-			body: JSON.stringify({ products: [{ app_id: 1, name: "Water", price_piasters: 500, stock: 10, available: true }] }),
+			body: JSON.stringify({ products: [{ app_id: 1, name: "Water", price: { amount_minor: 500, currency: "EGP" }, stock: 10, available: true }] }),
 		});
 		const seller = await env.orderak_db.prepare("SELECT id FROM sellers WHERE phone=?").bind(r.phone).first<{ id: string }>();
 		await env.orderak_db.prepare("UPDATE products SET stock=7,stock_version=1 WHERE store_id=? AND app_id=1").bind(seller!.id).run();
 
 		const passive = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
 			method: "POST", headers: authHeaders(r),
-			body: JSON.stringify({ products: [{ app_id: 1, name: "Water", price_piasters: 500, stock: 99, available: true, stock_dirty: false, expected_stock_version: 0 }] }),
+			body: JSON.stringify({ products: [{ app_id: 1, name: "Water", price: { amount_minor: 500, currency: "EGP" }, stock: 99, available: true, stock_dirty: false, expected_stock_version: 0 }] }),
 		});
 		expect(passive.status).toBe(200);
 		expect(await env.orderak_db.prepare("SELECT stock FROM products WHERE store_id=? AND app_id=1").bind(seller!.id).first()).toMatchObject({ stock: 7 });
 
 		const stale = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
 			method: "POST", headers: authHeaders(r),
-			body: JSON.stringify({ products: [{ app_id: 1, name: "Water", price_piasters: 500, stock: 99, available: true, stock_dirty: true, expected_stock_version: 0 }] }),
+			body: JSON.stringify({ products: [{ app_id: 1, name: "Water", price: { amount_minor: 500, currency: "EGP" }, stock: 99, available: true, stock_dirty: true, expected_stock_version: 0 }] }),
 		});
 		expect(stale.status).toBe(409);
 		expect(await stale.json()).toMatchObject({ code: "stale_stock", conflicts: [1] });
@@ -432,7 +432,7 @@ describe("POST /api/v1/products/sync", () => {
 		const products = Array.from({ length: 200 }, (_, index) => ({
 			app_id: index + 1,
 			name: `Product ${index + 1}`,
-			price_piasters: 100 + index,
+			price: { amount_minor: 100 + index, currency: "EGP" },
 			stock: 1,
 			available: true,
 		}));
@@ -459,7 +459,7 @@ describe("POST /api/v1/products/sync", () => {
 		const products = Array.from({ length: 25 }, (_, index) => ({
 			app_id: index + 1,
 			name: `Product ${index + 1}`,
-			price_piasters: 100,
+			price: { amount_minor: 100, currency: "EGP" },
 			stock: 1,
 			available: true,
 		}));

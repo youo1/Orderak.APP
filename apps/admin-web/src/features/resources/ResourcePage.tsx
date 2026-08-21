@@ -130,7 +130,7 @@ function rowsFromPayload(payload: Record<string, unknown> | undefined, keys: str
 
 const preferredColumns: Record<string, string[]> = {
   stores: ['store_name', 'store_code', 'country_code', 'status', 'product_count', 'category_count', 'created_at'],
-  buyers: ['buyer_name', 'buyer_phone', 'store_name', 'order_count', 'total_piasters', 'last_order_at', 'restricted'],
+  buyers: ['buyer_name', 'buyer_phone', 'store_name', 'order_count', 'total_minor', 'last_order_at', 'restricted'],
   support: ['id', 'subject', 'store_name', 'status', 'priority', 'assigned_email', 'updated_at'],
   deletions: ['id', 'phone_e164', 'status', 'requested_at', 'scheduled_for', 'verified_at'],
   subscriptions: ['store_name', 'plan_id', 'status', 'gateway', 'organization_status', 'current_period_end'],

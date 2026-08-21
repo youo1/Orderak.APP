@@ -7,7 +7,7 @@ async function seedProduct(r: Registered, appId = 1, name = "Cola"): Promise<str
 	const res = await SELF.fetch("https://api.orderak.app/api/v1/products/sync", {
 		method: "POST",
 		headers: authHeaders(r),
-		body: JSON.stringify({ products: [{ app_id: appId, name, price_piasters: 1500, stock: 10, available: true }] }),
+		body: JSON.stringify({ products: [{ app_id: appId, name, price: { amount_minor: 1500, currency: "EGP" }, stock: 10, available: true }] }),
 	});
 	const body = (await res.json()) as { products: { product_code: string }[] };
 	return body.products[0].product_code;

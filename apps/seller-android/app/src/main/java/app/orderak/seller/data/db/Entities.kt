@@ -7,7 +7,8 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.Relation
 
-// Money = minor units (piasters) per Plan §3.1
+// Money = an amount in the currency's minor units, plus the currency (ADR-009).
+// The minor unit is not always a hundredth: KWD, BHD and OMR use 1000.
 
 @Entity(
     tableName = "products",
@@ -19,7 +20,8 @@ data class ProductEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
     val description: String? = null,
-    val pricePiasters: Long,
+    val priceMinor: Long,
+    val currency: String = "EGP",
     val stock: Int,
     val discountType: String? = null, // "PERCENTAGE", "AMOUNT", or null
     val discountValue: Double? = null,
@@ -81,7 +83,8 @@ data class OrderEntity(
     val buyerName: String? = null,
     val status: String,             // OrderStatus.name
     val payMethod: String,          // PayMethod.name
-    val totalPiasters: Long,
+    val totalMinor: Long,
+    val currency: String = "EGP",
     val note: String? = null,
     val createdAt: Long = System.currentTimeMillis()
 )
@@ -97,7 +100,7 @@ data class OrderItemEntity(
     val productId: Long,
     val productName: String,        // denormalized: order history survives product edits
     val qty: Int,
-    val pricePiasters: Long
+    val priceMinor: Long
 )
 
 @Entity(tableName = "payments", indices = [androidx.room.Index(value = ["ref"], unique = true)])
@@ -106,7 +109,8 @@ data class PaymentEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val orderId: Long,
     val ref: String,
-    val amountPiasters: Long,
+    val amountMinor: Long,
+    val currency: String = "EGP",
     val verified: Boolean,
     val proofPath: String? = null,
     val createdAt: Long = System.currentTimeMillis()
@@ -124,6 +128,6 @@ data class CustomerSummary(
     val phone: String,
     val name: String?,
     val ordersCount: Int,
-    val totalPiasters: Long
+    val totalMinor: Long
 )
 

@@ -1,8 +1,15 @@
 # ADR-002: Store all monetary values as integer piasters
 
-**Status:** accepted
+**Status:** superseded
+
+**Superseded by:** [ADR-009](adr-009-minor-units-with-explicit-currency.md)
 
 **Date:** 2026-07-07
+
+> Superseded on 2026-08-21. The integer-minor-units decision below still holds.
+> What does not hold is fusing the currency and the exponent into the unit name:
+> `_piasters` pins EGP and a divisor of 100, and Kuwait, Bahrain and Oman use
+> 1000 minor units. See [ADR-009](adr-009-minor-units-with-explicit-currency.md).
 
 ## Context
 

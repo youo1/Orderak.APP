@@ -1,6 +1,8 @@
 // ============================================================
 // Billing routes: subscriptions, coupons, referrals.
-// All money is integer piasters (EGP * 100). Never floats.
+// Money is integer minor units plus an explicit currency (ADR-009). The minor
+// unit is not always a hundredth: KWD, BHD and OMR have 1000 per major unit.
+// Never floats, and never a bare /100.
 // ============================================================
 
 import {
@@ -35,9 +37,9 @@ interface CouponResult {
 	code?: string;
 	discount_type?: string;
 	value?: number;
-	original_piasters?: number;
-	discount_piasters?: number;
-	final_piasters?: number;
+	original_minor?: number;
+	discount_minor?: number;
+	final_minor?: number;
 }
 
 async function evaluateCoupon(
@@ -68,9 +70,9 @@ async function evaluateCoupon(
 		code,
 		discount_type: String(c.discount_type),
 		value: Number(c.value),
-		original_piasters: planPricePiasters,
-		discount_piasters: planPricePiasters - finalPiasters,
-		final_piasters: finalPiasters,
+		original_minor: planPricePiasters,
+		discount_minor: planPricePiasters - finalPiasters,
+		final_minor: finalPiasters,
 	};
 }
 
@@ -98,7 +100,7 @@ async function qualifyReferral(env: Env, referredSellerId: string, planPricePias
 	await env.orderak_db
 		.prepare(
 			`UPDATE referrals
-			 SET status = 'qualified', commission_piasters = ?, qualified_at = datetime('now')
+			 SET status = 'qualified', commission_minor = ?, qualified_at = datetime('now')
 			 WHERE id = ?`,
 		)
 		.bind(commission, ref.id)
@@ -242,7 +244,7 @@ async function subscribe(request: Request, env: Env, url: URL, authenticatedSell
 		return jsonResponse({ ok: true, idempotent: true, subscription: existing });
 	}
 
-	let amount = Number(plan.price_piasters);
+	let amount = Number(plan.price_minor);
 	let couponCode: string | null = null;
 
 	// -------- Free plan: activate immediately, no charge --------
@@ -266,7 +268,7 @@ async function subscribe(request: Request, env: Env, url: URL, authenticatedSell
 	if (body.coupon_code) {
 		const res = await evaluateCoupon(env, String(body.coupon_code), amount);
 		if (!res.valid) return jsonResponse({ error: "coupon_invalid", reason: res.reason }, 400);
-		amount = res.final_piasters!;
+		amount = res.final_minor!;
 		couponCode = res.code!;
 	}
 
@@ -354,7 +356,7 @@ async function subscribe(request: Request, env: Env, url: URL, authenticatedSell
 
 	// Mock gateway activates immediately → qualify any pending referral now.
 	if (result.status === "active") {
-		await qualifyReferral(env, String(seller.id), Number(plan.price_piasters));
+		await qualifyReferral(env, String(seller.id), Number(plan.price_minor));
 	}
 
 	audit("subscription.created", {
@@ -369,7 +371,7 @@ async function subscribe(request: Request, env: Env, url: URL, authenticatedSell
 		subscription: sub,
 		requires_payment: true,
 		checkout_url: result.checkoutUrl ?? null,
-		amount_charged_piasters: amount,
+		amount_charged_minor: amount,
 	});
 }
 
@@ -400,7 +402,7 @@ async function createOrReplaceSubscription(
 	const sub = await env.orderak_db
 		.prepare(
 			`INSERT INTO subscriptions
-			   (seller_id, plan_id, status, gateway, gateway_sub_id, amount_piasters,
+			   (seller_id, plan_id, status, gateway, gateway_sub_id, amount_minor,
 			    coupon_code, idempotency_key, current_period_end)
 			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 			 RETURNING *`,
@@ -454,7 +456,7 @@ async function subscriptionStatus(request: Request, env: Env, url: URL, authenti
 		// It's lazily ensured by /api/v1/referral/stats and /api/v1/subscribe, which is
 		// where the code is actually needed.
 		referral_code: seller.referral_code ?? null,
-		subscription: sub ?? { plan_id: "free", status: "active", amount_piasters: 0 },
+		subscription: sub ?? { plan_id: "free", status: "active", amount_minor: 0 },
 		plan,
 		features,
 		ads_enabled: adsEnabled,
@@ -504,12 +506,12 @@ async function couponValidate(request: Request, env: Env, url: URL): Promise<Res
 
 	const planId = String(body.plan_id ?? "").trim();
 	const plan = (await env.orderak_db
-		.prepare("SELECT price_piasters FROM plans WHERE id = ?")
+		.prepare("SELECT price_minor FROM plans WHERE id = ?")
 		.bind(planId)
 		.first()) as Record<string, unknown> | null;
 	if (!plan) return jsonResponse({ error: "plan_not_found" }, 404);
 
-	const res = await evaluateCoupon(env, String(body.code ?? ""), Number(plan.price_piasters));
+	const res = await evaluateCoupon(env, String(body.code ?? ""), Number(plan.price_minor));
 	return jsonResponse(res, res.valid ? 200 : 400);
 }
 
@@ -527,12 +529,12 @@ async function couponApply(request: Request, env: Env, url: URL, authenticatedSe
 
 	const planId = String(body.plan_id ?? "").trim();
 	const plan = (await env.orderak_db
-		.prepare("SELECT price_piasters FROM plans WHERE id = ?")
+		.prepare("SELECT price_minor FROM plans WHERE id = ?")
 		.bind(planId)
 		.first()) as Record<string, unknown> | null;
 	if (!plan) return jsonResponse({ error: "plan_not_found" }, 404);
 
-	const res = await evaluateCoupon(env, String(body.code ?? ""), Number(plan.price_piasters));
+	const res = await evaluateCoupon(env, String(body.code ?? ""), Number(plan.price_minor));
 	if (!res.valid) return jsonResponse({ error: "coupon_invalid", reason: res.reason }, 400);
 
 	// Prevent reuse by the same seller.
@@ -593,7 +595,7 @@ async function referralStats(request: Request, env: Env, url: URL, authenticated
 
 	const { results: referrals } = await env.orderak_db
 		.prepare(
-			`SELECT id, referred_id, status, commission_piasters, created_at, qualified_at
+			`SELECT id, referred_id, status, commission_minor, created_at, qualified_at
 			 FROM referrals WHERE referrer_id = ? ORDER BY id DESC`,
 		)
 		.bind(seller.id)
@@ -606,21 +608,21 @@ async function referralStats(request: Request, env: Env, url: URL, authenticated
 			   SUM(CASE WHEN status = 'pending'   THEN 1 ELSE 0 END) AS pending,
 			   SUM(CASE WHEN status = 'qualified' THEN 1 ELSE 0 END) AS qualified,
 			   SUM(CASE WHEN status = 'paid'      THEN 1 ELSE 0 END) AS paid,
-			   COALESCE(SUM(CASE WHEN status IN ('qualified','paid') THEN commission_piasters ELSE 0 END), 0) AS earned_piasters
+			   COALESCE(SUM(CASE WHEN status IN ('qualified','paid') THEN commission_minor ELSE 0 END), 0) AS earned_minor
 			 FROM referrals WHERE referrer_id = ?`,
 		)
 		.bind(seller.id)
 		.first()) as Record<string, unknown>;
 
 	const settings = (await env.orderak_db
-		.prepare("SELECT min_payout_piasters, payout_info FROM affiliate_settings WHERE id = 1")
+		.prepare("SELECT min_payout_minor, payout_info FROM affiliate_settings WHERE id = 1")
 		.first()) as Record<string, unknown> | null;
 
 	return jsonResponse({
 		ok: true,
 		referral_code: code,
 		summary,
-		min_payout_piasters: settings?.min_payout_piasters ?? 0,
+		min_payout_minor: settings?.min_payout_minor ?? 0,
 		payout_info: settings?.payout_info ?? null,
 		referrals,
 	});
@@ -685,12 +687,12 @@ async function handleWebhook(request: Request, env: Env): Promise<Response> {
 		.run();
 
 	// First successful paid payment → qualify referral.
-	if (newStatus === "active" && Number(sub.amount_piasters) > 0) {
+	if (newStatus === "active" && Number(sub.amount_minor) > 0) {
 		const plan = (await env.orderak_db
-			.prepare("SELECT price_piasters FROM plans WHERE id = ?")
+			.prepare("SELECT price_minor FROM plans WHERE id = ?")
 			.bind(sub.plan_id)
 			.first()) as Record<string, unknown> | null;
-		await qualifyReferral(env, String(sub.seller_id), Number(plan?.price_piasters ?? sub.amount_piasters));
+		await qualifyReferral(env, String(sub.seller_id), Number(plan?.price_minor ?? sub.amount_minor));
 	}
 
 	audit("webhook.processed", { type: event.type, sub_id: sub.id, new_status: newStatus });

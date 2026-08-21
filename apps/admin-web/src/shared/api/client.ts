@@ -39,9 +39,18 @@ export async function api<T = Record<string, unknown>>(path: string, init: Reque
 }
 
 export const format = {
-  money(value: unknown) {
-    const amount = Number(value || 0) / 100;
-    return new Intl.NumberFormat('en-EG', { style: 'currency', currency: 'EGP' }).format(amount);
+  /**
+   * Format an amount in minor units.
+   *
+   * The divisor comes from the currency, not from a constant: KWD, BHD and OMR
+   * use 1000 minor units per major unit, so a hardcoded /100 renders them ten
+   * times too large (ADR-009). Intl carries the ISO 4217 exponent, so asking it
+   * keeps this correct as markets are added.
+   */
+  money(value: unknown, currency = 'EGP') {
+    const formatter = new Intl.NumberFormat('en-EG', { style: 'currency', currency });
+    const exponent = formatter.resolvedOptions().minimumFractionDigits ?? 2;
+    return formatter.format(Number(value || 0) / 10 ** exponent);
   },
   date(value: unknown, timezone = 'Africa/Cairo') {
     if (!value) return '—';

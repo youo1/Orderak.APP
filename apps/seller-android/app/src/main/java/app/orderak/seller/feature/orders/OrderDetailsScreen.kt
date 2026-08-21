@@ -51,7 +51,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.orderak.seller.R
-import app.orderak.seller.core.money.formatEgp
+import app.orderak.seller.core.money.DEFAULT_CURRENCY
+import app.orderak.seller.core.money.formatAmount
 import app.orderak.seller.core.ui.FeatureGate
 import app.orderak.seller.data.billing.Feature
 import app.orderak.seller.data.db.PaymentEntity
@@ -170,7 +171,7 @@ fun OrderDetailsScreen(
                             Text("${item.qty}×", style = MaterialTheme.typography.bodyMedium)
                             Spacer(Modifier.width(8.dp))
                             Text(item.productName, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                            Text(stringResource(R.string.currency_egp, formatEgp(item.qty * item.pricePiasters)),
+                            Text(stringResource(R.string.currency_egp, formatAmount(item.qty * item.priceMinor, order.currency)),
                                 style = MaterialTheme.typography.bodyMedium)
                         }
                     }
@@ -178,7 +179,7 @@ fun OrderDetailsScreen(
                     Row(Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.order_total), Modifier.weight(1f),
                             style = MaterialTheme.typography.titleMedium)
-                        Text(stringResource(R.string.currency_egp, formatEgp(order.totalPiasters)),
+                        Text(stringResource(R.string.currency_egp, formatAmount(order.totalMinor, order.currency)),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.primary)
                     }
@@ -239,7 +240,7 @@ fun OrderDetailsScreen(
                                             color = if (payment.verified) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                                         )
                                     }
-                                    Text(stringResource(R.string.currency_egp, formatEgp(payment.amountPiasters)),
+                                    Text(stringResource(R.string.currency_egp, formatAmount(payment.amountMinor, payment.currency)),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Text(dateFormat.format(Date(payment.createdAt)),

@@ -257,7 +257,7 @@ async function buyers(env: AdminWorkerEnv, url: URL): Promise<Response> {
 	const storeId = url.searchParams.get("store_id");
 	const q = `%${url.searchParams.get("q") ?? ""}%`;
 	const result = await env.orderak_db.prepare(
-		`SELECT o.store_id,s.store_name,o.buyer_phone,MAX(o.buyer_name) buyer_name,COUNT(*) order_count,SUM(o.total_piasters) total_piasters,MAX(o.created_at) last_order_at,
+		`SELECT o.store_id,s.store_name,o.buyer_phone,MAX(o.buyer_name) buyer_name,COUNT(*) order_count,SUM(o.total_minor) total_minor,MAX(o.created_at) last_order_at,
 		 MAX(CASE WHEN r.status='blocked' AND r.revoked_at IS NULL AND (r.expires_at IS NULL OR r.expires_at>datetime('now')) THEN 1 ELSE 0 END) restricted
 		 FROM orders o JOIN sellers s ON s.id=o.store_id LEFT JOIN buyer_restrictions r ON r.store_id=o.store_id AND r.buyer_phone_last4=substr(o.buyer_phone,-4)
 		 WHERE (? IS NULL OR o.store_id=?) AND (o.buyer_name LIKE ? OR o.buyer_phone LIKE ?)
@@ -700,7 +700,7 @@ async function loadExportPage(
 		const where = cursor ? "WHERE store_id>? OR (store_id=? AND buyer_phone>?)" : "";
 		const statement = db.prepare(
 			`SELECT store_id,buyer_name,substr(buyer_phone,-4) phone_last4,
-			 COUNT(*) orders,SUM(total_piasters) total_piasters,MAX(created_at) last_order_at,
+			 COUNT(*) orders,SUM(total_minor) total_minor,MAX(created_at) last_order_at,
 			 buyer_phone AS __cursor_phone
 			 FROM orders ${where} GROUP BY store_id,buyer_phone ORDER BY store_id,buyer_phone LIMIT ?`,
 		);

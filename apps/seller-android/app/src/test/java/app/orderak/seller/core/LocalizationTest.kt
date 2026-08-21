@@ -3,7 +3,7 @@ package app.orderak.seller.core
 import app.orderak.seller.core.phone.Countries
 import app.orderak.seller.core.locale.AppLocales
 import app.orderak.seller.core.locale.resolveSupportedSystemTag
-import app.orderak.seller.core.money.parseEgpToPiasters
+import app.orderak.seller.core.money.parseMoney
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -44,13 +44,13 @@ class LocalizationTest {
     @Test
     fun `money parser accepts French decimal separator`() {
         Locale.setDefault(Locale.FRENCH)
-        assertEquals(435L, parseEgpToPiasters("4,35"))
+        assertEquals(435L, parseMoney("4,35", "EGP")?.amountMinor)
     }
 
     @Test
     fun `money parser accepts Arabic digits and decimal separator`() {
         Locale.setDefault(Locale.forLanguageTag("ar-EG"))
-        assertEquals(435L, parseEgpToPiasters("٤٫٣٥"))
+        assertEquals(435L, parseMoney("٤٫٣٥", "EGP")?.amountMinor)
     }
 
     @Test

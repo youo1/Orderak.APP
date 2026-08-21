@@ -22,11 +22,24 @@ import { dirFor, t, type Locale } from "../../platform/localization/i18n";
 import { entitlementLimitReached, reserveUsage, voidUsageReservation } from "../commerce/entitlements";
 import { storeCapabilityEnabled } from "../operations/capabilities";
 import { keyedHash } from "../identity/auth";
+import { type Currency, exponentOf } from "../../platform/money/money";
 
 type Store = Record<string, unknown>;
 
-function egpLabel(piasters: number, lang: Locale): string {
-	return (piasters / 100).toLocaleString(lang === "ar" ? "ar-EG" : "en-EG");
+/**
+ * Render an amount for the storefront.
+ *
+ * The caller appends the currency word from the translation table, so this
+ * formats the number only — but the number of decimal places still comes from
+ * the currency rather than a constant. `egpLabel` divided by a literal 100,
+ * which renders 15000 fils as "150" instead of "15.000" (ADR-009).
+ */
+function amountLabel(amountMinor: number, currency: Currency, lang: Locale): string {
+	const exponent = exponentOf(currency);
+	return (amountMinor / 10 ** exponent).toLocaleString(lang === "ar" ? "ar-EG" : "en-EG", {
+		minimumFractionDigits: exponent,
+		maximumFractionDigits: exponent,
+	});
 }
 
 // ---- SEO <head> ------------------------------------------------------------
@@ -158,9 +171,9 @@ function productCard(store: Store, p: Record<string, unknown>, linkToPage: boole
 		? `<a href="/${pid}/p/${code}"><div class="name">${esc(p.name)}</div></a>`
 		: `<div class="name">${esc(p.name)}</div>`;
 	return `
-	<div class="card" data-code="${code}" data-price="${p.price_piasters}">
+	<div class="card" data-code="${code}" data-price="${p.price_minor}">
 		${img}
-		<div class="info">${nameHtml}<div class="price">${egpLabel(Number(p.price_piasters), lang)} ${esc(t(lang, "catalog.currency"))}</div></div>
+		<div class="info">${nameHtml}<div class="price">${amountLabel(Number(p.price_minor), String(p.currency ?? "EGP") as Currency, lang)} ${esc(t(lang, "catalog.currency"))}</div></div>
 		<div class="qty">
 			<button type="button" aria-label="${esc(t(lang, "catalog.decrease"))}" onclick="chg('${code}',-1)">−</button>
 			<span id="q_${code}">0</span>
@@ -175,6 +188,12 @@ function orderForm(store: Store, lang: Locale): string {
 	const postUrl = "/" + esc(store.public_identifier);
 	const js = (key: string) => JSON.stringify(t(lang, key));
 	const numberLocale = lang === "ar" ? "ar-EG" : "en-EG";
+	// The browser script below works in minor units and needs the divisor for
+	// this store's currency. Injected rather than written as 100: KWD, BHD and
+	// OMR use 1000, and a literal here is a factor-of-ten error in those markets.
+	const storeCurrency = String(store.currency ?? "EGP") as Currency;
+	const minorPerMajor = 10 ** exponentOf(storeCurrency);
+	const minorDigits = exponentOf(storeCurrency);
 	const paymentOptions = [
 		String(store.vfcash ?? "").trim() ? `<option value="VF_CASH">${esc(t(lang, "catalog.vfcash"))}</option>` : "",
 		String(store.instapay ?? "").trim() ? `<option value="INSTAPAY">${esc(t(lang, "catalog.instapay"))}</option>` : "",
@@ -231,7 +250,7 @@ async function send(e){
 	var ok=document.getElementById('ok');ok.replaceChildren();
 	addText(ok,'🎉 '+${js("catalog.order_success")}+' #'+String(d.order_no),'b');ok.appendChild(document.createElement('br'));
 	addText(ok,${js("catalog.total")}+': ');
-	addText(ok,(Number(d.total_piasters)/100).toLocaleString('${numberLocale}')+' '+${js("catalog.currency")},'b');
+	addText(ok,(Number(d.total_minor)/100).toLocaleString('${numberLocale}')+' '+${js("catalog.currency")},'b');
 	if(d.vfcash){ok.appendChild(document.createElement('br'));addText(ok,${js("catalog.vfcash")}+': ');var vf=addText(ok,String(d.vfcash),'b');vf.dir='ltr'}
 	if(d.instapay){ok.appendChild(document.createElement('br'));addText(ok,${js("catalog.instapay")}+': ');var ip=addText(ok,String(d.instapay),'b');ip.dir='ltr'}
 	var wa=String(d.contact_phone||'').replace(/\\D/g,'');
@@ -244,10 +263,10 @@ async function send(e){
 
 async function availableProducts(env: Env, storeId: string, lang: Locale, categoryId?: string): Promise<Record<string, unknown>[]> {
 	const sql = categoryId
-		? `SELECT p.id, p.product_code, COALESCE(pt.name,p.name) name, COALESCE(pt.description,p.description) description, p.price_piasters, p.stock, p.image_url FROM products p
+		? `SELECT p.id, p.product_code, COALESCE(pt.name,p.name) name, COALESCE(pt.description,p.description) description, p.price_minor, p.stock, p.image_url FROM products p
 		   LEFT JOIN product_translations pt ON pt.product_id=p.id AND pt.lang=? AND pt.source_name=p.name AND pt.source_description=COALESCE(p.description,'') AND pt.translation_status IN ('machine','reviewed')
 		   WHERE p.store_id = ? AND p.category_id = ? AND p.available = 1 AND p.stock > 0 ORDER BY p.created_at DESC`
-		: `SELECT p.id, p.product_code, COALESCE(pt.name,p.name) name, COALESCE(pt.description,p.description) description, p.price_piasters, p.stock, p.image_url FROM products p
+		: `SELECT p.id, p.product_code, COALESCE(pt.name,p.name) name, COALESCE(pt.description,p.description) description, p.price_minor, p.stock, p.image_url FROM products p
 		   LEFT JOIN product_translations pt ON pt.product_id=p.id AND pt.lang=? AND pt.source_name=p.name AND pt.source_description=COALESCE(p.description,'') AND pt.translation_status IN ('machine','reviewed')
 		   WHERE p.store_id = ? AND p.available = 1 AND p.stock > 0 ORDER BY p.created_at DESC`;
 	const stmt = categoryId
@@ -330,7 +349,8 @@ export async function renderProductPage(env: Env, store: Store, product: Record<
 	if (translated) product = { ...product, name: translated.name, description: translated.description };
 	const pid = String(store.public_identifier);
 	const canonical = `${PUBLIC_SITE_URL}/${pid}/p/${esc(product.product_code)}`;
-	const price = egpLabel(Number(product.price_piasters), lang);
+	const productCurrency = String(product.currency ?? "EGP") as Currency;
+	const price = amountLabel(Number(product.price_minor), productCurrency, lang);
 	const inStock = Number(product.stock) > 0 && Number(product.available) === 1;
 
 	// Single-product order (reuses the shared form + one card).
@@ -345,8 +365,8 @@ export async function renderProductPage(env: Env, store: Store, product: Record<
 		description: (product.description as string) || String(product.name),
 		offers: {
 			"@type": "Offer",
-			priceCurrency: "EGP",
-			price: (Number(product.price_piasters) / 100).toFixed(2),
+			priceCurrency: productCurrency,
+			price: (Number(product.price_minor) / 10 ** exponentOf(productCurrency)).toFixed(exponentOf(productCurrency)),
 			availability: inStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
 			url: canonical,
 		},
@@ -391,18 +411,18 @@ export async function handleCatalogOrder(request: Request, env: Env, store: Stor
 		const rawIdempotencyKey = request.headers.get("idempotency-key")?.trim() ?? "";
 		const idempotencyKey = /^[A-Za-z0-9._:-]{8,100}$/.test(rawIdempotencyKey)
 			? rawIdempotencyKey : crypto.randomUUID();
-		const successResponse = (order: { order_no: number; total_piasters: number }): Response => jsonResponse({
+		const successResponse = (order: { order_no: number; total_minor: number }): Response => jsonResponse({
 			ok: true,
 			order_no: order.order_no,
-			total_piasters: order.total_piasters,
+			total_minor: order.total_minor,
 			contact_phone: store.whatsapp || store.phone,
 			instapay: store.instapay,
 			vfcash: store.vfcash,
 		});
-		const existingOrder = async (): Promise<{ order_no: number; total_piasters: number } | null> =>
+		const existingOrder = async (): Promise<{ order_no: number; total_minor: number } | null> =>
 			db.prepare(
-				"SELECT order_no,total_piasters FROM orders WHERE store_id=? AND idempotency_key=?",
-			).bind(store.id, idempotencyKey).first<{ order_no: number; total_piasters: number }>();
+				"SELECT order_no,total_minor FROM orders WHERE store_id=? AND idempotency_key=?",
+			).bind(store.id, idempotencyKey).first<{ order_no: number; total_minor: number }>();
 		const replay = await existingOrder();
 		if (replay) return successResponse(replay);
 
@@ -441,7 +461,7 @@ export async function handleCatalogOrder(request: Request, env: Env, store: Stor
 		const marks = codes.map(() => "?").join(",");
 		const { results: products } = (await db
 			.prepare(
-				`SELECT id, product_code, name, price_piasters, stock FROM products
+				`SELECT id, product_code, name, price_minor, stock FROM products
 				 WHERE store_id = ? AND product_code IN (${marks})`,
 			)
 			.bind(store.id, ...codes)
@@ -458,10 +478,10 @@ export async function handleCatalogOrder(request: Request, env: Env, store: Stor
 				if (!p) return null;
 				const qty = Math.floor(Number(i.qty));
 				if (qty <= 0 || qty > 999 || qty > Number(p.stock)) return null;
-				total += qty * Number(p.price_piasters);
-				return { product_id: p.id, product_name: p.name, qty, price_piasters: Number(p.price_piasters) };
+				total += qty * Number(p.price_minor);
+				return { product_id: p.id, product_name: p.name, qty, price_minor: Number(p.price_minor) };
 			})
-			.filter(Boolean) as { product_id: string; product_name: string; qty: number; price_piasters: number }[];
+			.filter(Boolean) as { product_id: string; product_name: string; qty: number; price_minor: number }[];
 
 		if (lines.length !== rawItems.length) return jsonResponse({ error: "stock_changed" }, 409);
 
@@ -492,7 +512,7 @@ export async function handleCatalogOrder(request: Request, env: Env, store: Stor
 			stmts.push(
 				db
 					.prepare(
-						`INSERT INTO orders (id, order_no, store_id, buyer_phone, buyer_name, pay_method, total_piasters, note, idempotency_key, status)
+						`INSERT INTO orders (id, order_no, store_id, buyer_phone, buyer_name, pay_method, total_minor, note, idempotency_key, status)
 						 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'NEW')`,
 					)
 					.bind(
@@ -511,10 +531,10 @@ export async function handleCatalogOrder(request: Request, env: Env, store: Stor
 				stmts.push(
 					db
 						.prepare(
-							`INSERT INTO order_items (id, order_id, product_id, product_name, qty, price_piasters)
+							`INSERT INTO order_items (id, order_id, product_id, product_name, qty, price_minor)
 							 VALUES (?, ?, ?, ?, ?, ?)`,
 						)
-						.bind(newUuid(), orderId, l.product_id, l.product_name, l.qty, l.price_piasters),
+						.bind(newUuid(), orderId, l.product_id, l.product_name, l.qty, l.price_minor),
 				);
 			}
 			return stmts;
@@ -555,7 +575,7 @@ export async function handleCatalogOrder(request: Request, env: Env, store: Stor
 			await db.batch(buildStmts(orderNo));
 		}
 
-		return successResponse({ order_no: orderNo, total_piasters: total });
+		return successResponse({ order_no: orderNo, total_minor: total });
 	} catch (e) {
 		if (quotaReservationId) await voidUsageReservation(env, quotaReservationId);
 		if (e instanceof TenantWriteFencedError) {
