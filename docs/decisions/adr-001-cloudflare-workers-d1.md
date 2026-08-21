@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: backend
+applies_to: [production, staging]
+---
 # ADR-001: Cloudflare Workers + D1 as the backend platform
 
 **Status:** accepted

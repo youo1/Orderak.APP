@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: governance
+applies_to: [production, staging]
+---
 # ADR-XXX: Title
 
 **Status:** proposed | accepted | deprecated | superseded

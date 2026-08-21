@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: governance
+applies_to: [internal]
+---
 # Orderak Data Map
 
 > **Status:** Draft inventory — legal bases, retention, transfers, and vendor

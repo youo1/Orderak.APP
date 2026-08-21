@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: governance
+applies_to: [internal]
+---
 # Phase 0 operating cadence
 
 The cadence keeps decisions, dependencies, risks, and evidence synchronized.

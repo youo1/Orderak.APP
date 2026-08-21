@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: governance
+applies_to: [internal]
+---
 # Phase 0 role assignment and RACI
 
 This document assigns one accountable role to each Phase 0 result. Named role

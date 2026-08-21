@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: security
+applies_to: [production, staging]
+---
 # Data Classification Standard
 
 > **Status:** Draft for review

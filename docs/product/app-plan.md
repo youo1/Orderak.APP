@@ -1,3 +1,10 @@
+---
+status: current
+generated: false
+owner: product
+last_verified: 2026-08-10
+applies_to: [production, staging]
+---
 # Orderak App Plan
 
 > **Status:** Current implemented product summary plus explicitly listed gaps

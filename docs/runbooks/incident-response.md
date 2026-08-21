@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: security
+applies_to: [production, staging]
+---
 # Incident-Response Plan
 
 > **Status:** Pre-production draft — not operational until contacts, secure

@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: backend
+applies_to: [production, staging]
+---
 # OpenAPI development and release guide
 
 ## Current lifecycle

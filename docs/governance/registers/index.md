@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: governance
+applies_to: [internal]
+---
 # Governance register index
 
 These registers are live control records. Update the narrowest register in the

@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: product
+applies_to: [internal]
+---
 # Phase 4 launch product requirements
 
 | Control | Value |

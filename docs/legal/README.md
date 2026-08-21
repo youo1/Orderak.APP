@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: legal
+applies_to: [production]
+---
 # Legal-document status
 
 The files in this directory are repository copies of the Terms and Privacy

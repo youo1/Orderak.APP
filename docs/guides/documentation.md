@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: governance
+applies_to: [production, staging]
+---
 # Documentation guide
 
 Orderak documentation is maintained with the code it describes. A change is

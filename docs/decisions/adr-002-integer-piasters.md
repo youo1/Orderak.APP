@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: backend
+applies_to: [production, staging]
+---
 # ADR-002: Store all monetary values as integer piasters
 
 **Status:** superseded
