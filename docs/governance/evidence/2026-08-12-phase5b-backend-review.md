@@ -1,5 +1,5 @@
 ---
-status: current
+status: archived
 generated: false
 owner: backend
 last_verified: 2026-08-12
