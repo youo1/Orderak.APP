@@ -43,7 +43,7 @@
     "tsx": "4.20.6",
     "typescript": "~6.0.2",
     "vitest": "^4.1.10",
-    "wrangler": "^4.118.0"
+    "wrangler": "^4.123.0"
   },
   "dependencies": {
     "@hono/zod-openapi": "^1.6.1",
