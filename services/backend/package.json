@@ -31,7 +31,7 @@
     "verify:drift": "node scripts/verify-cloudflare-drift.mjs"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.18.8",
+    "@cloudflare/vitest-pool-workers": "^0.21.3",
     "@fontsource-variable/cairo": "5.3.0",
     "@fontsource-variable/noto-sans-arabic": "5.3.0",
     "@fontsource/tajawal": "5.3.0",
@@ -47,12 +47,12 @@
   },
   "dependencies": {
     "@hono/zod-openapi": "^1.6.1",
-    "@material/material-color-utilities": "0.3.0",
-    "@sentry/cloudflare": "^10.69.0",
+    "@material/material-color-utilities": "0.4.0",
+    "@sentry/cloudflare": "^10.70.0",
     "@simplewebauthn/server": "^13.3.2",
-    "hono": "^4.13.0",
+    "hono": "^4.13.2",
     "jose": "^6.2.8",
-    "libphonenumber-js": "^1.13.9",
+    "libphonenumber-js": "^1.13.11",
     "postal-mime": "^2.7.5",
     "zod": "^4.4.3"
   }
