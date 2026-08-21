@@ -32,6 +32,26 @@ shows the Android, public API, private administration, storage, queue, billing,
 AI, and external-provider boundaries together. It is internal engineering
 documentation and is intentionally not published from the public Worker.
 
+## Where the detail lives
+
+This document maps components and the flows between them. **The business logic
+inside each component is documented per domain**, and those pages are
+authoritative on their own subject — where this overview and a domain page
+disagree about a model, the domain page is right.
+
+| Domain | Covers |
+| --- | --- |
+| [Identity](../domains/identity.md) | Accounts, authentication, device secrets, deletion, retention |
+| [Stores](../domains/stores.md) | Store codes, slugs, public identifiers, resolution after rename |
+| [Catalog](../domains/catalog.md) | Products, categories, translations, taxonomy, geo, public pages |
+| [Orders](../domains/orders.md) | Order status machine and the public order endpoint's defences |
+| [Billing](../domains/billing.md) | Payment gateways, Google Play verification, the billing gates |
+| [Entitlements](../domains/entitlements.md) | Legacy plan limits, the v2 policy engine, usage reservation |
+| [Growth](../domains/growth.md) | Ads, coupons, referrals |
+| [Design system](../domains/design-system.md) | Token revisions, rollback, store theme, screen manifest |
+| [Admin control plane](../domains/admin-control-plane.md) | The internal operations surface — 72% of the API |
+| [Database topology](../data/database.md) | Databases, tenant routing, and the patterns D1 forces |
+
 ## Market portability
 
 Orderak is architected for an **Egypt-first, MENA-next, global-later** rollout.
