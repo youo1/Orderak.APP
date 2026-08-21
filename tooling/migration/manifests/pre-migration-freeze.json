@@ -6817,11 +6817,11 @@
       "sha256": "50adf1ad59718a3813f928572b48b35ecdc283fb00ad8e7a675a750716503780",
       "size": 1935,
       "type": "config",
-      "decision": "verbatim",
-      "reason": "Foundation PR — copied verbatim, contains no repo-specific identifiers.",
-      "evidence": "Orderak.APP@948d6c6e (foundation commit)",
+      "decision": "drop",
+      "reason": "Renovate App was never installed on this repository: no Renovate pull request and no dependency dashboard issue was ever opened here. The config described grouping, digest pinning and patch auto-merge that nothing performed, so the repository appeared to have dependency automation while having none.",
+      "evidence": "Replaced by .github/dependabot.yml, which reproduces the same grouping and pinning intent on the native GitHub integration that needs no app install. Verified 2026-08-21: origin had only main and one non-Renovate pull request, and zero issues.",
       "reviewer": "claude",
-      "reviewed_at": "2026-08-11"
+      "reviewed_at": "2026-08-21"
     },
     {
       "path": "services/backend/.dev.vars.example",
