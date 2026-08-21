@@ -50,10 +50,15 @@ jobs:
       - name: Audit (high and critical fail)
         run: pnpm audit --audit-level high
 
+      # continue-on-error already keeps a non-zero audit from failing the job,
+      # so the trailing `|| true` this step also carried was a second belt on
+      # the same trousers - and the more dangerous of the two, because it hides
+      # the exit code from the step summary as well as from the job result. The
+      # gate is the high-and-critical step above; this one only reports.
       - name: Report moderate and low
         if: always()
         continue-on-error: true
-        run: pnpm audit --audit-level low || true
+        run: pnpm audit --audit-level low
 
   sbom:
     name: Generate SBOM
