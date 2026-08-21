@@ -18,11 +18,11 @@ jobs:
   specification:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -64,12 +64,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: specification
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           distribution: temurin
           java-version: '17'
-      - uses: gradle/actions/setup-gradle@48b5f213c81028ace310571dc5ec0fbbca0b2947 # v4
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
       # google-services.json is gitignored, so processMockDebugGoogleServices
       # fails with "File google-services.json is missing" without this. The mock
       # flavour declares no applicationIdSuffix, so it builds under the base
@@ -91,11 +91,11 @@ jobs:
         # operations additionally receive three deterministic fuzz cases.
         shard: [0, 1, 2, 3, 4, 5, 6, 7]
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -110,13 +110,19 @@ jobs:
           cat /tmp/prism.log
           exit 1
       # jsonschema-rs is pinned alongside Schemathesis, not left to resolve.
-      # `pipx install schemathesis==4.24.3` pins Schemathesis and nothing beneath
-      # it. jsonschema-rs 0.50.0 dropped `is_satisfiable` from CanonicalSchema,
-      # which Schemathesis 4.24.3 calls, so every run died with
+      # Schemathesis 4.24.3 declared `jsonschema-rs>=0.49.0` with no upper bound, so
+      # 0.50.0 satisfied it while dropping `is_satisfiable` from CanonicalSchema,
+      # which 4.24.3 calls. Every run died with
       # "'builtins.CanonicalSchema' object has no attribute 'is_satisfiable'"
-      # — a pinned tool broken by an unpinned dependency underneath it. This is
-      # what turned OpenAPI Nightly red from 2026-08-19 onward.
-      - run: pipx install schemathesis==4.24.3 --pip-args "jsonschema-rs==0.49.1"
+      # — a pinned tool broken by an unpinned dependency underneath it. That is what
+      # turned OpenAPI Nightly red from 2026-08-19 onward.
+      #
+      # Upstream has since fixed the root cause: 4.25.0 declares
+      # `jsonschema-rs>=0.50.0,<0.51.0`, so the resolver can no longer pick a version
+      # that breaks it. The explicit pin below is kept anyway — an upper bound in the
+      # package protects against the next 0.51, but only an exact pin makes a fuzzing
+      # run reproducible, and a reproducible run is the whole point of pinning here.
+      - run: pipx install schemathesis==4.25.0 --pip-args "jsonschema-rs==0.50.0"
       # This PR job targets Prism, not the real API. The draft has 33 request
       # bodies declared only as
       # {type: object, additionalProperties: true}. Fuzzing arbitrary JSON for
@@ -176,7 +182,7 @@ jobs:
             --report junit,har \
             --report-dir "schemathesis-report-${SHARD}/fuzz" \
             --output-sanitize true
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: schemathesis-pr-${{ matrix.shard }}
@@ -187,9 +193,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: specification
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -203,7 +209,7 @@ jobs:
           for _ in {1..30}; do curl -fsS http://127.0.0.1:4010/api/v1/theme >/dev/null && exit 0; sleep 1; done
           cat prism.log
           exit 1
-      - uses: grafana/setup-k6-action@db07bd9765aac508ef18982e52ab937fe633a065 # v1
+      - uses: grafana/setup-k6-action@db07bd9765aac508ef18982e52ab937fe633a065 # v1.2.1
       - run: k6 run quality/performance/k6/api-load.js
         env:
           BASE_URL: http://127.0.0.1:4010

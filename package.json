@@ -1,7 +1,7 @@
 {
   "name": "orderak-workspace",
   "private": true,
-  "packageManager": "pnpm@11.20.0",
+  "packageManager": "pnpm@11.22.0",
   "engines": {
     "node": ">=24.0.0"
   },
@@ -20,6 +20,6 @@
     "verify:doc-links": "node tooling/repository/verify-doc-links.mjs"
   },
   "devDependencies": {
-    "turbo": "^2.10.8"
+    "turbo": "^2.10.11"
   }
 }
