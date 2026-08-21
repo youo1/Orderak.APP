@@ -76,10 +76,12 @@ rules as universal defaults.
 
 This is a target architecture with partial implementation. ISO phone-country
 support, country-scoped city data, global taxonomy, localized country names,
-and country-bearing public identifiers are already portable. Money is now
-portable too: migration `044_money_minor_units_with_currency.sql` renamed the
-`*_piasters` columns to `*_minor` and added an explicit `currency` to every
-table that holds an amount.
+and country-bearing public identifiers are already portable. Money became
+portable in migration `044_money_minor_units_with_currency.sql`, which renamed
+the `*_piasters` columns to `*_minor` and added an explicit `currency` to every
+table holding an amount. That migration is live in staging and **has not been
+applied to production yet** — see
+[schema skew](../data/database.md#staging-and-production-are-on-different-schemas-right-now).
 
 What remains Egypt-specific: public catalog rendering still assumes EGP, payout
 fields (InstaPay, Vodafone Cash) are Egyptian instruments, and there is no

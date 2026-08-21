@@ -30,18 +30,24 @@ itself. This list is the index; the ADR is authoritative on its own status.
 | [ADR-006: Authoritative Play verification](../../decisions/adr-006-authoritative-play-verification.md) | Accepted | |
 | [ADR-007: Shard-ready single D1](../../decisions/adr-007-shard-ready-single-d1.md) | Accepted | |
 | [ADR-008: Evolvable safety contracts](../../decisions/adr-008-evolvable-safety-contracts.md) | Accepted | |
-| [ADR-009: Minor units with explicit currency](../../decisions/adr-009-minor-units-with-explicit-currency.md) | **Proposed** | ⚠ See the note below — implemented while still proposed |
-| [ADR-010: Schema-first API contract](../../decisions/adr-010-schema-first-api-contract.md) | Proposed | |
+| [ADR-009: Minor units with explicit currency](../../decisions/adr-009-minor-units-with-explicit-currency.md) | Accepted; staging only | Production migration pending — see the resolution below |
+| [ADR-010: Schema-first API contract](../../decisions/adr-010-schema-first-api-contract.md) | Proposed | Not yet accepted; implementation status implies no acceptance |
 
-> **Open governance item — ADR-009.** The record states `Status: proposed`, but
-> its decision is deployed: migration
-> `044_money_minor_units_with_currency.sql` applied to staging D1 on
-> 2026-08-21, and the backend and schema use `*_minor` with an explicit
-> `currency` throughout. That conflicts with the completion rule below, which
-> says proposed behavior must not be represented as production authorization.
-> Either the ADR should be moved to Accepted with an accountable owner and
-> date recorded, or the deployment needs a recorded exception. This index does
-> not resolve it — raised 2026-08-21 during a documentation audit.
+**ADR-009 resolution, 2026-08-21.** Raised during a documentation audit as a
+conflict with the completion rule below: the record read `proposed` while its
+migration was deployed. Resolved by the repository owner as **accepted**, and
+by establishing what "deployed" actually meant.
+
+Checking the live databases rather than the migration file changed the answer.
+Migration `044` is applied to **staging only**; production is still at `043`
+and its `orders` table still holds `total_piasters` with no `currency` column.
+The decision never reached production, so the original framing of the conflict
+-- "deployed while proposed" -- was itself half wrong.
+
+The ADR now records accepted status, the accountable authority, and a measured
+evidence table. It closes when production runs 044. The environment skew is
+tracked in
+[database topology](../../data/database.md#staging-and-production-are-on-different-schemas-right-now).
 
 ## Decision completion rule
 
