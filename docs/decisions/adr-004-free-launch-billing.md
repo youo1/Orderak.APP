@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: product
+applies_to: [production, staging]
+---
 # ADR-004: Free launch with paid acquisition disabled
 
 - Status: Accepted as engineering baseline; G4 business/legal/finance approval pending

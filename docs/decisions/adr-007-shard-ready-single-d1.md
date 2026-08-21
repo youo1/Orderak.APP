@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: backend
+applies_to: [production, staging]
+---
 # ADR-007: Shard-ready tenant boundary on one D1 database
 
 **Status:** accepted; physical sharding deferred until measured

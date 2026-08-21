@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: backend
+applies_to: [production, staging]
+---
 # ADR-005: Versioned organization entitlements and Google Play verification
 
 - **Status:** Accepted for local implementation; production activation gated

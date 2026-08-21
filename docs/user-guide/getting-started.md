@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: product
+applies_to: [production]
+---
 # Getting started with Orderak (pre-release)
 
 > **Audience:** Seller-app testers

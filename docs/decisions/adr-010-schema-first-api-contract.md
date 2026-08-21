@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: backend
+applies_to: [production, staging]
+---
 # ADR-010: Model API payloads with Zod at the route boundary
 
 **Status:** proposed

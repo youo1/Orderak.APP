@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: legal
+applies_to: [production]
+---
 # Orderak — Terms of Service
 
 **Last updated:** 29 July 2026

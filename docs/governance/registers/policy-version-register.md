@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: governance
+applies_to: [internal]
+---
 # Policy and contract version register
 
 This register reconciles approved text, product behavior, stored acceptance,

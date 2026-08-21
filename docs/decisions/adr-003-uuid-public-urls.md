@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: backend
+applies_to: [production, staging]
+---
 # ADR-003: UUID primary keys with immutable public codes
 
 **Status:** accepted

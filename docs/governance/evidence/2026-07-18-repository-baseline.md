@@ -1,3 +1,9 @@
+---
+status: archived
+generated: false
+owner: governance
+applies_to: [internal]
+---
 # Repository and platform baseline - 18 July 2026
 
 ## Evidence metadata

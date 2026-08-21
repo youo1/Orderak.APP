@@ -1,3 +1,10 @@
+---
+status: current
+generated: false
+owner: backend
+last_verified: 2026-07-19
+applies_to: [production, staging]
+---
 # Firebase Authentication Outage
 
 > **Status:** Current operational procedure; verify Firebase quotas, billing,

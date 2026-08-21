@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: backend
+applies_to: [production, staging]
+---
 # Troubleshooting Guide
 
 Common issues and their fixes during development and production operation.

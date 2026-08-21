@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: product
+applies_to: [internal]
+---
 # Phase 4 data-to-feature and Android permission matrix
 
 | Feature | Minimum data | Purpose | Access / recipient | Retention and control | Launch state |

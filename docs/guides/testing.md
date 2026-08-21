@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: backend
+applies_to: [production, staging]
+---
 # Testing Guide
 
 Orderak has independent backend and Android suites plus versioned authentication,

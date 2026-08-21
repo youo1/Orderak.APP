@@ -1,3 +1,10 @@
+---
+status: current
+generated: false
+owner: backend
+last_verified: 2026-08-11
+applies_to: [production, staging]
+---
 # Orderak Application Structure
 
 **Status:** active repository contract

@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: android
+applies_to: [production, staging]
+---
 # Android Authentication Profile
 
 **Profile version:** 1  

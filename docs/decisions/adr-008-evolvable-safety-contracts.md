@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: governance
+applies_to: [production, staging]
+---
 # ADR-008: Evolvable safety contracts and Android-first portability seams
 
 **Status:** accepted

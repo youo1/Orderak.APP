@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: product
+applies_to: [internal]
+---
 # Phase 4 roles, permissions, journeys, and responsibilities
 
 ## Role and permission baseline

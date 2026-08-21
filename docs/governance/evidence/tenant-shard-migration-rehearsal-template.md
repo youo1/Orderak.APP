@@ -1,3 +1,9 @@
+---
+status: archived
+generated: false
+owner: governance
+applies_to: [internal]
+---
 # Tenant shard migration rehearsal evidence
 
 ## Identification

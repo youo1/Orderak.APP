@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: security
+applies_to: [production, staging]
+---
 # Threat Model
 
 > **Status:** Draft for review  
