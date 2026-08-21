@@ -501,6 +501,7 @@
     }
   },
   "components": {
+    "schemas": {},
     "securitySchemes": {
       "googleOidc": {
         "$ref": "./components/common.json#/securitySchemes/googleOidc"
