@@ -66,12 +66,14 @@ and closure evidence. Archived plans do not create new implementation scope.
 | ---------- | --------------- |
 | [API reference](./reference/api.md) | All backend endpoints, request/response shapes, error codes |
 | [Architecture overview](./architecture/overview.md) | System diagram, hostnames, data flows |
+| [Billing domain](./domains/billing.md) | Payment gateway abstraction, Google Play verification, and the two gates that keep billing closed |
+| [Entitlements domain](./domains/entitlements.md) | Legacy plan limits versus the v2 organization-scoped engine, and how monthly usage is reserved |
 | [Android-first portability](./architecture/cross-platform-readiness.md) | Current versioning/platform seams and explicitly deferred iOS/PWA work |
 | [Seller API compatibility](./contracts/api-compatibility-contract.md) | API version, payload, compatibility, and enforcement rules |
 | [Sync/conflict contract](./contracts/sync-conflict-contract.md) | Authority, revision, retry, idempotency, and conflict policy by entity |
 | [Interactive full architecture](./architecture/orderak-full-architecture.html) | Filterable Android, Worker, data, billing, admin, AI, and provider boundaries |
 | [Security model](./architecture/security-model.md) | Auth flow, token verification, secret storage |
-| [Database migrations](./guides/database-migrations.md) | Migration workflow and a section-by-section explanation of every migration |
+| [Database migrations](./guides/database-migrations.md) | Migration workflow and an index explaining what each migration does |
 | [Staging and Production workflow](./guides/staging-production-workflow.md) | Daily branch workflow and safe promotion of a tested commit between environments |
 | [Architecture decision records](./decisions/adr-001-cloudflare-workers-d1.md) | Records of significant technical decisions |
 

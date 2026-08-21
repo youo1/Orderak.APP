@@ -42,6 +42,9 @@ nav:
     - Threat Model: architecture/threat-model.md
     - Data Classification: architecture/data-classification.md
     - Logging Standard: architecture/logging-standard.md
+  - Domains:
+    - Billing: domains/billing.md
+    - Entitlements: domains/entitlements.md
   - Contracts:
     - Authentication Invariants: contracts/authentication-security-invariants.md
     - Localization Invariants: contracts/localization-invariants.md

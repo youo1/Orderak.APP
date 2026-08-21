@@ -78,6 +78,14 @@
     {
       "id": "d1-restore",
       "description": "How to recover a D1 database from backup, including decryption, index and trigger rebuild, and the FTS5 caveat."
+    },
+    {
+      "id": "billing-domain",
+      "description": "How Orderak takes money: the payment gateway abstraction and which gateway is actually implemented, the Google Play verification path, and the two independent gates that keep billing closed."
+    },
+    {
+      "id": "entitlements-domain",
+      "description": "What a store is allowed to do: the legacy plan tables and the v2 organization-scoped policy engine, which one answers under which flag, and how monthly usage is reserved atomically."
     }
   ]
 }

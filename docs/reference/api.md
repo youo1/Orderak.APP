@@ -2,6 +2,7 @@
 status: current
 generated: false
 owner: backend
+last_verified: 2026-08-10
 applies_to: [production, staging]
 authoritative_for: [api-reference]
 ---

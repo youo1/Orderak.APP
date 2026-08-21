@@ -11,14 +11,29 @@ into several files.
 
 | Change | Authoritative document |
 | --- | --- |
-| Backend endpoint or payload | [`../api.md`](../reference/api.md) |
-| Product behavior or screen flow | [`../app-plan.md`](../product/app-plan.md) |
-| Installation, configuration, or deployment | [`../setup.md`](./setup.md) |
-| System component or data flow | [`../architecture/overview.md`](../architecture/overview.md) |
-| Authentication, authorization, or secrets | [`../architecture/security-model.md`](../architecture/security-model.md) |
-| Database migration | [`database-migrations.md`](./database-migrations.md) |
-| Localization contract | [`../localization-architecture.md`](../architecture/localization-architecture.md) |
+| Backend endpoint or payload | [`reference/api.md`](../reference/api.md) |
+| Product behavior or screen flow | [`product/app-plan.md`](../product/app-plan.md) |
+| Installation, configuration, or deployment | [`guides/setup.md`](./setup.md) |
+| System component or data flow | [`architecture/overview.md`](../architecture/overview.md) |
+| Authentication, authorization, or secrets | [`architecture/security-model.md`](../architecture/security-model.md) |
+| Payment gateways, Google Play billing, billing gates | [`domains/billing.md`](../domains/billing.md) |
+| Plan limits, entitlements, usage metering | [`domains/entitlements.md`](../domains/entitlements.md) |
+| Database migration | The generator, not the document — see below |
+| Localization contract | [`architecture/localization-architecture.md`](../architecture/localization-architecture.md) |
 | Operational recovery procedure | A focused runbook in `docs/runbooks/` |
+
+Business-domain documents under `docs/domains/` explain the model — the tables,
+the invariants, and which code path is authoritative. They do not restate the
+HTTP surface, which belongs to the API reference, or the decision rationale,
+which belongs to an ADR. Each one claims a registered subject in
+[`../governance/subject-registry.json`](../governance/subject-registry.json), so
+a second document cannot quietly become a competing source of truth.
+
+[`database-migrations.md`](./database-migrations.md) is generated and is an
+index, not a copy of the SQL. To change what it says about a migration, edit the
+`descriptions` map in `services/backend/scripts/generate-migration-docs.mjs` and
+regenerate. Editing the Markdown directly is destroyed on the next run, and CI
+fails when the committed file and the generator disagree.
 
 The root and component README files should remain concise entry points. Link to
 the authoritative guide for details that would otherwise be duplicated.
