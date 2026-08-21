@@ -76,12 +76,15 @@ rules as universal defaults.
 
 This is a target architecture with partial implementation. ISO phone-country
 support, country-scoped city data, global taxonomy, localized country names,
-and country-bearing public identifiers are already portable. Product/order
-money fields and several APIs still use `*_piasters`, public catalog rendering
-still assumes EGP, and payout fields are Egypt-specific. Before activating a
-second market, those constraints require a versioned migration to explicit
-currency plus generic minor units and a country-capability/payment-method
-model.
+and country-bearing public identifiers are already portable. Money is now
+portable too: migration `044_money_minor_units_with_currency.sql` renamed the
+`*_piasters` columns to `*_minor` and added an explicit `currency` to every
+table that holds an amount.
+
+What remains Egypt-specific: public catalog rendering still assumes EGP, payout
+fields (InstaPay, Vodafone Cash) are Egyptian instruments, and there is no
+country-capability or payment-method model. Those are the constraints to clear
+before activating a second market.
 
 ```mermaid
 graph TD
@@ -271,10 +274,10 @@ router). Concerns are split into:
 
 - **UUID primary keys** are never exposed in URLs. Public identifiers
   (`store_code`, `product_code`, `category_code`) are immutable.
-- **Integer minor units** for all money — no floating-point. The current
-  Egypt-launch schema names these fields `*_piasters` and assumes EGP; a
-  versioned migration to generic `*_minor` fields plus explicit ISO 4217
-  currency is required before a second market is activated.
+- **Integer minor units** for all money — no floating-point, and never an
+  amount without its currency. Money columns are `*_minor` with an explicit
+  ISO 4217 `currency`, applied by migration
+  `044_money_minor_units_with_currency.sql`.
 - **Mirror metadata + optimistic stock sync** — existing stock changes only for
   an explicit dirty edit whose server revision matches. Public orders claim
   stock atomically and advance the revision, preventing stale-device lost updates.

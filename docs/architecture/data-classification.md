@@ -55,7 +55,7 @@ applies_to: [production, staging]
 | Table | Fields | Classification | Notes |
 |---|---|---|---|
 | `orders` | `buyer_phone`, `buyer_name` | L2 | Buyer personal data; store-scoped |
-| `orders` | `order_no`, `status`, `pay_method`, `total_piasters`, `note` | L1 | Operational; visible to seller |
+| `orders` | `order_no`, `status`, `pay_method`, `total_minor`, `currency`, `note` | L1 | Operational; visible to seller |
 | `order_items` | All fields | L1 | Operational order details |
 
 ### 2.3 Legal & Consent — L2 Confidential

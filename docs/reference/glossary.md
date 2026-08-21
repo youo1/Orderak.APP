@@ -111,13 +111,30 @@ A product translation that has been queued for AI generation but not yet
 produced. The public storefront falls back to the seller-authored original text
 until the status transitions to `machine`.
 
+### minor units
+
+The storage form for all money: an integer count of a currency's smallest
+unit, always accompanied by an explicit `currency` column. Money columns carry
+the `_minor` suffix — `price_minor`, `total_minor`, `amount_minor`,
+`commission_minor`, `min_payout_minor`.
+
+**Never** use floating-point for money — it causes rounding errors.
+
+An amount is meaningless without its currency, because the number of minor
+units per major unit differs: EGP and SAR use 100, KWD and BHD use 1000, JPY
+uses 1. Migration `044_money_minor_units_with_currency.sql` renamed the
+former `_piasters` columns and added `currency`. See
+[ADR-009](../decisions/adr-009-minor-units-with-explicit-currency.md), which
+supersedes ADR-002.
+
 ### piasters (قرش)
 
-The base unit of currency throughout the entire codebase: Egyptian Pounds
-(EGP) × 100, stored as an integer. Example: EGP 150.00 = 15000 piasters.
-All API amounts use the `_piasters` suffix (e.g. `price_piasters`,
-`total_piasters`). The Android UI explicitly divides by 100 for display.
-**Never** use floating-point for money — it causes rounding errors.
+The minor unit **of the Egyptian pound specifically**: EGP 1.00 = 100
+piasters, so EGP 150.00 is stored as `15000`.
+
+The word names a fact about EGP, not a schema convention. Column names no
+longer use it — see [minor units](#minor-units) — precisely because the old
+`_piasters` suffix silently pinned every amount to one currency.
 
 ### product_code
 

@@ -77,9 +77,10 @@ Engineering must preserve that direction during the Egypt launch:
 The present implementation is only **partially market-portable**. Global phone
 country selection, localized country presentation, country-scoped city data,
 country-prefixed public identifiers, and Arabic/English/French Android
-resources are already useful foundations. The current EGP/piaster money model
-and Egypt-specific seller payment fields remain launch-era constraints and
-must not be copied into new shared features.
+resources are already useful foundations. Money is no longer one of those constraints: migration 044 moved every amount
+to `*_minor` with an explicit currency. Egypt-specific seller payment fields
+(InstaPay, Vodafone Cash) and EGP-assuming catalog rendering remain launch-era
+constraints and must not be copied into new shared features.
 
 ## Generated design-system behavior
 

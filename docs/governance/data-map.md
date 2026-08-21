@@ -57,7 +57,7 @@ applies_to: [internal]
 |---|---|---|---|---|---|---|
 | `products.id` (UUID) | Server-generated | Internal product identity | N/A (internal) | D1 | Until store deletion | Backend only; never in URLs |
 | `product_code` (p-XXXXXX) | Server-generated (immutable) | Public product URL key | N/A (internal) | D1 | Until store deletion | Public catalog pages |
-| `products.name`, `description`, `slug`, `price_piasters`, `stock`, `available`, `image_url` | Seller input via app | Product listing data | Performance of contract | D1 + R2 (images) | Until store deletion | Public catalog pages; app (Room cache) |
+| `products.name`, `description`, `slug`, `price_minor`, `currency`, `stock`, `available`, `image_url` | Seller input via app | Product listing data | Performance of contract | D1 + R2 (images) | Until store deletion | Public catalog pages; app (Room cache) |
 | `categories.name`, `category_code`, `slug`, `sort_order` | Seller input via app | Product categorization | Performance of contract | D1 | Until store deletion | Public catalog pages; app (Room cache) |
 | `product_translations.*` | AI-generated (DeepSeek) then cached | Customer-facing translations (ar/en) | Legitimate interest (improving buyer experience) | D1 | Until source product changes (stale rows replaced) or store deletion | Public catalog pages; never in seller app |
 
@@ -68,8 +68,8 @@ applies_to: [internal]
 | `orders.id` (UUID) | Server-generated | Internal order identity | N/A (internal) | D1 | Until store deletion | Backend only |
 | `order_no` | Server-sequenced per store | Human-readable order number | N/A (internal) | D1 | Until store deletion | App (Room sync); admin panel |
 | `buyer_phone`, `buyer_name` | Buyer input via public catalog form | Order fulfillment contact | Performance of contract | D1 `orders` | Until store deletion (seller's business record) | Seller app; admin panel |
-| `status`, `pay_method`, `total_piasters`, `note` | System + seller updates | Order lifecycle tracking | Performance of contract | D1 | Until store deletion | Seller app; admin panel |
-| `order_items.product_name`, `qty`, `price_piasters` | Buyer input + product snapshot | Denormalized order line items | Performance of contract | D1 | Until store deletion | Seller app; admin panel |
+| `status`, `pay_method`, `total_minor`, `currency`, `note` | System + seller updates | Order lifecycle tracking | Performance of contract | D1 | Until store deletion | Seller app; admin panel |
+| `order_items.product_name`, `qty`, `price_minor` | Buyer input + product snapshot | Denormalized order line items | Performance of contract | D1 | Until store deletion | Seller app; admin panel |
 
 ### 1.5 Billing & Payments
 
