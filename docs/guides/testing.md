@@ -202,7 +202,7 @@ differently in this repository than in the one it was migrated from.
 
 - `d1-backup.yml`: encrypted D1 export to R2, per environment.
 - `restore-drill.yml`: downloads an encrypted backup, decrypts it under a
-  reviewer-gated environment, and proves it restores.
+  separate environment that holds the AGE private key, and proves it restores.
 - `infra-drift.yml`: compares declared Cloudflare resources against the account.
 - `openapi-nightly.yml`: live-staging contract run against a read-only allowlist.
 - `android-staging-distribution.yml`: Firebase App Distribution.

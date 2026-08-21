@@ -8,13 +8,22 @@ name: D1 Backup Restore Drill
 # decrypts it, and runs the same restore verification against the decrypted
 # output.
 #
-# Manual, not scheduled, and reviewer-gated: the environment
-# (backup-restore-staging / backup-restore-production) has a required
-# reviewer, and holds the only copy of the AGE private key that can ever
+# Manual, not scheduled, and gated by credential custody rather than by a
+# reviewer. This comment previously claimed the environment
+# (backup-restore-staging / backup-restore-production) "has a required
+# reviewer". Measured 2026-08-20: every environment in this repository reads
+# protection_rules: [], this one included. Environment reviewers are not
+# available on private repositories under the current plan, and this
+# repository is private — the same limit already recorded for youo1/Orderak
+# applies here. There is no reviewer gate to rely on.
+#
+# The control that does hold is the one that was always the stronger half:
+# the environment holds the only copy of the AGE private key that can ever
 # leave this repository's control. The backup job itself never sees it — it
 # only holds the public recipient. If the backup job's credentials leak, an
 # attacker gets write access to future backups, not decrypt access to every
-# past one.
+# past one. A job that does not declare this environment cannot decrypt
+# anything, reviewer or no reviewer.
 
 on:
   workflow_dispatch:
@@ -107,7 +116,7 @@ jobs:
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 

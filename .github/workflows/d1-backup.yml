@@ -24,7 +24,8 @@ name: D1 Backup
 #
 # ENCRYPTION. Exports contain seller phone numbers. This job holds the AGE
 # public recipient only — never the private key. Encrypting here and
-# decrypting only in a separate, reviewer-gated workflow means compromising
+# decrypting only in a separate workflow whose environment holds the private
+# key — and which this job cannot enter — means compromising
 # this job's credentials does not also expose every past backup; it exposes
 # only the ability to write new ones. See restore-drill.yml and
 # docs/runbooks/d1-restore.md for the decrypt path, retention, and key
@@ -125,7 +126,7 @@ jobs:
         with:
           # node:sqlite — used by the restore drill — is stable on Node 24 and
           # still behind --experimental-sqlite on 22.
-          node-version: 24
+          node-version-file: .nvmrc
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
@@ -289,7 +290,7 @@ jobs:
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
