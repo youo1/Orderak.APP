@@ -132,7 +132,7 @@ blocked for the same reason.
 
 ## Retention
 
-`domains/identity/retention.ts` runs a daily cleanup over **16 rules**. Some
+`domains/identity/retention.ts` runs a daily cleanup over **17 rules**. Some
 delete rows; some only null out an IP column while keeping the record, which is
 the right shape for audit data that must survive its personal data.
 
