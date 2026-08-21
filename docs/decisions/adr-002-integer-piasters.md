@@ -1,5 +1,5 @@
 ---
-status: current
+status: superseded
 generated: false
 owner: backend
 applies_to: [production, staging]

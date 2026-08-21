@@ -60,7 +60,7 @@ and closure evidence. Archived plans do not create new implementation scope.
 | Document | What it covers |
 | ---------- | --------------- |
 | [Setup guide](./guides/setup.md) | First-time local setup, Cloudflare provisioning, Firebase, email, and production deployment |
-| [Glossary](./reference/glossary.md) | All domain terms with Arabic translations (`store_code`, `public_identifier`, `piasters`, …) |
+| [Glossary](./reference/glossary.md) | All domain terms with Arabic translations (`store_code`, `public_identifier`, `minor units`, …) |
 | [Testing guide](./guides/testing.md) | How to run each test suite (backend + Android) |
 | [Staging and Production workflow](./guides/staging-production-workflow.md) | GitHub flow, environment isolation, Staging testing, Production promotion, and rollback |
 | [Troubleshooting](./guides/troubleshooting.md) | Common issues and their fixes |

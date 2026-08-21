@@ -36,7 +36,7 @@ merchant's buyer funds.
 | --- | --- | --- |
 | `PRD-AUTH-001` | Seller signs in with the protected Firebase SMS Phase 1 flow | The protected auth regression gate passes; failures and recovery follow the contract |
 | `PRD-STORE-001` | Seller creates and edits one store profile and public identifier | Store-scoped authorization prevents cross-store read/write; required fields validate |
-| `PRD-CATALOG-001` | Seller manages categories, products, prices, stock, and images | CRUD and sync are idempotent; integer piasters are used; plan limit is enforced server-side |
+| `PRD-CATALOG-001` | Seller manages categories, products, prices, stock, and images | CRUD and sync are idempotent; money is integer minor units with an explicit currency; plan limit is enforced server-side |
 | `PRD-PUBLIC-001` | Buyer views an Arabic/English public catalog and submits an order request | Unsupported locale falls back; invalid or unavailable products cannot create a valid order |
 | `PRD-ORDER-001` | Seller views orders and performs allowed status transitions | State machine rejects invalid transitions; duplicate sync does not duplicate orders |
 | `PRD-CUSTOMER-001` | Seller views customers derived from its own orders | Only the owning seller can access buyer records; no broad contacts permission is used |
@@ -70,10 +70,10 @@ merchant's buyer funds.
   Arabic/English public catalog architecture remain unchanged.
 - Android release manifest permissions remain limited to `INTERNET` unless a
   separately approved requirement changes the permission contract.
-- Launch currency is EGP and is currently stored and calculated as integer
-  piasters. New shared features must treat this as an Egypt configuration, not
-  a universal product invariant; explicit ISO currency and generic minor units
-  are required before activating another market.
+- Launch currency is EGP. Amounts are stored as integer minor units with an
+  explicit ISO 4217 currency (migration 044), so the money model itself is no
+  longer Egypt-specific. Catalog rendering and seller payout instruments still
+  assume Egypt and must not be treated as universal product invariants.
 - Core seller and public journeys include Arabic/RTL, accessibility, network,
   timeout, empty, invalid, duplicate, unauthorized, and server-error tests.
 - Every release requirement links to code, tests, evidence, documentation, an

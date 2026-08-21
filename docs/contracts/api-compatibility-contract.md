@@ -30,7 +30,10 @@ authoritative_for: [api-compatibility]
 
 1. Errors use RFC 9457 Problem Details with stable `code` and `request_id`;
    the legacy `{error}` shape is not part of v1.
-2. JSON fields use `snake_case`; money is integer piasters; timestamps are RFC
+2. JSON fields use `snake_case`; money is integer minor units in `*_minor`
+   fields, always carried with an explicit ISO 4217 `currency`, per
+   [ADR-009](../decisions/adr-009-minor-units-with-explicit-currency.md);
+   timestamps are RFC
    3339 UTC; cursor pages expose `next_cursor` and `has_more`.
 3. Common Seller DTOs contain no Android-only fields. Provider proof belongs to
    provider-specific operations.

@@ -17,16 +17,31 @@ applies_to: [internal]
 
 ## Existing architecture decisions
 
-The following accepted ADRs remain authoritative unless superseded through the
-ADR process:
+Every ADR in `docs/decisions/`, with the status each record states about
+itself. This list is the index; the ADR is authoritative on its own status.
 
-- [ADR-001: Cloudflare Workers + D1](../../decisions/adr-001-cloudflare-workers-d1.md)
-- [ADR-002: Integer piasters](../../decisions/adr-002-integer-piasters.md)
-- [ADR-003: UUID public URLs](../../decisions/adr-003-uuid-public-urls.md)
-- [ADR-004: Free launch billing](../../decisions/adr-004-free-launch-billing.md)
+| ADR | Status | Note |
+| --- | --- | --- |
+| [ADR-001: Cloudflare Workers + D1](../../decisions/adr-001-cloudflare-workers-d1.md) | Accepted | Revisit if the approved Egyptian hosting/transfer outcome requires a materially different platform architecture |
+| [ADR-002: Integer piasters](../../decisions/adr-002-integer-piasters.md) | **Superseded** by ADR-009 on 2026-08-21 | Integer minor units still hold; fusing currency and exponent into the unit name does not |
+| [ADR-003: UUID public URLs](../../decisions/adr-003-uuid-public-urls.md) | Accepted | |
+| [ADR-004: Free launch billing](../../decisions/adr-004-free-launch-billing.md) | Accepted | Paired with `DEC-005` |
+| [ADR-005: Versioned entitlements and Google Play](../../decisions/adr-005-versioned-entitlements-google-play.md) | Accepted | |
+| [ADR-006: Authoritative Play verification](../../decisions/adr-006-authoritative-play-verification.md) | Accepted | |
+| [ADR-007: Shard-ready single D1](../../decisions/adr-007-shard-ready-single-d1.md) | Accepted | |
+| [ADR-008: Evolvable safety contracts](../../decisions/adr-008-evolvable-safety-contracts.md) | Accepted | |
+| [ADR-009: Minor units with explicit currency](../../decisions/adr-009-minor-units-with-explicit-currency.md) | **Proposed** | ⚠ See the note below — implemented while still proposed |
+| [ADR-010: Schema-first API contract](../../decisions/adr-010-schema-first-api-contract.md) | Proposed | |
 
-`ADR-001` must be revisited if the approved Egyptian hosting/transfer outcome
-requires a materially different platform architecture.
+> **Open governance item — ADR-009.** The record states `Status: proposed`, but
+> its decision is deployed: migration
+> `044_money_minor_units_with_currency.sql` applied to staging D1 on
+> 2026-08-21, and the backend and schema use `*_minor` with an explicit
+> `currency` throughout. That conflicts with the completion rule below, which
+> says proposed behavior must not be represented as production authorization.
+> Either the ADR should be moved to Accepted with an accountable owner and
+> date recorded, or the deployment needs a recorded exception. This index does
+> not resolve it — raised 2026-08-21 during a documentation audit.
 
 ## Decision completion rule
 

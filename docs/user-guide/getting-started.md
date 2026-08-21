@@ -46,7 +46,8 @@ link opens correctly.
 
 Open **Products** and use the add action. Enter the fields shown by the editor,
 such as name, price, stock, category, description, availability, and image.
-Prices are displayed in Egyptian pounds and stored by the system in piasters.
+Prices are displayed in Egyptian pounds. The system stores them as a whole
+number of piasters, so no fractions are lost.
 
 Orderak keeps a local Room database and synchronizes with the backend in the
 background (approximately every 15 minutes) and on demand. Changes are not

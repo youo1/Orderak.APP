@@ -70,7 +70,8 @@ Privacy and Security approve the L0-only leakage scan.
 
 Every operation declares `x-owner`, `x-data-classification`, `x-rate-limit`,
 `x-stability`, security, and response examples. JSON uses `snake_case`; money is
-integer piasters; timestamps are RFC 3339 UTC; cursor pages use `cursor`,
+integer minor units in `*_minor` fields with an explicit `currency`; timestamps
+are RFC 3339 UTC; cursor pages use `cursor`,
 `limit`, `next_cursor`, and `has_more`. RFC 9457 Problem Details is the only v1
 error envelope. Seller operations also document optional `x-orderak-platform`
 and `x-orderak-app-version` compatibility context; neither header grants access.
