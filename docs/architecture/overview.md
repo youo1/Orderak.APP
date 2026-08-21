@@ -2,6 +2,7 @@
 status: current
 generated: false
 owner: governance
+last_verified: 2026-08-11
 applies_to: [production, staging]
 authoritative_for: [system-architecture]
 ---
