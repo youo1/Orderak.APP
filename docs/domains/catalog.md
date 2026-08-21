@@ -30,8 +30,9 @@ Both are on everywhere. Nothing in this domain is dark.
 and — in a separate database — `geo_cities` and `geo_city_names`.
 
 Money columns are `price_minor` plus an explicit `currency`, renamed and added
-by migration `044_money_minor_units_with_currency.sql`. The older
-`price_piasters` name is gone; see
+by migration `044_money_minor_units_with_currency.sql`. **Production is still on
+the pre-044 names** until its next deploy — see
+[schema skew](../data/database.md#staging-and-production-are-on-different-schemas-right-now). For the reasoning, see
 [ADR-009](../decisions/adr-009-minor-units-with-explicit-currency.md).
 
 Ownership is `store_id` on `products` and `categories`. Note that this is the

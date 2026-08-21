@@ -30,7 +30,9 @@ by migration `009_uuid_public_urls.sql`, so orders use the newer name while
 older tables still say `seller_id` for the same value.
 
 Money is `total_minor` on the order and `price_minor` on each item, plus a
-`currency` column added by migration `044`. Item rows carry `product_name` as
+`currency` column added by migration `044`. **Production has not received 044
+yet** and still uses `total_piasters` with no currency column — see
+[schema skew](../data/database.md#staging-and-production-are-on-different-schemas-right-now). Item rows carry `product_name` as
 written at the time — a **snapshot**, so renaming a product later does not
 rewrite history.
 

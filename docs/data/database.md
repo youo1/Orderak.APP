@@ -37,6 +37,33 @@ cadence, and ODbL attribution obligations that should not be entangled with
 business data in backup and restore. See
 [catalog](../domains/catalog.md#geography).
 
+## Staging and production are on different schemas right now
+
+> **Measured 2026-08-21 against both live databases.** Staging is at migration
+> `044`. Production is at `043`. This is the single place that fact is
+> recorded; other documents point here rather than repeating it.
+
+| | Staging | Production |
+| --- | --- | --- |
+| Latest migration | `044_money_minor_units_with_currency.sql` | `043_audit_signing_key_version.sql` |
+| Money columns | `*_minor` | `*_piasters` |
+| `currency` column | Present | **Absent** |
+
+Migration 044 merged to `main` in `6cc7410` and reached staging automatically on
+the merge. Production deploys are `workflow_dispatch` only, behind a required
+reviewer, so it has not run — production was last deployed on 2026-08-17.
+
+**What this means when reading the rest of the documentation.** Money columns
+are described by their post-044 names, because that is what the code in `main`
+expects and what the next production deploy will create. Until that deploy
+runs, a query written against production must still use `total_piasters`,
+`price_minor` does not exist there, and there is no `currency` column to read.
+
+This skew closes the moment production deploys. It is recorded rather than
+smoothed over because a document that says "money has a currency column" is
+wrong in production today, and someone debugging a production query needs to
+know that before they trust it.
+
 ## The tenant key
 
 The tenant is the **organization**. `organization_routing` maps

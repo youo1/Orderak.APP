@@ -1,18 +1,44 @@
 ---
-status: draft
+status: current
 generated: false
 owner: backend
+last_verified: 2026-08-21
 applies_to: [production, staging]
 ---
 # ADR-009: Store monetary values as integer minor units with an explicit currency
 
-**Status:** proposed
+**Status:** accepted; implemented in staging, production migration pending
 
-**Date:** 2026-08-21
+**Date:** 2026-08-21 (proposed) / 2026-08-21 (accepted)
+
+**Accountable authority:** repository owner
 
 **Supersedes:** ADR-002
 
 **Superseded by:** none
+
+## Implementation evidence
+
+Recorded 2026-08-21, measured against the live databases rather than the
+migration file. The register's completion rule requires evidence, and "the
+migration exists in the repository" is not evidence that it ran.
+
+| Check | Result |
+| --- | --- |
+| `044_money_minor_units_with_currency.sql` in `main` | Yes, merged in `6cc7410` |
+| Applied to `orderak-db-staging` | Yes — `2026-08-21 12:51:15` |
+| Applied to `orderak-db` (production) | **No** — production is at `043` |
+| Staging `orders` columns | `total_minor`, `currency` |
+| Production `orders` columns | `total_piasters`, no `currency` |
+| Backend code | 76 `_minor` references; the 3 remaining `piasters` mentions are comments explaining the old name |
+
+Production deploys are `workflow_dispatch` only behind a required reviewer, so
+044 reaches production on the next deliberate deploy. Until then the two
+environments hold different schemas; that skew is tracked in
+[database topology](../data/database.md#staging-and-production-are-on-different-schemas-right-now).
+
+**This decision is accepted, not complete.** It closes when production runs
+migration 044 and this table is updated to say so.
 
 ## Context
 
