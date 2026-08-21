@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: governance
+applies_to: [internal]
+---
 # Temporary data, vendor, and release freeze
 
 ## Control notice

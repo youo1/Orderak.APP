@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: backend
+applies_to: [production, staging]
+---
 # Account deletion runbook
 
 > **Status:** Fail-closed fulfillment implemented; production activation gated

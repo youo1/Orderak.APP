@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: product
+applies_to: [internal]
+---
 # Phase 4 public catalog content controls
 
 ## Baseline rules

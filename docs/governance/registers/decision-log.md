@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: governance
+applies_to: [internal]
+---
 # Decision log
 
 | ID | Date | Decision / question | Status | Accountable owner | Rationale and consequence | Evidence / next action |

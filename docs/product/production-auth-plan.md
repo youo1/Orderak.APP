@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: product
+applies_to: [production, staging]
+---
 # Production Authentication Plan
 
 This document defines the production-ready authentication architecture target,

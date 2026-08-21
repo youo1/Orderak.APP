@@ -509,6 +509,9 @@ legacy internal UUIDs returned by this authenticated endpoint only.
 
 ## Public Store Pages (Web)
 
+> **Model:** [catalog domain](../domains/catalog.md) and
+> [stores domain](../domains/stores.md#resolution).
+
 Customers browse and order via SEO-friendly pages (title, description, canonical,
 Open Graph, Twitter card; product pages add JSON-LD):
 
@@ -588,11 +591,17 @@ to `.dev.vars` and put the key there (`.dev.vars` is git-ignored).
 
 ## Setting up D1 Database
 
+> **Topology:** [database topology](../data/database.md).
+
 See [`docs/guides/setup.md`](../guides/setup.md) for database provisioning and migration
 instructions. Always use `npx wrangler d1 migrations apply` — never execute
 individual migration files directly.
 
 ## Subscriptions, Plans & Billing
+
+> **Model:** [billing domain](../domains/billing.md). This section documents the
+> HTTP surface only — the gateway abstraction, the Google Play verification path
+> and the two gates that keep billing closed are explained there.
 
 **Launch state:** free launch. `BILLING_ENABLED` defaults to `false` and controls
 only sale visibility/new acquisition. `GOOGLE_PLAY_LIFECYCLE_ENABLED` separately
@@ -741,6 +750,8 @@ true }`). This prevents double-crediting referrals or duplicate status updates.
 
 ## Coupons
 
+> **Model:** [growth domain](../domains/growth.md#coupons).
+
 ### Validate a Coupon
 
 ```http
@@ -768,6 +779,8 @@ Content-Type: application/json
 seller. Coupon endpoints are **rate-limited** per phone.
 
 ## Referral / Affiliate Program
+
+> **Model:** [growth domain](../domains/growth.md#referrals).
 
 Every seller gets a unique `referral_code` on first subscription lookup.
 
@@ -805,6 +818,9 @@ x-orderak-secret: device-uuid-secret
 ```
 
 ## Ads (Android app)
+
+> **Model:** [growth domain](../domains/growth.md#ads). Ads are not gated by
+> `BILLING_ENABLED` — see that page for why.
 
 ### Get Active Ad
 
@@ -1057,6 +1073,9 @@ Set each with `npx wrangler secret put <NAME>`. For local dev, add them to
 
 ## Database Migration Notes
 
+> **Topology:** [database topology](../data/database.md); per-migration detail is
+> the [migration reference](../guides/database-migrations.md).
+
 Schema changes are documented in
 [`docs/guides/database-migrations.md`](../guides/database-migrations.md)
 with the exact SQL for every migration.
@@ -1122,6 +1141,9 @@ errors or tokens.
 
 ## Public catalog checkout
 
+> **Model:** [orders domain](../domains/orders.md#the-public-order-path), which
+> lists every defence on this endpoint in the order it applies.
+
 `POST /{public_identifier}` accepts buyer details and
 `items:[{product_code,qty}]`. Clients send a stable `idempotency-key` header
 (8–100 safe characters) for every logical checkout attempt. Reusing it returns
@@ -1185,6 +1207,9 @@ AI provider keys must stay on the backend. Never send them to Android, never
 commit them to Git, and always use `wrangler secret` (not `vars`) in production.
 
 ## Versioned plans and entitlements (CHG-004)
+
+> **Model:** [entitlements domain](../domains/entitlements.md), including the
+> legacy path that answers while `ENTITLEMENTS_ENABLED` is false.
 
 The v2 policy engine is organization-scoped and backend-authoritative. It is
 available only when `ENTITLEMENTS_ENABLED=true`; production remains false
@@ -1269,6 +1294,8 @@ repeated.
 
 ## Stable identity and phone-change API
 
+> **Model:** [identity domain](../domains/identity.md).
+
 `AUTH_IDENTITY_ENABLED` controls identity-table reads; dual-write and legacy
 seller projections continue on both sides of cutover. `GET
 /api/admin/v1/identity/readiness` reports active sellers missing identities,
@@ -1330,6 +1357,8 @@ deployment gates; they cannot enable AI or billing when the corresponding
 environment gate is off.
 
 ## Admin Control Center API (2026-07-21)
+
+> **Model:** [admin control plane](../domains/admin-control-plane.md).
 
 The public Android/API Worker does not mount `/admin` or `/api/admin/v1/*`.
 `admin.orderak.app` is a React Pages application behind a stateless custom-host

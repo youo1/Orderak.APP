@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: governance
+applies_to: [internal]
+---
 # Findings register
 
 Findings record observed control gaps or verification results. Closure requires

@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: backend
+applies_to: [production, staging]
+---
 # ADR-009: Store monetary values as integer minor units with an explicit currency
 
 **Status:** proposed

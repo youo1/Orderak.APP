@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: backend
+applies_to: [production, staging]
+---
 # Local development agents
 
 Orderak includes optional repository-local agent instructions under `.github/`.

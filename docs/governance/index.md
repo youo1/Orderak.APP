@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: governance
+applies_to: [internal]
+---
 # Orderak launch governance
 
 This package is the source-controlled control center for executing the Orderak

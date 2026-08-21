@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: backend
+applies_to: [production, staging]
+---
 # API changelog
 
 ## 2026-08-10 — live-contract conformance

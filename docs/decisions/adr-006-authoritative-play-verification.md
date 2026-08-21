@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: backend
+applies_to: [production, staging]
+---
 # ADR-006: Authoritative asynchronous Google Play lifecycle verification
 
 **Status:** accepted; production activation gated

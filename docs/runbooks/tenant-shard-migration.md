@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: backend
+applies_to: [production, staging]
+---
 # Tenant shard migration runbook
 
 **Current revision:** 1.0

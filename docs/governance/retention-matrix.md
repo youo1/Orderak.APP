@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: governance
+applies_to: [internal]
+---
 # Orderak Retention & Deletion Matrix
 
 > **Status:** Proposed policy and implementation target — not proof of current enforcement

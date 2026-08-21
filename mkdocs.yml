@@ -42,9 +42,18 @@ nav:
     - Threat Model: architecture/threat-model.md
     - Data Classification: architecture/data-classification.md
     - Logging Standard: architecture/logging-standard.md
+  - Data:
+    - Database Topology: data/database.md
   - Domains:
+    - Identity: domains/identity.md
+    - Stores: domains/stores.md
+    - Catalog: domains/catalog.md
+    - Orders: domains/orders.md
     - Billing: domains/billing.md
     - Entitlements: domains/entitlements.md
+    - Growth: domains/growth.md
+    - Design System: domains/design-system.md
+    - Admin Control Plane: domains/admin-control-plane.md
   - Contracts:
     - Authentication Invariants: contracts/authentication-security-invariants.md
     - Localization Invariants: contracts/localization-invariants.md
@@ -56,10 +65,21 @@ nav:
     - Control Center: governance/index.md
     - Data Map: governance/data-map.md
     - Retention and Deletion Matrix: governance/retention-matrix.md
+    - How We Work:
+      - Program Charter: governance/program-charter.md
+      - RACI: governance/raci.md
+      - Operating Cadence: governance/operating-cadence.md
+      - Evidence Standard: governance/evidence-standard.md
+      - Source Plan Traceability: governance/source-plan-traceability.md
+    - Controls:
+      - Cloudflare Token Inventory: governance/cloudflare-token-inventory.md
+      - Temporary Change Freeze: governance/temporary-change-freeze.md
     - Registers:
       - Register Index: governance/registers/index.md
       - Decisions: governance/registers/decision-log.md
       - Risks: governance/registers/risk-register.md
+      - Issues and Changes: governance/registers/issue-and-change-log.md
+      - Requirements: governance/registers/requirements-register.md
       - Third Parties and Permissions: governance/registers/third-party-and-permission-register.md
       - Policy Versions: governance/registers/policy-version-register.md
       - Findings: governance/registers/findings-register.md
@@ -85,6 +105,7 @@ nav:
     - Google Play Billing DLQ: runbooks/play-billing-dlq.md
     - Worker Secret Rotation: runbooks/secret-rotation.md
     - Tenant Shard Migration: runbooks/tenant-shard-migration.md
+    - Production Cutover: runbooks/production-cutover.md
   - Guides:
     - Documentation: guides/documentation.md
     - OpenAPI Development: guides/openapi-development.md

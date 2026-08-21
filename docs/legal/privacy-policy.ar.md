@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: legal
+applies_to: [production]
+---
 # أوردرك — سياسة الخصوصية
 
 **آخر تحديث:** 29 يوليو 2026

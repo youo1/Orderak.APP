@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: governance
+applies_to: [internal]
+---
 # Requirements, assumptions, and protected-contract register
 
 ## Confirmed Phase 0 requirements

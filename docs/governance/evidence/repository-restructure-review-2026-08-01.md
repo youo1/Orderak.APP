@@ -1,3 +1,9 @@
+---
+status: archived
+generated: false
+owner: governance
+applies_to: [internal]
+---
 # Repository Restructure Review — 2026-08-01
 
 **Branch:** `codex/repository-restructure`

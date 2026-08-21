@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: governance
+applies_to: [internal]
+---
 # Evidence repository and naming standard
 
 This standard defines what counts as completion evidence and where it may be

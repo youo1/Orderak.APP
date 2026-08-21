@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: governance
+applies_to: [internal]
+---
 # Third-party, SDK, and Android permission register
 
 This is the Phase 0 runtime and data-touching inventory. It is not yet a

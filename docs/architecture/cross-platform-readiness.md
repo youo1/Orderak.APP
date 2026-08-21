@@ -1,3 +1,10 @@
+---
+status: current
+generated: false
+owner: android
+last_verified: 2026-08-01
+applies_to: [production, staging]
+---
 # Cross-Platform Readiness
 
 **Status:** architecture boundary

@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: governance
+applies_to: [internal]
+---
 # Phase 0 source-plan traceability
 
 This index prevents requirements from being lost between the source plans, the

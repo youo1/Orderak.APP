@@ -1,3 +1,9 @@
+---
+status: current
+generated: false
+owner: governance
+applies_to: [internal]
+---
 # Orderak documentation
 
 Use this page to find the right document for your role or task. New
@@ -66,8 +72,16 @@ and closure evidence. Archived plans do not create new implementation scope.
 | ---------- | --------------- |
 | [API reference](./reference/api.md) | All backend endpoints, request/response shapes, error codes |
 | [Architecture overview](./architecture/overview.md) | System diagram, hostnames, data flows |
+| [Database topology](./data/database.md) | Which databases exist, the tenant key, and the concurrency patterns D1 forces |
+| [Identity domain](./domains/identity.md) | The seller account, authentication, device secrets, deletion and retention |
+| [Stores domain](./domains/stores.md) | Store code, slug, public identifier, and how a renamed store stays reachable |
+| [Catalog domain](./domains/catalog.md) | Products, categories, translations, business taxonomy, geo catalogue, public pages |
+| [Orders domain](./domains/orders.md) | Order status machine and every defence on the public order endpoint |
 | [Billing domain](./domains/billing.md) | Payment gateway abstraction, Google Play verification, and the two gates that keep billing closed |
 | [Entitlements domain](./domains/entitlements.md) | Legacy plan limits versus the v2 organization-scoped engine, and how monthly usage is reserved |
+| [Growth domain](./domains/growth.md) | Ads, coupons and referrals — which serve while billing is closed and which do not |
+| [Design system domain](./domains/design-system.md) | Immutable token revisions, rollback, store theme, and the Android screen manifest |
+| [Admin control plane](./domains/admin-control-plane.md) | The separate admin Worker and identity system, step-up authorization, signed audit archives |
 | [Android-first portability](./architecture/cross-platform-readiness.md) | Current versioning/platform seams and explicitly deferred iOS/PWA work |
 | [Seller API compatibility](./contracts/api-compatibility-contract.md) | API version, payload, compatibility, and enforcement rules |
 | [Sync/conflict contract](./contracts/sync-conflict-contract.md) | Authority, revision, retry, idempotency, and conflict policy by entity |
