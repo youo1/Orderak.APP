@@ -80,6 +80,38 @@
       "description": "How to recover a D1 database from backup, including decryption, index and trigger rebuild, and the FTS5 caveat."
     },
     {
+      "id": "database-topology",
+      "description": "Which databases, buckets, queues and Durable Objects exist, what the tenant routing key is, and the concurrency patterns D1's lack of interactive transactions forces."
+    },
+    {
+      "id": "catalog-domain",
+      "description": "Products, categories, per-locale product translations, the versioned business taxonomy, the isolated geo catalogue, and the public store pages rendered from them."
+    },
+    {
+      "id": "orders-domain",
+      "description": "Order creation and lifecycle: the status machine, the defences on the public unauthenticated order endpoint, per-store order numbering, and why buyers are derived rather than stored."
+    },
+    {
+      "id": "growth-domain",
+      "description": "Ads, coupons and referrals: which of them serve while billing is closed, how ad eligibility is decided server-side, and why referral credit waits for first payment."
+    },
+    {
+      "id": "design-system-domain",
+      "description": "The generated, immutably versioned Material design token system and its rollback path, the separate cached store theme, and the hand-maintained Android screen manifest."
+    },
+    {
+      "id": "admin-control-plane-domain",
+      "description": "The internal operations surface: the separate admin Worker and identity system, step-up action authorization, signed audit archives, feature flags, capabilities and runtime settings."
+    },
+    {
+      "id": "identity-domain",
+      "description": "The seller account: how it is created, how it authenticates, how devices are authorized, and how it is deleted and retained. Security properties themselves belong to the auth contracts."
+    },
+    {
+      "id": "stores-domain",
+      "description": "Store naming and public addressing: immutable store code, editable slug, composed public identifier, resolution after rename, and the public column allowlist."
+    },
+    {
       "id": "billing-domain",
       "description": "How Orderak takes money: the payment gateway abstraction and which gateway is actually implemented, the Google Play verification path, and the two independent gates that keep billing closed."
     },
