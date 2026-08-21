@@ -42,9 +42,18 @@ nav:
     - Threat Model: architecture/threat-model.md
     - Data Classification: architecture/data-classification.md
     - Logging Standard: architecture/logging-standard.md
+  - Data:
+    - Database Topology: data/database.md
   - Domains:
+    - Identity: domains/identity.md
+    - Stores: domains/stores.md
+    - Catalog: domains/catalog.md
+    - Orders: domains/orders.md
     - Billing: domains/billing.md
     - Entitlements: domains/entitlements.md
+    - Growth: domains/growth.md
+    - Design System: domains/design-system.md
+    - Admin Control Plane: domains/admin-control-plane.md
   - Contracts:
     - Authentication Invariants: contracts/authentication-security-invariants.md
     - Localization Invariants: contracts/localization-invariants.md
