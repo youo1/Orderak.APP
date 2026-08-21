@@ -20,12 +20,17 @@ the Git and GitHub setup and ended in a currency and API-contract migration.
 
 | | |
 | --- | --- |
-| Branch | `followup/phases-0-9-review` — 7 commits ahead of `origin/main` |
+| Branch | `followup/phases-0-9-review`, ahead of `origin/main` |
 | Merged | No |
 | Deployed | **Nowhere.** The branch is unprotected, and all five environments require a protected branch |
 
 Nothing in this workstream has reached staging or production. That is the
 deployment branch policy working, not an oversight.
+
+`git rev-list --count origin/main..HEAD` gives the commit count. It is not
+written here on purpose: the first version of this page stated a number, and the
+commit that added the page made it wrong. A figure that goes stale on the next
+commit belongs in a command, not in prose.
 
 ## Finished
 
