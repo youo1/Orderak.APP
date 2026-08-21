@@ -40,6 +40,10 @@ describe("failed-auth throttle", () => {
 		expect(await authSeller(env, store.phone, store.secret)).toBeNull();
 	});
 
+	// 25 sequential authSeller() calls, each a round trip to the rate-limiter
+	// Durable Object. This is a slow test by construction, not a regression: it
+	// sat just under the 5s default and applying the real migrations in
+	// createSchema pushed it over. The timeout states the real cost.
 	it("throttles each phone independently", async () => {
 		const victim = await registerStore();
 		const bystander = await registerStore();
@@ -51,7 +55,7 @@ describe("failed-auth throttle", () => {
 		expect(await authSeller(env, victim.phone, victim.secret)).toBeNull();
 		// A different phone must be unaffected by its neighbour's lockout.
 		expect(await authSeller(env, bystander.phone, bystander.secret)).not.toBeNull();
-	});
+	}, 20000);
 
 	it("counts failures where the enforcement check reads them", async () => {
 		const store = await registerStore();

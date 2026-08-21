@@ -1,5 +1,22 @@
-import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
+import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-pool-workers";
 import { defineConfig } from "vitest/config";
+
+/**
+ * The test database is built from `migrations/`, not from a schema written out
+ * again in the test helpers.
+ *
+ * It used to be the latter, and the cost was invisible until a migration
+ * renamed nine money columns and all 246 tests stayed green: the suite was
+ * asserting against a schema that no longer resembled the one the Workers
+ * actually run on. A hand-maintained copy of a schema does not drift loudly —
+ * it drifts into a passing test run, which is the worst place for it to go.
+ *
+ * Reading the real migrations means a migration that breaks a query now breaks
+ * a test, and a migration that fails to apply fails the suite rather than
+ * production.
+ */
+const migrations = await readD1Migrations("./migrations");
+const geoMigrations = await readD1Migrations("./geo-migrations");
 
 export default defineConfig({
 	plugins: [
@@ -9,6 +26,11 @@ export default defineConfig({
 			miniflare: {
 				r2Buckets: ["orderak_audit"],
 				bindings: {
+					// Read in Node above and applied inside the Workers runtime by
+					// createSchema(). Bindings must be JSON, and D1Migration is
+					// `{ name, queries }`, so it crosses the boundary as-is.
+					TEST_MIGRATIONS: migrations,
+					TEST_GEO_MIGRATIONS: geoMigrations,
 					DEPLOYMENT_ENVIRONMENT: "test",
 					// Tests register stores without Firebase OTP; production
 					// fails closed when FIREBASE_WEB_API_KEY is unset.

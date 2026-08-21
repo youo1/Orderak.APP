@@ -1,6 +1,13 @@
-// Test helpers: create the final (post-009) domain schema in the test D1 and
-// small utilities for driving the API via SELF.fetch.
-import { env, SELF, createExecutionContext } from "cloudflare:test";
+// Test helpers: apply the real migrations to the test D1 and drive the API via
+// SELF.fetch.
+import { applyD1Migrations, env, SELF, createExecutionContext } from "cloudflare:test";
+import type { D1Migration } from "cloudflare:test";
+
+/** Migration arrays injected as bindings by vitest.config.mts. */
+interface TestMigrationEnv {
+	TEST_MIGRATIONS: D1Migration[];
+	TEST_GEO_MIGRATIONS: D1Migration[];
+}
 import { invalidateDesignSystemCache } from "../src/domains/design/design-system";
 
 // Derived from ExportedHandler rather than hand-written: its `fetch` takes a
@@ -29,371 +36,111 @@ export function callWorker(
 	return Promise.resolve(worker.fetch(request as Parameters<WorkerFetch>[0], runtimeEnv, ctx));
 }
 
-const SCHEMA: string[] = [
-	`CREATE TABLE IF NOT EXISTS sellers (
-	  id TEXT PRIMARY KEY, store_code TEXT NOT NULL, country_code TEXT,
-	  store_name TEXT NOT NULL DEFAULT '', slug TEXT, public_identifier TEXT,
-	  phone TEXT NOT NULL UNIQUE, firebase_uid TEXT, instapay TEXT, vfcash TEXT, secret TEXT,
-	  description TEXT, whatsapp TEXT, email TEXT, website TEXT, address TEXT,
-	  logo_url TEXT, cover_url TEXT, referral_code TEXT,
-	  lang TEXT NOT NULL DEFAULT 'ar', status TEXT NOT NULL DEFAULT 'active',
-	  primary_device_id TEXT, primary_device_label TEXT, primary_device_platform TEXT,
-	  primary_device_app_version TEXT, primary_device_last_used_at TEXT,
-	  business_category TEXT, city_geoname_id INTEGER, city_catalog_id INTEGER,
-	  city_catalog_version TEXT, city_name TEXT,
-	  business_category_id TEXT,business_subcategory_id TEXT,business_taxonomy_version INTEGER,
-	  created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')))`,
-	`CREATE TABLE IF NOT EXISTS organizations (
-	  id TEXT PRIMARY KEY,name TEXT NOT NULL,owner_store_id TEXT NOT NULL UNIQUE,status TEXT DEFAULT 'active',
-	  default_locale TEXT DEFAULT 'en',play_account_hash TEXT UNIQUE,
-	  created_at TEXT DEFAULT (datetime('now')),updated_at TEXT DEFAULT (datetime('now')))`,
-	`CREATE TABLE IF NOT EXISTS organization_stores (
-	  organization_id TEXT NOT NULL,store_id TEXT NOT NULL UNIQUE,is_primary INTEGER DEFAULT 0,
-	  created_at TEXT DEFAULT (datetime('now')),PRIMARY KEY(organization_id,store_id))`,
-	`CREATE TABLE IF NOT EXISTS organization_members (
-	  id TEXT PRIMARY KEY,organization_id TEXT NOT NULL,seller_id TEXT,role TEXT,status TEXT,
-	  created_at TEXT DEFAULT (datetime('now')),updated_at TEXT DEFAULT (datetime('now')))`,
-	`CREATE TABLE IF NOT EXISTS seller_auth_identities (
-	  id TEXT PRIMARY KEY,seller_id TEXT NOT NULL,provider TEXT NOT NULL,provider_subject TEXT NOT NULL,
-	  verified_phone_e164 TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'active',verified_at TEXT DEFAULT (datetime('now')),
-	  superseded_at TEXT,created_at TEXT DEFAULT (datetime('now')),updated_at TEXT DEFAULT (datetime('now')))`,
-	`CREATE UNIQUE INDEX IF NOT EXISTS idx_auth_identity_provider_subject ON seller_auth_identities(provider,provider_subject)`,
-	`CREATE UNIQUE INDEX IF NOT EXISTS idx_auth_identity_active_phone ON seller_auth_identities(verified_phone_e164) WHERE status='active'`,
-	`CREATE UNIQUE INDEX IF NOT EXISTS idx_auth_identity_one_active_provider_per_seller ON seller_auth_identities(seller_id,provider) WHERE status='active'`,
-	`CREATE TABLE IF NOT EXISTS identity_migration_issues (
-	  seller_id TEXT NOT NULL,issue_code TEXT NOT NULL,first_observed_at TEXT DEFAULT (datetime('now')),
-	  last_observed_at TEXT DEFAULT (datetime('now')),occurrence_count INTEGER DEFAULT 1,resolved_at TEXT,
-	  PRIMARY KEY(seller_id,issue_code))`,
-	`CREATE TABLE IF NOT EXISTS organization_routing (
-	  organization_id TEXT PRIMARY KEY,shard_key TEXT NOT NULL DEFAULT 'primary',routing_version INTEGER DEFAULT 1,
-	  migration_state TEXT NOT NULL DEFAULT 'stable',target_shard_key TEXT,write_fence_started_at TEXT,
-	  write_fence_reason TEXT,updated_at TEXT DEFAULT (datetime('now')))`,
-	`CREATE TABLE IF NOT EXISTS phone_change_challenges (
-	  id TEXT PRIMARY KEY,challenge_token_hash TEXT NOT NULL UNIQUE,seller_id TEXT NOT NULL,current_phone_e164 TEXT NOT NULL,
-	  new_phone_e164 TEXT NOT NULL,current_provider_subject TEXT NOT NULL,expires_at TEXT NOT NULL,consumed_at TEXT,
-	  created_at TEXT DEFAULT (datetime('now')))`,
-	`CREATE TABLE IF NOT EXISTS categories (
-	  id TEXT PRIMARY KEY, store_id TEXT NOT NULL, category_code TEXT NOT NULL,
-	  name TEXT NOT NULL, slug TEXT, sort_order INTEGER NOT NULL DEFAULT 0,
-	  created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')))`,
-	`CREATE TABLE IF NOT EXISTS products (
-	  id TEXT PRIMARY KEY, store_id TEXT NOT NULL, category_id TEXT,
-	  product_code TEXT NOT NULL, app_id INTEGER, name TEXT NOT NULL, slug TEXT,
-	  description TEXT, price_piasters INTEGER NOT NULL DEFAULT 0, stock INTEGER NOT NULL DEFAULT 0,
-	  stock_version INTEGER NOT NULL DEFAULT 0,
-	  available INTEGER NOT NULL DEFAULT 1, image_url TEXT,
-	  created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')),
-	  UNIQUE(store_id, app_id))`,
-	`CREATE TABLE IF NOT EXISTS product_translations (
-	  product_id TEXT NOT NULL, lang TEXT NOT NULL, name TEXT NOT NULL, description TEXT,
-	  source_name TEXT NOT NULL, source_description TEXT NOT NULL DEFAULT '', detected_language TEXT,
-	  source_locale TEXT NOT NULL DEFAULT 'und', source_version TEXT NOT NULL DEFAULT '',
-	  translation_status TEXT NOT NULL DEFAULT 'machine', provider TEXT, model TEXT, reviewed_at TEXT,
-	  reviewed_by_type TEXT, reviewed_by_id TEXT,
-	  updated_at TEXT DEFAULT (datetime('now')), PRIMARY KEY(product_id, lang))`,
-	`CREATE TABLE IF NOT EXISTS seller_devices (
-	  seller_id TEXT NOT NULL, secret_hash TEXT NOT NULL,
-	  device_id TEXT, device_label TEXT, platform TEXT, app_version TEXT,
-	  created_at TEXT DEFAULT (datetime('now')), last_used_at TEXT DEFAULT (datetime('now')),
-	  PRIMARY KEY(seller_id, secret_hash))`,
-	`CREATE TABLE IF NOT EXISTS orders (
-	  id TEXT PRIMARY KEY, order_no INTEGER, store_id TEXT NOT NULL, buyer_phone TEXT NOT NULL,
-	  buyer_name TEXT, status TEXT NOT NULL DEFAULT 'NEW', pay_method TEXT NOT NULL DEFAULT 'COD',
-	  total_piasters INTEGER NOT NULL DEFAULT 0, note TEXT, idempotency_key TEXT,
-	  created_at TEXT DEFAULT (datetime('now')))`,
-	`CREATE TABLE IF NOT EXISTS coupon_uses (
-	  id INTEGER PRIMARY KEY AUTOINCREMENT, seller_id TEXT NOT NULL)`,
-	`CREATE TABLE IF NOT EXISTS referrals (
-	  id INTEGER PRIMARY KEY AUTOINCREMENT, referrer_id TEXT, referred_id TEXT)`,
-	`CREATE TABLE IF NOT EXISTS payment_events (
-	  id INTEGER PRIMARY KEY AUTOINCREMENT, seller_id TEXT, raw_json TEXT)`,
-	`CREATE TABLE IF NOT EXISTS order_items (
-	  id TEXT PRIMARY KEY, order_id TEXT NOT NULL, product_id TEXT, product_name TEXT NOT NULL,
-	  qty INTEGER NOT NULL DEFAULT 1, price_piasters INTEGER NOT NULL DEFAULT 0)`,
-	// Columns must cover everything getPlanLimit() and loadPlanConfig() SELECT —
-	// SQLite validates columns at prepare time, so a missing one throws even
-	// when no rows match. max_ai_requests_per_month is read on the /api/v1/chat
-	// path (that's what was 500-ing the chat tests once they authenticated).
-	`CREATE TABLE IF NOT EXISTS plans (
-	  id TEXT PRIMARY KEY, name TEXT, price_piasters INTEGER NOT NULL DEFAULT 0,
-	  currency TEXT NOT NULL DEFAULT 'EGP', ads_enabled INTEGER NOT NULL DEFAULT 0,
-	  active INTEGER NOT NULL DEFAULT 1, sort_order INTEGER NOT NULL DEFAULT 0,
-	  max_categories INTEGER, max_products INTEGER, max_orders_per_month INTEGER,
-	  max_ai_requests_per_month INTEGER, max_team_members INTEGER,
-	  custom_domain_enabled INTEGER NOT NULL DEFAULT 0,
-	  analytics_enabled INTEGER NOT NULL DEFAULT 0,
-	  priority_support_enabled INTEGER NOT NULL DEFAULT 0,
-	  multi_device_enabled INTEGER NOT NULL DEFAULT 0)`,
-	`CREATE TABLE IF NOT EXISTS subscriptions (
-	  id INTEGER PRIMARY KEY AUTOINCREMENT, seller_id TEXT NOT NULL, plan_id TEXT NOT NULL,
-	  status TEXT NOT NULL DEFAULT 'active', gateway TEXT NOT NULL DEFAULT 'mock',
-	  gateway_sub_id TEXT, amount_piasters INTEGER NOT NULL DEFAULT 0, coupon_code TEXT,
-	  idempotency_key TEXT, current_period_end TEXT,
-	  created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')))`,
-	`CREATE TABLE IF NOT EXISTS content_page_versions (
-	  id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT NOT NULL, lang TEXT NOT NULL,
-	  version INTEGER NOT NULL, title TEXT, body_html TEXT, notes TEXT,
-	  status TEXT NOT NULL DEFAULT 'draft', created_by INTEGER, created_at TEXT DEFAULT (datetime('now')),
-	  published_at TEXT, UNIQUE(slug,lang,version))`,
-	`CREATE TABLE IF NOT EXISTS legal_acceptances (
-	  id TEXT PRIMARY KEY, seller_id TEXT, phone_e164 TEXT NOT NULL,
-	  terms_version INTEGER NOT NULL, privacy_version INTEGER NOT NULL,
-	  locale TEXT NOT NULL, source TEXT NOT NULL, app_version TEXT,
-	  marketing_consent INTEGER NOT NULL DEFAULT 0,
-	  accepted_at TEXT DEFAULT (datetime('now')))`,
-	`CREATE TABLE IF NOT EXISTS onboarding_sessions (
-	  id TEXT PRIMARY KEY,token_hash TEXT NOT NULL UNIQUE,phone_e164 TEXT NOT NULL,firebase_uid TEXT NOT NULL,
-	  device_secret_hash TEXT NOT NULL,phone_country_iso TEXT,locale TEXT NOT NULL DEFAULT 'en',
-	  status TEXT NOT NULL DEFAULT 'phone_verified',
-	  full_name TEXT,birth_year INTEGER,email_private TEXT,terms_version INTEGER,privacy_version INTEGER,terms_accepted_at TEXT,
-	  app_version TEXT,completed_seller_id TEXT,idempotency_key TEXT,expires_at TEXT NOT NULL,
-	  city_catalog_id INTEGER,city_catalog_version TEXT,city_name TEXT,
-	  absolute_expires_at TEXT NOT NULL,created_at TEXT DEFAULT (datetime('now')),updated_at TEXT DEFAULT (datetime('now')))`,
-	`CREATE TABLE IF NOT EXISTS seller_profiles (
-	  seller_id TEXT PRIMARY KEY,full_name TEXT NOT NULL,birth_year INTEGER NOT NULL,email_private TEXT,email_verified_at TEXT,
-	  created_at TEXT DEFAULT (datetime('now')),updated_at TEXT DEFAULT (datetime('now')))`,
-	`CREATE UNIQUE INDEX IF NOT EXISTS idx_seller_profiles_email
-	  ON seller_profiles(lower(email_private)) WHERE email_private IS NOT NULL`,
-	`CREATE TABLE IF NOT EXISTS passkey_credentials (
-	  id TEXT PRIMARY KEY,seller_id TEXT NOT NULL,credential_id TEXT NOT NULL UNIQUE,
-	  credential_public_key BLOB NOT NULL,webauthn_user_id TEXT NOT NULL,counter INTEGER DEFAULT 0,
-	  aaguid TEXT,transports_json TEXT DEFAULT '[]',device_type TEXT NOT NULL,backed_up INTEGER DEFAULT 0,
-	  label TEXT,status TEXT DEFAULT 'active',created_at TEXT DEFAULT (datetime('now')),
-	  updated_at TEXT DEFAULT (datetime('now')),last_used_at TEXT,revoked_at TEXT)`,
-	`CREATE TABLE IF NOT EXISTS webauthn_challenges (
-	  id TEXT PRIMARY KEY,challenge_hash TEXT NOT NULL UNIQUE,ceremony TEXT NOT NULL,seller_id TEXT,
-	  webauthn_user_id TEXT,expires_at TEXT NOT NULL,consumed_at TEXT,created_at TEXT DEFAULT (datetime('now')))`,
-	`CREATE TABLE IF NOT EXISTS recent_auth_proofs (
-	  id TEXT PRIMARY KEY,token_hash TEXT NOT NULL UNIQUE,seller_id TEXT NOT NULL,method TEXT NOT NULL,
-	  expires_at TEXT NOT NULL,consumed_at TEXT,created_at TEXT DEFAULT (datetime('now')))`,
-	`CREATE TABLE IF NOT EXISTS email_verification_tokens (
-	  id TEXT PRIMARY KEY,seller_id TEXT NOT NULL,email TEXT NOT NULL,token_hash TEXT NOT NULL UNIQUE,
-	  kind TEXT NOT NULL DEFAULT 'initial' CHECK (kind IN ('initial','resend')),
-	  expires_at TEXT NOT NULL,used_at TEXT,created_at TEXT DEFAULT (datetime('now')))`,
-	`CREATE TRIGGER IF NOT EXISTS trg_email_verification_applied
-	  AFTER UPDATE OF used_at ON email_verification_tokens
-	  WHEN OLD.used_at IS NULL AND NEW.used_at IS NOT NULL
-	  BEGIN
-	    UPDATE seller_profiles SET email_verified_at=NEW.used_at,updated_at=NEW.used_at
-	    WHERE seller_id=NEW.seller_id AND lower(email_private)=lower(NEW.email);
-	  END`,
-	`CREATE TABLE IF NOT EXISTS geo_cities (
-	  geoname_id INTEGER PRIMARY KEY,country_iso TEXT NOT NULL,name TEXT NOT NULL,ascii_name TEXT NOT NULL,
-	  admin1_code TEXT,population INTEGER DEFAULT 0,timezone TEXT,updated_at TEXT DEFAULT (datetime('now')))`,
-	`CREATE TABLE IF NOT EXISTS geo_city_names (
-	  geoname_id INTEGER NOT NULL,lang TEXT NOT NULL,name TEXT NOT NULL,preferred INTEGER DEFAULT 0,
-	  PRIMARY KEY(geoname_id,lang,name))`,
-	`CREATE VIRTUAL TABLE IF NOT EXISTS geo_city_search USING fts5(
-	  geoname_id UNINDEXED,country_iso UNINDEXED,lang UNINDEXED,name,ascii_name,
-	  tokenize='unicode61 remove_diacritics 2')`,
-	`CREATE TABLE IF NOT EXISTS business_taxonomy_versions(
-	  id INTEGER PRIMARY KEY,label TEXT UNIQUE,status TEXT,source_name TEXT,review_method TEXT,published_at TEXT,
-	  created_at TEXT DEFAULT (datetime('now')))`,
-	`CREATE TABLE IF NOT EXISTS business_categories(
-	  id TEXT PRIMARY KEY,version_id INTEGER,key TEXT,name_en TEXT,name_ar TEXT,name_fr TEXT,
-	  sort_order INTEGER DEFAULT 0,active INTEGER DEFAULT 1)`,
-	`CREATE TABLE IF NOT EXISTS business_subcategories(
-	  id TEXT PRIMARY KEY,version_id INTEGER,category_id TEXT,key TEXT,name_en TEXT,name_ar TEXT,name_fr TEXT,
-	  sort_order INTEGER DEFAULT 0,active INTEGER DEFAULT 1)`,
-	`CREATE VIRTUAL TABLE IF NOT EXISTS business_taxonomy_search USING fts5(
-	  subcategory_id UNINDEXED,category_id UNINDEXED,name_en,name_ar,name_fr,
-	  tokenize='unicode61 remove_diacritics 2')`,
-	`CREATE TABLE IF NOT EXISTS deletion_requests (
-	  id TEXT PRIMARY KEY, phone_e164 TEXT NOT NULL, email TEXT, locale TEXT NOT NULL,
-	  source TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', requested_at TEXT DEFAULT (datetime('now')),
-	  deadline_at TEXT NOT NULL, verified_at TEXT, completed_at TEXT, notes TEXT)` ,
-	`CREATE TABLE IF NOT EXISTS admin_audit (
-	  id INTEGER PRIMARY KEY AUTOINCREMENT, admin_id INTEGER, action TEXT NOT NULL,
-	  entity TEXT, entity_id TEXT, details_json TEXT, ip TEXT, created_at TEXT DEFAULT (datetime('now')))` ,
-	`CREATE TABLE IF NOT EXISTS email_template_history (
-	  id INTEGER PRIMARY KEY AUTOINCREMENT, changed_ip TEXT, changed_at TEXT DEFAULT (datetime('now')))` ,
-	`CREATE TABLE IF NOT EXISTS email_events (
-	  id INTEGER PRIMARY KEY AUTOINCREMENT,to_addr TEXT,template_key TEXT,provider_id TEXT,
-	  event TEXT NOT NULL,error TEXT,meta_json TEXT,created_at TEXT DEFAULT (datetime('now')))` ,
-	`CREATE TABLE IF NOT EXISTS email_templates (
-	  key TEXT PRIMARY KEY,category TEXT,enabled INTEGER DEFAULT 1,current_version INTEGER DEFAULT 1,
-	  created_at TEXT DEFAULT (datetime('now')),updated_at TEXT DEFAULT (datetime('now')))`,
-	`CREATE TABLE IF NOT EXISTS email_template_translations (
-	  template_key TEXT NOT NULL,lang TEXT NOT NULL,subject TEXT DEFAULT '',html TEXT DEFAULT '',text TEXT DEFAULT '',
-	  version INTEGER DEFAULT 1,updated_by INTEGER,updated_at TEXT DEFAULT (datetime('now')),
-	  PRIMARY KEY(template_key,lang))`,
-	`CREATE TABLE IF NOT EXISTS ads (
-	  id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, title_i18n TEXT,
-	  image_url TEXT NOT NULL, image_url_i18n TEXT, click_url TEXT, type TEXT DEFAULT 'banner',
-	  target_plan TEXT DEFAULT 'free', frequency INTEGER DEFAULT 1, weight INTEGER DEFAULT 1,
-	  active INTEGER DEFAULT 1, starts_at TEXT, ends_at TEXT, created_at TEXT DEFAULT (datetime('now')))` ,
-	`CREATE TABLE IF NOT EXISTS ad_impressions (
-	  id INTEGER PRIMARY KEY AUTOINCREMENT, ad_id INTEGER, seller_id TEXT, kind TEXT,
-	  event_key TEXT UNIQUE, created_at TEXT DEFAULT (datetime('now')))` ,
-	`CREATE TABLE IF NOT EXISTS announcements (
-	  id INTEGER PRIMARY KEY AUTOINCREMENT, title_i18n TEXT, body_i18n TEXT, target_plan TEXT DEFAULT 'all',
-	  starts_at TEXT, ends_at TEXT, active INTEGER DEFAULT 1, created_by INTEGER,
-	  created_at TEXT DEFAULT (datetime('now')))` ,
-	`CREATE TABLE IF NOT EXISTS announcement_reads (
-	  announcement_id INTEGER NOT NULL, seller_id TEXT NOT NULL, read_at TEXT DEFAULT (datetime('now')),
-	  PRIMARY KEY(announcement_id,seller_id))` ,
-	`CREATE TABLE IF NOT EXISTS support_tickets (
-	  id INTEGER PRIMARY KEY AUTOINCREMENT, seller_id TEXT NOT NULL, subject TEXT NOT NULL,
-	  status TEXT DEFAULT 'open', priority TEXT DEFAULT 'normal', assigned_to INTEGER,
-	  created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')))` ,
-	`CREATE TABLE IF NOT EXISTS support_messages (
-	  id INTEGER PRIMARY KEY AUTOINCREMENT, ticket_id INTEGER NOT NULL, sender TEXT NOT NULL,
-	  body TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')))` ,
-	`CREATE TABLE IF NOT EXISTS operational_job_runs (
-	  id TEXT PRIMARY KEY, job_key TEXT, trigger_kind TEXT, status TEXT, started_at TEXT DEFAULT (datetime('now')),
-	  completed_at TEXT, affected_count INTEGER, error_message TEXT, triggered_by INTEGER)` ,
-	`CREATE TABLE IF NOT EXISTS settings (
-	  key TEXT PRIMARY KEY, value_json TEXT, updated_by INTEGER, updated_at TEXT DEFAULT (datetime('now')))` ,
-	`CREATE TABLE IF NOT EXISTS design_system_revisions (
-	  id INTEGER PRIMARY KEY AUTOINCREMENT,schema_version INTEGER NOT NULL,generator_version TEXT NOT NULL,
-	  source_json TEXT NOT NULL,overrides_json TEXT NOT NULL DEFAULT '{}',snapshot_json TEXT NOT NULL,
-	  validation_json TEXT NOT NULL,legacy_projection_json TEXT NOT NULL,content_hash TEXT NOT NULL,
-	  status TEXT NOT NULL DEFAULT 'candidate',created_by INTEGER,created_at TEXT DEFAULT (datetime('now')),
-	  published_at TEXT,rollback_of_revision_id INTEGER,name TEXT,name_key TEXT,
-	  FOREIGN KEY(rollback_of_revision_id) REFERENCES design_system_revisions(id) ON DELETE SET NULL)` ,
-	`CREATE UNIQUE INDEX IF NOT EXISTS idx_design_system_revision_name_key
-	  ON design_system_revisions(name_key) WHERE name_key IS NOT NULL` ,
-	`CREATE TABLE IF NOT EXISTS design_system_state (
-	  id INTEGER PRIMARY KEY,active_revision_id INTEGER,updated_at TEXT DEFAULT (datetime('now')))` ,
-	`INSERT OR IGNORE INTO design_system_state(id,active_revision_id) VALUES(1,NULL)` ,
-	`CREATE TABLE IF NOT EXISTS store_capability_overrides (
-	  id TEXT PRIMARY KEY, store_id TEXT NOT NULL, capability_key TEXT NOT NULL, enabled INTEGER NOT NULL,
-	  reason TEXT NOT NULL, expires_at TEXT, created_by INTEGER, created_at TEXT DEFAULT (datetime('now')), revoked_at TEXT)` ,
-	`CREATE TABLE IF NOT EXISTS feature_flags (
-	  flag_key TEXT PRIMARY KEY, description TEXT, value_type TEXT DEFAULT 'boolean', default_value_json TEXT,
-	  env_gate TEXT, runtime_consumer TEXT, risk TEXT, rollout_seed TEXT, status TEXT, version INTEGER DEFAULT 1,
-	  updated_by INTEGER, updated_at TEXT DEFAULT (datetime('now')))` ,
-	`CREATE TABLE IF NOT EXISTS feature_flag_rules (
-	  id TEXT PRIMARY KEY, flag_key TEXT, priority INTEGER, scope_type TEXT, scope_value TEXT,
-	  min_version_code INTEGER, max_version_code INTEGER, rollout_basis_points INTEGER, value_json TEXT,
-	  starts_at TEXT, ends_at TEXT, active INTEGER DEFAULT 1, reason TEXT, created_by INTEGER, created_at TEXT DEFAULT (datetime('now')))` ,
-	`CREATE TABLE IF NOT EXISTS app_version_policies (
-	  id TEXT PRIMARY KEY, platform TEXT, country_code TEXT, channel TEXT, recommended_version_code INTEGER,
-	  minimum_version_code INTEGER, blocked_version_codes_json TEXT DEFAULT '[]', warning_message_i18n TEXT DEFAULT '{}',
-	  blocking_message_i18n TEXT DEFAULT '{}', store_url TEXT, enforce_after TEXT, maintenance_mode INTEGER DEFAULT 0,
-	  active INTEGER DEFAULT 1, reason TEXT, updated_by INTEGER, updated_at TEXT DEFAULT (datetime('now')))` ,
-	`CREATE TABLE IF NOT EXISTS buyer_restrictions (
-	  id TEXT PRIMARY KEY, store_id TEXT, buyer_phone_hash TEXT, buyer_phone_last4 TEXT, scope TEXT,
-	  status TEXT, reason TEXT, evidence TEXT, expires_at TEXT, created_by INTEGER, created_at TEXT DEFAULT (datetime('now')), revoked_at TEXT)` ,
-	`CREATE TABLE IF NOT EXISTS buyer_privacy_requests (
-	  id TEXT PRIMARY KEY, store_id TEXT, buyer_phone_hash TEXT NOT NULL, buyer_phone_last4 TEXT NOT NULL,
-	  request_type TEXT NOT NULL, status TEXT DEFAULT 'open', notes TEXT, requested_at TEXT DEFAULT (datetime('now')),
-	  completed_at TEXT, updated_by INTEGER)` ,
-	`CREATE TABLE IF NOT EXISTS capability_definitions (
-	  capability_key TEXT PRIMARY KEY, domain TEXT, label TEXT, description TEXT, implementation_status TEXT,
-	  enforcement_binding TEXT, runtime_consumer TEXT, risk TEXT, scopes_json TEXT DEFAULT '[]', updated_at TEXT DEFAULT (datetime('now')))` ,
-	`CREATE TABLE IF NOT EXISTS support_macros (
-	  id TEXT PRIMARY KEY, name TEXT, category TEXT, locale TEXT, body TEXT, active INTEGER DEFAULT 1,
-	  updated_by INTEGER, updated_at TEXT DEFAULT (datetime('now')))` ,
-	`CREATE TABLE IF NOT EXISTS content_configs (
-	  id TEXT PRIMARY KEY, content_key TEXT, locale TEXT, audience TEXT, version INTEGER, status TEXT,
-	  value_json TEXT, starts_at TEXT, ends_at TEXT, created_by INTEGER, created_at TEXT DEFAULT (datetime('now')),
-	  published_by INTEGER, published_at TEXT)` ,
-	`CREATE TABLE IF NOT EXISTS admin_exports (
-	  id TEXT PRIMARY KEY, export_type TEXT, classification TEXT, filters_json TEXT, status TEXT,
-	  row_count INTEGER, byte_count INTEGER, r2_key TEXT, created_at TEXT DEFAULT (datetime('now')),
-	  completed_at TEXT, expires_at TEXT, requested_by INTEGER, download_token_hash TEXT,
-	  download_expires_at TEXT, downloaded_at TEXT, error_message TEXT,
-	  attempt_count INTEGER NOT NULL DEFAULT 0, lease_expires_at TEXT)` ,
-	`CREATE TABLE IF NOT EXISTS admin_audit_exports (
-	  id TEXT PRIMARY KEY, first_audit_id INTEGER, last_audit_id INTEGER, event_count INTEGER,
-	  object_key TEXT, content_hash TEXT, signature TEXT, previous_hash TEXT, status TEXT DEFAULT 'written',
-	  created_at TEXT DEFAULT (datetime('now')), verified_at TEXT,
-	  signing_key_version INTEGER NOT NULL DEFAULT 1)` ,
-	`CREATE TABLE IF NOT EXISTS admin_users (
-	  id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT NOT NULL UNIQUE, name TEXT, password_hash TEXT NOT NULL,
-	  role TEXT NOT NULL DEFAULT 'readonly', lang TEXT NOT NULL DEFAULT 'en', timezone TEXT DEFAULT 'Africa/Cairo',
-	  totp_secret TEXT, totp_secret_ciphertext TEXT, totp_key_version INTEGER, totp_enabled INTEGER DEFAULT 0,
-	  mfa_required INTEGER DEFAULT 1, must_change_password INTEGER DEFAULT 0, password_expires_at TEXT,
-	  recovery_codes_acknowledged_at TEXT,
-	  active INTEGER DEFAULT 1, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT, last_login_at TEXT)` ,
-	`CREATE TABLE IF NOT EXISTS admin_sessions (
-	  id TEXT PRIMARY KEY, admin_id INTEGER NOT NULL DEFAULT 0, token_hash TEXT NOT NULL DEFAULT '', csrf_hash TEXT,
-	  expires_at TEXT NOT NULL, idle_expires_at TEXT, last_used_at TEXT, ip TEXT, user_agent TEXT,
-	  revoked_at TEXT, revoked_by INTEGER, revocation_reason TEXT, created_at TEXT DEFAULT (datetime('now')))` ,
-	`CREATE TABLE IF NOT EXISTS admin_auth_challenges (
-	  id TEXT PRIMARY KEY, admin_id INTEGER NOT NULL, kind TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0,
-	  expires_at TEXT NOT NULL, consumed_at TEXT, created_at TEXT DEFAULT (datetime('now')))` ,
-	`CREATE TABLE IF NOT EXISTS admin_recovery_codes (
-	  id TEXT PRIMARY KEY, admin_id INTEGER NOT NULL, code_hash TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')), used_at TEXT)` ,
-	`CREATE TABLE IF NOT EXISTS admin_invitations (
-	  id TEXT PRIMARY KEY, email TEXT NOT NULL, name TEXT, role TEXT NOT NULL, token_hash TEXT UNIQUE,
-	  expires_at TEXT NOT NULL, created_by INTEGER NOT NULL, created_at TEXT DEFAULT (datetime('now')),
-	  accepted_at TEXT, revoked_at TEXT)` ,
-	`CREATE TABLE IF NOT EXISTS admin_action_authorizations (
-	  id TEXT PRIMARY KEY, admin_id INTEGER, action TEXT, entity_id TEXT, payload_hash TEXT, expires_at TEXT,
-	  verified_at TEXT, consumed_at TEXT, created_at TEXT DEFAULT (datetime('now')))` ,
-	`CREATE TABLE IF NOT EXISTS security_alerts (
-	  id TEXT PRIMARY KEY, severity TEXT, kind TEXT, fingerprint TEXT, title TEXT, details_json TEXT DEFAULT '{}',
-	  occurrence_count INTEGER DEFAULT 1, status TEXT DEFAULT 'open', first_seen_at TEXT DEFAULT (datetime('now')),
-	  last_seen_at TEXT DEFAULT (datetime('now')), acknowledged_at TEXT, acknowledged_by INTEGER,
-	  resolved_at TEXT, resolved_by INTEGER, resolution_note TEXT)` ,
-	`CREATE TABLE IF NOT EXISTS error_logs (
-	  id INTEGER PRIMARY KEY AUTOINCREMENT, context TEXT, message TEXT, stack TEXT,
-	  path TEXT, method TEXT, ip TEXT, created_at TEXT DEFAULT (datetime('now')))`,
-	`CREATE TABLE IF NOT EXISTS outbound_email_jobs (
-	  id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'queued', attempt_count INTEGER NOT NULL DEFAULT 0,
-	  lease_expires_at TEXT, provider_id TEXT, last_error TEXT, created_at TEXT DEFAULT (datetime('now')),
-	  updated_at TEXT DEFAULT (datetime('now')), sent_at TEXT,
-	  -- Outbox columns (prod: 042_email_outbox.sql). payload holds the job until
-	  -- it is sent; dispatched_at is NULL until the Queue accepted the id.
-	  payload TEXT, dispatched_at TEXT)`,
-	`CREATE TABLE IF NOT EXISTS operational_leases (
-	  job_key TEXT PRIMARY KEY, holder TEXT NOT NULL, lease_expires_at TEXT NOT NULL,
-	  updated_at TEXT DEFAULT (datetime('now')))`,
-	// Required by checkRateLimit() — hit by register, catalog order submission,
-	// media upload, admin login, coupons, /api/v1/auth/session, and the auth-failure
-	// throttle in authSeller(). Missing here made registerStore() throw, which
-	// cascaded into "no seller" 401s across the authenticated tests. (Prod: 002_billing.sql)
-	`CREATE TABLE IF NOT EXISTS rate_limits (
-	  bucket TEXT PRIMARY KEY, count INTEGER NOT NULL DEFAULT 0, window_start INTEGER NOT NULL)`,
-	// Webhook idempotency dedupe (prod: 006_hardening.sql).
-	`CREATE TABLE IF NOT EXISTS webhook_events (
-	  event_id TEXT PRIMARY KEY, gateway TEXT, type TEXT,
-	  processed_at TEXT DEFAULT (datetime('now')))`,
-	`CREATE UNIQUE INDEX IF NOT EXISTS idx_sellers_store_code ON sellers(store_code COLLATE NOCASE)`,
-	`CREATE UNIQUE INDEX IF NOT EXISTS idx_sellers_public_identifier ON sellers(public_identifier COLLATE NOCASE)`,
-	`CREATE UNIQUE INDEX IF NOT EXISTS idx_sellers_slug ON sellers(slug COLLATE NOCASE)`,
-	`CREATE UNIQUE INDEX IF NOT EXISTS idx_categories_code ON categories(category_code COLLATE NOCASE)`,
-	`CREATE UNIQUE INDEX IF NOT EXISTS idx_categories_store_slug ON categories(store_id, slug)`,
-	`CREATE UNIQUE INDEX IF NOT EXISTS idx_products_code ON products(product_code COLLATE NOCASE)`,
-	`CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_store_idempotency
-	  ON orders(store_id, idempotency_key) WHERE idempotency_key IS NOT NULL`,
-	`CREATE TRIGGER IF NOT EXISTS trg_order_items_claim_stock
-	 BEFORE INSERT ON order_items WHEN NEW.product_id IS NOT NULL
-	 BEGIN
-	   SELECT CASE WHEN NEW.qty <= 0 OR NOT EXISTS (
-	     SELECT 1 FROM products WHERE id=NEW.product_id AND available=1 AND stock>=NEW.qty
-	   ) THEN RAISE(ABORT, 'insufficient_stock') END;
-	   UPDATE products SET stock=stock-NEW.qty, stock_version=stock_version+1,
-	     updated_at=datetime('now') WHERE id=NEW.product_id;
-	 END`,
-];
+// The hand-written SCHEMA and GEO_SCHEMA arrays stood here: 94 CREATE TABLE
+// statements maintained in parallel with migrations/. They are gone — the test
+// database is built from the real migrations now. See vitest.config.mts.
 
-const GEO_SCHEMA: string[] = [
-	`CREATE TABLE IF NOT EXISTS city_catalog_versions (
-	  version TEXT PRIMARY KEY,source_url TEXT NOT NULL,source_sha256 TEXT NOT NULL,
-	  license TEXT NOT NULL,city_count INTEGER NOT NULL DEFAULT 0,
-	  active INTEGER NOT NULL DEFAULT 0,imported_at TEXT DEFAULT (datetime('now')))`,
-	`CREATE TABLE IF NOT EXISTS city_catalog (
-	  version TEXT NOT NULL,source_city_id INTEGER NOT NULL,country_iso TEXT NOT NULL,
-	  name TEXT NOT NULL,native_name TEXT,state_code TEXT,state_name TEXT,
-	  population INTEGER NOT NULL DEFAULT 0,timezone TEXT,
-	  PRIMARY KEY(version,source_city_id))`,
-	`CREATE VIRTUAL TABLE IF NOT EXISTS city_catalog_search USING fts5(
-	  version UNINDEXED,source_city_id UNINDEXED,country_iso UNINDEXED,
-	  name,native_name,state_name,tokenize='unicode61 remove_diacritics 2')`,
-];
+/**
+ * Every table the suite should clear between tests: whatever the migrations
+ * created, minus the things clearing would break.
+ *
+ * Derived from the database rather than from a list, because a list is the
+ * thing this change removes. A new migration adding a table used to require
+ * remembering to add it here too, and forgetting left state leaking between
+ * tests in exactly one table — the least likely place anyone would look.
+ *
+ * `d1_migrations` is excluded because applyD1Migrations() uses it to decide
+ * what has already run: clearing it makes every migration re-apply, and the
+ * second CREATE TABLE fails. FTS5 shadow tables are excluded because they are
+ * maintained by their virtual table, not written directly.
+ */
+async function clearableTables(db: D1Database): Promise<Map<string, string>> {
+	const { results } = await db
+		.prepare(
+			`SELECT name, sql FROM sqlite_master
+			 WHERE type = 'table'
+			   AND name NOT LIKE 'sqlite_%'
+			   AND name NOT LIKE '_cf_%'
+			   AND name <> 'd1_migrations'`,
+		)
+		.all<{ name: string; sql: string | null }>();
+	const ftsShadowSuffixes = ["_data", "_idx", "_content", "_docsize", "_config"];
+	const tables = new Map<string, string>();
+	for (const row of results) {
+		if (ftsShadowSuffixes.some((suffix) => row.name.endsWith(suffix))) continue;
+		tables.set(row.name, row.sql ?? "");
+	}
+	return tables;
+}
+
+/**
+ * A delete order that satisfies the schema's foreign keys: children before the
+ * parents they reference.
+ *
+ * Derived by reading `REFERENCES` out of each table's own DDL and sorting, not
+ * by attempting deletes and retrying the failures. That was the first attempt
+ * and it is subtly wrong: on an empty database every delete succeeds, so the
+ * "discovered" order records nothing about the constraints and breaks the
+ * moment a populated database uses it. A delete that succeeds because there was
+ * nothing to delete has proved nothing.
+ *
+ * A cycle is reported rather than worked around, because a half-cleared
+ * database leaking into the next test is harder to diagnose than a loud
+ * failure here.
+ */
+function deleteOrderFor(tables: Map<string, string>): string[] {
+	const referencedBy = new Map<string, Set<string>>();
+	for (const [table, ddl] of tables) {
+		const targets = new Set<string>();
+		for (const match of ddl.matchAll(/REFERENCES\s+["`[]?([A-Za-z0-9_]+)/gi)) {
+			const target = match[1];
+			if (target !== table && tables.has(target)) targets.add(target);
+		}
+		referencedBy.set(table, targets);
+	}
+
+	const order: string[] = [];
+	const done = new Set<string>();
+	while (done.size < tables.size) {
+		// A table is safe to delete once everything it references is either already
+		// deleted or is itself waiting on nothing but already-deleted tables.
+		const ready = [...tables.keys()].filter(
+			(table) => !done.has(table)
+				&& [...(referencedBy.get(table) ?? [])].every((target) => done.has(target) || target === table),
+		);
+		const layer = ready.length > 0
+			? ready
+			: [...tables.keys()].filter((table) => !done.has(table));
+		if (ready.length === 0) {
+			throw new Error(
+				`Foreign-key cycle among test tables, so no delete order exists: ${layer.join(", ")}`,
+			);
+		}
+		for (const table of layer) {
+			order.push(table);
+			done.add(table);
+		}
+	}
+	// Children reference parents, so a table whose dependencies resolved first is
+	// a parent and must be emptied last.
+	return order.reverse();
+}
+
+/** Computed once from the schema; see deleteOrderFor. */
+let deleteOrder: string[] | null = null;
 
 export async function createSchema(): Promise<void> {
 	invalidateDesignSystemCache();
-	for (const stmt of SCHEMA) await env.orderak_db.prepare(stmt).run();
-	for (const stmt of GEO_SCHEMA) await env.orderak_geo.prepare(stmt).run();
-	// Vitest 4 keeps a project's D1 binding between tests. Reset every table
-	// represented by this focused schema so tests remain order-independent.
-	const tables = SCHEMA.map((stmt) => stmt.match(/CREATE TABLE IF NOT EXISTS\s+([a-z0-9_]+)/i)?.[1])
-		.filter((name): name is string => Boolean(name));
-	for (const table of [...new Set(tables)].reverse()) {
+	// The real migrations, not a copy of them. See vitest.config.mts.
+	await applyD1Migrations(env.orderak_db, (env as unknown as TestMigrationEnv).TEST_MIGRATIONS);
+	await applyD1Migrations(env.orderak_geo, (env as unknown as TestMigrationEnv).TEST_GEO_MIGRATIONS);
+	// Vitest 4 keeps a project's D1 binding between tests, so tables are cleared
+	// rather than recreated, keeping tests order-independent.
+	//
+	// The order respects foreign keys and is computed once: cleanup runs before
+	// every one of 246 tests, so anything repeated per-call is paid 246 times.
+	if (deleteOrder === null) deleteOrder = deleteOrderFor(await clearableTables(env.orderak_db));
+	for (const table of deleteOrder) {
 		await env.orderak_db.prepare(`DELETE FROM ${table}`).run();
 	}
 	await env.orderak_db.prepare("DELETE FROM geo_city_search").run();
