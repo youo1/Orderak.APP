@@ -37,7 +37,6 @@ deployable pieces plus supporting material:
 - **`services/backend/`** — a Cloudflare Worker (TypeScript) that owns the D1 database,
   R2 media storage, D1-backed sessions, authentication enforcement, billing, email,
   and all calls to AI or other third-party services (DeepSeek today).
-- **`packages/ai-prompts/`** — prompt templates used by the backend's AI features.
 - **`design/`** — Figma and Canva links plus exported design assets.
 - **`docs/`** — product plan, API reference, architecture notes, and companion
   guides.

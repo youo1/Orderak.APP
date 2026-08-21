@@ -103,6 +103,14 @@ const EXPECTED_ABSENT = new Map([
 	// precisely to say it is gone. A path can be referenced because it is absent,
 	// not only because it is present, and the check has no way to tell those
 	// apart from the citation alone.
+	// Deleted 2026-08-22 as dead code: nine prompt templates for a LangChain
+	// workbench that never existed in this repository — AGENTS.md documented six
+	// Python files for it, none of which were ever here. CHANGELOG and the
+	// 2026-08-01 restructure review name `packages/` because that is what the tree
+	// held on those dates, and rewriting a dated record to match today would be a
+	// worse defect than the dangling path.
+	["packages", "Emptied 2026-08-22 when packages/ai-prompts was deleted. Named only by dated records describing the tree as it was."],
+	["packages/ai-prompts", "Deleted 2026-08-22. Prompt templates no code read, serving a multi-agent tool absent from this repository."],
 	["docs/contracts/SUSPENDED.md", "Removed by Phase 0: a notice about a contract-suspension mechanism that no longer exists. Referenced in governance records as evidence of its removal."],
 ]);
 

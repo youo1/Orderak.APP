@@ -77,7 +77,7 @@ const assertSuffix = (label, names, suffix) => {
 
 for (const directory of [
   "apps/seller-android", "apps/admin-web", "services/backend", "contracts/openapi",
-  "contracts/typescript", "packages/ai-prompts", "quality/performance", "tooling/repository"
+  "contracts/typescript", "quality/performance", "tooling/repository"
 ]) requireFile(directory);
 for (const legacy of ["android-app", "admin-frontend", "backend", "openapi", "shared-types", "ai-prompts", "performance", "outputs", "path", "pmcp"]) requireAbsent(legacy);
 

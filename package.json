@@ -10,7 +10,7 @@
     "test": "turbo run test",
     "lint": "turbo run lint",
     "test:types": "turbo run test:types",
-    "lint:markdown": "npx --yes markdownlint-cli2@0.23.2 \"**/*.md\" \"#**/node_modules/**\" \"#**/build/**\" \"#**/dist/**\" \"#**/portal-build/**\" \"#**/.wrangler/**\" \"#site/**\" \"#docs/archive/**\" \"#packages/ai-prompts/**\" \"#**/.venv/**\"",
+    "lint:markdown": "npx --yes markdownlint-cli2@0.23.2 \"**/*.md\" \"#**/node_modules/**\" \"#**/build/**\" \"#**/dist/**\" \"#**/portal-build/**\" \"#**/.wrangler/**\" \"#site/**\" \"#docs/archive/**\" \"#**/.venv/**\"",
     "mock:seller-v1": "pnpm --filter @orderak/openapi run mock:seller-v1",
     "openapi:check": "pnpm --filter @orderak/openapi run check",
     "openapi:bundle": "pnpm --filter @orderak/openapi run bundle",
