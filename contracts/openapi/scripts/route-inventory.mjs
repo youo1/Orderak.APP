@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { discoverHonoRoutes, assertMountsAtRoot } from "./hono-inventory.mjs";
+import { discoverHonoRoutes, assertMountsAtRoot, assertOpenApiRoutesResolvable } from "./hono-inventory.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const openapiRoot = path.resolve(here, "..");
@@ -36,6 +36,15 @@ export function discoverRoutes() {
     throw new Error(
       "Hono sub-app mounted under a prefix; route inventory would under-report.\n" +
       badMounts.map((m) => `  ${m}`).join("\n"),
+    );
+  }
+
+  const unresolvable = assertOpenApiRoutesResolvable(backendFiles, backendRoot);
+  if (unresolvable.length > 0) {
+    throw new Error(
+      "app.openapi() route whose method/path cannot be read statically. It would be\n" +
+      "implemented but absent from the contract, with coverage still reporting 100%.\n" +
+      unresolvable.map((m) => `  ${m}`).join("\n"),
     );
   }
 
