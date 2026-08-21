@@ -24,6 +24,12 @@ updates:
       day: wednesday
       time: "06:00"
       timezone: Africa/Cairo
+    # A version published minutes ago has been reviewed by nobody. Waiting a
+    # week is the standard defence against a compromised release being proposed
+    # before the ecosystem has noticed it — the shape most supply-chain attacks
+    # on package registries take.
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 5
     groups:
       cloudflare-wrangler:
@@ -47,6 +53,12 @@ updates:
       day: wednesday
       time: "06:00"
       timezone: Africa/Cairo
+    # A version published minutes ago has been reviewed by nobody. Waiting a
+    # week is the standard defence against a compromised release being proposed
+    # before the ecosystem has noticed it — the shape most supply-chain attacks
+    # on package registries take.
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 3
     groups:
       android-compose:
@@ -70,6 +82,12 @@ updates:
       day: wednesday
       time: "06:00"
       timezone: Africa/Cairo
+    # A version published minutes ago has been reviewed by nobody. Waiting a
+    # week is the standard defence against a compromised release being proposed
+    # before the ecosystem has noticed it — the shape most supply-chain attacks
+    # on package registries take.
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 5
     groups:
       github-actions:
