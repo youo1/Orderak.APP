@@ -22,8 +22,16 @@ into several files.
 | Installation, configuration, or deployment | [`guides/setup.md`](./setup.md) |
 | System component or data flow | [`architecture/overview.md`](../architecture/overview.md) |
 | Authentication, authorization, or secrets | [`architecture/security-model.md`](../architecture/security-model.md) |
+| Accounts, sessions, devices, deletion, retention | [`domains/identity.md`](../domains/identity.md) |
+| Store codes, slugs, public identifiers | [`domains/stores.md`](../domains/stores.md) |
+| Products, categories, translations, taxonomy, geo | [`domains/catalog.md`](../domains/catalog.md) |
+| Order lifecycle or the public order endpoint | [`domains/orders.md`](../domains/orders.md) |
 | Payment gateways, Google Play billing, billing gates | [`domains/billing.md`](../domains/billing.md) |
 | Plan limits, entitlements, usage metering | [`domains/entitlements.md`](../domains/entitlements.md) |
+| Ads, coupons, referrals | [`domains/growth.md`](../domains/growth.md) |
+| Design tokens, theme delivery, screen manifest | [`domains/design-system.md`](../domains/design-system.md) |
+| Admin operations, flags, capabilities, audit | [`domains/admin-control-plane.md`](../domains/admin-control-plane.md) |
+| Databases, tenant routing, D1 concurrency patterns | [`data/database.md`](../data/database.md) |
 | Database migration | The generator, not the document — see below |
 | Localization contract | [`architecture/localization-architecture.md`](../architecture/localization-architecture.md) |
 | Operational recovery procedure | A focused runbook in `docs/runbooks/` |
