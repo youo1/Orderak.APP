@@ -22,7 +22,7 @@ describe("admin control-plane enforcement", () => {
 	it("requires scoped privacy transitions and re-verifies identity before anonymization", async () => {
 		const registered = await registerStore({ phone: "+201511100000" });
 		const seller = await env.orderak_db.prepare("SELECT id FROM sellers WHERE phone=?").bind(registered.phone).first<{ id: string }>();
-		await env.orderak_db.prepare("INSERT INTO orders(id,store_id,buyer_phone,buyer_name,status,pay_method,total_piasters) VALUES('privacy-order',?,?,?,'NEW','COD',1000)")
+		await env.orderak_db.prepare("INSERT INTO orders(id,store_id,buyer_phone,buyer_name,status,pay_method,total_minor) VALUES('privacy-order',?,?,?,'NEW','COD',1000)")
 			.bind(seller!.id, "+201000000111", "Buyer Name").run();
 		expect((await adminFetch("/api/admin/v1/buyer-privacy", "readonly", { method: "POST", body: "{}" })).status).toBe(403);
 		const opened = await adminFetch("/api/admin/v1/buyer-privacy", "owner", { method: "POST", body: JSON.stringify({ store_id: seller!.id, buyer_phone: "+201000000111", request_type: "deletion", notes: "verified request intake" }) });

@@ -12,8 +12,13 @@ on:
         required: true
         type: string
 
+# contents: write is needed only by the final step, which tags the deployed
+# commit. It is a deliberate widening: without a tag, the only record of what
+# is in production is this workflow run history, and Actions history is kept
+# for 90 days. After that, "what shipped on date X" has no answer in GitHub at
+# all. A tag is permanent and costs one API call.
 permissions:
-  contents: read
+  contents: write
   actions: read
 
 concurrency:
@@ -71,7 +76,7 @@ jobs:
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '22'
+          node-version-file: .nvmrc
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
@@ -116,3 +121,25 @@ jobs:
         run: |
           curl --fail --show-error --retry 5 --retry-delay 5 https://api.orderak.app/health
           curl --fail --show-error --retry 5 --retry-delay 5 https://admin.orderak.app/
+
+      # Runs only after the smoke test passes, so a tag means "this reached
+      # production and answered", not merely "this was dispatched". A failed
+      # deploy leaves no tag behind to be mistaken for a release.
+      - name: Tag the released commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ inputs.release_sha }}
+        run: |
+          set -euo pipefail
+          TAG="production/$(date -u +%Y-%m-%dT%H%MZ)"
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" >/dev/null 2>&1; then
+            echo "Tag ${TAG} already exists; leaving it untouched."
+            exit 0
+          fi
+          gh api "repos/${GITHUB_REPOSITORY}/git/refs" -f ref="refs/tags/${TAG}" -f sha="${RELEASE_SHA}" >/dev/null
+          echo "Tagged ${RELEASE_SHA} as ${TAG}"
+          {
+            echo "### Released ${TAG}"
+            echo ""
+            echo "Commit ${RELEASE_SHA} is live on api.orderak.app and admin.orderak.app"
+          } >> "${GITHUB_STEP_SUMMARY}"

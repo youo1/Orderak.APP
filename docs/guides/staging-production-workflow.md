@@ -2,7 +2,7 @@
 status: current
 generated: false
 owner: governance
-last_verified: 2026-08-13
+last_verified: 2026-08-19
 applies_to: [production, staging]
 authoritative_for: [release-workflow]
 ---
@@ -71,28 +71,52 @@ The repository currently uses these controls:
 - A manual Production workflow requiring both a tested `release_ref` and the
   exact confirmation text `DEPLOY_PRODUCTION`.
 
-**This paragraph used to say required reviewers were unavailable. That is no
-longer true, and the reason it changed is worth keeping.** The restriction
-applied to *private* repositories on the current plan. Both `youo1/Orderak` and
-`youo1/Orderak.APP` are now **public**, so environment required reviewers are
-available.
+**Required reviewers are unavailable again, and the reviewer gate is now
+withdrawn as a plan rather than deferred. Corrected 2026-08-20.**
 
-Verified empirically on 2026-08-15 rather than inferred from the plan tier: a
-throwaway environment was created on `Orderak.APP` with a `reviewers` payload,
-the API accepted it and returned `protection_rules: ["required_reviewers"]`,
-and the environment was deleted immediately afterwards.
+This paragraph has now been wrong in both directions, so the sequence is worth
+keeping in full:
 
-**Neither repository's `production` environment uses them today.** The old
-repository's carries only a `branch_policy` rule, and the approval boundary in
-practice is still the typed `DEPLOY_PRODUCTION` confirmation plus restricted
-manual dispatch. That is weaker than a reviewer gate: it stops an accident, not
-a decision.
+1. It originally said required reviewers were unavailable — true, because the
+   restriction applies to *private* repositories on the current plan.
+2. On 2026-08-15 both repositories were public, and it was rewritten to say
+   reviewers were available. That was verified empirically rather than inferred
+   from the plan tier: a throwaway environment was created on `Orderak.APP` with
+   a `reviewers` payload, the API accepted it and returned
+   `protection_rules: ["required_reviewers"]`, and the environment was deleted
+   immediately afterwards.
+3. Both repositories then went **private** — `youo1/Orderak` on 2026-08-16 — and
+   this paragraph was not revisited. Measured 2026-08-20:
+   `youo1/Orderak.APP` and `youo1/Orderak` both report `private=true`, and every
+   environment in `Orderak.APP` reads `protection_rules: []`. The plan
+   restriction applies once more.
 
-So the accurate statement is now: a reviewer gate is **available and not
-configured**. It should be set on `production`, `backup-restore-staging`,
-`backup-restore-production` and `staging-rollback` when those environments are
-created in `Orderak.APP` at cutover — before their first dispatch, not after.
-Until then, do not describe the workflow as having a GitHub reviewer gate.
+So step 2's finding still stands as a measurement; it just no longer describes
+the repository as it is. **A reviewer gate is unavailable, not merely
+unconfigured.**
+
+The earlier plan — "set it on `production`, `backup-restore-staging`,
+`backup-restore-production` and `staging-rollback` before their first dispatch" —
+is withdrawn, and not only because the platform now refuses it. On a
+single-maintainer repository the gate could never have done the work claimed for
+it: the sole reviewer is always the change author, so the approval is a
+self-approval, and a control that one person can always satisfy alone constrains
+nothing. Keeping it on the roadmap kept a permanent false finding in every audit.
+(`staging-rollback` also does not exist in `Orderak.APP`; the five environments
+present are `production`, `staging`, `staging-contract-tests`, and the two
+`backup-restore-*`.)
+
+What replaces it is what was always doing the real work — checks a machine
+performs on every dispatch, none of which need a second person to be available:
+the typed `DEPLOY_PRODUCTION` confirmation, the 40-character SHA matched against
+`origin/main`, the requirement that the SHA already have a successful
+`staging-deploy.yml` run, `require-deploy-owner`, `verify-deployment-map.mjs`,
+the full test/lint/`--dry-run` pass, and the post-deploy smoke test. Alongside
+those sits credential custody: each deploy token is scoped to its environment, so
+a workflow that does not declare the environment cannot reach its resources.
+
+Do not describe this workflow as having a GitHub reviewer gate. It does not have
+one, and by current design it is not getting one.
 
 ## Daily development workflow
 
@@ -415,8 +439,23 @@ incident:
 
 `youo1/Orderak` no longer deploys Staging. Its `CLOUDFLARE_API_TOKEN` was
 removed from the `staging` environment, and its `staging-deploy.yml` is
-dispatch-only behind a typed `BREAK_GLASS` confirmation plus a required
-reviewer on the `staging-rollback` environment.
+dispatch-only behind a typed `BREAK_GLASS` confirmation.
+
+> **The required reviewer on `staging-rollback` is almost certainly gone, and
+> this procedure no longer relies on it.** Making `youo1/Orderak` private on
+> 2026-08-16 stripped `required_reviewers` from both its `backup-restore-*`
+> environments — measured before and after. Environment reviewers are not
+> available on private repositories under that plan, so the same applies to
+> `staging-rollback`. **That specific environment has not been re-queried**, so
+> this is stated as the consequence of a measured plan limit, not as its own
+> measurement. Confirm it before relying on the gate.
+>
+> What still holds is the stronger control, and it was always the real one: the
+> environment carries **no credential**, so the break-glass path cannot run until
+> a human deliberately puts one there. The reviewer was defence in depth on top
+> of that, not the thing preventing a deploy.
+
+That environment name still gates the dispatch, so the steps below are unchanged.
 
 **That environment deliberately holds no credential.** The plan's requirement
 is a rollback credential kept *outside* Actions — "a deliberate human act, not

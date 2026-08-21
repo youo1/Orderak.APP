@@ -1,0 +1,94 @@
+# Dependency updates.
+#
+# This file replaces renovate.json, which configured a Renovate App that was
+# never installed on this repository: no Renovate pull request or dependency
+# dashboard was ever opened here. The config described grouping, pinning, and
+# patch auto-merge that nothing was performing, so the repository appeared to
+# have dependency automation while having none.
+#
+# Dependabot security updates are already enabled on this repository, but those
+# only act on published advisories. Routine version updates — the work
+# renovate.json was actually written for — need this file.
+#
+# Groups mirror the intent of the renovate.json packageRules they replace, so
+# one review covers a toolchain rather than arriving as separate pull requests.
+version: 2
+updates:
+  # pnpm workspace. Dependabot resolves every workspace member from the root
+  # pnpm-lock.yaml, so a single root entry covers apps/, services/, and
+  # contracts/ rather than one entry per package.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: wednesday
+      time: "06:00"
+      timezone: Africa/Cairo
+    # A version published minutes ago has been reviewed by nobody. Waiting a
+    # week is the standard defence against a compromised release being proposed
+    # before the ecosystem has noticed it — the shape most supply-chain attacks
+    # on package registries take.
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    groups:
+      cloudflare-wrangler:
+        patterns: ["wrangler", "@cloudflare/*", "miniflare"]
+      react-vite:
+        patterns: ["react", "react-dom", "@types/react", "@types/react-dom", "vite", "@vitejs/*", "tailwindcss", "@tailwindcss/*"]
+      dev-tooling:
+        patterns: ["oxlint", "vitest", "@vitest/*", "playwright", "@playwright/*", "tsx", "typescript"]
+      sentry:
+        patterns: ["@sentry/*"]
+      # Everything else, patch and minor only. Majors still arrive on their own
+      # so a breaking change is never bundled with routine upgrades.
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  # Android / Compose / Kotlin toolchain.
+  - package-ecosystem: gradle
+    directory: /apps/seller-android
+    schedule:
+      interval: weekly
+      day: wednesday
+      time: "06:00"
+      timezone: Africa/Cairo
+    # A version published minutes ago has been reviewed by nobody. Waiting a
+    # week is the standard defence against a compromised release being proposed
+    # before the ecosystem has noticed it — the shape most supply-chain attacks
+    # on package registries take.
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 3
+    groups:
+      android-compose:
+        update-types: [minor, patch]
+    ignore:
+      # Kotlin and AGP majors were dependencyDashboardApproval in renovate.json:
+      # they move jvmTarget and the Compose compiler together and must be taken
+      # deliberately, not as an incidental pull request.
+      - dependency-name: org.jetbrains.kotlin:*
+        update-types: [version-update:semver-major]
+      - dependency-name: com.android.tools.build:gradle
+        update-types: [version-update:semver-major]
+
+  # Action versions. Every workflow here pins actions by commit SHA; Dependabot
+  # updates the SHA and rewrites the trailing version comment, so pinning is
+  # kept rather than traded away for update coverage.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: wednesday
+      time: "06:00"
+      timezone: Africa/Cairo
+    # A version published minutes ago has been reviewed by nobody. Waiting a
+    # week is the standard defence against a compromised release being proposed
+    # before the ecosystem has noticed it — the shape most supply-chain attacks
+    # on package registries take.
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns: ["*"]

@@ -67,6 +67,80 @@ function collectStringConstants(sourceFile) {
 	return constants;
 }
 
+/**
+ * Collect module-level `const NAME = createRoute({ ... })` bindings.
+ *
+ * `@hono/zod-openapi` registers a route as `app.openapi(routeDef, handler)`,
+ * and the idiomatic form defines `routeDef` separately rather than inline:
+ *
+ *   const listOrders = createRoute({ method: "get", path: "/api/v1/orders", ... });
+ *   app.openapi(listOrders, handler);
+ *
+ * Without this map the `.openapi()` branch below can only see inline
+ * definitions, which would under-report exactly the routes most likely to be
+ * written — and an under-reported route surfaces as "spec operation with no
+ * implementation", the same phantom the regex inventory used to produce.
+ */
+function collectRouteDefinitions(sourceFile) {
+	const definitions = new Map();
+	const visit = (node) => {
+		if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer
+			&& ts.isCallExpression(node.initializer)
+			&& ts.isIdentifier(node.initializer.expression)
+			&& node.initializer.expression.text === "createRoute") {
+			const arg = node.initializer.arguments[0];
+			if (arg && ts.isObjectLiteralExpression(arg)) definitions.set(node.name.text, arg);
+		}
+		ts.forEachChild(node, visit);
+	};
+	visit(sourceFile);
+	return definitions;
+}
+
+/** Read a string-valued property from a `createRoute({ ... })` object literal. */
+function objectLiteralProperty(objectLiteral, key) {
+	for (const property of objectLiteral.properties) {
+		if (!ts.isPropertyAssignment(property)) continue;
+		const name = property.name;
+		const text = ts.isIdentifier(name) || ts.isStringLiteralLike(name) ? name.text : null;
+		if (text === key) return property.initializer;
+	}
+	return null;
+}
+
+/**
+ * Resolve the first argument of `.openapi(...)` to `{ methodNode, pathNode }`.
+ *
+ * Accepts both the inline `app.openapi(createRoute({...}), h)` form and the
+ * `const r = createRoute({...}); app.openapi(r, h)` form. Anything else — a
+ * route object built by a helper, or imported from another module — is
+ * genuinely not resolvable from this file alone, and returning null is the
+ * honest answer: assertOpenApiRoutesResolvable() below reports it rather than
+ * letting it disappear silently.
+ */
+function resolveOpenApiRouteDefinition(node, definitions) {
+	// `.openapi()` is two different methods sharing a name. Zod's names a schema
+	// for the components block — `MoneySchema.openapi("Money", { ... })` — and
+	// takes a string first. Hono's registers a route and takes a createRoute
+	// object. Without this discriminator every named schema in the codebase is
+	// reported as an unresolvable route, which is how this was first noticed.
+	if (ts.isStringLiteralLike(node)) return null;
+
+	let objectLiteral = null;
+	if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)
+		&& node.expression.text === "createRoute") {
+		const arg = node.arguments[0];
+		if (arg && ts.isObjectLiteralExpression(arg)) objectLiteral = arg;
+	} else if (ts.isIdentifier(node)) {
+		objectLiteral = definitions.get(node.text) ?? null;
+	}
+	if (!objectLiteral) return null;
+	return {
+		methodNode: objectLiteralProperty(objectLiteral, "method"),
+		pathNode: objectLiteralProperty(objectLiteral, "path"),
+	};
+}
+
 /** Resolve a path argument node to a literal string, or null when it is dynamic. */
 function resolvePath(node, constants) {
 	if (!node) return null;
@@ -186,6 +260,47 @@ export function assertMountsAtRoot(files) {
 }
 
 /**
+ * Report every `.openapi(...)` registration whose method and path cannot be
+ * read from this file.
+ *
+ * A route registered through a helper or imported from another module is
+ * invisible to the AST pass, and an invisible route is not a harmless omission:
+ * it is implemented, serving traffic, and absent from the contract — while
+ * route coverage reports 100% because it never knew the route existed. That is
+ * strictly worse than the phantom "route without spec" this inventory was
+ * written to eliminate, because it fails silently in the safe-looking direction.
+ *
+ * So it fails loudly, matching assertMountsAtRoot() above.
+ */
+export function assertOpenApiRoutesResolvable(files, workspaceRoot) {
+	const offenders = [];
+	for (const file of files) {
+		const source = fs.readFileSync(file, "utf8");
+		const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+		const definitions = collectRouteDefinitions(sourceFile);
+		const constants = collectStringConstants(sourceFile);
+		const relative = path.relative(workspaceRoot, file).replaceAll("\\", "/");
+		const visit = (node) => {
+			if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)
+				&& node.expression.name.text === "openapi" && node.arguments[0]
+				&& !ts.isStringLiteralLike(node.arguments[0])) {
+				const definition = resolveOpenApiRouteDefinition(node.arguments[0], definitions);
+				const methodOk = definition?.methodNode && ts.isStringLiteralLike(definition.methodNode);
+				const pathOk = definition?.pathNode && resolvePath(definition.pathNode, constants);
+				if (!methodOk || !pathOk) {
+					offenders.push(`${relative}: .openapi(${node.arguments[0].getText().slice(0, 60)}…) — `
+						+ `${!definition ? "route object is not a local createRoute(...)"
+							: !methodOk ? "method is not a string literal" : "path is not statically resolvable"}`);
+				}
+			}
+			ts.forEachChild(node, visit);
+		};
+		visit(sourceFile);
+	}
+	return offenders;
+}
+
+/**
  * Discover every Hono route registration in the given files.
  * Returns [{ method, path, source }].
  */
@@ -196,11 +311,41 @@ export function discoverHonoRoutes(files, workspaceRoot) {
 		const source = fs.readFileSync(file, "utf8");
 		const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
 		const constants = collectStringConstants(sourceFile);
+		const routeDefinitions = collectRouteDefinitions(sourceFile);
 		const relative = path.relative(workspaceRoot, file).replaceAll("\\", "/");
 
 		const visit = (node) => {
 			if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
 				const called = node.expression.name.text;
+
+				// `@hono/zod-openapi`: app.openapi(createRoute({ method, path }), handler).
+				// The method and path live inside an object literal rather than in the
+				// call's own arguments, so this cannot share the branch below. Handled
+				// first because "openapi" is not a Hono verb and must never fall through
+				// to the ROUTE_METHODS path-is-first-argument assumption.
+				if (called === "openapi" && node.arguments[0]) {
+					const definition = resolveOpenApiRouteDefinition(node.arguments[0], routeDefinitions);
+					if (definition && definition.methodNode && definition.pathNode) {
+						const raw = resolvePath(definition.pathNode, constants);
+						const method = ts.isStringLiteralLike(definition.methodNode)
+							? definition.methodNode.text.toUpperCase()
+							: null;
+						if (raw && raw.startsWith("/api/") && method && HTTP_METHODS.has(method)) {
+							const resolved = toOpenApiPaths(raw);
+							if (resolved) {
+								routes.push({
+									method,
+									path: resolved.canonical,
+									variants: resolved.variants,
+									source: relative,
+								});
+							}
+						}
+					}
+					ts.forEachChild(node, visit);
+					return;
+				}
+
 				if (ROUTE_METHODS.has(called)) {
 					// `.on(method, path, handler)` puts the path second.
 					const isOn = called === "on";

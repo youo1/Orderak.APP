@@ -2,6 +2,7 @@
 status: current
 generated: false
 owner: backend
+last_verified: 2026-08-20
 applies_to: [production, staging]
 authoritative_for: [deployment-environments]
 ---
@@ -57,12 +58,49 @@ Bindings remain identical across environments; their resource targets are isolat
 
 ## GitHub configuration to verify live
 
-Expected environments are `staging`, `production`, and `staging-contract-tests`.
-Repository workflows reference the variable name `CLOUDFLARE_ACCOUNT_ID` and secret
-name `CLOUDFLARE_API_TOKEN`; only their existence and scope may be audited. The live
+Workflows in this repository reference **five** environments — `staging`,
+`production`, `staging-contract-tests`, and the two `backup-restore-*`
+environments `restore-drill.yml` selects between. Earlier revisions of this
+paragraph listed only the first three and omitted the restore pair.
+
+They reference the **variable** `CLOUDFLARE_ACCOUNT_ID` and the **secrets**
+`ORDERAK_DEPLOY_STAGING`, `ORDERAK_DEPLOY_PRODUCTION`, `ORDERAK_BACKUP_STAGING`,
+`ORDERAK_BACKUP_PRODUCTION`, `ORDERAK_DRIFT_CHECK`, `ORDERAK_ANALYTICS` and
+`ORDERAK_RESTORE_READ`. Each is read into the `CLOUDFLARE_API_TOKEN` environment
+variable, which is what wrangler reads — the secret name and the variable name are
+different strings and only the secret name was renamed. Only their existence and
+scope may be audited. The live
 review must also confirm default branch, branch protection, required checks,
-CODEOWNERS, environment reviewers/wait rules, workflow permissions, concurrency,
-deployment URLs, and that Production approval cannot be provided solely by the change author.
+CODEOWNERS, workflow permissions, concurrency, and deployment URLs.
+
+### Production approval: automated gates, not a second reviewer
+
+An earlier revision of this section required the live review to confirm "that
+Production approval cannot be provided solely by the change author." That control
+was never configured, and on a single-maintainer repository it cannot be: there is
+no second person to provide the approval. A rule nobody can satisfy is not a
+control, and auditing against it produced a permanent false finding.
+
+The rule is withdrawn. Production is gated by checks a machine performs on every
+dispatch, all of which live in `production-deploy.yml` and none of which depend on
+a second human being available:
+
+| Gate | Prevents |
+|---|---|
+| Typed `DEPLOY_PRODUCTION` confirmation | An accidental dispatch |
+| 40-character SHA, matched against `origin/main` | Deploying a side branch |
+| SHA must have a successful `staging-deploy.yml` run | Deploying an unexercised commit |
+| `require-deploy-owner` against `DEPLOY_OWNER` | Deploying from the wrong repository |
+| `verify-deployment-map.mjs` | Deploying at the wrong resources |
+| Full test, type-check, lint, and `wrangler --dry-run` | Shipping a broken build or config |
+| Post-deploy smoke test on `/health` and the Admin origin | A silently dead deploy |
+
+The `production` GitHub Environment is retained, and its purpose is credential
+custody rather than approval: `ORDERAK_DEPLOY_PRODUCTION` is scoped to that
+environment, so a workflow that does not declare it cannot reach production
+Cloudflare resources. The same reasoning keeps `staging-contract-tests` separate
+from `staging` — the nightly fuzzer needs seller credentials and must not also
+inherit a deploy token.
 
 Production accepts a full 40-character commit SHA, verifies that the checked-out SHA
 has a successful `staging-deploy.yml` run, requires `DEPLOY_PRODUCTION`, and then enters

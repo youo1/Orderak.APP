@@ -71,7 +71,7 @@ op.get(`${B}/subscriptions`, async (c) => {
 		const limit = Math.min(500, Math.max(1, Number(url.searchParams.get("limit")) || 100));
 		const { results } = await env.orderak_db.prepare(
 			`SELECT s.id,s.seller_id,se.store_name,se.store_code,se.public_identifier,s.plan_id,s.status,s.gateway,
-			 s.amount_piasters,s.current_period_end,s.created_at,s.updated_at,
+			 s.amount_minor,s.current_period_end,s.created_at,s.updated_at,
 			 os.organization_id,orgs.status AS organization_status,orgs.plan_revision_id,
 			 orgs.pending_revision_id,orgs.pending_effective_at,orgs.source AS subscription_source,
 			 pr.version AS plan_version,sp.plan_key AS governed_plan_key,
@@ -227,7 +227,7 @@ op.get(`${B}/stores/:storeId`, async (c) => {
 			const hasPrimaryDevice = Number(store.has_primary_device ?? 0) === 1;
 			delete store.has_primary_device;
 			const subscription = gate("subscriptions:view") ? null : await env.orderak_db.prepare(
-				`SELECT s.id,s.plan_id,s.status,s.gateway,s.amount_piasters,s.current_period_end,
+				`SELECT s.id,s.plan_id,s.status,s.gateway,s.amount_minor,s.current_period_end,
 				 os.organization_id,orgs.status AS organization_status,orgs.plan_revision_id,
 				 orgs.pending_revision_id,orgs.pending_effective_at,orgs.source AS subscription_source,
 				 pr.version AS plan_version,sp.plan_key AS governed_plan_key

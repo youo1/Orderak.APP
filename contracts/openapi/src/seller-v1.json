@@ -9,7 +9,7 @@
       "url": "https://docs.orderak.app"
     },
     "license": {
-      "name": "Proprietary \u2014 internal pre-release",
+      "name": "Proprietary — internal pre-release",
       "url": "https://docs.orderak.app/legal/terms-of-service/"
     }
   },
@@ -47,7 +47,11 @@
         "x-data-classification": "pending-review",
         "x-rate-limit": "seller-authenticated-default",
         "x-stability": "draft",
-        "security": [],
+        "security": [
+          {
+            "sellerDevice": []
+          }
+        ],
         "parameters": [
           {
             "$ref": "./components/common.json#/parameters/RequestId"
@@ -60,14 +64,44 @@
           }
         ],
         "responses": {
-          "302": {
-            "description": "Redirect to the content-addressed stylesheet for the active design system revision.",
+          "200": {
+            "description": "Successful response",
             "headers": {
               "X-Request-ID": {
                 "$ref": "./components/common.json#/headers/RequestId"
-              },
-              "Location": {
-                "$ref": "./components/common.json#/headers/Location"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/GenericSuccess"
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "ok": true
+                    }
+                  },
+                  "empty": {
+                    "value": {
+                      "ok": true,
+                      "items": [],
+                      "has_more": false
+                    }
+                  },
+                  "pagination": {
+                    "value": {
+                      "ok": true,
+                      "items": [
+                        {
+                          "id": "example"
+                        }
+                      ],
+                      "next_cursor": "opaque-cursor",
+                      "has_more": true
+                    }
+                  }
+                }
               }
             }
           },
@@ -232,7 +266,11 @@
         "x-data-classification": "pending-review",
         "x-rate-limit": "seller-authenticated-default",
         "x-stability": "draft",
-        "security": [],
+        "security": [
+          {
+            "sellerDevice": []
+          }
+        ],
         "parameters": [
           {
             "$ref": "./components/common.json#/parameters/RequestId"
@@ -262,9 +300,35 @@
               }
             },
             "content": {
-              "text/css": {
+              "application/json": {
                 "schema": {
-                  "type": "string"
+                  "$ref": "./components/common.json#/schemas/GenericSuccess"
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "ok": true
+                    }
+                  },
+                  "empty": {
+                    "value": {
+                      "ok": true,
+                      "items": [],
+                      "has_more": false
+                    }
+                  },
+                  "pagination": {
+                    "value": {
+                      "ok": true,
+                      "items": [
+                        {
+                          "id": "example"
+                        }
+                      ],
+                      "next_cursor": "opaque-cursor",
+                      "has_more": true
+                    }
+                  }
                 }
               }
             }
@@ -349,21 +413,6 @@
                       "request_id": "018f-example"
                     }
                   }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No published design system revision matches the requested content hash.",
-            "headers": {
-              "X-Request-ID": {
-                "$ref": "./components/common.json#/headers/RequestId"
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "./components/common.json#/schemas/Problem"
                 }
               }
             }
@@ -5150,7 +5199,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "pattern": "^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$"
+              "minLength": 1
             }
           }
         ],
@@ -5276,21 +5325,6 @@
                       "request_id": "018f-example"
                     }
                   }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No verification job with this id exists for the authenticated seller (api-store.ts routes non-hex ids to a generic not-found before auth; a hex-shaped but unknown or unowned id is rejected after auth at google-play.ts:1097 with error=\"verification_not_found\"). Both paths surface as 404 to the caller.",
-            "headers": {
-              "X-Request-ID": {
-                "$ref": "./components/common.json#/headers/RequestId"
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "./components/common.json#/schemas/Problem"
                 }
               }
             }
@@ -5837,51 +5871,6 @@
           },
           {
             "$ref": "./components/common.json#/parameters/AppVersion"
-          },
-          {
-            "name": "category_id",
-            "in": "query",
-            "required": true,
-            "description": "Active global business-category identifier.",
-            "schema": {
-              "type": "string",
-              "pattern": "^[a-z0-9_]{2,80}$"
-            }
-          },
-          {
-            "name": "query",
-            "in": "query",
-            "required": false,
-            "description": "Optional localized prefix search.",
-            "schema": {
-              "type": "string",
-              "maxLength": 80
-            }
-          },
-          {
-            "name": "language",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "ar",
-                "en",
-                "fr"
-              ],
-              "default": "en"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 50,
-              "default": 30
-            }
           }
         ],
         "responses": {
@@ -6327,10 +6316,8 @@
             "required": true,
             "schema": {
               "type": "string",
-              "pattern": "^[pP]-[A-HJ-NP-Za-hj-np-z2-9]{6,8}$",
-              "example": "p-R4XT9B"
-            },
-            "description": "Immutable product code: `p-` followed by 6 or 8 characters from an unambiguous alphabet (no I, O, 0 or 1). Matched case-insensitively."
+              "minLength": 1
+            }
           },
           {
             "name": "language",
@@ -6564,10 +6551,8 @@
             "required": true,
             "schema": {
               "type": "string",
-              "pattern": "^[pP]-[A-HJ-NP-Za-hj-np-z2-9]{6,8}$",
-              "example": "p-R4XT9B"
-            },
-            "description": "Immutable product code: `p-` followed by 6 or 8 characters from an unambiguous alphabet (no I, O, 0 or 1). Matched case-insensitively."
+              "minLength": 1
+            }
           },
           {
             "name": "language",
@@ -7281,10 +7266,8 @@
             "required": true,
             "schema": {
               "type": "string",
-              "pattern": "^[cC]-[A-HJ-NP-Za-hj-np-z2-9]{6,8}$",
-              "example": "c-K7M2QP"
-            },
-            "description": "Immutable category code: `c-` followed by 6 or 8 characters from an unambiguous alphabet (no I, O, 0 or 1). Matched case-insensitively."
+              "minLength": 1
+            }
           }
         ],
         "responses": {
@@ -7509,10 +7492,8 @@
             "required": true,
             "schema": {
               "type": "string",
-              "pattern": "^[cC]-[A-HJ-NP-Za-hj-np-z2-9]{6,8}$",
-              "example": "c-K7M2QP"
-            },
-            "description": "Immutable category code: `c-` followed by 6 or 8 characters from an unambiguous alphabet (no I, O, 0 or 1). Matched case-insensitively."
+              "minLength": 1
+            }
           }
         ],
         "responses": {
@@ -7641,21 +7622,6 @@
               }
             }
           },
-          "404": {
-            "description": "No category with this code exists for the authenticated store.",
-            "headers": {
-              "X-Request-ID": {
-                "$ref": "./components/common.json#/headers/RequestId"
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "./components/common.json#/schemas/Problem"
-                }
-              }
-            }
-          },
           "429": {
             "description": "Rate limited",
             "headers": {
@@ -7752,10 +7718,8 @@
             "required": true,
             "schema": {
               "type": "string",
-              "pattern": "^[cC]-[A-HJ-NP-Za-hj-np-z2-9]{6,8}$",
-              "example": "c-K7M2QP"
-            },
-            "description": "Immutable category code: `c-` followed by 6 or 8 characters from an unambiguous alphabet (no I, O, 0 or 1). Matched case-insensitively."
+              "minLength": 1
+            }
           }
         ],
         "requestBody": {
@@ -8001,10 +7965,8 @@
             "required": true,
             "schema": {
               "type": "string",
-              "pattern": "^[cC]-[A-HJ-NP-Za-hj-np-z2-9]{6,8}$",
-              "example": "c-K7M2QP"
-            },
-            "description": "Immutable category code: `c-` followed by 6 or 8 characters from an unambiguous alphabet (no I, O, 0 or 1). Matched case-insensitively."
+              "minLength": 1
+            }
           }
         ],
         "requestBody": {
@@ -11481,31 +11443,68 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "./components/common.json#/schemas/GenericSuccess"
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "orders": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Order"
+                      }
+                    },
+                    "has_more": {
+                      "type": "boolean"
+                    },
+                    "next_since": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "orders",
+                    "has_more",
+                    "next_since"
+                  ]
                 },
                 "examples": {
                   "success": {
                     "value": {
-                      "ok": true
-                    }
-                  },
-                  "empty": {
-                    "value": {
                       "ok": true,
-                      "items": [],
-                      "has_more": false
-                    }
-                  },
-                  "pagination": {
-                    "value": {
-                      "ok": true,
-                      "items": [
+                      "orders": [
                         {
-                          "id": "example"
+                          "id": "018f-example",
+                          "order_no": 12,
+                          "buyer_phone": "+201000000000",
+                          "buyer_name": "Mariam",
+                          "status": "NEW",
+                          "pay_method": "COD",
+                          "total": {
+                            "amount_minor": 15000,
+                            "currency": "EGP"
+                          },
+                          "note": null,
+                          "created_at": "2026-08-21T10:00:00Z",
+                          "items": [
+                            {
+                              "product_id": "018f-product",
+                              "product_code": "P-0001",
+                              "product_name": "Cola",
+                              "qty": 2,
+                              "price": {
+                                "amount_minor": 7500,
+                                "currency": "EGP"
+                              }
+                            }
+                          ]
                         }
                       ],
-                      "next_cursor": "opaque-cursor",
-                      "has_more": true
+                      "has_more": false,
+                      "next_since": 12
                     }
                   }
                 }
@@ -12375,31 +12374,48 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "./components/common.json#/schemas/GenericSuccess"
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "products": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Product"
+                      }
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "products"
+                  ]
                 },
                 "examples": {
                   "success": {
                     "value": {
-                      "ok": true
-                    }
-                  },
-                  "empty": {
-                    "value": {
                       "ok": true,
-                      "items": [],
-                      "has_more": false
-                    }
-                  },
-                  "pagination": {
-                    "value": {
-                      "ok": true,
-                      "items": [
+                      "products": [
                         {
-                          "id": "example"
+                          "id": "018f-product",
+                          "product_code": "P-0001",
+                          "name": "Cola",
+                          "slug": "cola",
+                          "description": null,
+                          "price": {
+                            "amount_minor": 15000,
+                            "currency": "EGP"
+                          },
+                          "stock": 10,
+                          "stock_version": 1,
+                          "available": true,
+                          "image_url": null,
+                          "category_code": null
                         }
-                      ],
-                      "next_cursor": "opaque-cursor",
-                      "has_more": true
+                      ]
                     }
                   }
                 }
@@ -15116,7 +15132,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "pattern": "^[0-9]+$"
+              "minLength": 1
             }
           }
         ],
@@ -15239,33 +15255,6 @@
                       "status": 403,
                       "code": "forbidden",
                       "detail": "The request could not be completed.",
-                      "request_id": "018f-example"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Ticket not found",
-            "headers": {
-              "X-Request-ID": {
-                "$ref": "./components/common.json#/headers/RequestId"
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "./components/common.json#/schemas/Problem"
-                },
-                "examples": {
-                  "default": {
-                    "value": {
-                      "type": "https://developers.orderak.app/problems/not_found",
-                      "title": "Not Found",
-                      "status": 404,
-                      "code": "not_found",
-                      "detail": "The ticket does not exist or is not visible to this seller.",
                       "request_id": "018f-example"
                     }
                   }
@@ -15802,6 +15791,193 @@
     }
   },
   "components": {
+    "schemas": {
+      "Order": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "order_no": {
+            "type": "integer"
+          },
+          "buyer_phone": {
+            "type": "string"
+          },
+          "buyer_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "pay_method": {
+            "type": "string"
+          },
+          "total": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderItem"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "order_no",
+          "buyer_phone",
+          "buyer_name",
+          "status",
+          "pay_method",
+          "total",
+          "note",
+          "created_at",
+          "items"
+        ]
+      },
+      "Money": {
+        "type": "object",
+        "properties": {
+          "amount_minor": {
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "EGP",
+              "SAR",
+              "AED",
+              "QAR",
+              "KWD",
+              "BHD",
+              "OMR"
+            ]
+          }
+        },
+        "required": [
+          "amount_minor",
+          "currency"
+        ],
+        "description": "An amount in the currency's minor units, plus the currency. The number of minor units per major unit follows ISO 4217 and is not always 100: EGP has 2 decimal places, KWD has 3. Never divide by a constant.",
+        "example": {
+          "amount_minor": 15000,
+          "currency": "EGP"
+        }
+      },
+      "OrderItem": {
+        "type": "object",
+        "properties": {
+          "product_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "product_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "product_name": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "price": {
+            "$ref": "#/components/schemas/Money"
+          }
+        },
+        "required": [
+          "product_id",
+          "product_code",
+          "product_name",
+          "qty",
+          "price"
+        ]
+      },
+      "Product": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "price": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "stock": {
+            "type": "integer"
+          },
+          "stock_version": {
+            "type": "integer"
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "image_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "category_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "product_code",
+          "name",
+          "slug",
+          "description",
+          "price",
+          "stock",
+          "stock_version",
+          "available",
+          "image_url",
+          "category_code"
+        ]
+      }
+    },
     "securitySchemes": {
       "sellerDevice": {
         "$ref": "./components/common.json#/securitySchemes/sellerDevice"

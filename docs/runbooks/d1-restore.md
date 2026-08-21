@@ -20,7 +20,7 @@ Use this runbook to recover a D1 database from the R2 backups produced by the
 `.github/workflows/d1-backup.yml` workflow. To prove a backup is recoverable
 without doing a real restore, dispatch
 `.github/workflows/restore-drill.yml` instead — it runs the same decrypt and
-verify steps below under a reviewer-gated environment, without touching any
+verify steps below under the environment that holds the AGE private key, without touching any
 live database.
 
 For accidental writes within the Time Travel window, prefer
@@ -231,32 +231,39 @@ backup, and vice versa.
 | Holds | `AGE_RECIPIENT` (public key) — a GitHub **variable**, `staging` and `production` environments | `AGE_IDENTITY` (private key) — a GitHub **secret**, `backup-restore-staging` and `backup-restore-production` environments |
 | Can | Encrypt new backups | Decrypt existing backups |
 | Cannot | Decrypt anything — the public key alone cannot | Write backups — no D1 or R2-write credential in scope |
-| Gated by | Whatever already gates the backup job | A **required reviewer** on the `backup-restore-*` environment — every decrypt is a deliberate, reviewed act, never an automatic one |
+| Gated by | Whatever already gates the backup job | **Custody of `AGE_IDENTITY`**, scoped to the `backup-restore-*` environment — a job that does not declare that environment cannot decrypt at all. Manual dispatch only; no schedule, and no reviewer (see below) |
 
-> **The reviewer gate holds in `Orderak.APP` and no longer holds in the old
-> repository.** Making `youo1/Orderak` private on 2026-08-16 **stripped
-> `required_reviewers` from both its `backup-restore-*` environments** —
-> measured before and after, not inferred: the rule was present, and after the
-> change both read `[]`. Environment reviewers are unavailable on private
-> repositories under the current plan.
+> **The reviewer gate does not hold here either — corrected 2026-08-20.** This
+> note previously read "the reviewer gate holds in `Orderak.APP`", and treated
+> the loss of `required_reviewers` as something that had happened only to the
+> old repository when `youo1/Orderak` went private on 2026-08-16. A direct
+> query of this repository's environments on 2026-08-20 contradicts that: all
+> five — `production`, `staging`, `staging-contract-tests`, and both
+> `backup-restore-*` — read `protection_rules: []`. `Orderak.APP` is itself a
+> private repository, so the same plan limit was always going to apply to it.
+> The earlier claim was inferred from the old repository's measurement rather
+> than measured here.
 >
-> So restore drills in the old repository now run unapproved until it is
-> archived. That is accepted rather than overlooked: the gate existed to
-> constrain access on a **public** repository, the repository is now private
-> with a single owner, and the drill decrypts to `/tmp` and shreds without
-> touching a database. The exposure it guarded against is the one that going
-> private removed.
+> So restore drills run unapproved in **both** repositories. That is accepted
+> rather than overlooked, for the reason already recorded: the gate existed to
+> constrain access on a **public** repository, this one is private with a
+> single owner, and the drill decrypts to `/tmp` and shreds without touching a
+> database. The exposure it guarded against is the one that going private
+> removed.
 >
-> It is recorded because this table would otherwise state a protection that is
-> not there, and a runbook claiming a gate that does not exist is worse than
-> one that claims nothing.
+> It is corrected here because this table would otherwise state a protection
+> that is not there, and a runbook claiming a gate that does not exist is worse
+> than one that claims nothing. The rule that replaces it is the one in the
+> table: whoever holds `AGE_IDENTITY` can decrypt, and nothing else can.
 
 This split is the actual control. If the backup job's credentials leak, the
 attacker can write bogus future backups but cannot read a single past one —
-recipient-only access grants no decryption capability. If the restore
-environment's reviewer gate is ever bypassed, that is what exposes history,
-which is why it is a separate, narrower-audience environment rather than a
-convenience shared with the nightly job.
+recipient-only access grants no decryption capability. History is exposed only
+by `AGE_IDENTITY` leaving the `backup-restore-*` environments, which is why it
+lives in a separate, narrower-audience environment rather than as a convenience
+shared with the nightly job. With no reviewer gate available on a private
+repository, that separation is the whole of the control, not a second layer
+behind one.
 
 ### Rotating a key
 

@@ -45,7 +45,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.orderak.seller.R
-import app.orderak.seller.core.money.formatEgp
+import app.orderak.seller.core.money.DEFAULT_CURRENCY
+import app.orderak.seller.core.money.formatAmount
 import app.orderak.seller.domain.PayMethod
 
 /** S7 — convert a chat into a structured order in <30s (quick form + qty steppers). */
@@ -107,7 +108,7 @@ fun NewOrderScreen(
                                 ),
                             )
                             Text(
-                                stringResource(R.string.currency_egp, formatEgp(p.pricePiasters)),
+                                stringResource(R.string.currency_egp, formatAmount(p.priceMinor, p.currency)),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.primary
                             )
@@ -161,7 +162,7 @@ fun NewOrderScreen(
                 Text(stringResource(R.string.order_total), style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    stringResource(R.string.currency_egp, formatEgp(viewModel.totalPiasters())),
+                    stringResource(R.string.currency_egp, formatAmount(viewModel.totalMinor(), DEFAULT_CURRENCY)),
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.primary
                 )

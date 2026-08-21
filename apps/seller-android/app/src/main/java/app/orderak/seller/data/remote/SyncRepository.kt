@@ -157,7 +157,7 @@ class SyncRepository @Inject constructor(
         val dtos = products.map {
             ProductDto(
                 app_id = it.id, name = it.name,
-                price_piasters = it.pricePiasters,
+                price = MoneyDto(it.priceMinor, it.currency),
                 stock = it.stock, available = it.available,
                 description = it.description,
                 image_url = it.imageUrl,
@@ -257,7 +257,8 @@ class SyncRepository @Inject constructor(
                 buyerName = o.buyer_name,
                 status = o.status,
                 payMethod = o.pay_method,
-                totalPiasters = o.total_piasters,
+                totalMinor = o.total.amount_minor,
+                currency = o.total.currency,
                 note = o.note,
                 createdAt = parseCreatedAt(o.created_at),
             )
@@ -278,7 +279,7 @@ class SyncRepository @Inject constructor(
                     productId = productId, // 0 only if the code didn't match locally
                     productName = item.product_name,
                     qty = item.qty,
-                    pricePiasters = item.price_piasters,
+                    priceMinor = item.price.amount_minor,
                 )
             }
         )

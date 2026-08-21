@@ -592,7 +592,7 @@ async function handleApi(
 			if (!store) return jsonResponse({ error: "auth" }, 401);
 			const { results: orderRows } = (await env.orderak_db
 				.prepare(
-					`SELECT id, order_no, buyer_phone, buyer_name, status, pay_method, total_piasters, note, created_at
+					`SELECT id, order_no, buyer_phone, buyer_name, status, pay_method, total_minor, currency, note, created_at
 					 FROM orders WHERE store_id = ? AND order_no > ? ORDER BY order_no LIMIT 51`,
 				)
 				.bind(store.id, since)
@@ -607,7 +607,7 @@ async function handleApi(
 				const marks = orders.map(() => "?").join(",");
 				const { results: items } = (await env.orderak_db
 					.prepare(
-						`SELECT oi.order_id, oi.product_id, p.product_code, oi.product_name, oi.qty, oi.price_piasters
+						`SELECT oi.order_id, oi.product_id, p.product_code, oi.product_name, oi.qty, oi.price_minor
 						 FROM order_items oi
 						 LEFT JOIN products p ON p.id = oi.product_id
 						 WHERE oi.order_id IN (${marks})`,
@@ -621,7 +621,20 @@ async function handleApi(
 					itemsByOrder.set(order_id, list);
 				}
 			}
-			for (const o of orders) o.items = itemsByOrder.get(o.id) ?? [];
+			// Money leaves as an object, not a bare integer: the client cannot render
+			// 15000 without knowing whether it is pounds or dinars (ADR-009). The line
+			// items inherit the order's currency rather than carrying their own, so a
+			// line and its order can never disagree.
+			for (const o of orders) {
+				const currency = String(o.currency ?? "EGP");
+				o.total = { amount_minor: Number(o.total_minor), currency };
+				delete o.total_minor;
+				delete o.currency;
+				o.items = (itemsByOrder.get(o.id) ?? []).map((item) => {
+					const { price_minor, ...rest } = item;
+					return { ...rest, price: { amount_minor: Number(price_minor), currency } };
+				});
+			}
 			const nextSince = orders.length ? Number(orders[orders.length - 1].order_no) : since;
 			// Piggyback the plan/entitlement config so the app doesn't spend a
 			// separate authenticated /api/v1/config request every sync. Same auth,

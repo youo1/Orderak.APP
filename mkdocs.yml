@@ -18,6 +18,7 @@ exclude_docs: |
 
 nav:
   - Home: index.md
+  - Status: status.md
   - Setup: guides/setup.md
   - Glossary: reference/glossary.md
   - API Reference: reference/api.md
@@ -50,30 +51,15 @@ nav:
     - Android Localization Profile: platforms/android-localization-profile.md
   - Governance:
     - Control Center: governance/index.md
-    - Program Charter: governance/program-charter.md
-    - Role Assignment and RACI: governance/raci.md
-    - Operating Cadence: governance/operating-cadence.md
-    - Evidence Standard: governance/evidence-standard.md
     - Data Map: governance/data-map.md
     - Retention and Deletion Matrix: governance/retention-matrix.md
-    - Temporary Change Freeze: governance/temporary-change-freeze.md
-    - Source-Plan Traceability: governance/source-plan-traceability.md
     - Registers:
       - Register Index: governance/registers/index.md
-      - Requirements: governance/registers/requirements-register.md
       - Decisions: governance/registers/decision-log.md
       - Risks: governance/registers/risk-register.md
-      - Issues and Changes: governance/registers/issue-and-change-log.md
       - Third Parties and Permissions: governance/registers/third-party-and-permission-register.md
       - Policy Versions: governance/registers/policy-version-register.md
       - Findings: governance/registers/findings-register.md
-    - Baseline Evidence: governance/evidence/2026-07-18-repository-baseline.md
-    - Repository Restructure Review: governance/evidence/repository-restructure-review-2026-08-01.md
-    - Pre-Cutover Baseline: governance/evidence/2026-08-12-pre-cutover-baseline.md
-    - Phase 5a Documented Commands: governance/evidence/2026-08-12-phase5a-documented-commands.md
-    - Phase 5b Code Review: governance/evidence/2026-08-12-phase5b-backend-review.md
-    - Tenant Shard Migration Rehearsal: governance/evidence/tenant-shard-migration-rehearsal-template.md
-    - Initial G0 Gate Review: governance/evidence/gate-g0-20260718-v0.1.md
   - Decisions:
     - Template: decisions/template.md
     - ADR 001 — Cloudflare Workers + D1: decisions/adr-001-cloudflare-workers-d1.md
@@ -84,6 +70,8 @@ nav:
     - ADR 006 - Authoritative Play Verification: decisions/adr-006-authoritative-play-verification.md
     - ADR 007 - Shard-ready Single D1: decisions/adr-007-shard-ready-single-d1.md
     - ADR 008 - Evolvable Safety Contracts: decisions/adr-008-evolvable-safety-contracts.md
+    - ADR 009 — Minor Units with Explicit Currency: decisions/adr-009-minor-units-with-explicit-currency.md
+    - ADR 010 — Schema-First API Contract: decisions/adr-010-schema-first-api-contract.md
   - Runbooks:
     - Account Deletion: runbooks/account-deletion.md
     - Incident Response: runbooks/incident-response.md

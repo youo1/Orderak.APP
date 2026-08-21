@@ -40,7 +40,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.orderak.seller.R
-import app.orderak.seller.core.money.formatEgp
+import app.orderak.seller.core.money.DEFAULT_CURRENCY
+import app.orderak.seller.core.money.formatAmount
 import app.orderak.seller.data.db.OrderEntity
 import app.orderak.seller.domain.OrderStatus
 import java.text.DateFormat
@@ -147,7 +148,7 @@ fun OrderCard(o: OrderEntity, onClick: () -> Unit) {
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    stringResource(R.string.currency_egp, formatEgp(o.totalPiasters)),
+                    stringResource(R.string.currency_egp, formatAmount(o.totalMinor, o.currency)),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary
                 )

@@ -9,7 +9,8 @@ import android.content.Context
 import app.orderak.seller.core.images.ImageStore
 import app.orderak.seller.data.remote.SyncScheduler
 import dagger.hilt.android.qualifiers.ApplicationContext
-import app.orderak.seller.core.money.parseEgpToPiasters
+import app.orderak.seller.core.money.DEFAULT_CURRENCY
+import app.orderak.seller.core.money.parseMoney
 import app.orderak.seller.data.billing.EntitlementManager
 import app.orderak.seller.data.db.CategoryEntity
 import app.orderak.seller.data.db.OrderakDatabase
@@ -44,7 +45,7 @@ data class ProductEditUiState(
 ) {
     val canSave: Boolean
         get() = (name.trim().length >= 2) &&
-                (parseEgpToPiasters(priceText) != null) &&
+                (parseMoney(priceText, DEFAULT_CURRENCY) != null) &&
                 ((stockText.toIntOrNull() ?: -1) >= 0) &&
                 (discountValueText.isEmpty() || (discountValueText.toDoubleOrNull() ?: -1.0) >= 0)
 }
@@ -75,7 +76,7 @@ class ProductEditViewModel @Inject constructor(
                     _state.value = ProductEditUiState(
                         id = p.id, createdAt = p.createdAt, name = p.name,
                         description = p.description.orEmpty(),
-                        priceText = (p.pricePiasters / 100.0).let { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString() },
+                        priceText = (p.priceMinor / 100.0).let { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString() },
                         stockText = p.stock.toString(),
                         discountType = p.discountType,
                         discountValueText = p.discountValue?.let { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString() }.orEmpty(),
@@ -111,7 +112,7 @@ class ProductEditViewModel @Inject constructor(
 
     fun save(onDone: () -> Unit) {
         val s = _state.value
-        val price = parseEgpToPiasters(s.priceText) ?: return
+        val price = parseMoney(s.priceText, DEFAULT_CURRENCY)?.amountMinor ?: return
         _state.value = s.copy(saving = true)
         viewModelScope.launch {
             if (s.id == 0L && db.productDao().allOnce().size >= entitlementManager.getProductLimit()) {
@@ -125,7 +126,7 @@ class ProductEditViewModel @Inject constructor(
                 ProductEntity(
                     id = s.id, name = s.name.trim(),
                     description = s.description.trim().ifBlank { null },
-                    pricePiasters = price,
+                    priceMinor = price,
                     stock = newStock,
                     // Hidden until backend and public catalog share one discount contract.
                     discountType = existing?.discountType,

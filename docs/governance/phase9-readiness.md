@@ -1,8 +1,8 @@
 ---
-status: current
+status: archived
 generated: false
 owner: governance
-last_verified: 2026-08-16
+last_verified: 2026-08-19
 applies_to: [production]
 ---
 # Phase 9 — decommissioning the old repository
@@ -14,10 +14,11 @@ What it contains, what gates it, and the earliest date it can start.
 From the plan, in its own order:
 
 1. **Decide the history question explicitly.** Archiving makes a repository
-   read-only; it removes nothing. `youo1/Orderak` is **public**, and its history
-   still contains the `.wrangler` cache files that were dropped from the new
-   repository. Either purge history or make it private/restricted, per the
-   retention policy — the plan requires a decision, not a default.
+   read-only; it removes nothing. Its history still contains the `.wrangler`
+   cache files that were dropped from the new repository. Either purge history
+   or make it private/restricted, per the retention policy — the plan requires a
+   decision, not a default. **Decided and taken 2026-08-16: restrict, do not
+   purge.** `youo1/Orderak` is now **private**. See the record below.
 2. **Revoke secrets, deploy keys, webhooks and GitHub App installations
    *before* archiving.** Archiving does not revoke anything.
 3. **Keep the encrypted bundle** with checksum, two copies, and a proven
@@ -112,7 +113,7 @@ is the same failure class as the Semgrep gate that had been red since 08-12.
 | --- | --- |
 | Two production releases | met 2026-08-16, thinly |
 | Old age key retention | **blocks until 2026-09-15** |
-| History decision | not made |
+| History decision | **made 2026-08-16** — restrict, not purge; repository is private |
 | Restore drill on an old-key object | not run since the key replacement |
 
 Phase 9 cannot start before **2026-09-15**, and the delay is a property of the
@@ -180,12 +181,51 @@ The contract-seller pair is the **only copy anywhere**. `Orderak.APP`'s
 be read back to move it — the same trap the age identity fell into. Revoking it
 here would force recreating the staging seller.
 
+### The history decision, made 2026-08-16: restrict, not purge
+
+Phase 9 step 1 asks for an explicit decision between purging history and
+restricting access. **`youo1/Orderak` was made private.** History was not
+rewritten, and that is the decision rather than a deferral of it.
+
+What its history actually contains was checked, not assumed: no credentials, no
+tokens, no keys. The `.wrangler` cache files hold the Cloudflare account id, the
+owner email, and an approximate location and ISP from a request-info blob —
+personal information, and no longer public.
+
+The trade flipped once the provenance cost was counted. **19 of the 25 `drop`
+rows in `tooling/migration/manifests/pre-migration-freeze.json` cite
+`youo1/Orderak@016e3207` as their sole evidence** — they are the record of files
+deliberately absent from this repository, and that commit is the only place the
+content they refer to exists. Rewriting history changes every SHA and orphans
+all 19, destroying the provenance chain of the migration itself in order to
+remove information that going private has already taken out of public view.
+
+#### The side effect, measured rather than assumed
+
+Going private **stripped `required_reviewers` from both `backup-restore-*`
+environments** in that repository — recorded before and after: the rule was
+present, and after the change both read `[]`. Environment reviewers are not
+available on private repositories under this plan.
+
+So restore drills there now run unapproved until the repository is archived.
+Accepted rather than overlooked: the gate constrained access on a *public*
+repository, the repository is private with a single owner, and the drill
+decrypts to `/tmp` and shreds without touching a database.
+
+The same plan limit applies to every environment in that repository, so the
+`staging-rollback` reviewer named in the break-glass procedure is gone on the
+same evidence. That is noted in
+[the staging/production workflow guide](../guides/staging-production-workflow.md#break-glass-deploying-staging-from-the-source-repository);
+it has not been separately measured, and the control that actually holds there
+is that the environment carries no credential at all.
+
 ### Remaining, and why each waits
 
 1. **Archive the repository** — blocks Actions, which takes `restore-drill.yml`
    with it. This is the reason the whole phase waits, not a formality.
-2. **The history decision** — the repository is public and its history still
-   contains `.wrangler` cache files. Purge, or restrict, per retention policy.
-   This is a decision, not a task, and it has not been made.
+2. ~~**The history decision**~~ — **closed 2026-08-16.** The repository was made
+   private rather than history-purged, and the reasoning is recorded under
+   [The history decision](#the-history-decision-made-2026-08-16-restrict-not-purge)
+   below.
 3. **Delete the five duplicate Cloudflare tokens** — after a restore drill
    passes here against an old-key object.

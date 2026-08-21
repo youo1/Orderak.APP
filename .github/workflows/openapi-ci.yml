@@ -24,7 +24,7 @@ jobs:
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
@@ -97,7 +97,7 @@ jobs:
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
@@ -109,7 +109,14 @@ jobs:
           for _ in {1..30}; do curl -fsS http://127.0.0.1:4010/api/v1/theme >/dev/null && exit 0; sleep 1; done
           cat /tmp/prism.log
           exit 1
-      - run: pipx install schemathesis==4.24.3
+      # jsonschema-rs is pinned alongside Schemathesis, not left to resolve.
+      # `pipx install schemathesis==4.24.3` pins Schemathesis and nothing beneath
+      # it. jsonschema-rs 0.50.0 dropped `is_satisfiable` from CanonicalSchema,
+      # which Schemathesis 4.24.3 calls, so every run died with
+      # "'builtins.CanonicalSchema' object has no attribute 'is_satisfiable'"
+      # — a pinned tool broken by an unpinned dependency underneath it. This is
+      # what turned OpenAPI Nightly red from 2026-08-19 onward.
+      - run: pipx install schemathesis==4.24.3 --pip-args "jsonschema-rs==0.49.1"
       # This PR job targets Prism, not the real API. The draft has 33 request
       # bodies declared only as
       # {type: object, additionalProperties: true}. Fuzzing arbitrary JSON for
@@ -184,7 +191,7 @@ jobs:
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile

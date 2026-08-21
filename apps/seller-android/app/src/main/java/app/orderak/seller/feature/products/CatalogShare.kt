@@ -6,7 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.widget.Toast
 import app.orderak.seller.R
-import app.orderak.seller.core.money.formatEgp
+import app.orderak.seller.core.money.DEFAULT_CURRENCY
+import app.orderak.seller.core.money.formatAmount
 import app.orderak.seller.data.db.ProductEntity
 
 /**
@@ -18,7 +19,7 @@ fun shareCatalogText(context: Context, shopName: String?, sellerPhone: String?, 
         appendLine(context.getString(R.string.share_catalog_header, shopName.orEmpty()))
         appendLine()
         products.filter { it.available && it.stock > 0 }.forEach { p ->
-            val priceStr = context.getString(R.string.currency_egp, formatEgp(p.pricePiasters))
+            val priceStr = context.getString(R.string.currency_egp, formatAmount(p.priceMinor, p.currency))
 
             append("• ${p.name}")
             append(" — $priceStr")

@@ -64,8 +64,8 @@ class NewOrderViewModel @Inject constructor(
         _state.value = _state.value.copy(qty = _state.value.qty + (product.id to next), stockError = false)
     }
 
-    fun totalPiasters(): Long =
-        products.value.sumOf { p -> (( _state.value.qty[p.id] ?: 0) * p.pricePiasters) }
+    fun totalMinor(): Long =
+        products.value.sumOf { p -> (( _state.value.qty[p.id] ?: 0) * p.priceMinor) }
 
     fun save(onDone: (Long) -> Unit) {
         val s = _state.value
@@ -80,7 +80,7 @@ class NewOrderViewModel @Inject constructor(
                 _state.value = s.copy(saving = false, stockError = true)
                 return@launch
             }
-            val lines = selected.map { (p, q, _) -> NewOrderLine(p.id, p.name, q, p.pricePiasters) }
+            val lines = selected.map { (p, q, _) -> NewOrderLine(p.id, p.name, q, p.priceMinor) }
             val id = orderRepo.create(
                 buyerPhone = s.phone, buyerName = s.name.ifBlank { null },
                 payMethod = s.payMethod, note = s.note.ifBlank { null }, lines = lines

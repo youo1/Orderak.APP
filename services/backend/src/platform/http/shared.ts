@@ -140,10 +140,11 @@ export function esc(s: unknown): string {
 		.replace(/"/g, "&quot;");
 }
 
-/** Format piasters (EGP * 100) as a human EGP string. */
-export function egp(piasters: number): string {
-	return (piasters / 100).toLocaleString("en-EG", { minimumFractionDigits: 2 });
-}
+// `egp(piasters)` stood here: a formatter with `/ 100` and `en-EG` hardcoded.
+// It had no callers, so it is removed rather than migrated — carrying dead code
+// through a currency migration only creates another place for the old
+// assumption to survive. Use formatMoney() from platform/money/money.ts, which
+// takes the currency and reads its exponent from ICU (ADR-009).
 
 /**
  * Hash a seller's device secret at rest.
@@ -590,7 +591,7 @@ export function audit(action: string, details: Record<string, unknown>): void {
 	console.log(`[AUDIT] ${action} ${JSON.stringify(details)}`);
 }
 
-/** Compute discounted amount (piasters) given a discount type + value. */
+/** Compute a discounted amount in minor units, given a discount type + value. */
 export function applyDiscount(
 	amountPiasters: number,
 	type: string,
@@ -600,7 +601,7 @@ export function applyDiscount(
 	if (type === "percentage") {
 		discount = Math.floor((amountPiasters * Math.max(0, Math.min(100, value))) / 100);
 	} else {
-		// fixed piasters
+		// a fixed amount, already in minor units
 		discount = Math.max(0, Math.floor(value));
 	}
 	return Math.max(0, amountPiasters - discount);

@@ -187,6 +187,12 @@ const descriptions = {
   "043_audit_signing_key_version.sql": [
     "Adds signing_key_version to admin_audit_exports so an audit archive records which key signed it. Without it, rotating ADMIN_AUDIT_SIGNING_KEY made every existing archive unverifiable with no way to tell which key to try. Defaults to 1, which resolves to the pre-existing ADMIN_AUDIT_SIGNING_KEY, so history verifies unchanged and nothing is re-signed.",
   ],
+  "044_money_minor_units_with_currency.sql": [
+    "Renames the nine `*_piasters` columns to `*_minor` and adds a currency column to the six tables that own an amount, implementing ADR-009. `_piasters` names a unit that exists only in Egypt and asserts an exponent of 2; Kuwait, Bahrain and Oman use 1000 minor units per major unit, so a column named price_piasters holding fils is wrong in the schema itself, and every `/ 100` reading it is wrong by a factor of ten rather than by a rounding error.",
+    "order_items gets no currency column: a line item takes the currency of the order above it, and a pair that can disagree is a disagreement nothing can detect after the fact. `items` gets none either, because no query in services/backend/src reads that table.",
+    "Renames in place rather than rebuilding. ALTER TABLE RENAME COLUMN and ADD COLUMN ... NOT NULL DEFAULT were both verified against D1 on 2026-08-21 and succeed, so the twelve-step rebuild used elsewhere in this directory would take on its risks - dropped indexes, lost foreign keys, a partially written copy - to accomplish what the simpler statement already does.",
+    "Backfills DEFAULT 'EGP', which is correct by construction rather than by assumption: there are no users and no live money rows yet. That property disappears the day a second currency exists, which is why this migration is cheap now and expensive later.",
+  ],
 };
 
 function anchor(name) {

@@ -1,6 +1,57 @@
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 import { discoverRoutes, openapiRoot, surfaceFor } from "./route-inventory.mjs";
+
+/**
+ * Response schemas for the operations that have been modelled (ADR-010).
+ *
+ * Extracted in a child process because the definitions live in the backend's
+ * TypeScript, which needs bundler-style module resolution that plain Node does
+ * not do. Absent entries are not an error: an unmodelled operation keeps the
+ * GenericSuccess placeholder, which is visibly empty rather than confidently
+ * wrong.
+ */
+function loadModelledSchemas() {
+  const script = fileURLToPath(new URL("./extract-response-schemas.mts", import.meta.url));
+  // Resolved rather than path-joined: pnpm hoists tsx to the workspace root, so
+  // a relative guess at node_modules breaks depending on the linker.
+  const require = createRequire(import.meta.url);
+  const tsxCli = require.resolve("tsx/cli");
+  const raw = execFileSync(process.execPath, [tsxCli, script], { encoding: "utf8", cwd: openapiRoot });
+  return JSON.parse(raw);
+}
+
+const modelled = loadModelledSchemas();
+
+/**
+ * The subset of modelled schemas a surface actually references, including the
+ * ones reached only through a $ref from another schema.
+ *
+ * Injecting all of them into every surface leaves admin-v1 carrying Order and
+ * Product, which Redocly reports as oas3-unused-component — correctly. A spec
+ * should describe its own surface and nothing else.
+ */
+function schemasUsedBy(paths) {
+  const wanted = new Set();
+  const visit = (node) => {
+    if (!node || typeof node !== "object") return;
+    if (Array.isArray(node)) { for (const item of node) visit(item); return; }
+    const ref = node.$ref;
+    if (typeof ref === "string") {
+      const name = ref.startsWith("#/components/schemas/") ? ref.slice("#/components/schemas/".length) : null;
+      if (name && modelled.schemas[name] && !wanted.has(name)) {
+        wanted.add(name);
+        visit(modelled.schemas[name]);
+      }
+    }
+    for (const value of Object.values(node)) visit(value);
+  };
+  visit(paths);
+  return Object.fromEntries([...wanted].map((name) => [name, modelled.schemas[name]]));
+}
 
 const publicSellerPaths = new Set([
   "/api/v1/theme",
@@ -28,7 +79,7 @@ function problemExample(status, code, retryable = false) {
   };
 }
 
-function response(status, description, example, retryAfter = false) {
+function response(status, description, example, retryAfter = false, modelledResponse = null) {
   return {
     description,
     headers: {
@@ -37,12 +88,21 @@ function response(status, description, example, retryAfter = false) {
     },
     content: {
       [status < 400 ? "application/json" : "application/problem+json"]: {
-        schema: { "$ref": status < 400 ? "./components/common.json#/schemas/GenericSuccess" : "./components/common.json#/schemas/Problem" },
-        examples: status < 400 ? {
-          success: { value: example },
-          empty: { value: { ok: true, items: [], has_more: false } },
-          pagination: { value: { ok: true, items: [{ id: "example" }], next_cursor: "opaque-cursor", has_more: true } }
-        } : { default: { value: example } }
+        schema: status < 400
+          ? (modelledResponse?.schema ?? { "$ref": "./components/common.json#/schemas/GenericSuccess" })
+          : { "$ref": "./components/common.json#/schemas/Problem" },
+        // A modelled operation supplies its own example. The three generic ones
+        // below only validate against GenericSuccess's open object; against a
+        // real schema they fail oas3-valid-media-example, correctly.
+        examples: status >= 400
+          ? { default: { value: example } }
+          : modelledResponse
+            ? { success: { value: modelledResponse.example } }
+            : {
+              success: { value: example },
+              empty: { value: { ok: true, items: [], has_more: false } },
+              pagination: { value: { ok: true, items: [{ id: "example" }], next_cursor: "opaque-cursor", has_more: true } }
+            }
       }
     }
   };
@@ -101,7 +161,8 @@ function buildOperation(route, surface) {
       }
     } : {}),
     responses: {
-      "200": response(200, "Successful response", { ok: true }),
+      "200": response(200, "Successful response", { ok: true }, false,
+        modelled.operations[`${route.method} ${route.path}`] ?? null),
       "400": response(400, "Validation failure", { ...problemExample(400, "validation_failed"), field_errors: { field: "invalid" } }),
       "401": response(401, "Authentication required", problemExample(401, "auth")),
       "403": response(403, "Insufficient permission", problemExample(403, "forbidden")),
@@ -161,6 +222,7 @@ for (const surface of ["seller", "admin", "integrations"]) {
     tags: [{ name: surface, description: `${surface} v1 operations` }],
     paths,
     components: {
+      schemas: schemasUsedBy(paths),
       securitySchemes: {
         ...(surface === "seller" ? { sellerDevice: { "$ref": "./components/common.json#/securitySchemes/sellerDevice" } } : {}),
         ...(surface === "admin" ? { adminSession: { "$ref": "./components/common.json#/securitySchemes/adminSession" } } : {}),

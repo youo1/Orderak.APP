@@ -37,3 +37,10 @@ overrides:
   # the advisory was published: Supply Chain went from success to failure across
   # commits that changed only documentation and a k6 script.
   nanoid@<3.3.18: ">=3.3.18"
+  # GHSA-w5hq-g745-h8pq — missing buffer bounds check in v3/v5/v6 when buf is
+  # supplied. Reaches the tree only as @stoplight/prism-cli > @stoplight/http-spec
+  # > postman-collection > uuid, so it runs in the OpenAPI mock during CI and
+  # never in a Worker. postman-collection calls v4 without a buf, so the flaw is
+  # not reachable here; the override exists so the advisory stops being an open
+  # alert that has to be re-triaged on every audit.
+  uuid@<11.1.1: ">=11.1.1"

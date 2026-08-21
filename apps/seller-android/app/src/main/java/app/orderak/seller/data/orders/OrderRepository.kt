@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
 
-data class NewOrderLine(val productId: Long, val name: String, val qty: Int, val pricePiasters: Long)
+data class NewOrderLine(val productId: Long, val name: String, val qty: Int, val priceMinor: Long)
 
 @Singleton
 class OrderRepository @Inject constructor(
@@ -41,17 +41,17 @@ class OrderRepository @Inject constructor(
     ): Long = db.withTransaction {
         db.customerDao().insertIgnore(CustomerEntity(phone = buyerPhone, name = buyerName))
         if (!buyerName.isNullOrBlank()) db.customerDao().fillName(buyerPhone, buyerName)
-        val total = lines.sumOf { it.qty * it.pricePiasters }
+        val total = lines.sumOf { it.qty * it.priceMinor }
         val orderId = orderDao.insert(
             OrderEntity(
                 buyerPhone = buyerPhone, buyerName = buyerName,
                 status = OrderStatus.NEW.name, payMethod = payMethod.name,
-                totalPiasters = total, note = note
+                totalMinor = total, note = note
             )
         )
         orderDao.insertItems(lines.map {
             OrderItemEntity(orderId = orderId, productId = it.productId,
-                productName = it.name, qty = it.qty, pricePiasters = it.pricePiasters)
+                productName = it.name, qty = it.qty, priceMinor = it.priceMinor)
         })
         lines.forEach { db.productDao().decrementStock(it.productId, it.qty) }
         orderId

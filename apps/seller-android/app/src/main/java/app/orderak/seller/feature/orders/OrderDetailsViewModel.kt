@@ -86,7 +86,7 @@ class OrderDetailsViewModel @Inject constructor(
             _proof.value = ProofUiState.Running
             val text = verifier.ocr(uri)
             var duplicate = false
-            val prelim = PaymentVerifier.evaluate(text, o.totalPiasters) { false }
+            val prelim = PaymentVerifier.evaluate(text, o.totalMinor) { false }
             prelim.ref?.let { duplicate = repo.isDuplicateRef(it) }
             val result = prelim.copy(duplicateRef = duplicate)
             if (result.verified) {
@@ -94,7 +94,7 @@ class OrderDetailsViewModel @Inject constructor(
                 repo.recordPayment(
                     PaymentEntity(
                         orderId = o.id, ref = result.ref ?: "",
-                        amountPiasters = o.totalPiasters,
+                        amountMinor = o.totalMinor,
                         verified = true, proofPath = path
                     )
                 )

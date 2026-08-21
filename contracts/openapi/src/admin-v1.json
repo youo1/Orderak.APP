@@ -32662,7 +32662,7 @@
           "admin"
         ],
         "summary": "POST /api/admin/v1/security/audit-archives/verify",
-        "description": "Re-reads recent audit archives from object storage and proves each one matches the content hash and signature recorded for it. Each archive is checked with the key version stored against it, so archives written before a signing-key rotation still verify. Returns 200 with per-archive results even when an archive fails, so an integrity finding is not mistaken for the endpoint being unavailable.",
+        "description": "Pre-release admin v1 operation. Detailed domain schemas replace the generic bootstrap schema during API-first review.",
         "x-owner": "Platform Engineering",
         "x-data-classification": "L1",
         "x-rate-limit": "admin-authenticated-default",
@@ -40134,6 +40134,7 @@
     }
   },
   "components": {
+    "schemas": {},
     "securitySchemes": {
       "adminSession": {
         "$ref": "./components/common.json#/securitySchemes/adminSession"

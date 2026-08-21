@@ -35,7 +35,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import app.orderak.seller.R
-import app.orderak.seller.core.money.formatEgp
+import app.orderak.seller.core.money.DEFAULT_CURRENCY
+import app.orderak.seller.core.money.formatAmount
 import app.orderak.seller.data.db.CustomerSummary
 import app.orderak.seller.data.orders.OrderRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -91,7 +92,7 @@ fun CustomersScreen(
                         )
                     }
                     Text(
-                        stringResource(R.string.currency_egp, formatEgp(c.totalPiasters)),
+                        stringResource(R.string.currency_egp, formatAmount(c.totalMinor, DEFAULT_CURRENCY)),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.primary
                     )
