@@ -414,8 +414,8 @@ Request:
   "phone": "01012345678",
   "secret": "device-uuid-secret",
   "products": [
-    { "app_id": 1, "name": "Pizza", "price_piasters": 15000, "stock": 10, "available": true, "stock_dirty": true, "expected_stock_version": 4 },
-    { "app_id": 2, "name": "Burger", "price_piasters": 8000, "stock": 5, "available": true, "stock_dirty": false, "expected_stock_version": 9 }
+    { "app_id": 1, "name": "Pizza", "price": { "amount_minor": 15000, "currency": "EGP" }, "stock": 10, "available": true, "stock_dirty": true, "expected_stock_version": 4 },
+    { "app_id": 2, "name": "Burger", "price": { "amount_minor": 8000, "currency": "EGP" }, "stock": 5, "available": true, "stock_dirty": false, "expected_stock_version": 9 }
   ]
 }
 ```
@@ -484,7 +484,7 @@ Response:
       "buyer_name": "Ahmed",
       "status": "NEW",
       "pay_method": "COD",
-      "total_piasters": 15000,
+      "total": { "amount_minor": 15000, "currency": "EGP" },
       "note": null,
       "created_at": "2026-07-07 12:00:00",
       "items": [
@@ -493,7 +493,7 @@ Response:
           "product_code": "p-H72LP9",
           "product_name": "Pizza",
           "qty": 1,
-          "price_piasters": 15000
+          "price": { "amount_minor": 15000, "currency": "EGP" }
         }
       ]
     }
@@ -556,7 +556,7 @@ Response:
 {
   "ok": true,
   "order_no": 1,
-  "total_piasters": 23000,
+  "total": { "amount_minor": 23000, "currency": "EGP" },
   "contact_phone": "01012345678",
   "instapay": "01012345678",
   "vfcash": null
@@ -611,7 +611,19 @@ Only `MockGateway` is implemented. `STRIPE_SECRET_KEY` is currently ignored;
 paid launch requires a real approved gateway implementation and provider-native
 webhook verification.
 
-All money is stored as **integer piasters** (EGP × 100). Never floats.
+All money is an **integer amount in the currency's minor unit, plus the
+currency**. Never floats, and never a bare integer on the wire:
+
+```json
+{ "amount_minor": 15000, "currency": "EGP" }
+```
+
+The number of minor units per major unit follows ISO 4217 and is not always 100.
+`15000` is `150.00 EGP` but `15.000 KWD` — Kuwait, Bahrain and Oman use a
+thousandth. Read the exponent from the currency (`Intl.NumberFormat` on the web
+and in Workers, `java.util.Currency` on Android); never divide by a constant.
+
+See [ADR-009](../decisions/adr-009-minor-units-with-explicit-currency.md).
 
 ### List Plans (public)
 
@@ -628,7 +640,7 @@ Returns the active plans with their feature lists:
     {
       "id": "free",
       "name": "Free",
-      "price_piasters": 0,
+      "price_minor": 0,
       "currency": "EGP",
       "interval": "monthly",
       "ads_enabled": 1,
@@ -636,8 +648,8 @@ Returns the active plans with their feature lists:
         { "feature_key": "orders", "name": "Order taking", "description": "...", "enabled": 1 }
       ]
     },
-    { "id": "starter", "name": "Starter", "price_piasters": 9900, "ads_enabled": 0, "features": [] },
-    { "id": "professional", "name": "Professional", "price_piasters": 24900, "ads_enabled": 0, "features": [] }
+    { "id": "starter", "name": "Starter", "price_minor": 9900, "ads_enabled": 0, "features": [] },
+    { "id": "professional", "name": "Professional", "price_minor": 24900, "ads_enabled": 0, "features": [] }
   ]
 }
 ```
@@ -673,8 +685,8 @@ Response (paid plan):
   "ok": true,
   "status": "pending",
   "checkout_url": "https://pay.example/checkout/cs_test_123",
-  "amount_piasters": 7920,
-  "discount_piasters": 1980
+  "amount_minor": 7920,
+  "discount_minor": 1980
 }
 ```
 
@@ -745,9 +757,9 @@ Content-Type: application/json
   "valid": true,
   "discount_type": "percentage",
   "value": 20,
-  "original_piasters": 9900,
-  "discount_piasters": 1980,
-  "final_piasters": 7920
+  "original_minor": 9900,
+  "discount_minor": 1980,
+  "final_minor": 7920
 }
 ```
 
@@ -786,8 +798,8 @@ x-orderak-secret: device-uuid-secret
   "referral_code": "AY3K9Q",
   "total_referred": 3,
   "qualified": 1,
-  "pending_commission_piasters": 5000,
-  "paid_commission_piasters": 0
+  "pending_commission_minor": 5000,
+  "paid_commission_minor": 0
 }
 ```
 
