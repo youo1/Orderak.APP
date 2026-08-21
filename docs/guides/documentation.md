@@ -22,8 +22,16 @@ into several files.
 | Installation, configuration, or deployment | [`guides/setup.md`](./setup.md) |
 | System component or data flow | [`architecture/overview.md`](../architecture/overview.md) |
 | Authentication, authorization, or secrets | [`architecture/security-model.md`](../architecture/security-model.md) |
+| Accounts, sessions, devices, deletion, retention | [`domains/identity.md`](../domains/identity.md) |
+| Store codes, slugs, public identifiers | [`domains/stores.md`](../domains/stores.md) |
+| Products, categories, translations, taxonomy, geo | [`domains/catalog.md`](../domains/catalog.md) |
+| Order lifecycle or the public order endpoint | [`domains/orders.md`](../domains/orders.md) |
 | Payment gateways, Google Play billing, billing gates | [`domains/billing.md`](../domains/billing.md) |
 | Plan limits, entitlements, usage metering | [`domains/entitlements.md`](../domains/entitlements.md) |
+| Ads, coupons, referrals | [`domains/growth.md`](../domains/growth.md) |
+| Design tokens, theme delivery, screen manifest | [`domains/design-system.md`](../domains/design-system.md) |
+| Admin operations, flags, capabilities, audit | [`domains/admin-control-plane.md`](../domains/admin-control-plane.md) |
+| Databases, tenant routing, D1 concurrency patterns | [`data/database.md`](../data/database.md) |
 | Database migration | The generator, not the document — see below |
 | Localization contract | [`architecture/localization-architecture.md`](../architecture/localization-architecture.md) |
 | Operational recovery procedure | A focused runbook in `docs/runbooks/` |
@@ -34,6 +42,23 @@ HTTP surface, which belongs to the API reference, or the decision rationale,
 which belongs to an ADR. Each one claims a registered subject in
 [`../governance/subject-registry.json`](../governance/subject-registry.json), so
 a second document cannot quietly become a competing source of truth.
+
+### Claiming a subject requires a verification date
+
+`verify-doc-frontmatter.mjs` rejects a `status: current` document that carries
+`authoritative_for` without `last_verified`. If a document is the one place a
+reader goes to be *sure* about something, it must say when that was last
+checked against the implementation.
+
+Set the date to the day you actually verified the content — not the day you
+edited it, and never a guess. If you are not prepared to verify it, drop the
+authority claim instead; an unowned subject fails the check too, which is the
+signal that someone needs to pick it up.
+
+The rule deliberately does not apply to every current document. Governance
+registers are event logs, legal policy is reviewed by counsel on its own
+cadence, and an ADR's meaningful date is the day it was decided. Requiring a
+date there would produce fabricated dates, not accuracy.
 
 [`database-migrations.md`](./database-migrations.md) is generated and is an
 index, not a copy of the SQL. To change what it says about a migration, edit the

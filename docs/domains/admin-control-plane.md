@@ -141,10 +141,26 @@ They hold Orderak's own engineering workflow, not customer data, inside the same
 D1 database as customer data. That is worth knowing before reasoning about
 backup scope, restore blast radius, or row counts.
 
-> **Whether this tracker is actually used is not verifiable from the
-> repository.** The code paths exist. If it is unused, these tables are
-> candidates for removal; if it is used, it deserves its own document. Someone
-> with operational knowledge needs to answer this.
+**Measured against production D1 on 2026-08-21, it is almost entirely unused:**
+
+| Table | Rows in production |
+| --- | --- |
+| `project_tasks` | 0 |
+| `roadmap_items` | 0 |
+| `bugs` | 0 |
+| `releases` | 0 |
+| `project_docs` | 6 |
+| `app_screens` | 23 |
+
+`app_screens` is genuinely live — it is the synced
+[screen manifest](./design-system.md#the-app-screen-manifest), not part of the
+tracker. The four empty tables and `project_docs` are the tracker itself.
+
+So the schema, the admin routes in `admin-project.ts`, and the panel screens
+exist for a workflow nobody is running. That makes them a **removal candidate**
+rather than a documentation gap. Removing them is a schema change with its own
+migration and approval, and is out of scope for documentation — but nothing
+should be built on top of them in the meantime.
 
 ## Boundaries
 

@@ -55,7 +55,7 @@ covering the Arabic alphabet plus Arabic-Indic digits `٠`–`٩`. A store named
 This is a first-class requirement, not a fallback — Arabic is the primary
 language of the seller base.
 
-`RESERVED_SLUGS` blocks 24 values that would collide with routes or conventions:
+`RESERVED_SLUGS` blocks 22 values that would collide with routes or conventions:
 `api`, `admin`, `adminx`, `c`, `p`, `s`, `health`, `www`, `app`, `orderak`,
 `static`, `assets`, `favicon`, `robots`, `sitemap`, `media`, `offers`,
 `branches`, `tables`, `events`, `coupons`, `services`. Note that `c`, `p` and

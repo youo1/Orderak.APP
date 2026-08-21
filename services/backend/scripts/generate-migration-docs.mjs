@@ -8,6 +8,12 @@ const repoDir = resolve(backendDir, "..", "..");
 const migrationsDir = join(backendDir, "migrations");
 const outputPath = join(repoDir, "docs", "guides", "database-migrations.md");
 
+// Bumped by hand when someone re-checks the descriptions below against the SQL.
+// Deliberately not `new Date()`: a date that moves on every run says only that
+// the generator ran, which is the one thing nobody needs to be told, and it
+// would make the CI staleness diff fail on any day the file was regenerated.
+const LAST_VERIFIED = "2026-08-21";
+
 const descriptions = {
   "001_init.sql": [
     "Creates the original seller, product, order, order-item, and generic item tables.",
@@ -221,6 +227,7 @@ const lines = [
   "status: current",
   "generated: true",
   "owner: backend",
+  `last_verified: ${LAST_VERIFIED}`,
   "applies_to: [production, staging]",
   "authoritative_for: [database-migrations]",
   "---",
