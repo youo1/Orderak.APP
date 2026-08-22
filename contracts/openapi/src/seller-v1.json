@@ -12318,7 +12318,7 @@
           "seller"
         ],
         "summary": "POST /api/v1/products/sync",
-        "description": "Pre-release seller v1 operation. Detailed domain schemas replace the generic bootstrap schema during API-first review.",
+        "description": "Mirrors the seller catalog. Products absent from the submitted array are deleted, so `products` is required: omitting it is rejected rather than treated as an empty catalog. An explicitly empty array is honoured and clears the catalog.",
         "x-owner": "Seller Experience",
         "x-data-classification": "pending-review",
         "x-rate-limit": "seller-authenticated-default",
@@ -12348,15 +12348,43 @@
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": [
+                  "products"
+                ],
+                "properties": {
+                  "products": {
+                    "type": "array",
+                    "description": "The complete catalog as the client holds it. Anything omitted here is deleted server-side. Omitting the field entirely is rejected with 400 products_required — it is never read as an empty catalog.",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                },
                 "additionalProperties": true
               },
               "examples": {
                 "valid": {
-                  "value": {}
-                },
-                "validation_failure": {
+                  "summary": "Full mirror of a one-product catalog",
                   "value": {
-                    "unexpected": "review-schema"
+                    "products": [
+                      {
+                        "app_id": 1,
+                        "name": "Cola",
+                        "price": {
+                          "amount_minor": 15000,
+                          "currency": "EGP"
+                        },
+                        "stock": 10,
+                        "available": true
+                      }
+                    ]
+                  }
+                },
+                "empty_catalog": {
+                  "summary": "Seller has deleted every product; the empty array is explicit",
+                  "value": {
+                    "products": []
                   }
                 }
               }

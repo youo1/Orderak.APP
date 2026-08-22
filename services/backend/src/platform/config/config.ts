@@ -9,22 +9,30 @@
 
 import { jsonResponse, authSeller, type AuthenticatedSeller } from "../http/shared";
 import { keyedHash, sha256Hex } from "../../domains/identity/auth";
+import { FREE_LIMITS } from "../../domains/commerce/plan-limits";
 import {
 	projectEntitlementsForAndroid,
 	resolveEntitlements,
 	type EntitlementSnapshot,
 } from "../../domains/commerce/entitlements";
 
-/** Free-plan defaults, returned when a seller has no active subscription. */
+/**
+ * Free-plan defaults, returned when a seller has no active subscription.
+ *
+ * The four capped limits come from plan-limits.ts, which is what the server
+ * enforces. They were duplicated here as literals, so the app and the server
+ * each had their own copy of the same rule and nothing would have noticed them
+ * diverging until a seller was refused by one and allowed by the other.
+ *
+ * `max_team_members` has no entry there because nothing enforces it server-side
+ * yet; it stays a literal until something does.
+ */
 const FREE_CONFIG = {
 	ok: true,
 	plan_id: "free",
 	ads_enabled: true,
 	limits: {
-		max_categories: 5,
-		max_products: 20,
-		max_orders_per_month: 50,
-		max_ai_requests_per_month: 20,
+		...FREE_LIMITS,
 		max_team_members: 1,
 	},
 	features: {
@@ -215,6 +223,41 @@ function versionDecision(policy: DbRow | null, versionCode: number): Record<stri
 	};
 }
 
+/**
+ * Short-lived isolate cache for the two global reads behind a feature flag.
+ *
+ * `feature_flags` and `feature_flag_rules` are deployment-wide: neither query
+ * takes a seller. But loadClientConfig() evaluates four flags, and it is
+ * piggybacked onto GET /api/v1/orders, which the Android client polls on every
+ * sync — so a device syncing every minute was issuing roughly a dozen D1 reads
+ * a minute for rows that change when an administrator edits a flag, which is
+ * approximately never.
+ *
+ * Thirty seconds, because a flag change is an operational action whose author
+ * is watching for it to take effect and half a minute is within the time they
+ * would spend confirming. The per-store override query is deliberately not
+ * cached — it is per seller, and a support agent revoking a capability expects
+ * that to bite immediately.
+ *
+ * Isolate-local, so it disappears with the isolate and never has to be
+ * invalidated across them.
+ */
+const FLAG_CACHE_MS = 30_000;
+const flagCache = new Map<string, { at: number; value: unknown }>();
+
+async function cachedFlagRead<T>(key: string, load: () => Promise<T>): Promise<T> {
+	const hit = flagCache.get(key);
+	if (hit && Date.now() - hit.at < FLAG_CACHE_MS) return hit.value as T;
+	const value = await load();
+	flagCache.set(key, { at: Date.now(), value });
+	return value;
+}
+
+/** Drop the cached flag definitions — for tests, and for an admin write path. */
+export function invalidateFeatureFlagCache(): void {
+	flagCache.clear();
+}
+
 async function effectiveFeature(
 	env: Env,
 	flagKey: string,
@@ -225,7 +268,8 @@ async function effectiveFeature(
 	storeId: string,
 	planEligible: boolean,
 ): Promise<Record<string, unknown>> {
-	const definition = await env.orderak_db.prepare("SELECT * FROM feature_flags WHERE flag_key=? AND status='published'").bind(flagKey).first<DbRow>();
+	const definition = await cachedFlagRead(`definition:${flagKey}`, () =>
+		env.orderak_db.prepare("SELECT * FROM feature_flags WHERE flag_key=? AND status='published'").bind(flagKey).first<DbRow>());
 	if (!definition) return { enabled: false, source: "missing" };
 	const envGate = definition.env_gate ? String(definition.env_gate) : null;
 	if (envGate && (env as unknown as Record<string, unknown>)[envGate] !== "true") return { enabled: false, source: `environment:${envGate}` };
@@ -235,10 +279,10 @@ async function effectiveFeature(
 		const override = await env.orderak_db.prepare("SELECT enabled,id FROM store_capability_overrides WHERE store_id=? AND capability_key=? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>datetime('now')) ORDER BY created_at DESC LIMIT 1").bind(storeId, capabilityKey).first<{ enabled: number; id: string }>();
 		if (override) return { enabled: override.enabled === 1, source: `store_override:${override.id}` };
 	}
-	const rules = await env.orderak_db.prepare(
+	const rules = await cachedFlagRead(`rules:${flagKey}`, () => env.orderak_db.prepare(
 		`SELECT * FROM feature_flag_rules WHERE flag_key=? AND active=1 AND (starts_at IS NULL OR starts_at<=datetime('now'))
 		 AND (ends_at IS NULL OR ends_at>datetime('now')) ORDER BY priority,id`,
-	).bind(flagKey).all<DbRow>();
+	).bind(flagKey).all<DbRow>());
 	for (const rule of rules.results) {
 		const scope = String(rule.scope_type);
 		const match = scope === "global"

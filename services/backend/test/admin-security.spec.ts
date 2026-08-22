@@ -32,9 +32,10 @@ async function enrolledOwner(): Promise<{ cookie: string; csrf: string; secret: 
 	const cookie = setCookie.split(";")[0];
 	const acknowledged = await call("/api/admin/v1/auth/recovery-codes/acknowledge", { method: "POST", headers: { cookie, origin: BASE, "x-csrf-token": payload.csrf_token, "content-type": "application/json" }, body: "{}" });
 	expect(acknowledged.status).toBe(200);
-	// /me issues a fresh CSRF token, so the one from enrollment is stale after
-	// this call. Return the current one or every CSRF-protected request the
-	// caller makes afterwards is rejected with 403.
+	// The CSRF token is derived from the session, so this returns the same value
+	// enrollment did. It is read back rather than reused to keep the helper
+	// honest about which token callers should present, and to assert that the
+	// acknowledgement above actually took effect.
 	const current = await (await call("/api/admin/v1/auth/me", { headers: { cookie } })).json<{ csrf_token: string; admin: { recoveryCodesAcknowledged: boolean } }>();
 	expect(current.admin.recoveryCodesAcknowledged).toBe(true);
 	return { cookie, csrf: current.csrf_token, secret: enrollment.secret, enrollmentToken: enrollment.enrollment_token, enrollmentCode: code };
@@ -133,3 +134,77 @@ async function totp(secret: string): Promise<string> {
 	const binary = ((hash[offset] & 0x7f) << 24) | (hash[offset + 1] << 16) | (hash[offset + 2] << 8) | hash[offset + 3];
 	return String(binary % 1_000_000).padStart(6, "0");
 }
+
+// /me had to mint a fresh CSRF token because the raw value cannot be read back
+// out of csrf_hash — and minting one overwrote the hash, so a second call
+// invalidated the first caller's token. The SPA calls refresh() on mount and on
+// every 401, and two admin tabs refresh independently, so a mutation could fail
+// csrf_invalid with nothing the user could do but reload.
+describe("admin CSRF token stability", () => {
+	beforeEach(async () => {
+		await createSchema();
+		env.ADMIN_API_KEY = "bootstrap-key";
+		env.ADMIN_SESSION_PEPPER = "session-pepper-with-at-least-thirty-two-characters";
+		env.ADMIN_RECOVERY_PEPPER = "recovery-pepper-with-at-least-thirty-two-characters";
+		env.ADMIN_TOTP_KEY_CURRENT = "1";
+		env.ADMIN_TOTP_KEY_V1 = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+		env.ADMIN_EXPORT_SIGNING_KEY = "export-signing-key-at-least-thirty-two-characters";
+		env.ADMIN_ORIGIN = BASE;
+		env.LOCAL_ADMIN_ENABLED = "false";
+		env.ADMIN_BREAK_GLASS_IP_ALLOWLIST = "127.0.0.1";
+	});
+
+	it("returns the same token across concurrent /me calls", async () => {
+		const owner = await enrolledOwner();
+		const responses = await Promise.all([
+			call("/api/admin/v1/auth/me", { headers: { cookie: owner.cookie } }),
+			call("/api/admin/v1/auth/me", { headers: { cookie: owner.cookie } }),
+			call("/api/admin/v1/auth/me", { headers: { cookie: owner.cookie } }),
+		]);
+		const tokens: string[] = [];
+		for (const response of responses) {
+			expect(response.status).toBe(200);
+			tokens.push((await response.json<{ csrf_token: string }>()).csrf_token);
+		}
+		expect(tokens[0]).toBeTruthy();
+		expect(new Set(tokens).size).toBe(1);
+	});
+
+	it("keeps a token valid after another /me call has happened", async () => {
+		const owner = await enrolledOwner();
+		const early = (await (await call("/api/admin/v1/auth/me", { headers: { cookie: owner.cookie } }))
+			.json<{ csrf_token: string }>()).csrf_token;
+		// A second tab refreshes. The first tab's token must survive it.
+		await call("/api/admin/v1/auth/me", { headers: { cookie: owner.cookie } });
+
+		const mutation = await call("/api/admin/v1/auth/recovery-codes/acknowledge", {
+			method: "POST",
+			headers: { cookie: owner.cookie, origin: BASE, "x-csrf-token": early, "content-type": "application/json" },
+			body: "{}",
+		});
+		expect(mutation.status).toBe(200);
+	});
+
+	it("gives different sessions different tokens", async () => {
+		const owner = await enrolledOwner();
+		const first = (await (await call("/api/admin/v1/auth/me", { headers: { cookie: owner.cookie } }))
+			.json<{ csrf_token: string }>()).csrf_token;
+		// Same administrator, new session: the token is bound to the session, so
+		// signing in again must not reproduce the previous one.
+		const login = await call("/api/admin/v1/auth/login", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ email: "owner@orderak.app", password: PASSWORD }),
+		});
+		const challenge = await login.json<{ mfa_token: string }>();
+		const mfa = await call("/api/admin/v1/auth/mfa", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ mfa_token: challenge.mfa_token, code: await totp(owner.secret) }),
+		});
+		expect(mfa.status).toBe(200);
+		const second = (await mfa.json<{ csrf_token: string }>()).csrf_token;
+		expect(second).toBeTruthy();
+		expect(second).not.toBe(first);
+	});
+});

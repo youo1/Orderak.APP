@@ -334,6 +334,12 @@ const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
 	],
 };
 
+/**
+ * Resources whose read permission comes with `project:view` rather than being
+ * granted individually — the internal delivery-tracking surfaces.
+ */
+const INTERNAL_READ_RESOURCES = ["roadmap", "tasks", "releases", "bugs", "screens", "endpoints", "prompts", "design", "docs"];
+
 /** Does a role grant a permission? */
 export function hasPermission(role: AdminRole, permission: string): boolean {
 	const perms = ROLE_PERMISSIONS[role];
@@ -344,14 +350,36 @@ export function hasPermission(role: AdminRole, permission: string): boolean {
 	if (permission === "theme:manage" && perms.includes("theme:rollback")) return true;
 	// allow "resource:*" wildcards
 	const resource = permission.split(":")[0];
-	const internalReadResources = new Set(["roadmap", "tasks", "releases", "bugs", "screens", "endpoints", "prompts", "design", "docs"]);
-	if (permission.endsWith(":view") && perms.includes("project:view") && internalReadResources.has(resource)) return true;
+	if (permission.endsWith(":view") && perms.includes("project:view") && INTERNAL_READ_RESOURCES.includes(resource)) return true;
 	return perms.includes(`${resource}:*`);
 }
 
-/** The full permission list for a role (for the UI to hide/show sections). */
+/**
+ * Every permission a role actually holds, including the ones it holds by
+ * implication — what the UI needs to decide which sections exist.
+ *
+ * This used to return the raw table, and the admin SPA re-derived the implied
+ * permissions itself with a `can()` that only understood exact matches and
+ * `resource:*`. It knew nothing about `project:view` granting the nine internal
+ * read permissions, or about `theme:rollback` implying `theme:manage` and
+ * `theme:view` — so the UI hid sections the API would have served, and the two
+ * implementations could drift apart silently because nothing compared them.
+ *
+ * Expanding here means there is one implementation of the rule and the client
+ * only has to test membership.
+ */
 export function permissionsForRole(role: AdminRole): string[] {
-	return ROLE_PERMISSIONS[role] ?? [];
+	const perms = ROLE_PERMISSIONS[role];
+	if (!perms) return [];
+	if (perms.includes("*")) return ["*"];
+
+	const expanded = new Set(perms);
+	if (perms.includes("theme:rollback")) expanded.add("theme:manage");
+	if (expanded.has("theme:manage")) expanded.add("theme:view");
+	if (perms.includes("project:view")) {
+		for (const resource of INTERNAL_READ_RESOURCES) expanded.add(`${resource}:view`);
+	}
+	return [...expanded].sort();
 }
 
 export const ALL_ROLES: AdminRole[] = ["owner", "finance", "support", "readonly"];

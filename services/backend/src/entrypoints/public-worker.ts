@@ -23,7 +23,7 @@ import { landingPageHtml } from "../landing";
 import { publicDesignSystemCss, publicDesignSystemResponse } from "../domains/admin/admin-theme";
 import { designSystemCss, designSystemFontPreload, loadActiveDesignSystem } from "../domains/design/design-system";
 import { PUBLIC_SITE_URL } from "../domains/identity/identity";
-import { authSeller, logError, jsonResponse, methodNotAllowed, corsHeaders, readCreds, checkRateLimit, recordDeviceMetadata, enforceRequestBodyLimit, type AuthenticatedSeller } from "../platform/http/shared";
+import { authSeller, logError, jsonResponse, methodNotAllowed, corsHeaders, allowedCorsOrigin, readCreds, checkRateLimit, recordDeviceMetadata, enforceRequestBodyLimit, type AuthenticatedSeller } from "../platform/http/shared";
 import { getPlanLimit } from "../domains/commerce/plan-limits";
 import { handleStoreRoutes } from "../domains/stores/api-store";
 import { serveMedia } from "../platform/storage/media";
@@ -44,6 +44,7 @@ import { handleBusinessTaxonomyRoutes } from "../domains/catalog/business-taxono
 import { pickLocale } from "../platform/localization/i18n";
 import { withSentry } from "@sentry/cloudflare";
 import { recordLatency, flushLatencySamples } from "../platform/observability/measurement";
+import { DEFAULT_CURRENCY } from "../platform/money/money";
 import { Hono } from "hono";
 
 // Durable Object classes must be exported from the Worker entrypoint so the
@@ -231,6 +232,38 @@ app.use("*", async (c, next) => {
 	// 204/304 and friends must stay bodyless; their body is already null, so
 	// passing it through is correct for every status.
 	c.res = new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+});
+
+// ---- CORS ------------------------------------------------------------------
+//
+// Access-Control-Allow-Origin is applied here rather than in jsonResponse(),
+// for the same reason X-Request-ID is: the header depends on the request, and
+// jsonResponse() does not have one. It called corsHeaders() with no argument,
+// so the origin header was omitted from every real response and present only on
+// the OPTIONS preflight — a browser saw the preflight pass and then had the
+// actual response blocked, and the allowlist in shared.ts governed nothing.
+//
+// Set after next() so the value is never baked into an edge-cached response:
+// caches.default stores whatever the loader returned, and freezing one caller's
+// Origin into it would hand that header to every subsequent caller. Vary:
+// Origin is set alongside for the same reason.
+//
+// Responses from caches.default have immutable headers, hence the rebuild.
+app.use("*", async (c, next) => {
+	await next();
+
+	const origin = allowedCorsOrigin(c.req.raw);
+	if (!origin) return;
+	// A handler that set its own policy keeps it — the same rule hardenPublic()
+	// follows. /api/v1/theme answers `*` on purpose: it serves public design
+	// tokens with no credentials to any client, and narrowing that to the
+	// allowlist would break every consumer outside it.
+	if (c.res.headers.has("access-control-allow-origin")) return;
+
+	const headers = new Headers(c.res.headers);
+	headers.set("access-control-allow-origin", origin);
+	headers.append("vary", "Origin");
+	c.res = new Response(c.res.body, { status: c.res.status, statusText: c.res.statusText, headers });
 });
 
 app.use("*", async (c, next) => {
@@ -448,7 +481,7 @@ export default withSentry<PublicWorkerEnv, QueuedEmailMessage>(
 	},
 
 	// ---- Inbound email (Cloudflare Email Routing → Worker) ----
-	async email(message, env, ctx): Promise<void> {
+	async email(message, env, _ctx): Promise<void> {
 		await handleInboundEmail(message, env);
 	},
 
@@ -626,7 +659,7 @@ async function handleApi(
 			// items inherit the order's currency rather than carrying their own, so a
 			// line and its order can never disagree.
 			for (const o of orders) {
-				const currency = String(o.currency ?? "EGP");
+				const currency = String(o.currency || DEFAULT_CURRENCY);
 				o.total = { amount_minor: Number(o.total_minor), currency };
 				delete o.total_minor;
 				delete o.currency;

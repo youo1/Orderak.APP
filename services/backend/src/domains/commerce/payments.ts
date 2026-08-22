@@ -40,10 +40,19 @@ export interface WebhookEvent {
 
 export interface PaymentGateway {
 	readonly name: string;
+	/**
+	 * Whether this gateway actually moves money.
+	 *
+	 * False for the mock, which reports every checkout as `active` without
+	 * charging anything. Callers that grant entitlements in exchange for payment
+	 * must check this before doing so — see subscribe() in billing.ts, which
+	 * refuses a paid plan on a gateway that cannot take payment.
+	 */
+	readonly takesRealPayments: boolean;
 	createCheckout(req: CheckoutRequest): Promise<CheckoutResult>;
 	cancelSubscription(gatewaySubId: string): Promise<void>;
 	/** Verify signature and parse a raw webhook body into a normalized event. */
-	parseWebhook(rawBody: string, signature: string | null, secret?: string): Promise<WebhookEvent>;
+	parseWebhook(rawBody: string, signature: string | null, secret?: string, requireSignature?: boolean): Promise<WebhookEvent>;
 }
 
 /** Verify an HMAC-SHA256 hex signature over a raw body (constant-time). */
@@ -75,6 +84,9 @@ function oneMonthFromNow(): string {
  */
 export class MockGateway implements PaymentGateway {
 	readonly name = "mock";
+	// It reports every checkout as active without charging. Anything that grants
+	// a paid entitlement has to know that before granting one.
+	readonly takesRealPayments = false;
 
 	async createCheckout(req: CheckoutRequest): Promise<CheckoutResult> {
 		// A deterministic-ish id so repeated idempotency keys are traceable.
@@ -93,12 +105,20 @@ export class MockGateway implements PaymentGateway {
 		return;
 	}
 
-	async parseWebhook(rawBody: string, signature: string | null, secret?: string): Promise<WebhookEvent> {
-		// SECURITY: /api/integrations/v1/payment is a public POST. When a webhook secret
-		// is configured, require a valid HMAC-SHA256 signature over the raw body —
-		// otherwise anyone who learns/guesses a gateway_sub_id could flip
-		// subscription statuses (e.g. activate a paid plan for free). Only when no
-		// secret is configured (local dev / tests) do we trust the body as before.
+	async parseWebhook(rawBody: string, signature: string | null, secret?: string, requireSignature = false): Promise<WebhookEvent> {
+		// SECURITY: /api/integrations/v1/payment is a public POST. A valid
+		// HMAC-SHA256 signature over the raw body is required whenever a secret is
+		// configured — otherwise anyone who learns or guesses a gateway_sub_id
+		// could flip subscription statuses and activate a paid plan for free.
+		//
+		// `requireSignature` closes the other half. Verification used to be
+		// skipped entirely when no secret was set, which is right for local dev
+		// and tests and wrong everywhere else — and staging did not list
+		// PAYMENT_WEBHOOK_SECRET in its required secrets, so on staging an unset
+		// secret turned a public endpoint that writes subscription status into an
+		// unauthenticated one. The caller passes true for any deployed
+		// environment, making "no secret" a refusal rather than a bypass.
+		if (requireSignature && !secret) throw new Error("webhook_secret_not_configured");
 		if (secret) {
 			if (!signature || !(await verifyHmacHex(rawBody, signature, secret))) {
 				throw new Error("bad_signature");

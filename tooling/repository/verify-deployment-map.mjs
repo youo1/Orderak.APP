@@ -111,6 +111,56 @@ if (adminConfig.d1_databases?.[0]?.database_id !== publicConfig.d1_databases?.[0
 if (adminStaging?.d1_databases?.[0]?.database_id !== publicStaging?.d1_databases?.[0]?.database_id) fail("Staging public/admin Workers must share the mapped staging D1.");
 if (adminStaging?.send_email?.[0]?.name !== "EMAIL") fail("Staging Admin Worker must declare the non-inherited EMAIL binding.");
 
+// ---------------------------------------------------------------------------
+// Key-version selectors must name a key the environment is guaranteed to have.
+//
+// admin-auth.ts resolves ADMIN_TOTP_KEY_CURRENT through keyForVersion(), and
+// admin-control-plane.ts resolves ADMIN_AUDIT_KEY_CURRENT through
+// keyForAuditVersion(). Both return undefined for a version whose secret is
+// unset, and both callers then fail closed at runtime: beginEnrollment() answers
+// 500 so no administrator can enrol MFA or finish a recovery, and
+// archiveAuditBatch() throws every fifteen minutes so the audit trail stops
+// being archived at all.
+//
+// Production declared version 2 for both while requiring only the version-1
+// secrets, so nothing at deploy time established that the keys it had switched
+// to actually existed — the two controls would simply have stopped working, on
+// a schedule, with no failing deploy to say so. Staging required them and
+// production did not, which is the wrong way round.
+//
+// Version 1 stays required alongside the current version because existing
+// material records the version it was written under: the enrolled TOTP
+// ciphertext is version 1, and migration 043 backfilled signing_key_version 1
+// onto every archive written before versioning existed. Dropping V1 would leave
+// that history undecryptable and unverifiable.
+const TOTP_KEY_BY_VERSION = { 1: "ADMIN_TOTP_KEY_V1", 2: "ADMIN_TOTP_KEY_V2" };
+const AUDIT_KEY_BY_VERSION = { 1: "ADMIN_AUDIT_SIGNING_KEY", 2: "ADMIN_AUDIT_KEY_V2" };
+
+function checkKeyVersion(label, environment, selectorName, keysByVersion) {
+  const required = new Set(environment?.secrets?.required ?? []);
+  const raw = environment?.vars?.[selectorName] ?? "1";
+  const version = Number(raw);
+  if (!Number.isInteger(version) || version < 1) {
+    fail(`${label} ${selectorName} is "${raw}", which is not a key version.`);
+    return;
+  }
+  const current = keysByVersion[version];
+  if (!current) {
+    fail(`${label} ${selectorName} selects version ${version}, which no key resolves to. Add it to keyForVersion()/keyForAuditVersion() first.`);
+    return;
+  }
+  for (const name of new Set([keysByVersion[1], current])) {
+    if (!required.has(name)) {
+      fail(`${label} selects ${selectorName}=${version} but does not require ${name}. A key version that is not guaranteed present fails closed at runtime instead of at deploy time.`);
+    }
+  }
+}
+
+for (const [label, environment] of [["Production admin", adminConfig], ["Staging admin", adminStaging]]) {
+  checkKeyVersion(label, environment, "ADMIN_TOTP_KEY_CURRENT", TOTP_KEY_BY_VERSION);
+  checkKeyVersion(label, environment, "ADMIN_AUDIT_KEY_CURRENT", AUDIT_KEY_BY_VERSION);
+}
+
 const edgeProd = loadJsonc("apps/admin-web/wrangler.edge.jsonc");
 const edgeStaging = loadJsonc("apps/admin-web/wrangler.edge.staging.jsonc");
 if (edgeProd.name !== "orderak-admin-edge" || edgeStaging.name !== "orderak-admin-edge-staging") fail("Admin Edge Worker names drifted.");

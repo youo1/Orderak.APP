@@ -1,0 +1,45 @@
+-- 045: make sellers.referral_code actually unique.
+--
+-- WHY
+--   ensureReferralCode() in platform/http/shared.ts generates an 8-character
+--   code and writes it with a bare UPDATE, wrapped in a five-attempt retry loop
+--   whose catch block carries the comment "UNIQUE-ish collision (no unique
+--   constraint, but keep retry safety)".
+--
+--   That comment was accurate and that is the problem. `idx_sellers_refcode`
+--   (migration 002, rebuilt by 009) is a plain index, so the UPDATE cannot
+--   fail on a duplicate — it succeeds, the catch never runs, the retry loop is
+--   unreachable, and two sellers end up owning the same code.
+--
+--   referralApply() then resolves a referrer with
+--   `SELECT id FROM sellers WHERE referral_code = ?` and takes whichever row
+--   SQLite returns first. A collision does not error; it credits the wrong
+--   seller, and the commission that follows is paid to someone who did not earn
+--   it. Nothing in the data afterwards distinguishes that from a correct
+--   attribution.
+--
+--   32^8 is about 1.1e12, so a collision is unlikely at any plausible size.
+--   "Unlikely" is the right reason to keep the code short and the wrong reason
+--   to let the database accept a duplicate: the retry loop already exists to
+--   handle this case and only needs the constraint to fire.
+--
+-- rollout: expand-contract — CREATE UNIQUE INDEX only. It adds a constraint
+--   without changing any column the running Worker reads, so the previous
+--   release keeps serving normally while this applies. The one behaviour that
+--   changes is that a duplicate INSERT/UPDATE now raises instead of silently
+--   succeeding, which is what ensureReferralCode() has always been written to
+--   expect.
+--
+-- IF THIS FAILS
+--   Duplicates already exist. Find them with:
+--     SELECT referral_code, COUNT(*) c FROM sellers
+--     WHERE referral_code IS NOT NULL
+--     GROUP BY referral_code HAVING c > 1;
+--   Clear the code on all but the oldest seller in each group (NULL is allowed
+--   and is re-issued lazily on next use), then re-run.
+--
+--   NULLs are distinct in a SQLite unique index, so every seller without a code
+--   yet is unaffected.
+
+DROP INDEX IF EXISTS idx_sellers_refcode;
+CREATE UNIQUE INDEX idx_sellers_refcode ON sellers(referral_code) WHERE referral_code IS NOT NULL;

@@ -157,12 +157,25 @@ async function listStores(env: AdminWorkerEnv, url: URL): Promise<Response> {
 
 async function listPlans(env: AdminWorkerEnv): Promise<Response> {
 	const {results:plans} = await env.orderak_db.prepare("SELECT * FROM plans ORDER BY sort_order").all();
-	const out = [];
-	for (const plan of plans as Record<string,unknown>[]) {
-		const {results:features} = await env.orderak_db.prepare("SELECT id,feature_key,name,description,enabled FROM plan_features WHERE plan_id=?").bind(plan.id).all();
-		out.push({...plan,features});
+	const planRows = plans as Record<string,unknown>[];
+	// One query for every plan's features, not one per plan. The public twin
+	// (listPublicPlans in billing.ts) was fixed for this and this one was not, so
+	// the admin list stayed at N+1 while the seller-facing list did not.
+	const featuresByPlan = new Map<unknown, Record<string,unknown>[]>();
+	if (planRows.length) {
+		const marks = planRows.map(() => "?").join(",");
+		const {results:features} = await env.orderak_db
+			.prepare(`SELECT id,plan_id,feature_key,name,description,enabled FROM plan_features WHERE plan_id IN (${marks})`)
+			.bind(...planRows.map((plan) => plan.id))
+			.all();
+		for (const feature of features as Record<string,unknown>[]) {
+			const {plan_id, ...rest} = feature;
+			const list = featuresByPlan.get(plan_id) ?? [];
+			list.push(rest);
+			featuresByPlan.set(plan_id, list);
+		}
 	}
-	return jsonResponse({ok:true,plans:out});
+	return jsonResponse({ok:true,plans:planRows.map((plan) => ({...plan,features:featuresByPlan.get(plan.id) ?? []}))});
 }
 
 async function upsertPlan(request: Request, env: AdminWorkerEnv, admin: AdminClaims): Promise<Response> {

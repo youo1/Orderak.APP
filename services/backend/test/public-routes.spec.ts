@@ -101,6 +101,37 @@ describe("public checkout integrity", () => {
 		expect(response.status).toBe(400);
 	});
 
+	// The monthly quota was a SELECT COUNT followed later by an INSERT. Two
+	// buyers arriving together both read a count under the limit and both orders
+	// were written, so a store on the free plan could exceed its allowance by as
+	// many orders as arrived at once. The count now lives in the insert itself.
+	it("does not let concurrent orders exceed the monthly quota", async () => {
+		const r = await registerStore();
+		const code = await seedProduct(r);
+		const seller = await env.orderak_db.prepare("SELECT id FROM sellers WHERE phone=?").bind(r.phone).first<{ id: string }>();
+		// Free plan allows 50 orders a month; fill it to one remaining.
+		const filler = [];
+		for (let index = 0; index < 49; index += 1) {
+			filler.push(env.orderak_db.prepare(
+				"INSERT INTO orders(id,order_no,store_id,buyer_phone,pay_method,total_minor,currency,status) VALUES(?,?,?,'01000000000','COD',100,'EGP','NEW')",
+			).bind(`filler-${index}`, index + 1, seller!.id));
+		}
+		await env.orderak_db.batch(filler);
+
+		const place = (key: string) => SELF.fetch(`${SITE}/${r.public_identifier}`, {
+			method: "POST",
+			headers: { "content-type": "application/json", "idempotency-key": key },
+			body: JSON.stringify({ items: [{ product_code: code, qty: 1 }], buyer_phone: "01012345678", pay_method: "COD" }),
+		});
+		const [a, b] = await Promise.all([place("quota-race-a"), place("quota-race-b")]);
+
+		const statuses = [a.status, b.status].sort();
+		expect(statuses).toEqual([200, 409]);
+		const total = await env.orderak_db.prepare("SELECT COUNT(*) AS c FROM orders WHERE store_id=?")
+			.bind(seller!.id).first<{ c: number }>();
+		expect(total?.c).toBe(50);
+	});
+
 	it("replays an idempotent order once and rejects overselling", async () => {
 		const r = await registerStore();
 		const code = await seedProduct(r);

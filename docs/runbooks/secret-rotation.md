@@ -331,7 +331,17 @@ off and does not call those services.
 - **`ADMIN_API_KEY` and `ADMIN_JWT_SECRET` on the public Worker** — recorded
   above as vestigial and candidates for deletion. Requiring them would make
   their removal a deploy failure, cementing a credential that should go.
-- **`ADMIN_BREAK_GLASS_IP_ALLOWLIST`** — absent on Production, optional in code.
+- **`ADMIN_BREAK_GLASS_IP_ALLOWLIST`** — absent on Production. Not required at
+  deploy time, but not optional in the sense that word usually carries: an
+  unset list matches no address, so `breakGlassSourceAllowed()` denies every
+  caller and both `POST /api/admin/v1/auth/bootstrap` and
+  `POST /api/admin/v1/auth/password/reset` answer
+  `403 break_glass_source_forbidden` on Production regardless of the API key.
+  The break-glass recovery path is therefore unavailable there today. Failing
+  closed is the right direction — an API key alone should not reset an owner
+  account from an arbitrary address — but the consequence is that an owner who
+  loses both their TOTP device and their recovery codes cannot be recovered
+  through the API. See [`../guides/troubleshooting.md`](../guides/troubleshooting.md).
 
 ### The guard was observed failing
 

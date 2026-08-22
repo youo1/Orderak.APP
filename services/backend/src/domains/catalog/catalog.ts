@@ -22,7 +22,7 @@ import { dirFor, t, type Locale } from "../../platform/localization/i18n";
 import { entitlementLimitReached, reserveUsage, voidUsageReservation } from "../commerce/entitlements";
 import { storeCapabilityEnabled } from "../operations/capabilities";
 import { keyedHash } from "../identity/auth";
-import { type Currency, exponentOf } from "../../platform/money/money";
+import { DEFAULT_CURRENCY, type Currency, exponentOf } from "../../platform/money/money";
 
 type Store = Record<string, unknown>;
 
@@ -40,6 +40,19 @@ function amountLabel(amountMinor: number, currency: Currency, lang: Locale): str
 		minimumFractionDigits: exponent,
 		maximumFractionDigits: exponent,
 	});
+}
+
+/**
+ * The currency the order form on this page should count in.
+ *
+ * Read from the products rather than from the store, because `sellers` has no
+ * currency column — migration 044 put one on products, orders, payments and
+ * subscriptions and deliberately not on the seller. handleCatalogOrder refuses
+ * an order whose lines disagree, so every product on a page that can be ordered
+ * shares one currency and the first is representative.
+ */
+function pageCurrency(products: Record<string, unknown>[]): Currency {
+	return String(products[0]?.currency || DEFAULT_CURRENCY) as Currency;
 }
 
 // ---- SEO <head> ------------------------------------------------------------
@@ -173,7 +186,7 @@ function productCard(store: Store, p: Record<string, unknown>, linkToPage: boole
 	return `
 	<div class="card" data-code="${code}" data-price="${p.price_minor}">
 		${img}
-		<div class="info">${nameHtml}<div class="price">${amountLabel(Number(p.price_minor), String(p.currency ?? "EGP") as Currency, lang)} ${esc(t(lang, "catalog.currency"))}</div></div>
+		<div class="info">${nameHtml}<div class="price">${amountLabel(Number(p.price_minor), String(p.currency || DEFAULT_CURRENCY) as Currency, lang)} ${esc(t(lang, "catalog.currency"))}</div></div>
 		<div class="qty">
 			<button type="button" aria-label="${esc(t(lang, "catalog.decrease"))}" onclick="chg('${code}',-1)">−</button>
 			<span id="q_${code}">0</span>
@@ -184,16 +197,24 @@ function productCard(store: Store, p: Record<string, unknown>, linkToPage: boole
 
 // Order form + client script. Posts item {product_code, qty} lists to the
 // store's public_identifier root — codes only, never UUIDs.
-function orderForm(store: Store, lang: Locale): string {
+function orderForm(store: Store, lang: Locale, currency: Currency): string {
 	const postUrl = "/" + esc(store.public_identifier);
 	const js = (key: string) => JSON.stringify(t(lang, key));
 	const numberLocale = lang === "ar" ? "ar-EG" : "en-EG";
 	// The browser script below works in minor units and needs the divisor for
-	// this store's currency. Injected rather than written as 100: KWD, BHD and
-	// OMR use 1000, and a literal here is a factor-of-ten error in those markets.
-	const storeCurrency = String(store.currency ?? "EGP") as Currency;
-	const minorPerMajor = 10 ** exponentOf(storeCurrency);
-	const minorDigits = exponentOf(storeCurrency);
+	// the currency being displayed. Injected rather than written as 100: KWD,
+	// BHD and OMR use 1000, and a literal here is a factor-of-ten error in those
+	// markets — which is what both of these were until now. The two constants
+	// were computed here and then ignored by the script, so the running total
+	// and the order confirmation both still divided by a hardcoded 100.
+	//
+	// Taken from the products on the page, not from the store: `sellers` has no
+	// currency column (migration 044 added one to products, orders, payments and
+	// subscriptions, deliberately not to the seller). handleCatalogOrder refuses
+	// an order whose lines disagree, so a page's products share one currency and
+	// reading the first is reading all of them.
+	const minorPerMajor = 10 ** exponentOf(currency);
+	const minorDigits = exponentOf(currency);
 	const paymentOptions = [
 		String(store.vfcash ?? "").trim() ? `<option value="VF_CASH">${esc(t(lang, "catalog.vfcash"))}</option>` : "",
 		String(store.instapay ?? "").trim() ? `<option value="INSTAPAY">${esc(t(lang, "catalog.instapay"))}</option>` : "",
@@ -222,7 +243,7 @@ function chg(code,d,max){
 	qty[code]=Math.max(0,Math.min(max==null?99:max,(qty[code]||0)+d));
 	document.getElementById('q_'+code).textContent=qty[code];
 	var t=0;document.querySelectorAll('.card').forEach(function(c){t+=(qty[c.dataset.code]||0)*(+c.dataset.price)});
-	document.getElementById('total').textContent=(t/100).toLocaleString('${numberLocale}');
+	document.getElementById('total').textContent=(t/${minorPerMajor}).toLocaleString('${numberLocale}',{minimumFractionDigits:${minorDigits},maximumFractionDigits:${minorDigits}});
 }
 function addText(parent,text,tag){var el=document.createElement(tag||'span');el.textContent=text;parent.appendChild(el);return el}
 async function send(e){
@@ -250,7 +271,7 @@ async function send(e){
 	var ok=document.getElementById('ok');ok.replaceChildren();
 	addText(ok,'🎉 '+${js("catalog.order_success")}+' #'+String(d.order_no),'b');ok.appendChild(document.createElement('br'));
 	addText(ok,${js("catalog.total")}+': ');
-	addText(ok,(Number(d.total_minor)/100).toLocaleString('${numberLocale}')+' '+${js("catalog.currency")},'b');
+	addText(ok,(Number(d.total_minor)/${minorPerMajor}).toLocaleString('${numberLocale}',{minimumFractionDigits:${minorDigits},maximumFractionDigits:${minorDigits}})+' '+${js("catalog.currency")},'b');
 	if(d.vfcash){ok.appendChild(document.createElement('br'));addText(ok,${js("catalog.vfcash")}+': ');var vf=addText(ok,String(d.vfcash),'b');vf.dir='ltr'}
 	if(d.instapay){ok.appendChild(document.createElement('br'));addText(ok,${js("catalog.instapay")}+': ');var ip=addText(ok,String(d.instapay),'b');ip.dir='ltr'}
 	var wa=String(d.contact_phone||'').replace(/\\D/g,'');
@@ -263,10 +284,10 @@ async function send(e){
 
 async function availableProducts(env: Env, storeId: string, lang: Locale, categoryId?: string): Promise<Record<string, unknown>[]> {
 	const sql = categoryId
-		? `SELECT p.id, p.product_code, COALESCE(pt.name,p.name) name, COALESCE(pt.description,p.description) description, p.price_minor, p.stock, p.image_url FROM products p
+		? `SELECT p.id, p.product_code, COALESCE(pt.name,p.name) name, COALESCE(pt.description,p.description) description, p.price_minor, p.currency, p.stock, p.image_url FROM products p
 		   LEFT JOIN product_translations pt ON pt.product_id=p.id AND pt.lang=? AND pt.source_name=p.name AND pt.source_description=COALESCE(p.description,'') AND pt.translation_status IN ('machine','reviewed')
 		   WHERE p.store_id = ? AND p.category_id = ? AND p.available = 1 AND p.stock > 0 ORDER BY p.created_at DESC`
-		: `SELECT p.id, p.product_code, COALESCE(pt.name,p.name) name, COALESCE(pt.description,p.description) description, p.price_minor, p.stock, p.image_url FROM products p
+		: `SELECT p.id, p.product_code, COALESCE(pt.name,p.name) name, COALESCE(pt.description,p.description) description, p.price_minor, p.currency, p.stock, p.image_url FROM products p
 		   LEFT JOIN product_translations pt ON pt.product_id=p.id AND pt.lang=? AND pt.source_name=p.name AND pt.source_description=COALESCE(p.description,'') AND pt.translation_status IN ('machine','reviewed')
 		   WHERE p.store_id = ? AND p.available = 1 AND p.stock > 0 ORDER BY p.created_at DESC`;
 	const stmt = categoryId
@@ -296,7 +317,7 @@ export async function renderStorePage(env: Env, store: Store, lang: Locale): Pro
 	const cards = products.map((p) => productCard(store, p, true, lang)).join("");
 	const body = `${storeHeader(store, lang)}${chips}${
 		cards || `<p style='text-align:center'>${esc(t(lang, "catalog.empty"))}</p>`
-	}${products.length ? orderForm(store, lang) : ""}`;
+	}${products.length ? orderForm(store, lang, pageCurrency(products)) : ""}`;
 
 	const revision = await loadActiveDesignSystem(env);
 	const theme = revision.legacyTheme;
@@ -322,7 +343,7 @@ export async function renderCategoryPage(env: Env, store: Store, category: Recor
 <div class="crumb"><a href="/${pid}">${esc(store.store_name)}</a> / ${esc(category.name)}</div>
 <div class="sec">${esc(category.name)}</div>
 ${cards || `<p style='text-align:center'>${esc(t(lang, "catalog.category_empty"))}</p>`}
-${products.length ? orderForm(store, lang) : ""}`;
+${products.length ? orderForm(store, lang, pageCurrency(products)) : ""}`;
 
 	const revision = await loadActiveDesignSystem(env);
 	const theme = revision.legacyTheme;
@@ -349,7 +370,7 @@ export async function renderProductPage(env: Env, store: Store, product: Record<
 	if (translated) product = { ...product, name: translated.name, description: translated.description };
 	const pid = String(store.public_identifier);
 	const canonical = `${PUBLIC_SITE_URL}/${pid}/p/${esc(product.product_code)}`;
-	const productCurrency = String(product.currency ?? "EGP") as Currency;
+	const productCurrency = String(product.currency || DEFAULT_CURRENCY) as Currency;
 	const price = amountLabel(Number(product.price_minor), productCurrency, lang);
 	const inStock = Number(product.stock) > 0 && Number(product.available) === 1;
 
@@ -377,7 +398,7 @@ export async function renderProductPage(env: Env, store: Store, product: Record<
 <div class="sec">${esc(product.name)}</div>
 ${product.description ? `<div class="desc">${esc(product.description)}</div>` : ""}
 ${card}${soldOut}
-${inStock ? orderForm(store, lang) : ""}
+${inStock ? orderForm(store, lang, productCurrency) : ""}
 <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>`;
 
 	const revision = await loadActiveDesignSystem(env);
@@ -434,8 +455,16 @@ export async function handleCatalogOrder(request: Request, env: Env, store: Stor
 			return jsonResponse({ error: "rate_limited" }, 429);
 		}
 
+		// The month boundary is UTC. Stores are in Africa/Cairo, so an order placed
+		// in the last two or three hours of a month is counted against the next
+		// one. Left as UTC deliberately rather than shifted by a fixed offset:
+		// Egypt observes DST again as of 2023, so `+2 hours` is wrong for half the
+		// year, and the correct fix is a per-store timezone, which `sellers` does
+		// not have. A quota that rolls over a few hours early is a smaller error
+		// than one that is wrong by an hour for six months of the year.
 		const monthlyLimit = await getPlanLimit(env, String(store.id), "max_orders_per_month");
-		if (env.ENTITLEMENTS_ENABLED !== "true" && monthlyLimit !== null) {
+		const enforceMonthlyLimit = env.ENTITLEMENTS_ENABLED !== "true" && monthlyLimit !== null;
+		if (enforceMonthlyLimit) {
 			const usage = await db.prepare(
 				"SELECT COUNT(*) AS count FROM orders WHERE store_id=? AND created_at>=datetime('now','start of month')",
 			).bind(store.id).first<{count:number}>();
@@ -461,7 +490,7 @@ export async function handleCatalogOrder(request: Request, env: Env, store: Stor
 		const marks = codes.map(() => "?").join(",");
 		const { results: products } = (await db
 			.prepare(
-				`SELECT id, product_code, name, price_minor, stock FROM products
+				`SELECT id, product_code, name, price_minor, currency, stock FROM products
 				 WHERE store_id = ? AND product_code IN (${marks})`,
 			)
 			.bind(store.id, ...codes)
@@ -479,11 +508,31 @@ export async function handleCatalogOrder(request: Request, env: Env, store: Stor
 				const qty = Math.floor(Number(i.qty));
 				if (qty <= 0 || qty > 999 || qty > Number(p.stock)) return null;
 				total += qty * Number(p.price_minor);
-				return { product_id: p.id, product_name: p.name, qty, price_minor: Number(p.price_minor) };
+				return {
+					product_id: p.id, product_name: p.name, qty,
+					price_minor: Number(p.price_minor),
+					currency: String(p.currency || DEFAULT_CURRENCY),
+				};
 			})
-			.filter(Boolean) as { product_id: string; product_name: string; qty: number; price_minor: number }[];
+			.filter(Boolean) as { product_id: string; product_name: string; qty: number; price_minor: number; currency: string }[];
 
 		if (lines.length !== rawItems.length) return jsonResponse({ error: "stock_changed" }, 409);
+
+		// `total` is a sum of price_minor across the ordered products, which is
+		// only a number if every one of them is denominated the same way. Adding
+		// 1500 piasters to 1500 fils produces 3000 of nothing, and the result is
+		// indistinguishable afterwards from a correct total — addMoney() in
+		// money.ts refuses the same operation for exactly this reason.
+		//
+		// The order row also stores one currency for the whole order and
+		// order_items deliberately has no column of its own (migration 044), so a
+		// mixed-currency order is not merely wrong, it is unrepresentable. Refuse
+		// it here rather than record a total that cannot be interpreted.
+		const orderCurrencies = new Set(lines.map((line) => line.currency));
+		if (orderCurrencies.size > 1) {
+			return jsonResponse({ error: "mixed_currency_order", currencies: [...orderCurrencies].sort() }, 409);
+		}
+		const orderCurrency = [...orderCurrencies][0] ?? DEFAULT_CURRENCY;
 
 		const payMethods = ["COD"];
 		if (String(store.vfcash ?? "").trim()) payMethods.push("VF_CASH");
@@ -512,8 +561,31 @@ export async function handleCatalogOrder(request: Request, env: Env, store: Stor
 			stmts.push(
 				db
 					.prepare(
-						`INSERT INTO orders (id, order_no, store_id, buyer_phone, buyer_name, pay_method, total_minor, note, idempotency_key, status)
-						 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'NEW')`,
+						// `currency` is written rather than left to the column default:
+						// the default is only correct while one market exists, and a
+						// default that is right by coincidence stops being right without
+						// anything changing here.
+						//
+						// INSERT ... SELECT ... WHERE, not a plain VALUES, so the quota
+						// is re-checked inside the same statement that consumes it. The
+						// check above runs before the request does any work and gives a
+						// clean error, but it is a read followed later by a write: two
+						// buyers ordering at the same moment both saw a count under the
+						// limit and both orders were written. The condition here is
+						// evaluated by SQLite as part of the insert, so the last order
+						// that fits is the last order that succeeds.
+						//
+						// A rejected insert leaves the order row absent, and the
+						// order_items rows in this batch then violate their foreign key,
+						// so D1 rolls the whole batch back — including the trigger's
+						// stock claims. The catch below re-reads the quota to turn that
+						// into a plan-limit response rather than a generic failure.
+						`INSERT INTO orders (id, order_no, store_id, buyer_phone, buyer_name, pay_method, total_minor, currency, note, idempotency_key, status)
+						 SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NEW'
+						 WHERE ? IS NULL OR (
+						   SELECT COUNT(*) FROM orders o
+						   WHERE o.store_id = ? AND o.created_at >= datetime('now','start of month')
+						 ) < ?`,
 					)
 					.bind(
 						orderId,
@@ -523,8 +595,14 @@ export async function handleCatalogOrder(request: Request, env: Env, store: Stor
 						String(body.buyer_name ?? "").slice(0, 40) || null,
 						payMethod,
 						total,
+						orderCurrency,
 						String(body.note ?? "").slice(0, 200) || null,
 						idempotencyKey,
+						// NULL disables the quota clause entirely, for an unlimited plan
+						// or when entitlements own the counting instead.
+						enforceMonthlyLimit ? monthlyLimit : null,
+						store.id,
+						enforceMonthlyLimit ? monthlyLimit : null,
 					),
 			);
 			for (const l of lines) {
@@ -555,6 +633,20 @@ export async function handleCatalogOrder(request: Request, env: Env, store: Stor
 			const duplicate = await existingOrder();
 			if (duplicate) return successResponse(duplicate);
 			const message = error instanceof Error ? error.message : String(error);
+			// The quota clause on the order insert is the only thing that can make
+			// the header row silently absent while its items still reference it, so
+			// a foreign-key failure here means a concurrent order took the last
+			// slot in the month. Checked before stock, because both produce the
+			// same rolled-back batch and this is the more specific cause.
+			if (enforceMonthlyLimit && /foreign key/i.test(message)) {
+				const usage = await db.prepare(
+					"SELECT COUNT(*) AS count FROM orders WHERE store_id=? AND created_at>=datetime('now','start of month')",
+				).bind(store.id).first<{ count: number }>();
+				if (Number(usage?.count ?? 0) >= Number(monthlyLimit)) {
+					if (quotaReservationId) await voidUsageReservation(env, quotaReservationId);
+					return limitReached("max_orders_per_month", Number(monthlyLimit), Number(usage?.count ?? 0));
+				}
+			}
 			const stillAvailable = await Promise.all(lines.map((line) => db.prepare(
 				"SELECT 1 AS ok FROM products WHERE id=? AND available=1 AND stock>=?",
 			).bind(line.product_id, line.qty).first<{ ok: number }>()));

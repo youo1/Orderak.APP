@@ -190,10 +190,37 @@ gradlew.bat connectedStagingDebugAndroidTest
 ```http
 POST /api/admin/v1/auth/password/reset
 x-admin-key: <ADMIN_API_KEY>
-{ "email": "you@orderak.app", "new_password": "..." }
+{ "email": "you@orderak.app", "new_password": "...", "incident_id": "INC-1234" }
 ```
 
-1. **Lost 2FA device?** Add `"clear_totp": true` to the reset request above.
+   `incident_id` is required — the request is rejected with
+   `email_strong_password_and_incident_required` without one, and the value is
+   written to the audit trail and to a `critical` security alert. The new
+   password must be at least 12 characters.
+
+   The reset always clears TOTP and every recovery code, and forces
+   re-enrolment on next sign-in. There is no `clear_totp` flag; a separate
+   option would imply a reset that leaves the second factor in place, which
+   this endpoint deliberately does not offer.
+
+3. **Both of the above require `ADMIN_BREAK_GLASS_IP_ALLOWLIST`.**
+   `requireBreakGlassAccess` checks the API key *and* the caller's
+   `CF-Connecting-IP` against that comma-separated list. An unset or empty list
+   matches nothing, so both `bootstrap` and `password/reset` answer
+   `403 break_glass_source_forbidden` from every address.
+
+   That is the intended failure direction — a key alone should not be enough to
+   reset an owner account from anywhere on the internet — but it does mean the
+   variable is a precondition, not a hardening extra. It is **not currently set
+   on the Production admin Worker**, so this recovery path is unavailable there
+   until it is:
+
+   ```bash
+   npx wrangler secret put ADMIN_BREAK_GLASS_IP_ALLOWLIST --config wrangler.admin.jsonc --env=""
+   ```
+
+   Until then, an owner locked out of both TOTP and their recovery codes cannot
+   be recovered through the API at all.
 
 ### Admin session expires unexpectedly
 
