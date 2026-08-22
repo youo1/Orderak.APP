@@ -15816,6 +15816,316 @@
           }
         }
       }
+    },
+    "/api/v1/orders/{id}/status": {
+      "patch": {
+        "operationId": "advanceOrderStatus",
+        "tags": [
+          "seller"
+        ],
+        "summary": "Advance an order through its pipeline",
+        "description": "Moves one order to the next state, or cancels it. The server owns the transition table: NEW -> CONFIRMED -> PAID -> SHIPPED -> DONE, with CANCELLED reachable only from NEW or CONFIRMED, and DONE and CANCELLED terminal. Any other move is refused with 409 rather than applied.\n\nRequesting the status an order already holds succeeds with `changed: false`, so a client retrying a dropped response converges instead of showing an error for work that landed.\n\nCancelling returns the reserved stock to the catalog. Placing the order took it, and until this operation existed nothing gave it back.",
+        "x-owner": "Seller Experience",
+        "x-data-classification": "pending-review",
+        "x-rate-limit": "seller-authenticated-default",
+        "x-stability": "draft",
+        "security": [
+          {
+            "sellerDevice": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "./components/common.json#/parameters/RequestId"
+          },
+          {
+            "$ref": "./components/common.json#/parameters/ClientPlatform"
+          },
+          {
+            "$ref": "./components/common.json#/parameters/AppVersion"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The per-store order number (`order_no` from GET /api/v1/orders), not the UUID. It is unique per store and this operation is scoped to one store by authentication, so it identifies exactly one order.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "status"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "CONFIRMED",
+                      "PAID",
+                      "SHIPPED",
+                      "DONE",
+                      "CANCELLED"
+                    ],
+                    "description": "Target state. NEW is not accepted: an order starts there and never returns."
+                  }
+                }
+              },
+              "examples": {
+                "confirm": {
+                  "value": {
+                    "status": "CONFIRMED"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "id",
+                    "order_no",
+                    "status",
+                    "changed"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "NEW",
+                        "CONFIRMED",
+                        "PAID",
+                        "SHIPPED",
+                        "DONE",
+                        "CANCELLED"
+                      ]
+                    },
+                    "changed": {
+                      "type": "boolean",
+                      "description": "False when the order already held the requested status."
+                    },
+                    "order_no": {
+                      "type": "integer",
+                      "description": "The per-store order number that was addressed."
+                    }
+                  }
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "ok": true,
+                      "id": "018f-example",
+                      "order_no": 12,
+                      "status": "CONFIRMED",
+                      "changed": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Status required",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/status_required",
+                      "title": "Status required",
+                      "status": 400,
+                      "code": "status_required",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/auth",
+                      "title": "Auth",
+                      "status": 401,
+                      "code": "auth",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/not_found",
+                      "title": "Not found",
+                      "status": 404,
+                      "code": "not_found",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Invalid transition",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/invalid_transition",
+                      "title": "Invalid transition",
+                      "status": 409,
+                      "code": "invalid_transition",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              },
+              "Retry-After": {
+                "$ref": "./components/common.json#/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/rate_limited",
+                      "title": "Rate Limited",
+                      "status": 429,
+                      "code": "rate_limited",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example",
+                      "retryable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Retryable dependency failure",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              },
+              "Retry-After": {
+                "$ref": "./components/common.json#/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/temporarily_unavailable",
+                      "title": "Temporarily Unavailable",
+                      "status": 503,
+                      "code": "temporarily_unavailable",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example",
+                      "retryable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {

@@ -187,11 +187,11 @@ gradlew.bat connectedStagingDebugAndroidTest
    [`../setup.md`](./setup.md) Section 5.
 2. **Forgot password?** Use the break-glass reset endpoint:
 
-```http
-POST /api/admin/v1/auth/password/reset
-x-admin-key: <ADMIN_API_KEY>
-{ "email": "you@orderak.app", "new_password": "...", "incident_id": "INC-1234" }
-```
+   ```http
+   POST /api/admin/v1/auth/password/reset
+   x-admin-key: <ADMIN_API_KEY>
+   { "email": "you@orderak.app", "new_password": "...", "incident_id": "INC-1234" }
+   ```
 
    `incident_id` is required — the request is rejected with
    `email_strong_password_and_incident_required` without one, and the value is

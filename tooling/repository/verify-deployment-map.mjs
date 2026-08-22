@@ -199,7 +199,13 @@ for (const [relative, expectedServers] of Object.entries(serverExpectations)) {
 // existed; nothing called them, so on a live system verified_at was never written.
 // Phase 7b needed it to prove that archives signed under audit key version 1 still
 // verify after staging moved to version 2.
-if (operationCount !== 246) fail(`OpenAPI operation inventory changed: expected 246, found ${operationCount}.`);
+// Raised to 247 on 2026-08-22 for PATCH /api/v1/orders/{id}/status. Order status
+// had no server route at all: OrderStatus.kt described a pipeline and the app
+// wrote transitions to its own Room database, so the server held every order at
+// NEW and a reinstall replayed work the seller had already done. Cancelling was
+// worse — placing an order takes stock through a trigger, and the Room-only
+// restore meant every cancellation leaked it.
+if (operationCount !== 247) fail(`OpenAPI operation inventory changed: expected 247, found ${operationCount}.`);
 const seller = JSON.parse(read("contracts/openapi/src/seller-v1.json"));
 for (const [route, pathItem] of Object.entries(seller.paths)) {
   for (const method of ["get", "post", "put", "patch", "delete"]) {

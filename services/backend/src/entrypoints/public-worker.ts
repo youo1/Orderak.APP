@@ -676,6 +676,89 @@ async function handleApi(
 			return jsonResponse({ ok: true, orders, config, has_more: hasMore, next_since: nextSince });
 		}
 
+		// ---- Advance an order through its pipeline ----
+		//
+		// The transition table below is the server's copy of OrderStatus.kt. It is
+		// duplicated rather than shared because the client cannot be the authority
+		// on it: the app writes its own Room row first for responsiveness, and a
+		// client that skips PAID or resurrects a cancelled order must be refused
+		// here regardless of what its enum believes.
+		if (request.method === "PATCH" && url.pathname.startsWith("/api/v1/orders/") && url.pathname.endsWith("/status")) {
+			const { phone, secret } = readCreds(request, url);
+			const store = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret);
+			if (!store) return jsonResponse({ error: "auth" }, 401);
+
+			// Addressed by order_no, not by the UUID primary key. The Android app
+			// stores `remoteId = o.order_no` (SyncRepository) and never keeps the
+			// UUID, so a UUID route would be uncallable by the only client that
+			// needs it without a Room migration. order_no is unique per store
+			// (idx_orders_store_orderno, migration 015) and this route is already
+			// scoped to one store by authentication, so it identifies exactly one
+			// row here. It is also the number the seller reads aloud.
+			const orderNo = Number(decodeURIComponent(url.pathname.split("/")[4] ?? ""));
+			if (!Number.isInteger(orderNo) || orderNo <= 0) {
+				return jsonResponse({ error: "not_found" }, 404);
+			}
+			const body = await request.json().catch(() => null) as { status?: unknown } | null;
+			if (!body || typeof body.status !== "string") {
+				return jsonResponse({ error: "status_required" }, 400);
+			}
+			const target = body.status;
+
+			// Scoped by store_id in the same statement that reads the row: a seller
+			// must not be able to probe another store's orders by the difference
+			// between "not found" and "not yours".
+			const row = await env.orderak_db
+				.prepare("SELECT id, order_no, status FROM orders WHERE order_no = ? AND store_id = ?")
+				.bind(orderNo, store.id)
+				.first<{ id: string; order_no: number; status: string }>();
+			if (!row) return jsonResponse({ error: "not_found" }, 404);
+
+			const current = String(row.status);
+			// Already there. Returned as success rather than as a conflict so a
+			// client that retries a dropped response converges instead of showing
+			// the seller an error for work that landed.
+			if (current === target) {
+				return jsonResponse({ ok: true, id: row.id, order_no: Number(row.order_no), status: current, changed: false });
+			}
+
+			const FORWARD: Record<string, string | undefined> = {
+				NEW: "CONFIRMED",
+				CONFIRMED: "PAID",
+				PAID: "SHIPPED",
+				SHIPPED: "DONE",
+			};
+			const CANCELLABLE = new Set(["NEW", "CONFIRMED"]);
+			const allowed = target === "CANCELLED"
+				? CANCELLABLE.has(current)
+				: FORWARD[current] === target;
+			if (!allowed) {
+				return jsonResponse({
+					error: "invalid_transition",
+					from: current,
+					to: target,
+					allowed: [FORWARD[current], ...(CANCELLABLE.has(current) ? ["CANCELLED"] : [])].filter(Boolean),
+				}, 409);
+			}
+
+			// Conditional on the status we read, so two devices racing the same
+			// order cannot both apply a transition. The loser sees 0 rows changed
+			// and re-reads rather than overwriting.
+			//
+			// Cancelling returns stock through trg_orders_release_stock_on_cancel
+			// (migration 046), which fires on this UPDATE. The handler deliberately
+			// does not touch products: the claim side is a trigger too, and the two
+			// must not drift apart.
+			const result = await env.orderak_db
+				.prepare("UPDATE orders SET status = ?, status_changed_at = datetime('now') WHERE id = ? AND store_id = ? AND status = ?")
+				.bind(target, row.id, store.id, current)
+				.run();
+			if (!result.meta.changes) {
+				return jsonResponse({ error: "conflict", from: current, to: target }, 409);
+			}
+			return jsonResponse({ ok: true, id: row.id, order_no: Number(row.order_no), status: target, changed: true });
+		}
+
 		return jsonResponse({ error: "not_found" }, 404);
 	} catch (e) {
 		await logError(env, "api", e, request);
