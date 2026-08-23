@@ -201,6 +201,7 @@
     <string name="payment_manual">أكد الدفع يدوي</string>
     <string name="payment_checking">بنفحص السكرين شوت…</string>
     <string name="payment_verified_ok">الدفع مطابق — اتأكد تلقائيًا ✅</string>
+    <string name="order_status_update_failed">تعذّر تحديث الطلب. راجع اتصالك وحاول تاني.</string>
     <string name="payment_flagged_title">⚠️ في حاجة مش مظبوطة</string>
     <string name="payment_flag_amount">• المبلغ في السكرين شوت مش مطابق للأوردر</string>
     <string name="payment_flag_ref">• مفيش رقم عملية واضح في الصورة</string>

@@ -722,22 +722,34 @@ async function handleApi(
 				return jsonResponse({ ok: true, id: row.id, order_no: Number(row.order_no), status: current, changed: false });
 			}
 
-			const FORWARD: Record<string, string | undefined> = {
-				NEW: "CONFIRMED",
-				CONFIRMED: "PAID",
-				PAID: "SHIPPED",
-				SHIPPED: "DONE",
+			// Mirrors OrderStatus.kt, which has two forward paths out of NEW, not
+			// one: `next` walks the pipeline a step at a time, and `markPaid`
+			// additionally allows NEW -> PAID. That is not a shortcut — a buyer can
+			// pay through InstaPay or Vodafone Cash before the seller has confirmed
+			// anything, so OrderDetailsScreen renders the payment card on NEW as
+			// well as CONFIRMED and the OCR proof flow marks such an order paid
+			// directly.
+			//
+			// A single-valued forward table refused that with 409. Every Android
+			// caller discards the result, so the seller was shown "payment verified"
+			// and a recorded payment row on an order the server kept at NEW.
+			const ALLOWED: Record<string, readonly string[] | undefined> = {
+				NEW: ["CONFIRMED", "PAID"],
+				CONFIRMED: ["PAID"],
+				PAID: ["SHIPPED"],
+				SHIPPED: ["DONE"],
 			};
 			const CANCELLABLE = new Set(["NEW", "CONFIRMED"]);
+			const forward = ALLOWED[current] ?? [];
 			const allowed = target === "CANCELLED"
 				? CANCELLABLE.has(current)
-				: FORWARD[current] === target;
+				: forward.includes(target);
 			if (!allowed) {
 				return jsonResponse({
 					error: "invalid_transition",
 					from: current,
 					to: target,
-					allowed: [FORWARD[current], ...(CANCELLABLE.has(current) ? ["CANCELLED"] : [])].filter(Boolean),
+					allowed: [...forward, ...(CANCELLABLE.has(current) ? ["CANCELLED"] : [])],
 				}, 409);
 			}
 

@@ -9,6 +9,9 @@ import app.orderak.seller.data.db.OrderWithItems
 import app.orderak.seller.data.db.OrderakDatabase
 import app.orderak.seller.data.db.PaymentDao
 import app.orderak.seller.data.db.PaymentEntity
+import app.orderak.seller.data.remote.BackendApi
+import app.orderak.seller.data.session.SessionStore
+import kotlinx.coroutines.flow.first
 import app.orderak.seller.domain.OrderStatus
 import app.orderak.seller.domain.PayMethod
 import kotlinx.coroutines.flow.Flow
@@ -21,7 +24,9 @@ data class NewOrderLine(val productId: Long, val name: String, val qty: Int, val
 class OrderRepository @Inject constructor(
     private val db: OrderakDatabase,
     private val orderDao: OrderDao,
-    private val paymentDao: PaymentDao
+    private val paymentDao: PaymentDao,
+    private val api: BackendApi,
+    private val sessionStore: SessionStore,
 ) {
     val orders: Flow<List<OrderEntity>> = orderDao.all()
     fun order(id: Long): Flow<OrderWithItems?> = orderDao.withItems(id)
@@ -57,27 +62,68 @@ class OrderRepository @Inject constructor(
         orderId
     }
 
+    /**
+     * Push a status change to the backend, then mirror what it accepted.
+     *
+     * These three used to write to Room and stop, which meant the server held
+     * every order at NEW: a reinstall replayed a pipeline the seller had already
+     * worked, and two devices could each hold a different truth about one order.
+     * Cancelling was worse — placing an order takes stock through a trigger, and
+     * the local-only restore leaked it on the server every time.
+     *
+     * The server owns the transition table and its answer is written here
+     * verbatim, so a client whose enum disagrees loses. Nothing is written when
+     * the call fails: a false return leaves the row as the server still has it,
+     * which is the honest state until the next sync.
+     *
+     * Orders created locally by the seller have no remoteId and are still
+     * local-only; they are moved in Room alone until they have been pushed.
+     */
+    private suspend fun applyStatus(id: Long, target: OrderStatus): Boolean {
+        val order = orderDao.byId(id) ?: return false
+        val remoteNo = order.remoteId
+        if (remoteNo == null) {
+            orderDao.updateStatus(id, target.name)
+            if (target == OrderStatus.CANCELLED) {
+                db.withTransaction {
+                    orderDao.itemsOf(id).forEach { db.productDao().restoreStock(it.productId, it.qty) }
+                }
+            }
+            return true
+        }
+        val phone = sessionStore.phone.first() ?: return false
+        val secret = sessionStore.getOrCreateSecret()
+        val response = api.setOrderStatus(phone, secret, remoteNo, target.name)
+        if (!response.ok) return false
+        // Mirror the server, not the request: on a repeat it answers with the
+        // status the order already held, and that is what should be shown.
+        orderDao.updateStatus(id, response.status)
+        // Stock is returned by the server's trigger. Room mirrors it only when
+        // the server says this call is what changed it, so a retry cannot credit
+        // the same units twice.
+        if (response.status == OrderStatus.CANCELLED.name && response.changed) {
+            db.withTransaction {
+                orderDao.itemsOf(id).forEach { db.productDao().restoreStock(it.productId, it.qty) }
+            }
+        }
+        return true
+    }
+
     /** Legal transitions only (domain state machine). Returns false if not allowed. */
     suspend fun advance(id: Long, from: OrderStatus): Boolean {
         val next = from.next ?: return false
-        orderDao.updateStatus(id, next.name)
-        return true
+        return applyStatus(id, next)
     }
 
     /** Fix(#12): PAID only reachable from NEW/CONFIRMED — the state machine stays authoritative. */
     suspend fun markPaid(id: Long, current: OrderStatus): Boolean {
         if (current != OrderStatus.NEW && current != OrderStatus.CONFIRMED) return false
-        orderDao.updateStatus(id, OrderStatus.PAID.name)
-        return true
+        return applyStatus(id, OrderStatus.PAID)
     }
 
     suspend fun cancel(id: Long, current: OrderStatus): Boolean {
         if (!current.canCancel) return false
-        db.withTransaction {
-            orderDao.itemsOf(id).forEach { db.productDao().restoreStock(it.productId, it.qty) }
-            orderDao.updateStatus(id, OrderStatus.CANCELLED.name)
-        }
-        return true
+        return applyStatus(id, OrderStatus.CANCELLED)
     }
 
     suspend fun isDuplicateRef(ref: String): Boolean = paymentDao.countByRef(ref) > 0

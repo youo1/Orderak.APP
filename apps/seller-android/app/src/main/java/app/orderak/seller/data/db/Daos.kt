@@ -106,6 +106,10 @@ interface OrderDao {
     @Query("SELECT * FROM orders WHERE id = :id")
     fun withItems(id: Long): Flow<OrderWithItems?>
 
+    /** One order row, without its items — used when a caller needs remoteId. */
+    @Query("SELECT * FROM orders WHERE id = :id")
+    suspend fun byId(id: Long): OrderEntity?
+
     @Query("SELECT * FROM order_items WHERE orderId = :orderId")
     suspend fun itemsOf(orderId: Long): List<OrderItemEntity>
 

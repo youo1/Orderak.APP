@@ -88,6 +88,23 @@ data class ProductCodeDto(
     val category_code: String? = null,
 )
 
+/**
+ * Result of moving one order along its pipeline.
+ *
+ * `changed` is false when the order already held the requested status. The call
+ * still succeeded — a retry has to converge rather than surface an error for
+ * work that landed — so the flag is how a caller tells "I moved it" from "it was
+ * already there".
+ */
+@Serializable
+data class OrderStatusRes(
+    val ok: Boolean = false,
+    @SerialName("order_no") val orderNo: Long = 0,
+    val status: String = "",
+    val changed: Boolean = false,
+    @SerialName("code") val error: String? = null,
+)
+
 @Serializable
 data class ProductsSyncRes(
     val ok: Boolean = false, val count: Int = 0,
@@ -627,6 +644,9 @@ class BackendApi @Inject constructor(
     private suspend fun putRaw(path: String, body: String, headers: Map<String, String> = emptyMap()): String =
         execute(builder(path, headers).put(body.toRequestBody(mediaJson)).build())
 
+    private suspend fun patchRaw(path: String, body: String, headers: Map<String, String> = emptyMap()): String =
+        execute(builder(path, headers).patch(body.toRequestBody(mediaJson)).build())
+
     private suspend fun deleteRaw(path: String, headers: Map<String, String> = emptyMap()): String =
         execute(builder(path, headers).delete().build())
 
@@ -840,6 +860,15 @@ class BackendApi @Inject constructor(
             creds(phone, secret) + ("x-orderak-recent-auth" to recentAuthToken),
         )
     }
+
+    /**
+     * Move one order to [status]. Addressed by the per-store order number, which
+     * is what OrderEntity.remoteId holds — the app never receives the UUID.
+     */
+    suspend fun setOrderStatus(phone: String, secret: String, orderNo: Long, status: String): OrderStatusRes =
+        apiCall({ OrderStatusRes(error = it) }) {
+            patchRaw("/api/v1/orders/$orderNo/status", """{"status":"$status"}""", creds(phone, secret))
+        }
 
     suspend fun syncProducts(req: ProductsSyncReq): ProductsSyncRes =
         apiCall({ ProductsSyncRes(error = it) }) {

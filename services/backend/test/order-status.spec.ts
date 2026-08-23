@@ -89,6 +89,42 @@ describe("order status transitions", () => {
 		expect(row?.status_changed_at).toBeTruthy();
 	});
 
+	it("accepts NEW to PAID, which is a second forward path and not a skipped step", async () => {
+		// A buyer can pay through InstaPay or Vodafone Cash before the seller has
+		// confirmed anything. OrderDetailsScreen renders the payment card on NEW,
+		// and the OCR proof flow calls markPaid straight from there. While the
+		// forward table held one target per state this answered 409, and because
+		// every Android caller discards the result the seller was shown "payment
+		// verified" on an order the server had left at NEW.
+		const seller = await registerStore({ phone: "+201500009111" });
+		const storeId = await storeIdOf(seller);
+		await seedProduct(storeId, "prod-j", 10);
+		await seedOrder(storeId, "order-j", "prod-j", 1);
+
+		const response = await patchStatus(seller, 1, "PAID");
+		expect(response.status).toBe(200);
+		expect(await response.json()).toMatchObject({ ok: true, status: "PAID", changed: true });
+
+		const row = await env.orderak_db.prepare("SELECT status FROM orders WHERE id = 'order-j'").first<{ status: string }>();
+		expect(row?.status).toBe("PAID");
+	});
+
+	it("lists both forward targets when it refuses a transition out of NEW", async () => {
+		const seller = await registerStore({ phone: "+201500009112" });
+		const storeId = await storeIdOf(seller);
+		await seedProduct(storeId, "prod-k", 10);
+		await seedOrder(storeId, "order-k", "prod-k", 1);
+
+		const response = await patchStatus(seller, 1, "DONE");
+		expect(response.status).toBe(409);
+		// The client shows the seller what it could have asked for, so the list has
+		// to carry every legal target rather than only the first one.
+		expect(await response.json()).toMatchObject({
+			code: "invalid_transition",
+			allowed: ["CONFIRMED", "PAID", "CANCELLED"],
+		});
+	});
+
 	it("refuses a skipped step instead of applying it", async () => {
 		const seller = await registerStore({ phone: "+201500009102" });
 		const storeId = await storeIdOf(seller);
