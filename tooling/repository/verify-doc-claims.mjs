@@ -151,11 +151,9 @@ const API_TOKEN_NAMES = new Set([
 
 function pathClaims(text) {
 	const claims = new Set();
-	// A line that names the source repository is describing something over
-	// there, not a claim about this checkout — README's pointer to the freeze
-	// manifest in youo1/Orderak is correct precisely because it says so.
-	const lines = text.split(/\r?\n/).filter((line) => !/youo1\/Orderak(?!\.APP)/.test(line));
-	for (const match of lines.join("\n").matchAll(/`([^`\n]+)`/g)) {
+	// Every path a document names is a claim about this checkout. There is no
+	// upstream repository to point at, so nothing is exempt from resolving here.
+	for (const match of text.matchAll(/`([^`\n]+)`/g)) {
 		const span = match[1].trim();
 		if (!span.includes("/")) continue;
 		if (/[<>{}*$|\\]/.test(span)) continue; // placeholders, globs, shell

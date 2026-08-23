@@ -105,12 +105,17 @@ what separated the two causes — the token was already fixed by then.
 Token permissions cannot be read back from Cloudflare, so every row above is a
 successful run rather than an inspection.
 
-## The old repository cannot be retired yet
+## Objects encrypted before 2026-08-16 can no longer be opened
 
-It holds the only identity for every production and staging object encrypted
-before 2026-08-16. Those objects sit under a **30-day retention lock**, so it
-must stay able to run `restore-drill.yml` until the last of them ages out.
+The identity for every production and staging object written under the previous
+recipient no longer exists. Those objects remain in R2 under their **30-day
+retention lock** and will age out on their own, but nothing can decrypt them in
+the meantime, and no restore can reach a point in time before 2026-08-16.
 
-That is a second, independent block on Phase 9, alongside the plan's own rule
-that nothing is deleted until two production releases have shipped from the new
-repository — one has.
+The current keys are unaffected: both were generated with the private half
+placed in offline custody first, and both have been proven by a drill. Recovery
+from 2026-08-16 onward is intact.
+
+The lesson is the one at the top of this note. A GitHub secret is a deployment
+mechanism, not custody — anything that can only be read by the system that holds
+it is one deletion away from gone.

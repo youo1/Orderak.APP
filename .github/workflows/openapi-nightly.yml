@@ -26,6 +26,9 @@ on:
         type: boolean
         default: false
 
+permissions:
+  contents: read
+
 concurrency:
   group: openapi-nightly-staging
   cancel-in-progress: false

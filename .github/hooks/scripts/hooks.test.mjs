@@ -54,17 +54,15 @@ test("ordinary reads fall through without a decision", () => {
   assert.deepEqual(output, {});
 });
 
-test("first stop requests the improvement audit", () => {
+test("stop hook is advisory and never blocks completion", () => {
   const output = run("continuous-improvement.mjs", {
     stop_hook_active: false,
   });
 
-  assert.equal(output.decision, "block");
-  assert.match(output.reason, /orderak-agent-improvement/);
-  assert.match(output.reason, /record-learning/);
+  assert.deepEqual(output, {});
 });
 
-test("re-entered stop does not loop", () => {
+test("stop hook stays non-blocking when re-entered", () => {
   const output = run("continuous-improvement.mjs", {
     stop_hook_active: true,
   });

@@ -79,17 +79,15 @@ keeping in full:
 
 1. It originally said required reviewers were unavailable — true, because the
    restriction applies to *private* repositories on the current plan.
-2. On 2026-08-15 both repositories were public, and it was rewritten to say
+2. On 2026-08-15 this repository was public, and it was rewritten to say
    reviewers were available. That was verified empirically rather than inferred
-   from the plan tier: a throwaway environment was created on `Orderak.APP` with
-   a `reviewers` payload, the API accepted it and returned
+   from the plan tier: a throwaway environment was created with a `reviewers`
+   payload, the API accepted it and returned
    `protection_rules: ["required_reviewers"]`, and the environment was deleted
    immediately afterwards.
-3. Both repositories then went **private** — `youo1/Orderak` on 2026-08-16 — and
-   this paragraph was not revisited. Measured 2026-08-20:
-   `youo1/Orderak.APP` and `youo1/Orderak` both report `private=true`, and every
-   environment in `Orderak.APP` reads `protection_rules: []`. The plan
-   restriction applies once more.
+3. The repository then went **private**, and this paragraph was not revisited.
+   Measured 2026-08-20: it reports `private=true`, and every environment reads
+   `protection_rules: []`. The plan restriction applies once more.
 
 So step 2's finding still stands as a measurement; it just no longer describes
 the repository as it is. **A reviewer gate is unavailable, not merely
@@ -381,9 +379,8 @@ Runs 3 to 5 span 105–195 ms p95 at identical load. That spread is client
 network variance, not application variance — the two-arm experiment put the
 application's own contribution at 2.5 ms.
 
-The durable place to run this is `openapi-nightly.yml`, which cannot run in
-`Orderak.APP` until the missing `staging-contract-tests` environment exists.
-See `docs/governance/evidence/2026-08-13-missing-github-environments.md`.
+The durable place to run this is `openapi-nightly.yml`, which cannot run until
+the `staging-contract-tests` environment exists.
 
 ### What the parity check actually covered, and what it could not
 
@@ -398,7 +395,7 @@ implying a fuller comparison happened:
 content types intact, `x-request-id` present and distinct per request.
 
 **Not captured:** a normalized response-body diff between the two deploys.
-Both repositories deploy to the *same* Workers — which is the plan's own
+Deploys reach the *same* Workers — which is the plan's own
 requirement, since parallel `orderak-migration-*` resources would put
 different data on each side and make comparison meaningless. The consequence
 is that the new deploy overwrote the old one, so there is no second live
@@ -434,65 +431,6 @@ incident:
   Durable Object's class name or storage layout is *not* rollback-safe: the
   older code would meet newer state. Treat DO lifecycle changes as
   forward-fix-only.
-
-## Break-glass: deploying Staging from the source repository
-
-`youo1/Orderak` no longer deploys Staging. Its `CLOUDFLARE_API_TOKEN` was
-removed from the `staging` environment, and its `staging-deploy.yml` is
-dispatch-only behind a typed `BREAK_GLASS` confirmation.
-
-> **The required reviewer on `staging-rollback` is almost certainly gone, and
-> this procedure no longer relies on it.** Making `youo1/Orderak` private on
-> 2026-08-16 stripped `required_reviewers` from both its `backup-restore-*`
-> environments — measured before and after. Environment reviewers are not
-> available on private repositories under that plan, so the same applies to
-> `staging-rollback`. **That specific environment has not been re-queried**, so
-> this is stated as the consequence of a measured plan limit, not as its own
-> measurement. Confirm it before relying on the gate.
->
-> What still holds is the stronger control, and it was always the real one: the
-> environment carries **no credential**, so the break-glass path cannot run until
-> a human deliberately puts one there. The reviewer was defence in depth on top
-> of that, not the thing preventing a deploy.
-
-That environment name still gates the dispatch, so the steps below are unchanged.
-
-**That environment deliberately holds no credential.** The plan's requirement
-is a rollback credential kept *outside* Actions — "a deliberate human act, not
-an automated path" — and a token sitting permanently in a repository that
-should not deploy is neither outside Actions nor deliberate. So the token
-lives in the owner's password manager, and the environment stays empty until
-someone decides an emergency justifies filling it.
-
-### Using it
-
-1. Confirm the emergency is real: `youo1/Orderak.APP` cannot deploy, and
-   rolling forward or back from there has already been tried. A Staging
-   rollback within Orderak.APP is the normal path and is rehearsed above.
-2. Add the deploy token from offline custody:
-
-   ```bash
-   gh secret set CLOUDFLARE_API_TOKEN --repo youo1/Orderak --env staging-rollback
-   ```
-
-3. Dispatch `Deploy Staging (break-glass only)` with
-   `confirm_break_glass=BREAK_GLASS`, and approve the environment when GitHub
-   asks.
-4. **Delete the secret again when the incident closes:**
-
-   ```bash
-   gh secret delete CLOUDFLARE_API_TOKEN --repo youo1/Orderak --env staging-rollback
-   ```
-
-### Stated expiry
-
-The credential's lifetime is **the incident**. It is added when one starts and
-removed when it closes — step 4 is not optional tidying, it is the control.
-An emergency token left behind is just a second deploy path nobody
-remembers, which is the situation Phase 7a existed to remove.
-
-Review this path whenever the migration reaches a new phase, and retire it
-entirely at Phase 9 when the source repository is decommissioned.
 
 ## Rollback and forward fixes
 

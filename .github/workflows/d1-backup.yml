@@ -36,16 +36,11 @@ name: D1 Backup
 
 on:
   schedule:
-    # Daily at 02:00 UTC. Moved here from the old repository on 2026-08-16 as
-    # part of the cutover: backups must now be encrypted to the NEW age
-    # recipient, and the old repository still carries the old one. Two
-    # repositories backing up the same databases on the same schedule is the
-    # duplication Phase 3 exists to prevent, so the old schedule is removed in
-    # the same change.
+    # Daily at 02:00 UTC — the quietest hour for the seller traffic these
+    # databases serve, so an export competes with as little live work as
+    # possible. Backups are encrypted to the age recipient held as a repository
+    # variable; this job never sees the private half.
     - cron: '0 2 * * *'
-  # This repository now owns the nightly backup. The comment that stood here
-  # said the opposite — that the old repository's cron was authoritative until
-  # cutover — which was true when written and stopped being true above.
   workflow_dispatch:
     inputs:
       target:
@@ -112,14 +107,7 @@ jobs:
           echo "Production backup credentials are present."
 
       - name: Install age (pinned, checksum-verified)
-        run: |
-          set -euo pipefail
-          curl -fsSL -o /tmp/age.tar.gz \
-            "https://github.com/FiloSottile/age/releases/download/v1.3.1/age-v1.3.1-linux-amd64.tar.gz"
-          echo "bdc69c09cbdd6cf8b1f333d372a1f58247b3a33146406333e30c0f26e8f51377  /tmp/age.tar.gz" | sha256sum -c -
-          tar -xzf /tmp/age.tar.gz -C /tmp
-          sudo mv /tmp/age/age /tmp/age/age-keygen /usr/local/bin/
-          age --version
+        run: bash .github/scripts/install-age.sh
 
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -278,14 +266,7 @@ jobs:
           echo "Staging backup credentials are present."
 
       - name: Install age (pinned, checksum-verified)
-        run: |
-          set -euo pipefail
-          curl -fsSL -o /tmp/age.tar.gz \
-            "https://github.com/FiloSottile/age/releases/download/v1.3.1/age-v1.3.1-linux-amd64.tar.gz"
-          echo "bdc69c09cbdd6cf8b1f333d372a1f58247b3a33146406333e30c0f26e8f51377  /tmp/age.tar.gz" | sha256sum -c -
-          tar -xzf /tmp/age.tar.gz -C /tmp
-          sudo mv /tmp/age/age /tmp/age/age-keygen /usr/local/bin/
-          age --version
+        run: bash .github/scripts/install-age.sh
 
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0

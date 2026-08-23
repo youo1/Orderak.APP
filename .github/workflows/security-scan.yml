@@ -32,10 +32,21 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
-      # gitleaks-action reports findings through the API. With only contents:read
+      # THREAT-MODEL DECISION (reviewed 2026-08): gitleaks-action posts findings
+      # as pull-request comments through the GitHub API. With only contents:read
       # it fails before scanning with
       #   RequestError [HttpError]: Resource not accessible by integration (403)
       # which reads like a scan failure but is a permissions one.
+      #
+      # Why `pull-requests: write` is accepted here rather than split out:
+      #   1. It grants no `contents: write`, no `actions`, and no secret access;
+      #      comments are the only thing it can mutate.
+      #   2. On a pull_request from a fork, GitHub downgrades the token to
+      #      read-only regardless, so an untrusted branch cannot mint comments.
+      #   3. The action runs as a pinned-SHA, code-reviewed step; it receives no
+      #      attacker-controlled script input.
+      # If the action ever needs broader write scope, split the commenter into a
+      # separate, workflow_run-gated job instead of widening this one.
       pull-requests: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

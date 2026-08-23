@@ -214,11 +214,7 @@ differently in this repository than in the one it was migrated from.
 - `android-staging-distribution.yml`: Firebase App Distribution.
 - `production-deploy.yml`: requires an explicit release SHA already verified on staging.
 
-> **Why four of those are dispatch-only here and scheduled in the source
-> repository.** `d1-backup`, `infra-drift` and `openapi-nightly` act on shared
-> Cloudflare resources that both repositories can still reach. Running the same
-> schedule from both would double every backup and race every drift check, so
-> the source repository keeps the crons until it is decommissioned and this one
-> takes them over. `restore-drill` is dispatch-only by design, not by phase: it
-> is the only path that decrypts a backup, and that must stay a deliberate,
-> reviewed act rather than something that happens nightly.
+> **Why `restore-drill` alone is dispatch-only.** `d1-backup`, `infra-drift`
+> and `openapi-nightly` run on their own schedules here. `restore-drill` does
+> not: it is the only path that decrypts a backup, and that must stay a
+> deliberate, reviewed act rather than something that happens nightly.

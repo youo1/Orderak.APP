@@ -21,7 +21,7 @@ on:
     paths:
       - '.github/workflows/**'
       - '.github/actions/**'
-      - '.github/workflow-lint.yml'
+      - '.github/workflows/workflow-lint.yml'
   push:
     branches: [main]
     paths:
