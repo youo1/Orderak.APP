@@ -13,12 +13,23 @@
 # Groups mirror the intent of the renovate.json packageRules they replace, so
 # one review covers a toolchain rather than arriving as separate pull requests.
 version: 2
+#
+# target-branch: develop on every entry, from 2026-08-24.
+#
+# `develop` is the integration branch; dependency bumps belong there, not on
+# the production branch. This is also not merely cosmetic. Dependabot treats
+# its configured target as authoritative: retargeting one of its pull requests
+# by hand and then asking it to rebase makes it reset the base back to the
+# configured branch. Three bumps reached `main` that way before this line
+# existed. Without it, no manual retarget of a Dependabot PR survives.
+#
 updates:
   # pnpm workspace. Dependabot resolves every workspace member from the root
   # pnpm-lock.yaml, so a single root entry covers apps/, services/, and
   # contracts/ rather than one entry per package.
   - package-ecosystem: npm
     directory: /
+    target-branch: develop
     schedule:
       interval: weekly
       day: wednesday
@@ -48,6 +59,7 @@ updates:
   # Android / Compose / Kotlin toolchain.
   - package-ecosystem: gradle
     directory: /apps/seller-android
+    target-branch: develop
     schedule:
       interval: weekly
       day: wednesday
@@ -77,6 +89,7 @@ updates:
   # kept rather than traded away for update coverage.
   - package-ecosystem: github-actions
     directory: /
+    target-branch: develop
     schedule:
       interval: weekly
       day: wednesday
