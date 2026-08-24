@@ -128,10 +128,6 @@ cd contracts/openapi && npm run check
 node tooling/repository/verify-worker-budget.mjs
 ```
 
-```bash
-node tooling/migration/verify-manifest.mjs tooling/migration/manifests/pre-migration-freeze.json .
-```
-
 Plus, from the repository root: `verify-doc-frontmatter`, `verify-doc-claims`,
 `verify-doc-links` and `verify-doc-encoding` under `tooling/repository/`, and
 `python -m mkdocs build --strict`.

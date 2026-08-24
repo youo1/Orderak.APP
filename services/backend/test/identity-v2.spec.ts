@@ -127,13 +127,13 @@ describe("stable identity and tenant routing", () => {
 			body: JSON.stringify({
 				...challenge,
 				id_token: token(authTime, "new"),
-				replacement_device_secret: "replacement-device",
+				replacement_device_secret: "replacement-device-0000-1111",
 			}),
 		});
 		const completed = await handlePhoneChangeRoutes(completionRequest(), enabled, new URL(`${BASE}/api/v1/auth/phone-change/complete`));
 		expect(completed?.status).toBe(200);
 		expect(await authSeller(enabled, oldPhone, oldSecret)).toBeNull();
-		expect(await authSeller(enabled, newPhone, "replacement-device")).not.toBeNull();
+		expect(await authSeller(enabled, newPhone, "replacement-device-0000-1111")).not.toBeNull();
 		const ownership = await env.orderak_db.prepare(
 			"SELECT owner_store_id,play_account_hash FROM organizations WHERE id='org-phone'",
 		).first<{ owner_store_id: string; play_account_hash: string }>();

@@ -121,6 +121,22 @@ function recoveryPepper(env: AdminWorkerEnv): string | null {
 	return env.ADMIN_RECOVERY_PEPPER ?? (env.LOCAL_ADMIN_ENABLED === "true" ? env.ADMIN_JWT_SECRET ?? null : null);
 }
 
+/**
+ * Break-glass is gated on the API key AND the caller's address.
+ *
+ * An unset allowlist matches nothing, so every caller is denied. That is the
+ * correct direction — possession of ADMIN_API_KEY alone should not reset an
+ * owner account from an arbitrary address — but it also means the variable is a
+ * precondition for the recovery path existing at all, not a hardening extra.
+ * It is not set on Production, so bootstrap and password reset are closed
+ * there; docs/runbooks/secret-rotation.md and docs/guides/troubleshooting.md
+ * say so rather than describing a path that does not work.
+ *
+ * The distinction is logged because "denied because the key was wrong" and
+ * "denied because this deployment has no allowlist configured" are different
+ * operational problems that produced the same 403 and no way to tell them apart
+ * during an incident.
+ */
 function breakGlassSourceAllowed(request: Request, env: AdminWorkerEnv): boolean {
 	if (env.LOCAL_ADMIN_ENABLED === "true") return true;
 	const ip = request.headers.get("cf-connecting-ip")?.trim() ?? "";
@@ -128,6 +144,13 @@ function breakGlassSourceAllowed(request: Request, env: AdminWorkerEnv): boolean
 		.split(",")
 		.map((value) => value.trim())
 		.filter(Boolean);
+	if (!allowlist.length) {
+		console.error(JSON.stringify({
+			signal: "break_glass_unconfigured",
+			detail: "ADMIN_BREAK_GLASS_IP_ALLOWLIST is unset, so every break-glass request is denied",
+		}));
+		return false;
+	}
 	return !!ip && allowlist.includes(ip);
 }
 
@@ -278,16 +301,32 @@ au.post(`${A}/bootstrap`, (c) => bootstrap(c.req.raw, c.env, lang(c)));
 au.post(`${A}/login`, (c) => login(c.req.raw, c.env, lang(c)));
 au.post(`${A}/mfa`, (c) => mfa(c.req.raw, c.env, lang(c)));
 au.post(`${A}/enroll`, (c) => enrollMfa(c.req.raw, c.env, lang(c)));
-au.post(`${A}/recovery`, (c) => recoverMfa(c.req.raw, c.env, lang(c)));
+au.post(`${A}/recovery`, (c) => recoverMfa(c.req.raw, c.env));
 au.get(`${A}/me`, (c) => me(c.req.raw, c.env));
 au.post(`${A}/logout`, (c) => logout(c.req.raw, c.env));
 au.post(`${A}/password`, (c) => changePassword(c.req.raw, c.env, lang(c)));
-au.post(`${A}/password/reset`, (c) => resetPassword(c.req.raw, c.env, lang(c)));
+au.post(`${A}/password/reset`, (c) => resetPassword(c.req.raw, c.env));
 au.post(`${A}/recovery-codes`, (c) => regenerateRecoveryCodes(c.req.raw, c.env, lang(c)));
 au.post(`${A}/recovery-codes/acknowledge`, (c) => acknowledgeRecoveryCodes(c.req.raw, c.env));
 
 // Terminating 404 scoped to /auth/*, so other admin paths still fall through.
 au.all(`${A}/*`, () => jsonResponse({ error: "not_found" }, 404));
+
+/**
+ * The CSRF token for a session — a pure function of the session id.
+ *
+ * Deterministic so that /me is idempotent: the raw token cannot be read back
+ * out of `csrf_hash`, so a handler that must return one either derives it or
+ * replaces it, and replacing it invalidates whatever every other tab is holding.
+ *
+ * The session id is a server-side UUID that is never sent to the client, and
+ * the pepper is a Worker secret, so this is unguessable to anyone who does not
+ * already hold the session cookie — which is the property a double-submit token
+ * needs.
+ */
+async function sessionCsrfToken(sessionId: string, pepper: string): Promise<string> {
+	return keyedHash(`csrf:${sessionId}`, pepper);
+}
 
 async function me(request: Request, env: AdminWorkerEnv): Promise<Response> {
 	const admin = await resolveAdmin(request, env);
@@ -295,13 +334,21 @@ async function me(request: Request, env: AdminWorkerEnv): Promise<Response> {
 	const row = await env.orderak_db.prepare("SELECT * FROM admin_users WHERE id=?").bind(admin.sub).first<AdminRow>();
 	if (!row) return jsonResponse({ error: "unauthorized" }, 401);
 	const session = admin.sid ? await env.orderak_db.prepare("SELECT csrf_hash FROM admin_sessions WHERE id=?").bind(admin.sid).first<{ csrf_hash: string }>() : null;
-	// The current raw CSRF token cannot be recovered from its hash. Rotate it for /me.
-	let csrf = "";
-	if (admin.sid && session) {
-		csrf = randomToken(24);
-		const pepper = sessionPepper(env);
-		if (pepper) await env.orderak_db.prepare("UPDATE admin_sessions SET csrf_hash=? WHERE id=?").bind(await keyedHash(csrf, pepper), admin.sid).run();
-	}
+	const pepper = sessionPepper(env);
+	// Derived from the session, so every call returns the same token.
+	//
+	// It used to mint a fresh random one and overwrite csrf_hash, which made
+	// concurrent calls destructive: the SPA calls refresh() on mount and again on
+	// every 401, and two admin tabs refresh independently, so one caller was
+	// routinely left holding a token the database had already replaced. Its next
+	// mutation failed csrf_invalid with nothing the user could do about it but
+	// reload.
+	//
+	// Rotation on read is not what makes a double-submit token safe — being
+	// unguessable and bound to the session is, and both still hold: the value is
+	// an HMAC of the session id under ADMIN_SESSION_PEPPER, the session id is
+	// never sent to the client, and the token changes whenever the session does.
+	const csrf = admin.sid && session && pepper ? await sessionCsrfToken(admin.sid, pepper) : "";
 	return sessionResponse(row, csrf);
 }
 
@@ -402,7 +449,7 @@ async function enrollMfa(request: Request, env: AdminWorkerEnv, lang: Locale): P
 	return issueSession(env, { ...row, totp_enabled: 1 }, request, recoveryCodes);
 }
 
-async function recoverMfa(request: Request, env: AdminWorkerEnv, lang: Locale): Promise<Response> {
+async function recoverMfa(request: Request, env: AdminWorkerEnv): Promise<Response> {
 	const body = await jsonObject(request);
 	const email = String(body.email ?? "").trim().toLowerCase();
 	const password = String(body.password ?? "");
@@ -436,8 +483,11 @@ async function issueSession(env: AdminWorkerEnv, row: AdminRow, request: Request
 	const pepper = sessionPepper(env);
 	if (!pepper) return jsonResponse({ error: "server_misconfigured", detail: "ADMIN_SESSION_PEPPER not set" }, 500);
 	const token = randomToken();
-	const csrf = randomToken(24);
 	const id = crypto.randomUUID();
+	// Derived from the session id, so /me can return the same value on every
+	// call instead of replacing it and invalidating other tabs. See
+	// sessionCsrfToken().
+	const csrf = await sessionCsrfToken(id, pepper);
 	await env.orderak_db.batch([
 		env.orderak_db.prepare(
 			`INSERT INTO admin_sessions(id,admin_id,token_hash,csrf_hash,expires_at,idle_expires_at,ip,user_agent,last_used_at)
@@ -543,7 +593,7 @@ async function replaceRecoveryCodes(env: AdminWorkerEnv, adminId: number): Promi
 	return codes;
 }
 
-async function resetPassword(request: Request, env: AdminWorkerEnv, lang: Locale): Promise<Response> {
+async function resetPassword(request: Request, env: AdminWorkerEnv): Promise<Response> {
 	const denied = requireBreakGlassAccess(request, env);
 	if (denied) return denied;
 	const body = await jsonObject(request);

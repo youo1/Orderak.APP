@@ -112,10 +112,22 @@ function publicRevision(revision: DesignSystemRevision) {
 	};
 }
 
+/**
+ * Length in user-perceived characters.
+ *
+ * `.length` counts UTF-16 units, so an emoji costs two and an Arabic name with
+ * combining marks costs more than it looks. Spreading the string counts code
+ * points, which fixes that but still splits a flag or a ZWJ sequence into
+ * several. A grapheme segmenter counts what someone typing into the field
+ * would count, which is the only measure an 80-character limit can mean.
+ */
+const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+
 function normalizeRevisionName(value: unknown): { name: string; key: string } | Response {
 	if (typeof value !== "string") return jsonResponse({ error: "revision_name_required" }, 400);
 	const name = value.trim();
-	const length = [...name].length;
+	let length = 0;
+	for (const _ of graphemes.segment(name)) length += 1;
 	if (length < 1 || length > 80) {
 		return jsonResponse({ error: "invalid_revision_name", minimumLength: 1, maximumLength: 80 }, 422);
 	}

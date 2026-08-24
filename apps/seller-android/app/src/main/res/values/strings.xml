@@ -189,6 +189,7 @@
     <string name="payment_manual">Confirm manually</string>
     <string name="payment_checking">Checking the screenshot…</string>
     <string name="payment_verified_ok">Payment matched — auto-confirmed ✅</string>
+    <string name="order_status_update_failed">Could not update the order. Check your connection and try again.</string>
     <string name="payment_flagged_title">⚠️ Something doesn\'t match</string>
     <string name="payment_flag_amount">• Amount in the screenshot doesn\'t match the order</string>
     <string name="payment_flag_ref">• No clear transaction reference found in the image</string>

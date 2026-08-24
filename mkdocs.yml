@@ -105,7 +105,6 @@ nav:
     - Google Play Billing DLQ: runbooks/play-billing-dlq.md
     - Worker Secret Rotation: runbooks/secret-rotation.md
     - Tenant Shard Migration: runbooks/tenant-shard-migration.md
-    - Production Cutover: runbooks/production-cutover.md
   - Guides:
     - Documentation: guides/documentation.md
     - OpenAPI Development: guides/openapi-development.md

@@ -38,6 +38,25 @@ jobs:
       PRODUCTION_CONFIRM: ${{ inputs.confirm }}
       RELEASE_SHA: ${{ inputs.release_sha }}
     steps:
+      # PRODUCTION FREEZE, 2026-08-24 — the project is in testing and delivery
+      # is staging-only. This gate fails closed: with the repository variable
+      # absent, `vars.PRODUCTION_DEPLOYS_ENABLED` expands to an empty string and
+      # no production deploy can proceed. Nothing already running in production
+      # is affected; this only stops new releases reaching it.
+      #
+      # To lift the freeze, set the repository variable
+      # PRODUCTION_DEPLOYS_ENABLED to the string "true". Deliberately a variable
+      # and not a code edit, so lifting it is one auditable settings change and
+      # re-freezing is the same.
+      - name: Production deploys are frozen
+        env:
+          ENABLED: ${{ vars.PRODUCTION_DEPLOYS_ENABLED }}
+        run: |
+          if [ "$ENABLED" != "true" ]; then
+            echo "::error::Production deploys are frozen (PRODUCTION_DEPLOYS_ENABLED is not 'true'). The project is staging-only while in testing."
+            exit 1
+          fi
+
       - name: Verify explicit production confirmation
         shell: bash
         run: |
@@ -107,6 +126,8 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm test -- --run
           pnpm run test:types
+          pnpm run lint
+          pnpm run verify:migrations
           pnpm run cf-types:check
           npx wrangler deploy --env="" --dry-run
           npx wrangler deploy --config wrangler.admin.jsonc --env="" --dry-run
@@ -120,6 +141,35 @@ jobs:
           pnpm run build
           pnpm run cf-types:check
           npx wrangler deploy --config wrangler.edge.jsonc --env="" --dry-run
+
+      # Migrations are the only step in this workflow that cannot be undone by
+      # deploying the previous revision. A Worker rolls back; a dropped column
+      # does not. Requiring a recent verified backup makes the restore point a
+      # precondition of the deploy rather than something to go looking for
+      # afterwards.
+      #
+      # This checks for a successful run rather than taking a backup inline:
+      # d1-backup.yml exports, verifies, replays into a scratch database,
+      # encrypts and uploads, and a second copy of that pipeline here would
+      # drift from the one the restore runbook documents. If this step fails,
+      # run the "D1 Backup" workflow and re-dispatch.
+      - name: Require a verified backup from the last 24 hours
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          LATEST=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/d1-backup.yml/runs?status=success&per_page=1" \
+            --jq '.workflow_runs[0].updated_at // empty')
+          if [ -z "$LATEST" ]; then
+            echo "::error::No successful D1 Backup run found. Run the D1 Backup workflow before deploying."
+            exit 1
+          fi
+          AGE=$(( $(date -u +%s) - $(date -u -d "$LATEST" +%s) ))
+          echo "Most recent successful backup: $LATEST ($((AGE / 3600))h ago)"
+          if [ "$AGE" -gt 86400 ]; then
+            echo "::error::Most recent D1 Backup is $((AGE / 3600))h old. Run the D1 Backup workflow before deploying."
+            exit 1
+          fi
 
       - name: Apply production database migrations
         working-directory: services/backend

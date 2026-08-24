@@ -15,18 +15,16 @@ import { getGateway } from "../commerce/payments";
 
 type Row = Record<string, unknown>;
 
-// ---- Admin-only trigger (bridge until scheduled() cron is wired) -----------
-
-export async function handleDeletionRoutes(
-	request: Request,
-	env: Env,
-	url: URL,
-): Promise<Response | null> {
-	// Route registration moved into index.ts; this function is the handler.
-	// The /api/v1/account/deletion-request path is handled in api-store.ts directly
-	// because the store auth interceptor already protects it.
-	return null;
-}
+// `handleDeletionRoutes` stood here: a three-parameter exported function that
+// used all of none of them and returned null unconditionally, with a comment
+// explaining that its routing had moved elsewhere. Nothing in src/, test/ or
+// the contracts referenced it. Removed rather than annotated, because a router
+// entry point that routes nothing is worse than absent — it invites a future
+// caller to wire it up and get silence.
+//
+// The deletion request path it used to describe is POST
+// /api/v1/account/deletion-request, handled in api-store.ts behind the seller
+// auth middleware.
 
 // ---- Automated fulfillment -------------------------------------------------
 
@@ -43,32 +41,88 @@ interface DeletionRequest {
 	notes: string | null;
 }
 
+/**
+ * Requests fetched per query. Fulfilment is almost entirely I/O — an R2 prefix
+ * purge, two Firebase calls, one D1 batch — so the page size bounds memory and
+ * query cost, not the work the invocation can get through.
+ */
+const DELETION_PAGE_SIZE = 10;
+
+/**
+ * How long one invocation keeps starting new deletions.
+ *
+ * A scheduled Worker gets fifteen minutes of wall clock. Stopping at ten leaves
+ * room for the request in flight to finish and for the backlog signal below to
+ * be written, rather than being cut off mid-fulfilment.
+ */
+const DELETION_TIME_BUDGET_MS = 10 * 60 * 1000;
+
 export async function processDeletionRequests(env: Env): Promise<number> {
-	let rows: Row[];
-	try {
-		const { results } = await env.orderak_db
-			.prepare(
-				`SELECT * FROM deletion_requests
-				 WHERE status = 'verified' AND deadline_at <= datetime('now')
-				 ORDER BY deadline_at ASC
-				 LIMIT 10`,
-			)
-			.all() as { results: Row[] };
-		rows = results ?? [];
-	} catch (e) {
-		console.error("[deletion] Failed to fetch deletion requests:", e);
-		throw e;
+	// This used to run one page of ten and stop, once a day. An eleventh request
+	// coming due on the same day was not deferred to the next run — it was
+	// deferred behind every request that came due after it, because the query
+	// orders by deadline and the oldest ten always win. A backlog built silently
+	// against a 90-day legal deadline, and nothing anywhere reported it.
+	//
+	// Now it works through the queue until the queue is empty or the invocation
+	// runs out of time, and says so when it stops early.
+	const startedAt = Date.now();
+	let completed = 0;
+	let failed = 0;
+
+	for (;;) {
+		let rows: Row[];
+		try {
+			const { results } = await env.orderak_db
+				.prepare(
+					`SELECT * FROM deletion_requests
+					 WHERE status = 'verified' AND deadline_at <= datetime('now')
+					 ORDER BY deadline_at ASC
+					 LIMIT ?`,
+				)
+				.bind(DELETION_PAGE_SIZE)
+				.all() as { results: Row[] };
+			rows = results ?? [];
+		} catch (e) {
+			console.error("[deletion] Failed to fetch deletion requests:", e);
+			throw e;
+		}
+		if (!rows.length) break;
+
+		// A request that fails fulfilment keeps status='verified', so it is
+		// returned by the next query too. Without this the loop would re-attempt
+		// the same failing request forever inside one invocation; tracking how
+		// many failed in this pass and stopping when a whole page did lets the
+		// working requests through and leaves the rest for the next run.
+		let progressed = false;
+		for (const row of rows) {
+			if (Date.now() - startedAt > DELETION_TIME_BUDGET_MS) break;
+			const req = row as unknown as DeletionRequest;
+			try {
+				await fulfillDeletion(env, req);
+				completed += 1;
+				progressed = true;
+			} catch (e) {
+				failed += 1;
+				console.error("[deletion] Fulfillment failed for request %s:", req.id, e);
+			}
+		}
+		if (!progressed || Date.now() - startedAt > DELETION_TIME_BUDGET_MS) break;
 	}
 
-	let completed = 0;
-	for (const row of rows) {
-		const req = row as unknown as DeletionRequest;
-		try {
-			await fulfillDeletion(env, req);
-			completed += 1;
-		} catch (e) {
-			console.error("[deletion] Fulfillment failed for request %s:", req.id, e);
-		}
+	// Whatever is still due when this returns is a backlog against a statutory
+	// deadline, which is exactly the thing that must not be invisible.
+	const remaining = await env.orderak_db
+		.prepare("SELECT COUNT(*) AS c FROM deletion_requests WHERE status='verified' AND deadline_at <= datetime('now')")
+		.first<{ c: number }>()
+		.catch(() => null);
+	if (Number(remaining?.c ?? 0) > 0) {
+		console.error(JSON.stringify({
+			signal: "deletion_backlog",
+			remaining: Number(remaining?.c ?? 0),
+			completed,
+			failed,
+		}));
 	}
 	return completed;
 }
@@ -220,18 +274,6 @@ async function fulfillDeletion(env: Env, req: DeletionRequest): Promise<void> {
 		//     "DELETE FROM seller_bank_accounts WHERE seller_id = ?"
 		//   ).bind(sId));
 
-		// --- Legal: de-identify consent records ---
-		// De-identify both phone_e164 and, when the column exists, ip_address.
-		stmts.push(
-			env.orderak_db
-				.prepare(
-					"UPDATE legal_acceptances SET seller_id = NULL, phone_e164 = ? WHERE seller_id = ?",
-				)
-				.bind(deidPhone, sId),
-		);
-		// TODO: When legal_acceptances.ip_address column is added via migration,
-		//       also SET ip_address = ? in the UPDATE above.
-
 		// --- Seller row: de-identify instead of deleting ---
 		// store_code, referral_code, and status must be retained (de-identified)
 		// for 5 years per docs/governance/retention-matrix.md §1.1.
@@ -273,6 +315,38 @@ async function fulfillDeletion(env: Env, req: DeletionRequest): Promise<void> {
 				.bind(deidPhone, deidPhone, deidPhone, sId),
 		);
 	}
+
+	// --- Legal: de-identify consent records ---
+	//
+	// Keyed on the PHONE, and deliberately outside the `if (sellerUuid)` block
+	// above. It used to be inside it and scoped `WHERE seller_id = ?`, which
+	// missed the rows that matter most:
+	//
+	//   * Acceptances recorded before registration completed. api-store.ts
+	//     claims them with `UPDATE ... SET seller_id=? WHERE phone_e164=? AND
+	//     seller_id IS NULL` once an account exists, so a signup that was
+	//     abandoned between "accepted the terms" and "created the store" leaves
+	//     a row with seller_id NULL — holding a phone number, unreachable by a
+	//     seller-scoped update, and with no other deletion path anywhere.
+	//
+	//   * Every acceptance for a phone with no seller row at all, because the
+	//     whole block was skipped in that case.
+	//
+	// docs/governance/retention-matrix.md §2 promises `phone_e164` is replaced
+	// with `deleted:<request-id>` on deletion. Matching on the phone is what
+	// makes that true for every row rather than for the linked subset.
+	//
+	// legal_acceptances.ip_address does not exist. The retention matrix used to
+	// list it alongside phone_e164 and a TODO here promised to null it "when the
+	// column is added"; no migration has ever created it, so the promise was to
+	// scrub a field that holds nothing. The matrix has been corrected instead.
+	stmts.push(
+		env.orderak_db
+			.prepare(
+				"UPDATE legal_acceptances SET seller_id = NULL, phone_e164 = ? WHERE phone_e164 = ? OR seller_id = ?",
+			)
+			.bind(`deleted:${req.id}`, req.phone_e164, sellerUuid),
+	);
 
 	// Update the deletion request itself: de-identify phone/email, mark completed.
 	stmts.push(

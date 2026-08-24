@@ -14,13 +14,6 @@
         "command": "node .github/hooks/scripts/guard-sensitive-actions.mjs",
         "timeout": 10
       }
-    ],
-    "Stop": [
-      {
-        "type": "command",
-        "command": "node .github/hooks/scripts/continuous-improvement.mjs",
-        "timeout": 10
-      }
     ]
   }
 }

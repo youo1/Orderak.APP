@@ -1,0 +1,70 @@
+name: Workflow Lint
+
+# The repository already wrote shellcheck directives it never enforced.
+# `.github/workflows/d1-backup.yml` carries three `# shellcheck disable=SC2086`
+# comments — written for a linter that had never been wired up, so they
+# suppressed warnings nothing was producing. A suppression for an absent linter
+# reads like a considered decision and is really just a comment.
+#
+# actionlint checks what a YAML parser cannot: that `uses:` refs resolve, that
+# `${{ }}` expressions reference contexts and properties that exist, that job
+# and step ids are valid, that `needs:` targets exist, and — via shellcheck,
+# preinstalled on the runner — that every `run:` block is sound shell. Seventeen
+# workflows here contain substantial inline bash that only ever ran in CI.
+#
+# The binary is pinned by version and verified by SHA-256 rather than installed
+# through an action, so the tool that guards the workflows is itself pinned the
+# way the workflows pin everything else.
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+      - '.github/actions/**'
+      - '.github/workflows/workflow-lint.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/**'
+      - '.github/actions/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: workflow-lint-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  ACTIONLINT_VERSION: 1.7.12
+  ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+
+jobs:
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install pinned actionlint
+        run: |
+          set -euo pipefail
+          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          url="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}"
+          curl --fail --silent --show-error --location --retry 3 --output "$archive" "$url"
+          echo "${ACTIONLINT_SHA256}  ${archive}" | sha256sum --check --status
+          tar --extract --gzip --file "$archive" actionlint
+          ./actionlint --version
+
+      - name: Lint workflows and composite actions
+        run: |
+          set -euo pipefail
+          # Note: ShellCheck is preinstalled on ubuntu-latest, and actionlint
+          # invokes it for every run: block automatically when it is on PATH.
+          # This comment must not begin with "# shellcheck" -- ShellCheck reads
+          # such a line as a directive expecting key=value and fails with
+          # SC1072 rather than treating it as prose.
+          shellcheck --version | head -2
+          ./actionlint -color

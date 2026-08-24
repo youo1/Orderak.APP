@@ -22,9 +22,11 @@ import { uploadMedia } from "../../platform/storage/media";
 import { verifyFirebaseToken } from "../../platform/auth/local-jwt";
 import { t, pickLocale } from "../../platform/localization/i18n";
 import { getPlanLimit, limitReached } from "../commerce/plan-limits";
+import { DEFAULT_CURRENCY, ENABLED_CURRENCIES } from "../../platform/money/money";
 import { refreshProductTranslations } from "../catalog/product-translations";
 import { ensureOrganizationForStore, entitlementLimitReached, resolveEntitlements } from "../commerce/entitlements";
 import { provisionDeviceSecret } from "../identity/seller-session";
+import { revokeRecentAuthProofsStatement } from "../identity/auth-v2";
 import { auditDb } from "../admin/admin-auth";
 import { requireTenantWrite, resolveTenantContextForStore, TenantWriteFencedError } from "../../platform/tenancy/tenant-routing";
 import {
@@ -129,6 +131,49 @@ function tokenAuthTime(idToken: string): number | null {
 	}
 }
 
+/**
+ * Map verified Firebase claims onto the identity the rest of the server uses.
+ *
+ * Exported for its own tests. The decision it makes is which claim counts as
+ * proof of a recent SMS challenge, and that decision was wrong for long enough
+ * to be worth pinning down somewhere a test can reach without standing up a
+ * JWKS endpoint.
+ *
+ * `auth_time`, never `iat`:
+ *
+ *   `iat` is when the ID token was minted. The Firebase SDK mints a new one
+ *   from a refresh token roughly every hour, with no user interaction — so on
+ *   any signed-in device it is always minutes old.
+ *
+ *   `auth_time` is when the user last completed a real challenge. It does not
+ *   move until someone receives and enters an SMS code.
+ *
+ * Every caller of hasFreshFirebaseProof() — enrolling a device secret on an
+ * account, restoring a session, both halves of a phone-number change — is
+ * asking the second question. Reading `iat` answered the first, which made
+ * possession of a refresh token equivalent to possession of the SIM: anyone
+ * with an exfiltrated token could mint a "fresh" proof on demand and satisfy a
+ * five-minute window indefinitely. The remote verification path never had this
+ * bug; it reads the real claim.
+ *
+ * A token with no `auth_time` (custom-token and anonymous flows omit it) yields
+ * undefined, which hasFreshFirebaseProof() rejects. That is the correct way to
+ * fail: a token that cannot say when its user authenticated has not shown that
+ * they just did.
+ */
+export function firebaseIdentityFromClaims(
+	// Open on purpose: a real ID token carries a dozen claims this function has
+	// no opinion about, `iat` among them, and a closed literal would make the
+	// test that proves `iat` is ignored impossible to write.
+	claims: { sub?: unknown; phone_number?: unknown; auth_time?: unknown; [claim: string]: unknown },
+	phone: string,
+): FirebaseIdentity | null {
+	const uid = typeof claims.sub === "string" ? claims.sub : "";
+	if (!uid || claims.phone_number !== phone) return null;
+	const authTime = Number(claims.auth_time);
+	return { uid, phone, authTime: Number.isFinite(authTime) ? authTime : undefined };
+}
+
 export async function verifyFirebasePhone(env: Env, idToken: string, phone: string): Promise<FirebaseIdentity | null> {
 	if (!env.FIREBASE_WEB_API_KEY || !idToken || !phone) return null;
 
@@ -139,12 +184,8 @@ export async function verifyFirebasePhone(env: Env, idToken: string, phone: stri
 	if (localEnabled && (env as unknown as Record<string, unknown>).FIREBASE_PROJECT_ID) {
 		const projectId = String((env as unknown as Record<string, unknown>).FIREBASE_PROJECT_ID);
 		const claims = await verifyFirebaseToken(idToken, projectId);
-		if (claims) {
-			const verifiedPhone = claims.phone_number === phone;
-			if (claims.sub && verifiedPhone) {
-				return { uid: claims.sub, phone, authTime: claims.iat };
-			}
-		}
+		const identity = claims ? firebaseIdentityFromClaims(claims, phone) : null;
+		if (identity) return identity;
 		// Local verification failed — fall through to remote (safe-fallback).
 	}
 
@@ -166,7 +207,7 @@ export async function verifyFirebasePhone(env: Env, idToken: string, phone: stri
 	}
 }
 
-function hasFreshFirebaseProof(identity: FirebaseIdentity): boolean {
+export function hasFreshFirebaseProof(identity: FirebaseIdentity): boolean {
 	if (identity.authTime == null) return false;
 	const age = Math.floor(Date.now() / 1000) - identity.authTime;
 	return age >= 0 && age <= FRESH_FIREBASE_PROOF_SECONDS;
@@ -376,12 +417,36 @@ async function handleRegister(request: Request, env: Env, url: URL): Promise<Res
 		// A verified phone alone is not permission to create an account. The
 		// auth/session step records the exact published terms/privacy versions
 		// accepted by this phone before registration is allowed.
+		//
+		// Matched against the versions that are published *now*, not merely
+		// against the existence of a row. The check was `WHERE phone_e164=?
+		// LIMIT 1`, so any acceptance of any version at any time in the past
+		// satisfied it — which is the opposite of what the comment above claims
+		// and what consent evidence is for. Someone who accepted v1 two years ago
+		// could create an account under v3 without ever being shown it, and the
+		// legal_acceptances row would record a version they had not agreed to
+		// under the terms then in force.
+		const locale = pickLocale(request, url);
+		const [currentTerms, currentPrivacy] = await Promise.all([
+			currentLegalVersion(env, "terms", locale),
+			currentLegalVersion(env, "privacy", locale),
+		]);
+		if (!currentTerms || !currentPrivacy) {
+			return jsonResponse({ error: "legal_not_configured" }, 503);
+		}
 		const acceptance = await env.orderak_db
-			.prepare("SELECT 1 AS accepted FROM legal_acceptances WHERE phone_e164=? LIMIT 1")
-			.bind(phone)
+			.prepare(
+				`SELECT 1 AS accepted FROM legal_acceptances
+				 WHERE phone_e164=? AND terms_version>=? AND privacy_version>=? LIMIT 1`,
+			)
+			.bind(phone, Number(currentTerms.version), Number(currentPrivacy.version))
 			.first();
 		if (!acceptance) {
-			return jsonResponse({ error: "legal_acceptance_required" }, 400);
+			return jsonResponse({
+				error: "legal_acceptance_required",
+				terms_version: Number(currentTerms.version),
+				privacy_version: Number(currentPrivacy.version),
+			}, 400);
 		}
 	}
 
@@ -711,10 +776,37 @@ async function updateCategory(request: Request, env: Env, store: Row, code: stri
 	const slug = body.slug != null ? slugify(String(body.slug)) || null : (existing.slug as string | null);
 	const sortOrder = body.sort_order != null ? Math.max(0, Math.floor(Number(body.sort_order) || 0)) : Number(existing.sort_order);
 
-	await env.orderak_db
-		.prepare("UPDATE categories SET name = ?, slug = ?, sort_order = ?, updated_at = datetime('now') WHERE id = ?")
-		.bind(name, slug, sortOrder, existing.id)
-		.run();
+	// idx_categories_store_slug is UNIQUE on (store_id, slug), so renaming a
+	// category onto a slug a sibling already holds violates it. createCategory
+	// handles that by retrying with a suffix; this ran the UPDATE bare, so the
+	// constraint surfaced as an unhandled exception and a 500 — a client error
+	// reported as a server one, with no indication of which name to pick instead.
+	//
+	// A duplicate is answered rather than auto-suffixed: a rename is a deliberate
+	// act by the seller, and silently storing something other than what they
+	// typed is worse than telling them the name is taken.
+	if (slug !== null && slug !== existing.slug) {
+		const taken = await env.orderak_db
+			.prepare("SELECT category_code FROM categories WHERE store_id = ? AND slug = ? AND id <> ?")
+			.bind(store.id, slug, existing.id)
+			.first<{ category_code: string }>();
+		if (taken) {
+			return jsonResponse({ error: "slug_taken", slug, conflicting_category_code: taken.category_code }, 409);
+		}
+	}
+
+	try {
+		await env.orderak_db
+			.prepare("UPDATE categories SET name = ?, slug = ?, sort_order = ?, updated_at = datetime('now') WHERE id = ?")
+			.bind(name, slug, sortOrder, existing.id)
+			.run();
+	} catch (error) {
+		// The check above races a concurrent rename; the index is the authority.
+		if (String((error as { message?: string })?.message ?? "").includes("UNIQUE")) {
+			return jsonResponse({ error: "slug_taken", slug }, 409);
+		}
+		throw error;
+	}
 	return jsonResponse({ ok: true, category: { category_code: code, name, slug, sort_order: sortOrder } });
 }
 
@@ -737,7 +829,7 @@ async function pullProducts(env: Env, store: Row): Promise<Response> {
 	const { results } = (await env.orderak_db
 		.prepare(
 			`SELECT p.id, p.app_id, p.product_code, p.name, p.slug, p.description,
-			        p.price_minor, p.stock, p.stock_version, p.available, p.image_url,
+			        p.price_minor, p.currency, p.stock, p.stock_version, p.available, p.image_url,
 			        c.category_code
 			 FROM products p
 			 LEFT JOIN categories c ON c.id = p.category_id
@@ -755,7 +847,7 @@ async function pullProducts(env: Env, store: Row): Promise<Response> {
 			slug: r.slug ?? null,
 			description: r.description ?? null,
 			// Money travels as an object so the client can render it (ADR-009).
-			price: { amount_minor: Number(r.price_minor), currency: String(r.currency ?? "EGP") },
+			price: { amount_minor: Number(r.price_minor), currency: String(r.currency || DEFAULT_CURRENCY) },
 			stock: Number(r.stock),
 			stock_version: Number(r.stock_version ?? 0),
 			available: r.available === 1,
@@ -768,8 +860,37 @@ async function pullProducts(env: Env, store: Row): Promise<Response> {
 // ---- Product sync ----------------------------------------------------------
 
 async function syncProducts(request: Request, env: Env, store: Row): Promise<Response> {
-	const body = (await request.json().catch(() => ({}))) as Row;
-	const requested = Array.isArray(body.products) ? (body.products as Row[]) : [];
+	// This endpoint is a MIRROR: anything the submitted list omits is deleted at
+	// the end of this function, and an empty list deletes the entire catalog.
+	// That makes the difference between "the seller has no products" and "this
+	// request did not say" the difference between a correct write and total data
+	// loss, so the two must never collapse into the same value.
+	//
+	// They used to. The body was parsed with `.catch(() => ({}))` and `products`
+	// was defaulted with `Array.isArray(...) ? ... : []`, so a truncated upload,
+	// a proxy that mangled the body, or a client that renamed the field all
+	// arrived here as an empty mirror and returned 200 after wiping the store.
+	// Neither failure is something a caller can distinguish from success.
+	//
+	// An explicitly empty `products: []` is still honoured — a seller who
+	// deletes their last product has an empty catalog, and SyncRepository.kt
+	// sends exactly that. Only the *absence* of the field is now an error.
+	let body: Row;
+	try {
+		body = (await request.json()) as Row;
+	} catch {
+		return jsonResponse({ error: "invalid_json" }, 400);
+	}
+	if (body === null || typeof body !== "object" || Array.isArray(body)) {
+		return jsonResponse({ error: "invalid_json" }, 400);
+	}
+	if (!Array.isArray(body.products)) {
+		return jsonResponse({
+			error: "products_required",
+			message: "products must be an array. Omitting it is rejected because this endpoint mirrors the catalog and would otherwise delete it.",
+		}, 400);
+	}
+	const requested = body.products as Row[];
 	const limit = await getPlanLimit(env, String(store.id), "max_products");
 	if (limit !== null) {
 		const validRequestedCount = requested.filter((product) => Number.isFinite(Number(product.app_id))).length;
@@ -829,7 +950,7 @@ async function syncProducts(request: Request, env: Env, store: Row): Promise<Res
 
 	const records: Array<{
 		id: string; categoryId: string | null; productCode: string; appId: number; name: string;
-		slug: string | null; description: string | null; price: number; stock: number;
+		slug: string | null; description: string | null; price: number; currency: string; stock: number;
 		available: number; imageUrl: string | null; categoryCode: string | null;
 		existed: boolean; stockDirty: boolean; expectedStockVersion: number | null;
 	}> = [];
@@ -842,8 +963,26 @@ async function syncProducts(request: Request, env: Env, store: Row): Promise<Res
 		if (seenAppIds.has(appId)) return jsonResponse({ error: "duplicate_app_id", app_id: appId }, 400);
 		seenAppIds.add(appId);
 		const name = String(raw.name ?? "").slice(0, 80);
-		const rawPrice = (raw.price ?? {}) as { amount_minor?: unknown };
+		const rawPrice = (raw.price ?? {}) as { amount_minor?: unknown; currency?: unknown };
 		const price = Math.max(0, Math.floor(Number(rawPrice.amount_minor) || 0));
+		// An amount is meaningless without its currency (ADR-009), and the client
+		// has always sent one — `MoneyDto(priceMinor, currency)` in
+		// SyncRepository.kt. It was read as far as `amount_minor` and the currency
+		// dropped on the floor, so every row landed on the column default.
+		//
+		// Rejected rather than defaulted when it is not a currency this deployment
+		// accepts. Defaulting is how 15000 fils becomes 150.00 EGP: a plausible
+		// number, silently wrong by a factor of ten, and undetectable afterwards
+		// because nothing recorded what was meant.
+		const currency = rawPrice.currency == null ? DEFAULT_CURRENCY : String(rawPrice.currency).toUpperCase();
+		if (!(ENABLED_CURRENCIES as readonly string[]).includes(currency)) {
+			return jsonResponse({
+				error: "currency_not_enabled",
+				app_id: appId,
+				currency,
+				enabled: [...ENABLED_CURRENCIES],
+			}, 400);
+		}
 		const stock = Math.max(0, Math.floor(Number(raw.stock) || 0));
 		const available = raw.available ? 1 : 0;
 		const description = raw.description != null ? String(raw.description).slice(0, 500) : null;
@@ -861,7 +1000,7 @@ async function syncProducts(request: Request, env: Env, store: Row): Promise<Res
 		}
 		records.push({
 			id: previous?.id ?? newUuid(), categoryId, productCode, appId, name, slug, description,
-			price, stock, available, imageUrl, categoryCode, existed: previous != null,
+			price, currency, stock, available, imageUrl, categoryCode, existed: previous != null,
 			stockDirty: raw.stock_dirty === true,
 			expectedStockVersion: raw.expected_stock_version != null && Number.isSafeInteger(Number(raw.expected_stock_version))
 				? Number(raw.expected_stock_version) : null,
@@ -870,20 +1009,27 @@ async function syncProducts(request: Request, env: Env, store: Row): Promise<Res
 
 	// Keep every statement below D1's bound-parameter ceiling. Each chunk is one
 	// upsert query, so a 2,000-product catalog does not consume 2,000 queries.
+	//
+	// SYNC_CHUNK_ROWS × the column count must stay under 100. Adding `currency`
+	// took the row from 12 bindings to 13, and 8 × 13 = 104 would have exceeded
+	// the ceiling — the failure mode being a runtime D1 error on any catalog
+	// larger than seven products, which no existing test would have caught.
+	const SYNC_COLUMNS = 13;
+	const SYNC_CHUNK_ROWS = Math.floor(100 / SYNC_COLUMNS); // 7
 	const stmts: D1PreparedStatement[] = [];
-	for (let offset = 0; offset < records.length; offset += 8) {
-		const chunk = records.slice(offset, offset + 8);
-		const values = chunk.map(() => "(?,?,?,?,?,?,?,?,?,?,?,?)").join(",");
+	for (let offset = 0; offset < records.length; offset += SYNC_CHUNK_ROWS) {
+		const chunk = records.slice(offset, offset + SYNC_CHUNK_ROWS);
+		const values = chunk.map(() => `(${Array(SYNC_COLUMNS).fill("?").join(",")})`).join(",");
 		const bindings = chunk.flatMap((record) => [
 			record.id, storeId, record.categoryId, record.productCode, record.appId, record.name,
-			record.slug, record.description, record.price, record.stock, record.available, record.imageUrl,
+			record.slug, record.description, record.price, record.currency, record.stock, record.available, record.imageUrl,
 		]);
 		stmts.push(env.orderak_db.prepare(
-			`INSERT INTO products (id,store_id,category_id,product_code,app_id,name,slug,description,price_minor,stock,available,image_url)
+			`INSERT INTO products (id,store_id,category_id,product_code,app_id,name,slug,description,price_minor,currency,stock,available,image_url)
 			 VALUES ${values}
 			 ON CONFLICT(store_id,app_id) DO UPDATE SET
 			 category_id=excluded.category_id,name=excluded.name,slug=excluded.slug,description=excluded.description,
-			 price_minor=excluded.price_minor,available=excluded.available,
+			 price_minor=excluded.price_minor,currency=excluded.currency,available=excluded.available,
 			 image_url=excluded.image_url,updated_at=datetime('now')`,
 		).bind(...bindings));
 	}
@@ -896,6 +1042,21 @@ async function syncProducts(request: Request, env: Env, store: Row): Promise<Res
 	if (!records.length) stmts.push(env.orderak_db.prepare("DELETE FROM products WHERE store_id=?").bind(storeId));
 
 	if (stmts.length) await env.orderak_db.batch(stmts);
+
+	// An empty mirror against a non-empty catalog is legitimate — a seller can
+	// delete their last product — but it is also what a client-side database
+	// loss looks like from here, and the two are indistinguishable at this
+	// layer. Record it so the difference can be established afterwards from the
+	// audit trail rather than guessed at from a support ticket.
+	if (!records.length && existing.size > 0) {
+		await auditDb(env, null, "catalog.mirror_emptied", {
+			entity: "store",
+			entity_id: storeId,
+			actor_type: "seller",
+			actor_id: storeId,
+			deleted_product_count: existing.size,
+		}, request);
+	}
 
 	const stockRecords = records.filter((record) => record.existed && record.stockDirty);
 	const missingBaselines = stockRecords.filter((record) => record.expectedStockVersion == null).map((record) => record.appId);
@@ -992,5 +1153,9 @@ async function logoutSeller(request: Request, env: Env, url: URL): Promise<Respo
 	const seller = await authSeller(env, phone, secret);
 	if (!seller) return jsonResponse({ error: "auth" }, 401);
 	const revoked = await revokeSellerCredential(env, String(seller.id), secret);
+	// The credential this proof was issued against no longer exists, so neither
+	// should the proof. Without this a step-up token survives sign-out for the
+	// rest of its ten-minute window.
+	if (revoked) await revokeRecentAuthProofsStatement(env, String(seller.id)).run();
 	return revoked ? jsonResponse({ ok: true }) : jsonResponse({ error: "auth" }, 401);
 }

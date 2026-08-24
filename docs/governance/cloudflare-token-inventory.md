@@ -108,12 +108,9 @@ naming scheme, named after the GitHub secret rather than the purpose:
 | `CLOUDFLARE_DRIFT_CHECK_TOKEN` | `orderak-drift-check` |
 | `orderak-restore-read-production` | `orderak-restore-read` |
 
-**Do not delete them yet.** The old repository still runs `restore-drill.yml`
-against backups encrypted under the old age key, and its environments hold
-whichever of these values it uses. They are deleted once that repository
-retires — which is blocked on the old backups ageing past their 30-day lock,
-and on the plan's rule that nothing is deleted until two production releases
-have shipped from the new repository.
+These old-scheme names are superseded. Delete each one once no workflow in
+this repository still reads it — check before removing, because the name a
+workflow reads is not always the name the token carries.
 
 `CLOUDFLARE_ANALYTICS_TOKEN` is the fifth old-scheme name; it is the only one
 with no `orderak-` counterpart yet, so it stays in use until one is created.

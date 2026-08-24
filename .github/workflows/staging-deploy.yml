@@ -1,6 +1,7 @@
 name: Deploy Staging
 
-# This repository owns staging deploys as of Phase 7a (2026-08-11).
+# This repository owns staging deploys. It is the only one holding a staging
+# deploy credential, so no other automation can reach these Workers.
 #
 # The push trigger was held back while both repositories could still reach
 # the same Workers — the plan's rule was "never copy schedules and leave

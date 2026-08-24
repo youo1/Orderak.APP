@@ -2,17 +2,20 @@ package app.orderak.seller.core.network
 
 import app.orderak.seller.BuildConfig
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Test
 
 /**
- * The public URL builders are the single choke point for share links. They must
- * produce the new scheme (/{public_identifier}[/c|/p/{code}]) and never embed a
- * phone number or the legacy /c/ store prefix.
+ * What remains here is the flavor wiring: each build variant must resolve
+ * API_BASE_URL to its own environment, and nothing else may quietly substitute
+ * one for another.
+ *
+ * The four URL-builder tests that used to sit alongside this one went with
+ * Backend.storeUrl/categoryUrl/productUrl on 2026-08-22. Those builders
+ * reconstructed a share link client-side; every caller now reads the canonical
+ * store_url the backend returns, held in SessionStore, so there was nothing
+ * left to assert against.
  */
 class BackendUrlTest {
-
-    private val pid = "EG-fresh-market-7KX9MP4R"
 
     @Test
     fun `base url matches the selected deployment environment`() {
@@ -23,31 +26,5 @@ class BackendUrlTest {
             else -> error("Unknown deployment environment")
         }
         assertEquals(expected, BuildConfig.API_BASE_URL)
-    }
-
-    @Test
-    fun `store url uses the public identifier at the root`() {
-        assertEquals("${BuildConfig.SITE_BASE_URL}/EG-fresh-market-7KX9MP4R", Backend.storeUrl(pid))
-    }
-
-    @Test
-    fun `category url nests under the store`() {
-        assertEquals(
-            "${BuildConfig.SITE_BASE_URL}/EG-fresh-market-7KX9MP4R/c/c-A82KD9",
-            Backend.categoryUrl(pid, "c-A82KD9"),
-        )
-    }
-
-    @Test
-    fun `product url nests under the store`() {
-        assertEquals(
-            "${BuildConfig.SITE_BASE_URL}/EG-fresh-market-7KX9MP4R/p/p-H72LP9",
-            Backend.productUrl(pid, "p-H72LP9"),
-        )
-    }
-
-    @Test
-    fun `store url never contains the legacy c prefix`() {
-        assertFalse(Backend.storeUrl(pid).contains("/c/"))
     }
 }

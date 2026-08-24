@@ -19,6 +19,20 @@ const migrations = await readD1Migrations("./migrations");
 const geoMigrations = await readD1Migrations("./geo-migrations");
 
 export default defineConfig({
+	test: {
+		// Istanbul, because that is the provider this package depends on.
+		// Vitest defaults to v8, so `vitest run --coverage` failed outright with
+		// "MISSING DEPENDENCY Cannot find dependency '@vitest/coverage-v8'" — the
+		// declared devDependency was unusable and coverage could not be measured
+		// at all. v8 coverage is also unreliable under the Workers pool, which
+		// runs tests inside workerd rather than in Node.
+		coverage: {
+			provider: "istanbul",
+			reporter: ["text-summary", "html", "json-summary"],
+			include: ["src/**/*.ts"],
+			exclude: ["src/generated/**", "src/**/*.d.ts"],
+		},
+	},
 	plugins: [
 		cloudflareTest({
 			remoteBindings: false,

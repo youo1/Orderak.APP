@@ -120,6 +120,18 @@ export const RESPONSE_SCHEMAS: Record<string, ModelledResponse> = {
 			next_since: 12,
 		},
 	},
+	"PATCH /api/v1/orders/{id}/status": {
+		schema: ok({
+			id: z.string(),
+			order_no: z.number().int(),
+			status: z.enum(["NEW", "CONFIRMED", "PAID", "SHIPPED", "DONE", "CANCELLED"]),
+			// False when the order already held the requested status. The call
+			// still succeeds — a retried request must converge, not error — so the
+			// flag is how a caller tells "I moved it" from "it was already there".
+			changed: z.boolean(),
+		}),
+		example: { ok: true, id: "018f-example", order_no: 12, status: "CONFIRMED", changed: true },
+	},
 	"POST /api/v1/products/sync": {
 		schema: ok({ products: z.array(ProductSchema) }),
 		example: {

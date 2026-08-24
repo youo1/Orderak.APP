@@ -585,11 +585,11 @@ validateInstructions();
 validateHooks();
 validateMcp(path.join(githubRoot, "mcp.json"), { shared: true });
 // .vscode/mcp.json is optional here, unlike the shared .github/mcp.json.
-// It is per-developer local editor configuration: gitignored by policy, and
-// the source repository's tracked copy was dropped in this migration because
-// it carried a live credential. Requiring a file the repository is not
-// supposed to contain made this validator fail on a correctly-migrated tree.
-// When a developer does create one locally, every rule below still applies.
+// It is per-developer local editor configuration and gitignored by policy —
+// a tracked copy of it has carried a live credential before. Requiring a file
+// the repository is not supposed to contain would make this validator fail on
+// a correct tree. When a developer does create one locally, every rule below
+// still applies.
 validateMcp(path.join(repositoryRoot, ".vscode", "mcp.json"), {
   shared: false,
   required: false,

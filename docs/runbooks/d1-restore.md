@@ -234,14 +234,13 @@ backup, and vice versa.
 | Gated by | Whatever already gates the backup job | **Custody of `AGE_IDENTITY`**, scoped to the `backup-restore-*` environment — a job that does not declare that environment cannot decrypt at all. Manual dispatch only; no schedule, and no reviewer (see below) |
 
 > **The reviewer gate does not hold here either — corrected 2026-08-20.** This
-> note previously read "the reviewer gate holds in `Orderak.APP`", and treated
-> the loss of `required_reviewers` as something that had happened only to the
-> old repository when `youo1/Orderak` went private on 2026-08-16. A direct
-> query of this repository's environments on 2026-08-20 contradicts that: all
-> five — `production`, `staging`, `staging-contract-tests`, and both
-> `backup-restore-*` — read `protection_rules: []`. `Orderak.APP` is itself a
-> private repository, so the same plan limit was always going to apply to it.
-> The earlier claim was inferred from the old repository's measurement rather
+> note previously read "the reviewer gate holds", treating the loss of
+> `required_reviewers` as somebody else's problem. A direct query of this
+> repository's environments on 2026-08-20 contradicts that: all five —
+> `production`, `staging`, `staging-contract-tests`, and both
+> `backup-restore-*` — read `protection_rules: []`. This is a private
+> repository, so the plan limit was always going to apply to it.
+> The earlier claim was inferred from an unrelated measurement rather
 > than measured here.
 >
 > So restore drills run unapproved in **both** repositories. That is accepted

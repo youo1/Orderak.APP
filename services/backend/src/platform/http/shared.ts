@@ -17,19 +17,38 @@ const ALLOWED_CORS_ORIGINS = new Set([
 ]);
 
 export function corsHeaders(request?: Request): HeadersInit {
-	const origin = request?.headers.get("origin") ?? "";
-	const allowOrigin = ALLOWED_CORS_ORIGINS.has(origin) ? origin : "";
 	const headers: Record<string, string> = {
 		"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
 		"Access-Control-Allow-Headers":
 			"Content-Type, Authorization, X-Request-ID, x-orderak-phone, x-orderak-secret, x-orderak-recent-auth, x-orderak-device-id, x-orderak-device-label, x-orderak-platform, x-orderak-app-version, x-admin-key, x-idempotency-key, idempotency-key",
 		"Access-Control-Expose-Headers": "X-Request-ID, Retry-After, ETag, Allow",
 	};
+	const allowOrigin = allowedCorsOrigin(request);
 	if (allowOrigin) {
 		headers["Access-Control-Allow-Origin"] = allowOrigin;
 		headers.Vary = "Origin";
 	}
 	return headers;
+}
+
+/**
+ * The Origin to echo back, or "" when the caller's origin is not on the list.
+ *
+ * Split out of corsHeaders() because the origin is the one CORS header that
+ * cannot be produced without the request, and jsonResponse() does not have one.
+ * It called `corsHeaders()` with no argument, so `Access-Control-Allow-Origin`
+ * was never present on any actual response — only on the OPTIONS preflight,
+ * which does have the request. A browser therefore saw the preflight succeed
+ * and then blocked the real response, and the eight-entry allowlist above had
+ * no effect on anything.
+ *
+ * Applied as middleware in the public Worker instead, which reaches every
+ * response including the ones built with `new Response` and the ones served
+ * from the edge cache.
+ */
+export function allowedCorsOrigin(request?: Request): string {
+	const origin = request?.headers.get("origin") ?? "";
+	return ALLOWED_CORS_ORIGINS.has(origin) ? origin : "";
 }
 
 export function jsonResponse(data: unknown, status = 200, extraHeaders: HeadersInit = {}): Response {
@@ -487,7 +506,12 @@ export async function ensureReferralCode(env: Env, seller: Record<string, unknow
 			seller.referral_code = code;
 			return code;
 		} catch {
-			// UNIQUE-ish collision (no unique constraint, but keep retry safety)
+			// A duplicate code. This retry existed from the start but could never
+			// run: idx_sellers_refcode was a plain index until migration 045, so
+			// the UPDATE succeeded on a collision and two sellers ended up sharing
+			// a code — which referralApply() resolves with `WHERE referral_code=?`,
+			// crediting whichever row came back first. Now the index rejects the
+			// write and the loop does what it was written to do.
 		}
 	}
 	throw new Error("could_not_generate_referral_code");

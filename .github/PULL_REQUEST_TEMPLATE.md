@@ -27,7 +27,7 @@ refuse it. See
 
 <!-- How did you test this change? Be specific. -->
 
-- [ ] Backend: `npm test` passes
+- [ ] Backend: `pnpm test` passes
 - [ ] Android: `gradlew.bat :app:assembleStagingDebug` succeeds
 - [ ] Android unit tests: `gradlew.bat testStagingDebugUnitTest` passes
 - [ ] Android lint: `gradlew.bat lintStagingDebug` clean

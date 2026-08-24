@@ -14,8 +14,7 @@ name: D1 Backup Restore Drill
 # reviewer". Measured 2026-08-20: every environment in this repository reads
 # protection_rules: [], this one included. Environment reviewers are not
 # available on private repositories under the current plan, and this
-# repository is private — the same limit already recorded for youo1/Orderak
-# applies here. There is no reviewer gate to rely on.
+# repository is private. There is no reviewer gate to rely on.
 #
 # The control that does hold is the one that was always the stronger half:
 # the environment holds the only copy of the AGE private key that can ever
@@ -104,14 +103,7 @@ jobs:
           echo "Restore-drill credentials are present."
 
       - name: Install age (pinned, checksum-verified)
-        run: |
-          set -euo pipefail
-          curl -fsSL -o /tmp/age.tar.gz \
-            "https://github.com/FiloSottile/age/releases/download/v1.3.1/age-v1.3.1-linux-amd64.tar.gz"
-          echo "bdc69c09cbdd6cf8b1f333d372a1f58247b3a33146406333e30c0f26e8f51377  /tmp/age.tar.gz" | sha256sum -c -
-          tar -xzf /tmp/age.tar.gz -C /tmp
-          sudo mv /tmp/age/age /tmp/age/age-keygen /usr/local/bin/
-          age --version
+        run: bash .github/scripts/install-age.sh
 
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0

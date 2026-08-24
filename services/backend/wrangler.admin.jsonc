@@ -1,3 +1,16 @@
+/**
+ * PRODUCTION IS THE BASE ENVIRONMENT IN THIS FILE.
+ *
+ * `wrangler deploy` with no `--env` deploys PRODUCTION. Staging lives under
+ * `env.staging` and needs `--env staging`. There is deliberately no
+ * `env.production` — see docs/architecture/deployment-environment-map.md.
+ *
+ * Use the package scripts, never bare wrangler:
+ *   pnpm run deploy:staging      -> staging   (this is the default `deploy`)
+ *   pnpm run deploy:production   -> production, and production deploys are
+ *                                   FROZEN as of 2026-08-24 while the project
+ *                                   is in testing. See production-deploy.yml.
+ */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "orderak-admin-worker",
@@ -82,14 +95,38 @@
 	// Production at all, and requiring it would fail a Production deploy for a
 	// value nothing reads. ADMIN_BREAK_GLASS_IP_ALLOWLIST is likewise absent on
 	// Production and optional in code.
+	//
+	// ADMIN_TOTP_KEY_V2 and ADMIN_AUDIT_KEY_V2 were added on 2026-08-22. The
+	// vars block above has selected version 2 for both since Phase 7c, but this
+	// list still required only the version-1 keys — so nothing at deploy time
+	// established that the keys production had switched to were actually there.
+	// Staging required them and production did not, which is the wrong way
+	// round: the failure is silent and scheduled. currentTotpKey() resolving to
+	// an unset key makes beginEnrollment() answer 500, so no administrator can
+	// enrol MFA or complete a recovery; currentAuditKeyVersion() resolving to
+	// one makes archiveAuditBatch() throw on every fifteen-minute cron, so the
+	// audit trail stops being archived and nothing reports that it has.
+	//
+	// tooling/repository/verify-deployment-map.mjs now enforces the rule that
+	// produced this edit: a declared key version must appear in the same
+	// environment's required list, and version 1 stays required alongside it
+	// because the enrolled TOTP ciphertext and every archive backfilled by
+	// migration 043 record version 1.
+	//
+	// If a production deploy fails on either name, the secret is genuinely
+	// absent and the two controls above are already broken on the live Worker.
+	// `wrangler secret put` is the fix; reverting the CURRENT selector to 1
+	// is the rollback.
 	"secrets": {
 		"required": [
 			"ADMIN_API_KEY",
+			"ADMIN_AUDIT_KEY_V2",
 			"ADMIN_AUDIT_SIGNING_KEY",
 			"ADMIN_EXPORT_SIGNING_KEY",
 			"ADMIN_RECOVERY_PEPPER",
 			"ADMIN_SESSION_PEPPER",
 			"ADMIN_TOTP_KEY_V1",
+			"ADMIN_TOTP_KEY_V2",
 			"BUYER_PRIVACY_PEPPER"
 		]
 	},

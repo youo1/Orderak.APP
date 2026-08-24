@@ -46,11 +46,16 @@ const succeedsOnlyByRedirect = (operation) => {
   return codes.some((code) => /^3\d\d$/.test(code)) && !codes.some((code) => /^2\d\d$/.test(code));
 };
 
+// A body that accepts additionalProperties stays open to arbitrary JSON even
+// when it also declares a few known properties. POST /api/v1/products/sync is
+// {type: object, additionalProperties: true, properties: {products: [...]}},
+// so the products array items and any extra keys are still arbitrary JSON -
+// exactly what the fuzzing phase must not feed Prism. Treat any object with
+// additionalProperties as unconstrained, properties or not.
 const hasUnconstrainedBody = (operation) =>
   Object.values(operation.requestBody?.content ?? {}).some(({ schema }) =>
     schema?.type === "object"
     && schema.additionalProperties === true
-    && !schema.properties
     && !schema.oneOf
     && !schema.anyOf
     && !schema.allOf,
