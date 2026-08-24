@@ -1,3 +1,16 @@
+/**
+ * PRODUCTION IS THE BASE ENVIRONMENT IN THIS FILE.
+ *
+ * `wrangler deploy` with no `--env` deploys PRODUCTION. Staging lives under
+ * `env.staging` and needs `--env staging`. There is deliberately no
+ * `env.production` — see docs/architecture/deployment-environment-map.md.
+ *
+ * Use the package scripts, never bare wrangler:
+ *   pnpm run deploy:staging      -> staging   (this is the default `deploy`)
+ *   pnpm run deploy:production   -> production, and production deploys are
+ *                                   FROZEN as of 2026-08-24 while the project
+ *                                   is in testing. See production-deploy.yml.
+ */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "orderak-admin-worker",

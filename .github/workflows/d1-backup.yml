@@ -46,7 +46,9 @@ on:
       target:
         description: Which environment to export
         type: choice
-        default: production
+        # Staging is where the project is developed; the nightly schedule covers
+        # both environments regardless of this default.
+        default: staging
         options:
           - production
           - staging
@@ -227,9 +229,14 @@ jobs:
           fi
 
   backup-staging:
+    # Runs on the nightly schedule as of 2026-08-24. Until then only production
+    # was backed up on a schedule and staging was dispatch-only, which left the
+    # environment the project actually develops against with no recent restore
+    # point for restore-drill.yml to exercise.
     if: >-
-      ${{ github.event_name == 'workflow_dispatch'
-          && (inputs.target == 'staging' || inputs.target == 'both') }}
+      ${{ github.event_name != 'workflow_dispatch'
+          || inputs.target == 'staging'
+          || inputs.target == 'both' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: staging

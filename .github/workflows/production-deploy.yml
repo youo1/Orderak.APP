@@ -38,6 +38,25 @@ jobs:
       PRODUCTION_CONFIRM: ${{ inputs.confirm }}
       RELEASE_SHA: ${{ inputs.release_sha }}
     steps:
+      # PRODUCTION FREEZE, 2026-08-24 — the project is in testing and delivery
+      # is staging-only. This gate fails closed: with the repository variable
+      # absent, `vars.PRODUCTION_DEPLOYS_ENABLED` expands to an empty string and
+      # no production deploy can proceed. Nothing already running in production
+      # is affected; this only stops new releases reaching it.
+      #
+      # To lift the freeze, set the repository variable
+      # PRODUCTION_DEPLOYS_ENABLED to the string "true". Deliberately a variable
+      # and not a code edit, so lifting it is one auditable settings change and
+      # re-freezing is the same.
+      - name: Production deploys are frozen
+        env:
+          ENABLED: ${{ vars.PRODUCTION_DEPLOYS_ENABLED }}
+        run: |
+          if [ "$ENABLED" != "true" ]; then
+            echo "::error::Production deploys are frozen (PRODUCTION_DEPLOYS_ENABLED is not 'true'). The project is staging-only while in testing."
+            exit 1
+          fi
+
       - name: Verify explicit production confirmation
         shell: bash
         run: |

@@ -189,9 +189,6 @@ the `on:` block of each file rather than assumed from the workflow name.
 **Runs on every PR and on push to `main`:**
 
 - `security-scan.yml`: gitleaks secret scan, dependency review.
-- `supply-chain.yml`: `pnpm audit`, CycloneDX SBOM. Also weekly, Mondays 05:00 UTC.
-- `open-source-security.yml`: Semgrep CE and Trivy filesystem scans. Also
-  weekly, Mondays 04:00 UTC.
 
 **Push to `main` only:**
 
@@ -199,17 +196,26 @@ the `on:` block of each file rather than assumed from the workflow name.
   repository owns staging deploys — see
   [staging-production-workflow.md](./staging-production-workflow.md).
 
-**Scheduled:**
+**Scheduled, plus manual dispatch:**
 
+- `openapi-nightly.yml`: nightly 00:20 UTC. Live-staging contract run against a
+  read-only allowlist.
+- `d1-backup.yml`: daily 02:00 UTC. Encrypted D1 export to R2, per environment.
+- `infra-drift.yml`: daily 06:00 UTC. Compares declared Cloudflare resources
+  against the account.
+- `open-source-security.yml`: weekly, Mondays 04:00 UTC. Semgrep CE and Trivy
+  filesystem scans.
 - `skills-auto-update.yml`: weekly, Mondays 04:17 UTC.
+- `supply-chain.yml`: weekly, Mondays 05:00 UTC. `pnpm audit`, CycloneDX SBOM.
+
+`supply-chain.yml` and `open-source-security.yml` also ran on every PR and push
+until 2026-08-24, when they were reduced to scheduled-only for solo pre-release
+development. The header comment in each file records how to restore them.
 
 **Manual dispatch only:**
 
-- `d1-backup.yml`: encrypted D1 export to R2, per environment.
 - `restore-drill.yml`: downloads an encrypted backup, decrypts it under a
   separate environment that holds the AGE private key, and proves it restores.
-- `infra-drift.yml`: compares declared Cloudflare resources against the account.
-- `openapi-nightly.yml`: live-staging contract run against a read-only allowlist.
 - `android-staging-distribution.yml`: Firebase App Distribution.
 - `production-deploy.yml`: requires an explicit release SHA already verified on staging.
 

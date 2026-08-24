@@ -12,6 +12,10 @@
 #
 # Groups mirror the intent of the renovate.json packageRules they replace, so
 # one review covers a toolchain rather than arriving as separate pull requests.
+# TEMPORARY, 2026-08-24 — solo pre-release development: the three schedules
+# below were weekly and are now monthly, to cut review load. Security updates
+# are unaffected; those are a repository setting and arrive on advisory, not on
+# this schedule.
 version: 2
 updates:
   # pnpm workspace. Dependabot resolves every workspace member from the root
@@ -20,8 +24,7 @@ updates:
   - package-ecosystem: npm
     directory: /
     schedule:
-      interval: weekly
-      day: wednesday
+      interval: monthly
       time: "06:00"
       timezone: Africa/Cairo
     # A version published minutes ago has been reviewed by nobody. Waiting a
@@ -49,8 +52,7 @@ updates:
   - package-ecosystem: gradle
     directory: /apps/seller-android
     schedule:
-      interval: weekly
-      day: wednesday
+      interval: monthly
       time: "06:00"
       timezone: Africa/Cairo
     # A version published minutes ago has been reviewed by nobody. Waiting a
@@ -78,8 +80,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
-      day: wednesday
+      interval: monthly
       time: "06:00"
       timezone: Africa/Cairo
     # A version published minutes ago has been reviewed by nobody. Waiting a
