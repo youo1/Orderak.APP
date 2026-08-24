@@ -87,11 +87,17 @@ in the current baseline.
 
 ## Dependency updates
 
-- Backend: Renovate (`renovate.json`) opens update PRs weekly and on a
-  vulnerability alert; `pnpm audit --audit-level high` runs in CI
-  (`supply-chain.yml`) on every PR, push to main, and weekly schedule.
-  There is no Dependabot configuration in this repository — Renovate is the
-  actual mechanism.
+- Backend: Dependabot (`.github/dependabot.yml`) opens grouped version-update
+  pull requests on a schedule, and security updates when an advisory is
+  published; `pnpm audit --audit-level high` runs in CI (`supply-chain.yml`) on
+  every pull request, on pushes to `main`, and weekly.
+  This entry previously named Renovate (`renovate.json`) as "the actual
+  mechanism" and stated there was no Dependabot configuration. Both were true
+  when written and neither is now: that file configured a Renovate App which was
+  never installed on this repository, and it has been replaced.
+- Repository-level controls, verified enabled on 2026-08-24: Dependabot alerts,
+  Dependabot security updates, secret scanning, and secret scanning push
+  protection.
 - Android: review the Android Studio dependency analyzer and Firebase BoM
   releases monthly.
 - Apply security patches within 7 days of release.
