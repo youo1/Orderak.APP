@@ -2,7 +2,7 @@
 status: current
 generated: true
 owner: backend
-last_verified: 2026-08-21
+last_verified: 2026-08-25
 applies_to: [production, staging]
 authoritative_for: [database-migrations]
 ---
@@ -89,6 +89,8 @@ trigger's final semicolon when replaying a fresh remote D1 database.
 - [042_email_outbox.sql](#042_email_outboxsql)
 - [043_audit_signing_key_version.sql](#043_audit_signing_key_versionsql)
 - [044_money_minor_units_with_currency.sql](#044_money_minor_units_with_currencysql)
+- [045_unique_referral_code.sql](#045_unique_referral_codesql)
+- [046_order_status_transitions.sql](#046_order_status_transitionssql)
 
 ## 001_init.sql
 
@@ -503,3 +505,24 @@ trigger's final semicolon when replaying a fresh remote D1 database.
 - order_items gets no currency column: a line item takes the currency of the order above it, and a pair that can disagree is a disagreement nothing can detect after the fact. `items` gets none either, because no query in services/backend/src reads that table.
 - Renames in place rather than rebuilding. ALTER TABLE RENAME COLUMN and ADD COLUMN ... NOT NULL DEFAULT were both verified against D1 on 2026-08-21 and succeed, so the twelve-step rebuild used elsewhere in this directory would take on its risks - dropped indexes, lost foreign keys, a partially written copy - to accomplish what the simpler statement already does.
 - Backfills DEFAULT 'EGP', which is correct by construction rather than by assumption: there are no users and no live money rows yet. That property disappears the day a second currency exists, which is why this migration is cheap now and expensive later.
+
+## 045_unique_referral_code.sql
+
+**Source:** `services/backend/migrations/045_unique_referral_code.sql`
+
+### What it does
+
+- Replaces the plain `idx_sellers_refcode` with a UNIQUE index on sellers(referral_code), partial on NOT NULL so unassigned sellers do not collide with each other.
+- ensureReferralCode() in platform/http/shared.ts already wrapped its UPDATE in a five-attempt retry loop for collisions. Without a unique constraint the UPDATE could not fail, so the catch block never ran and the retry was unreachable code: two sellers could hold one code. referralApply() resolves a referrer with SELECT ... WHERE referral_code = ? and takes the first row back, so a collision did not error - it credited the wrong seller, and nothing in the data afterwards distinguished that from a correct attribution.
+- Expand-contract: it adds a constraint without changing a column the running Worker reads, so the previous release keeps serving while it applies.
+
+## 046_order_status_transitions.sql
+
+**Source:** `services/backend/migrations/046_order_status_transitions.sql`
+
+### What it does
+
+- Adds `status_changed_at` to orders and the trigger `trg_orders_release_stock_on_cancel`, giving order status a server side for the first time.
+- OrderStatus.kt defines NEW to CONFIRMED to PAID to SHIPPED to DONE, but OrderRepository.markPaid and .cancel wrote the transition only to Room on the phone: no backend route accepted a status change, so the server held every order at NEW forever and a reinstall or a second device restored a pipeline the seller had already worked through.
+- The cancel path leaked stock. trg_order_items_claim_stock (026, restored by 041) decrements stock when an order is placed, and the cancel handler restored it in Room only, so units came off the catalog server-side and never went back. Release is a trigger rather than handler code because the claim side already is one, and splitting the pair across SQL and TypeScript lets the two definitions drift - a drift that surfaces only as a stock count nobody can explain.
+- Guarded on the transition (WHEN OLD.status <> 'CANCELLED') rather than on the value, so a repeated UPDATE to CANCELLED restores stock once and not twice.

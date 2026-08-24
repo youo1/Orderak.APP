@@ -61,7 +61,10 @@ jobs:
       - name: Lint workflows and composite actions
         run: |
           set -euo pipefail
-          # shellcheck is preinstalled on ubuntu-latest; actionlint invokes it
-          # for every run: block automatically when it is on PATH.
+          # Note: ShellCheck is preinstalled on ubuntu-latest, and actionlint
+          # invokes it for every run: block automatically when it is on PATH.
+          # This comment must not begin with "# shellcheck" -- ShellCheck reads
+          # such a line as a directive expecting key=value and fails with
+          # SC1072 rather than treating it as prose.
           shellcheck --version | head -2
           ./actionlint -color
