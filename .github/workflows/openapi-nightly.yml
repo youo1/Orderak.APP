@@ -45,7 +45,7 @@ jobs:
       matrix:
         shard: [0, 1, 2, 3, 4, 5, 6, 7]
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # jsonschema-rs is pinned alongside Schemathesis, not left to resolve.
       # `pipx install schemathesis==4.24.3` pins Schemathesis and nothing beneath
       # it. jsonschema-rs 0.50.0 dropped `is_satisfiable` from CanonicalSchema,
@@ -120,7 +120,7 @@ jobs:
           --report junit,har
           --report-dir schemathesis-report
           --output-sanitize true
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: schemathesis-nightly-sanitized-${{ matrix.shard }}
@@ -131,7 +131,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging-contract-tests
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: grafana/setup-k6-action@db07bd9765aac508ef18982e52ab937fe633a065 # v1
       - name: Low nightly load
         if: ${{ !inputs.run_pre_release }}
