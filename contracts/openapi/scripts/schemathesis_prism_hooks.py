@@ -34,3 +34,12 @@ def before_call(ctx, case, kwargs):
         case.query = {key: _printable(value) for key, value in case.query.items()}
     if case.path_parameters:
         case.path_parameters = {key: _printable(value) for key, value in case.path_parameters.items()}
+    # Prism's mock enforces the apiKey security the contract declares, so an
+    # authenticated operation answers 401 when its x-orderak-secret header is
+    # absent. The mock never validates the secret's value; a deterministic
+    # placeholder lets the fuzzing phase keep exercising response shapes instead
+    # of failing on "missing authentication" for the first constrained operation
+    # that happens to require a seller device credential.
+    headers = dict(case.headers) if case.headers else {}
+    headers["x-orderak-secret"] = "prism-mock"
+    case.headers = headers
