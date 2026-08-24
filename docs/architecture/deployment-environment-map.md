@@ -2,7 +2,7 @@
 status: current
 generated: false
 owner: backend
-last_verified: 2026-08-20
+last_verified: 2026-08-24
 applies_to: [production, staging]
 authoritative_for: [deployment-environments]
 ---
@@ -21,6 +21,8 @@ resources before any rename, creation, deletion, or Production deployment.
 | Link | Production | Staging |
 |---|---|---|
 | GitHub Environment | `production` | `staging` |
+| Deploying branch | `main` | `staging` |
+| Deployment trigger | Manual dispatch only | Push to `staging`, path-filtered |
 | Workflow | `.github/workflows/production-deploy.yml` | `.github/workflows/staging-deploy.yml` |
 | Public Wrangler config | `services/backend/wrangler.jsonc` base | same file, `env.staging` |
 | Admin Wrangler config | `services/backend/wrangler.admin.jsonc` base | same file, `env.staging` |
@@ -89,7 +91,7 @@ a second human being available:
 |---|---|
 | Typed `DEPLOY_PRODUCTION` confirmation | An accidental dispatch |
 | 40-character SHA, matched against `origin/main` | Deploying a side branch |
-| SHA must have a successful `staging-deploy.yml` run | Deploying an unexercised commit |
+| A successful `staging-deploy.yml` run on the SHA **or on its second parent** | Deploying an unexercised commit |
 | `require-deploy-owner` against `DEPLOY_OWNER` | Deploying from the wrong repository |
 | `verify-deployment-map.mjs` | Deploying at the wrong resources |
 | Full test, type-check, lint, and `wrangler --dry-run` | Shipping a broken build or config |
@@ -102,10 +104,19 @@ Cloudflare resources. The same reasoning keeps `staging-contract-tests` separate
 from `staging` — the nightly fuzzer needs seller credentials and must not also
 inherit a deploy token.
 
-Production accepts a full 40-character commit SHA, verifies that the checked-out SHA
-has a successful `staging-deploy.yml` run, requires `DEPLOY_PRODUCTION`, and then enters
-the protected `production` GitHub Environment. Staging migrations, deployments, and
-smoke tests remain separate from Production.
+Production accepts a full 40-character commit SHA, verifies that a successful
+`staging-deploy.yml` run exists for it, requires `DEPLOY_PRODUCTION`, and then enters
+the protected `production` GitHub Environment.
+
+The second-parent clause in that table dates from 2026-08-24, when Staging
+deploys moved from `main` to the `staging` branch. A `staging` to `main`
+promotion merge commit is a SHA Staging never deployed; the commit that was
+exercised is the merge's second parent. Checking the release SHA alone would
+have deadlocked Production permanently. The first parent — the previous
+Production release — is deliberately not accepted, since that would pass a
+promotion whose staging side had never deployed at all.
+
+Staging migrations, deployments, and smoke tests remain separate from Production.
 
 ## Cloudflare configuration to verify live
 

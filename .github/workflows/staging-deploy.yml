@@ -16,10 +16,18 @@ name: Deploy Staging
 #
 # Restored with the same path filters the source repository used, so a docs
 # or Android-only change still does not redeploy the Workers.
+#
+# The trigger branch moved from `main` to `staging` on 2026-08-24, when the
+# repository adopted develop -> staging -> main. Before that, `main` was both
+# the integration line and the staging trigger, so the branch named for an
+# environment deployed nothing and the branch named for production deployed
+# staging. Staging is now deployed by the branch called staging, and `main`
+# deploys nothing on push - production stays dispatch-only behind the typed
+# confirmation in production-deploy.yml.
 
 on:
   push:
-    branches: [main]
+    branches: [staging]
     paths:
       - 'services/backend/**'
       - 'apps/admin-web/**'
