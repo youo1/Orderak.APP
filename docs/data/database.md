@@ -50,8 +50,12 @@ business data in backup and restore. See
 | `currency` column | Present | **Absent** |
 
 Migration 044 merged to `main` in `6cc7410` and reached staging automatically on
-the merge. Production deploys are `workflow_dispatch` only, behind a required
-reviewer, so it has not run — production was last deployed on 2026-08-17.
+the merge, under the pre-2026-08-24 model in which `main` was the Staging
+trigger. That branch is now `staging`. Production deploys are
+`workflow_dispatch` only — gated by the automated checks in
+`production-deploy.yml`, not by a required reviewer, which is unavailable on
+this plan and withdrawn as a plan — so it has not run; production was last
+deployed on 2026-08-17.
 
 **What this means when reading the rest of the documentation.** Money columns
 are described by their post-044 names, because that is what the code in `main`
