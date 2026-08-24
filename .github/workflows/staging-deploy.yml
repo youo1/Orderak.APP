@@ -3,12 +3,32 @@ name: Deploy Staging
 # This repository owns staging deploys. It is the only one holding a staging
 # deploy credential, so no other automation can reach these Workers.
 #
-# The path filters keep a docs-only or Android-only change from redeploying
-# the Workers.
+# The push trigger was held back while both repositories could still reach
+# the same Workers — the plan's rule was "never copy schedules and leave
+# both repositories acting on the same resources." That condition no longer
+# holds: youo1/Orderak's staging deploy credential was removed, and its own
+# staging-deploy.yml is now break-glass only, dispatch-gated behind a typed
+# confirmation. (This comment also credited "a required reviewer" there;
+# that repository is private, and going private strips required_reviewers
+# under the current plan — see docs/governance/phase9-readiness.md. The
+# control that holds is the removed credential, which is the one that
+# matters: no token, no deploy.) One repository deploys staging, and it is
+# this one.
+#
+# Restored with the same path filters the source repository used, so a docs
+# or Android-only change still does not redeploy the Workers.
+#
+# The trigger branch moved from `main` to `staging` on 2026-08-24, when the
+# repository adopted develop -> staging -> main. Before that, `main` was both
+# the integration line and the staging trigger, so the branch named for an
+# environment deployed nothing and the branch named for production deployed
+# staging. Staging is now deployed by the branch called staging, and `main`
+# deploys nothing on push - production stays dispatch-only behind the typed
+# confirmation in production-deploy.yml.
 
 on:
   push:
-    branches: [main]
+    branches: [staging]
     paths:
       - 'services/backend/**'
       - 'apps/admin-web/**'

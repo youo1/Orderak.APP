@@ -72,12 +72,33 @@ jobs:
         with:
           expected-owner: ${{ vars.DEPLOY_OWNER }}
 
+      # Staging deploys fire on pushes to `staging`, not to `main` (changed
+      # 2026-08-24). A promotion merge commit on main is therefore a SHA that
+      # staging never deployed, and checking it alone would deadlock production
+      # permanently: the commit that was exercised is the merge's SECOND parent,
+      # the staging tip at promotion time.
+      #
+      # Accepted: the release commit itself (a fast-forward promotion, or a merge
+      # commit someone re-ran staging-deploy against by dispatch) and its second
+      # parent. Deliberately NOT accepted: the first parent, which is the previous
+      # production release. Accepting that one would pass a promotion whose
+      # staging side had never deployed at all, which is the whole point of this
+      # gate.
       - name: Verify the exact SHA passed Staging
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
-          RUNS=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/staging-deploy.yml/runs?head_sha=${RELEASE_SHA}&status=success&per_page=100" --jq '.workflow_runs | length')
+
+          # rev-list --parents reads the commit header only, so this works on the
+          # shallow checkout above without fetching the parent objects.
+          SECOND_PARENT=$(git rev-list --parents -n 1 HEAD | awk '{print $3}')
+
+          RUNS=0
+          for candidate in $RELEASE_SHA $SECOND_PARENT; do
+            found=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/staging-deploy.yml/runs?head_sha=${candidate}&status=success&per_page=100" --jq '.workflow_runs | length')
+            RUNS=$((RUNS + found))
+          done
           test "$RUNS" -gt 0
 
       # From main: production may only ever deploy the tip of main. The staging

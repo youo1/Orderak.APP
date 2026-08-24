@@ -21,6 +21,8 @@ resources before any rename, creation, deletion, or Production deployment.
 | Link | Production | Staging |
 |---|---|---|
 | GitHub Environment | `production` | `staging` |
+| Deploying branch | `main` | `staging` |
+| Deployment trigger | Manual dispatch only | Push to `staging`, path-filtered |
 | Workflow | `.github/workflows/production-deploy.yml` | `.github/workflows/staging-deploy.yml` |
 | Public Wrangler config | `services/backend/wrangler.jsonc` base | same file, `env.staging` |
 | Admin Wrangler config | `services/backend/wrangler.admin.jsonc` base | same file, `env.staging` |
@@ -58,6 +60,12 @@ Bindings remain identical across environments; their resource targets are isolat
 
 ## GitHub configuration to verify live
 
+Every environment is set to `deployment_branch_policy: {protected_branches:
+true}`, so only a protected branch can deploy to one. From 2026-08-24 that couples
+deployment to branch protection: `staging-deploy.yml` runs on the `staging`
+branch, and if that branch loses its protection the deploy fails at the
+environment gate rather than deploying from an unprotected ref.
+
 Workflows in this repository reference **five** environments — `staging`,
 `production`, `staging-contract-tests`, and the two `backup-restore-*`
 environments `restore-drill.yml` selects between. Earlier revisions of this
@@ -76,20 +84,27 @@ CODEOWNERS, workflow permissions, concurrency, and deployment URLs.
 ### Production approval: automated gates, not a second reviewer
 
 An earlier revision of this section required the live review to confirm "that
-Production approval cannot be provided solely by the change author." That control
-was never configured, and on a single-maintainer repository it cannot be: there is
-no second person to provide the approval. A rule nobody can satisfy is not a
-control, and auditing against it produced a permanent false finding.
+Production approval cannot be provided solely by the change author." That is the
+one thing this repository cannot confirm: there is no second person to provide
+the approval. A rule nobody can satisfy is not a control, and auditing against it
+produced a permanent false finding.
 
-The rule is withdrawn. Production is gated by checks a machine performs on every
-dispatch, all of which live in `production-deploy.yml` and none of which depend on
-a second human being available:
+The requirement is withdrawn — but note that the *setting* exists. Measured
+2026-08-24, the `production` environment carries `required_reviewers` with a
+single reviewer, `User:youo1`, and `prevent_self_review: false`. It returned when
+the repository became public again. So a dispatch does stop for an approval
+screen; it stops for the change author, which is a confirmation step and not a
+second pair of eyes.
+
+What actually gates Production is checks a machine performs on every dispatch,
+all of which live in `production-deploy.yml` and none of which depend on a second
+human being available:
 
 | Gate | Prevents |
 |---|---|
 | Typed `DEPLOY_PRODUCTION` confirmation | An accidental dispatch |
 | 40-character SHA, matched against `origin/main` | Deploying a side branch |
-| SHA must have a successful `staging-deploy.yml` run | Deploying an unexercised commit |
+| A successful `staging-deploy.yml` run on the SHA **or on its second parent** | Deploying an unexercised commit |
 | `require-deploy-owner` against `DEPLOY_OWNER` | Deploying from the wrong repository |
 | `verify-deployment-map.mjs` | Deploying at the wrong resources |
 | Full test, type-check, lint, and `wrangler --dry-run` | Shipping a broken build or config |
@@ -102,10 +117,19 @@ Cloudflare resources. The same reasoning keeps `staging-contract-tests` separate
 from `staging` — the nightly fuzzer needs seller credentials and must not also
 inherit a deploy token.
 
-Production accepts a full 40-character commit SHA, verifies that the checked-out SHA
-has a successful `staging-deploy.yml` run, requires `DEPLOY_PRODUCTION`, and then enters
-the protected `production` GitHub Environment. Staging migrations, deployments, and
-smoke tests remain separate from Production.
+Production accepts a full 40-character commit SHA, verifies that a successful
+`staging-deploy.yml` run exists for it, requires `DEPLOY_PRODUCTION`, and then enters
+the protected `production` GitHub Environment.
+
+The second-parent clause in that table dates from 2026-08-24, when Staging
+deploys moved from `main` to the `staging` branch. A `staging` to `main`
+promotion merge commit is a SHA Staging never deployed; the commit that was
+exercised is the merge's second parent. Checking the release SHA alone would
+have deadlocked Production permanently. The first parent — the previous
+Production release — is deliberately not accepted, since that would pass a
+promotion whose staging side had never deployed at all.
+
+Staging migrations, deployments, and smoke tests remain separate from Production.
 
 ## Production freeze, 2026-08-24
 
