@@ -10,14 +10,12 @@ name: Infrastructure Drift
 # took production deploys down. The divergence existed the whole time and was
 # only ever going to surface as an unrelated deploy failing.
 #
-# This repository owns the daily drift check as of 2026-08-16, and removed it
-# from the old repository in the same change. It follows production: this
-# repository now deploys production, so it checks production for drift.
+# The drift check follows production: this repository deploys production, so
+# it checks production for drift.
 
 on:
   schedule:
-    # Daily at 06:00 UTC. Moved from the old repository 2026-08-16: this
-    # repository now owns production, so it owns the drift check against it.
+    # Daily at 06:00 UTC.
     - cron: '0 6 * * *'
   workflow_dispatch:
     inputs:
@@ -40,11 +38,11 @@ jobs:
     environment: production
     env:
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-      # The old repository's copy of this line was `secrets.CLOUDFLARE_D1_BACKUP_TOKEN
-      # || secrets.CLOUDFLARE_API_TOKEN`. That fallback broke there this session: once
-      # the backup token was correctly narrowed to D1+R2 only, this check silently lost
-      # the D1/R2/Queues List access it actually needs. A single, dedicated read-only
-      # token removes the ambiguity — see the migration plan's token-rotation notes.
+      # Deliberately a single dedicated read-only token, not a fallback chain. An
+      # earlier `CLOUDFLARE_D1_BACKUP_TOKEN || CLOUDFLARE_API_TOKEN` form broke once
+      # the backup token was correctly narrowed to D1+R2 only: this check silently
+      # lost the D1/R2/Queues List access it actually needs. One dedicated token
+      # removes the ambiguity.
       CLOUDFLARE_API_TOKEN: ${{ secrets.ORDERAK_DRIFT_CHECK }}
 
     steps:

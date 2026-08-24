@@ -1,10 +1,7 @@
 name: OpenAPI Nightly Contract and Load
 
-# This repository owns the nightly run as of 2026-08-16. The comment here
-# previously said the opposite, and named its own two preconditions: no
-# staging-contract-tests environment, and no CONTRACT_SELLER_PHONE/_SECRET.
-#
-# The environment now exists. The two secrets are still the remaining gap:
+# The staging-contract-tests environment exists; the two secrets it needs are
+# still the remaining gap:
 # measured 2026-08-21, staging-contract-tests holds no secrets and no variables
 # at all.
 #
@@ -16,8 +13,8 @@ name: OpenAPI Nightly Contract and Load
 
 on:
   schedule:
-    # Nightly at 00:20 UTC. Moved from the old repository 2026-08-16, once
-    # staging-contract-tests existed here to hold CONTRACT_SELLER_*.
+    # Nightly at 00:20 UTC. Requires the staging-contract-tests environment to
+    # hold CONTRACT_SELLER_* — see the preflight below.
     - cron: '20 0 * * *'
   workflow_dispatch:
     inputs:

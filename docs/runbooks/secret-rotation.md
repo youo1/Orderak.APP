@@ -190,20 +190,12 @@ Rotating `ADMIN_AUDIT_SIGNING_KEY` on production before 043 lands would leave
 its **21 existing archives** carrying no key version, and therefore
 unverifiable — precisely the failure the migration was written to prevent.
 
-The migration file exists **only in `Orderak.APP`**, which does not deploy
-production. Two routes were considered:
-
-| | Route | Verdict |
-| --- | --- | --- |
-| a | Port 043 into the old repository so its next production deploy applies it | **Rejected** |
-| b | Apply it from `Orderak.APP` inside the cutover window, as the first step of 7c | **Chosen 2026-08-15** |
-
-Route (a) was rejected because it makes a production schema change happen as a
-side effect of copying a file: the migration would run on whichever production
-deploy came next, for whatever unrelated reason that deploy was triggered.
-Nobody would have decided to change production's schema at that moment. Route
-(b) keeps it a deliberate, scheduled step with the rest of the rotation, in a
-window where someone is watching.
+043 is applied as the **first step of 7c**, inside the rotation window
+(decided 2026-08-15). The rejected alternative was to let it ride along on
+whichever production deploy happened next: that makes a production schema
+change a side effect of an unrelated deploy, at a moment nobody chose. Applying
+it as a scheduled step keeps it deliberate, in a window where someone is
+watching.
 
 **7c therefore begins by applying 043 to production, before any secret is
 touched.**

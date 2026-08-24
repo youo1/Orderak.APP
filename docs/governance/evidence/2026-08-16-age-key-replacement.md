@@ -34,9 +34,9 @@ files with a match narrow enough that no secret material entered any log:
 | production | `age1m82wulejpecjfchqq2s6ppgje2d0dcrsxp7jyr2aldhrfw8s9cfqftz57e` |
 | staging | `age1pqesjv5gley0q90uz3m7ajxh5g2w7tr8kp9lrcfcw4p9np9qxc3q3fdlq5` |
 
-`AGE_RECIPIENT` was updated **on `Orderak.APP` only**. The old repository keeps
-the old recipient deliberately — it also holds the old identity, and is the
-only thing that can open the objects already in R2.
+`AGE_RECIPIENT` now carries the new value for each environment. The identity
+matching the *previous* recipient no longer exists anywhere, so the objects
+already written to R2 under it cannot be opened — see the closing section.
 
 ## Proven, and not proven
 

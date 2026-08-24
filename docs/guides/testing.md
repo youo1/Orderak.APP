@@ -171,9 +171,8 @@ gradlew.bat verifyAuthPhase1Contract verifySellerApiContract testStagingDebugUni
 
 ## CI
 
-Seventeen workflows. Grouped by what actually triggers them here — verified
-against the `on:` block of each file, because several are configured
-differently in this repository than in the one it was migrated from.
+Seventeen workflows. Grouped by what actually triggers them — verified against
+the `on:` block of each file rather than assumed from the workflow name.
 
 **Runs on every PR, path-filtered:**
 
