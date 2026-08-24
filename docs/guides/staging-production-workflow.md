@@ -109,7 +109,12 @@ The repository currently uses these controls:
   approval is a self-approval, which constrains nothing — the same reasoning the
   next section records for environment reviewers. The check suite is the gate
   that does the work.
-- Separate `staging` and `production` GitHub Environments.
+- Separate `staging` and `production` GitHub Environments, both set to accept
+  deployments from **protected branches only**
+  (`deployment_branch_policy: {protected_branches: true}`). Since 2026-08-24 this
+  is load-bearing rather than incidental: `staging-deploy.yml` runs on the
+  `staging` branch, so removing that branch's protection does not merely relax a
+  rule — it stops Staging deploying at all, at the environment gate.
 - Environment-scoped secrets and variables; workflows do not share credentials
   implicitly.
 - Separate concurrency groups so two deployments to the same environment do
@@ -117,8 +122,7 @@ The repository currently uses these controls:
 - A manual Production workflow requiring both a tested `release_ref` and the
   exact confirmation text `DEPLOY_PRODUCTION`.
 
-**Required reviewers are unavailable again, and the reviewer gate is now
-withdrawn as a plan rather than deferred. Corrected 2026-08-20.**
+**Production has a required-reviewer rule again. Corrected 2026-08-24.**
 
 This paragraph has now been wrong in both directions, so the sequence is worth
 keeping in full:
@@ -137,23 +141,34 @@ keeping in full:
    environment in `Orderak.APP` reads `protection_rules: []`. The plan
    restriction applies once more.
 
-So step 2's finding still stands as a measurement; it just no longer describes
-the repository as it is. **A reviewer gate is unavailable, not merely
-unconfigured.**
+4. `youo1/Orderak.APP` is **public again** — measured 2026-08-24,
+   `private=false` — and the reviewer rules returned with it. Measured the same
+   day: `production`, `backup-restore-production` and `backup-restore-staging`
+   each report `protection_rules: ["required_reviewers", "branch_policy"]`, with
+   a single reviewer, `User:youo1`, and `prevent_self_review: false`.
+
+Each step was a correct measurement when taken; what kept going wrong was
+treating a plan-tier consequence as a settled fact about the repository.
+**Production has a reviewer gate today, and dispatching `Deploy Production`
+pauses at an approval screen.**
+
+What has not changed is what the gate is worth. The only reviewer is the change
+author and self-review is not prevented, so the approval is a self-approval: a
+confirmation step, not a second pair of eyes. No audit should record it as one.
 
 The earlier plan — "set it on `production`, `backup-restore-staging`,
 `backup-restore-production` and `staging-rollback` before their first dispatch" —
-is withdrawn, and not only because the platform now refuses it. On a
-single-maintainer repository the gate could never have done the work claimed for
-it: the sole reviewer is always the change author, so the approval is a
+is withdrawn as a *plan*, though three of those environments now carry the rule
+anyway. On a single-maintainer repository the gate could never have done the
+work claimed for it: the sole reviewer is always the change author, so the approval is a
 self-approval, and a control that one person can always satisfy alone constrains
 nothing. Keeping it on the roadmap kept a permanent false finding in every audit.
 (`staging-rollback` also does not exist in `Orderak.APP`; the five environments
 present are `production`, `staging`, `staging-contract-tests`, and the two
 `backup-restore-*`.)
 
-What replaces it is what was always doing the real work — checks a machine
-performs on every dispatch, none of which need a second person to be available:
+What does the real work is what always did — checks a machine performs on every
+dispatch, none of which need a second person to be available:
 the typed `DEPLOY_PRODUCTION` confirmation, the 40-character SHA matched against
 `origin/main`, the requirement that the SHA already have a successful
 `staging-deploy.yml` run, `require-deploy-owner`, `verify-deployment-map.mjs`,
@@ -161,8 +176,9 @@ the full test/lint/`--dry-run` pass, and the post-deploy smoke test. Alongside
 those sits credential custody: each deploy token is scoped to its environment, so
 a workflow that does not declare the environment cannot reach its resources.
 
-Do not describe this workflow as having a GitHub reviewer gate. It does not have
-one, and by current design it is not getting one.
+Do not describe this workflow as having a *meaningful* reviewer gate. It has the
+setting, and the setting will stop and ask. It does not have a second reviewer,
+and on a single-maintainer repository it cannot.
 
 ## Daily development workflow
 
@@ -296,12 +312,18 @@ Google Play.
 5. Enter `main`'s current tip — the full 40-character promotion merge SHA — in
    `release_sha`. The input is a SHA: a tag or an abbreviated SHA is rejected.
 6. Enter exactly `DEPLOY_PRODUCTION` in `confirm`.
-7. Run the workflow and monitor every step until the smoke tests complete.
+7. Run the workflow, then **approve the `production` environment when GitHub
+   asks**. The run waits at that gate and does nothing until it is approved.
+8. Monitor every step until the smoke tests complete.
 
 The workflow validates the backend and Admin again before it applies Production
 migrations and deploys. It then smoke-tests the Production API and Admin URLs.
-Because there is currently no supported required-reviewer rule, dispatching the
-workflow starts this process without a second GitHub approval screen.
+
+**The run pauses for approval.** The `production` environment carries a
+required-reviewer rule naming `youo1`, so the dispatch stops at the environment
+gate until someone approves it in the Actions UI. Because that reviewer is the
+change author and `prevent_self_review` is false, this is a confirmation prompt
+rather than review by a second person — but nothing deploys until it is clicked.
 
 ### Production verification
 

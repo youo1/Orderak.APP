@@ -60,6 +60,12 @@ Bindings remain identical across environments; their resource targets are isolat
 
 ## GitHub configuration to verify live
 
+Every environment is set to `deployment_branch_policy: {protected_branches:
+true}`, so only a protected branch can deploy to one. From 2026-08-24 that couples
+deployment to branch protection: `staging-deploy.yml` runs on the `staging`
+branch, and if that branch loses its protection the deploy fails at the
+environment gate rather than deploying from an unprotected ref.
+
 Workflows in this repository reference **five** environments — `staging`,
 `production`, `staging-contract-tests`, and the two `backup-restore-*`
 environments `restore-drill.yml` selects between. Earlier revisions of this
@@ -78,14 +84,21 @@ CODEOWNERS, workflow permissions, concurrency, and deployment URLs.
 ### Production approval: automated gates, not a second reviewer
 
 An earlier revision of this section required the live review to confirm "that
-Production approval cannot be provided solely by the change author." That control
-was never configured, and on a single-maintainer repository it cannot be: there is
-no second person to provide the approval. A rule nobody can satisfy is not a
-control, and auditing against it produced a permanent false finding.
+Production approval cannot be provided solely by the change author." That is the
+one thing this repository cannot confirm: there is no second person to provide
+the approval. A rule nobody can satisfy is not a control, and auditing against it
+produced a permanent false finding.
 
-The rule is withdrawn. Production is gated by checks a machine performs on every
-dispatch, all of which live in `production-deploy.yml` and none of which depend on
-a second human being available:
+The requirement is withdrawn — but note that the *setting* exists. Measured
+2026-08-24, the `production` environment carries `required_reviewers` with a
+single reviewer, `User:youo1`, and `prevent_self_review: false`. It returned when
+the repository became public again. So a dispatch does stop for an approval
+screen; it stops for the change author, which is a confirmation step and not a
+second pair of eyes.
+
+What actually gates Production is checks a machine performs on every dispatch,
+all of which live in `production-deploy.yml` and none of which depend on a second
+human being available:
 
 | Gate | Prevents |
 |---|---|
