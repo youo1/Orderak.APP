@@ -171,9 +171,8 @@ gradlew.bat verifyAuthPhase1Contract verifySellerApiContract testStagingDebugUni
 
 ## CI
 
-Seventeen workflows. Grouped by what actually triggers them here — verified
-against the `on:` block of each file, because several are configured
-differently in this repository than in the one it was migrated from.
+Seventeen workflows. Grouped by what actually triggers them — verified against
+the `on:` block of each file rather than assumed from the workflow name.
 
 **Runs on every PR, path-filtered:**
 
@@ -190,9 +189,6 @@ differently in this repository than in the one it was migrated from.
 **Runs on every PR and on push to `main`:**
 
 - `security-scan.yml`: gitleaks secret scan, dependency review.
-- `supply-chain.yml`: `pnpm audit`, CycloneDX SBOM. Also weekly, Mondays 05:00 UTC.
-- `open-source-security.yml`: Semgrep CE and Trivy filesystem scans. Also
-  weekly, Mondays 04:00 UTC.
 
 **Push to `main` only:**
 
@@ -200,25 +196,30 @@ differently in this repository than in the one it was migrated from.
   repository owns staging deploys — see
   [staging-production-workflow.md](./staging-production-workflow.md).
 
-**Scheduled:**
+**Scheduled, plus manual dispatch:**
 
+- `openapi-nightly.yml`: nightly 00:20 UTC. Live-staging contract run against a
+  read-only allowlist.
+- `d1-backup.yml`: daily 02:00 UTC. Encrypted D1 export to R2, per environment.
+- `infra-drift.yml`: daily 06:00 UTC. Compares declared Cloudflare resources
+  against the account.
+- `open-source-security.yml`: weekly, Mondays 04:00 UTC. Semgrep CE and Trivy
+  filesystem scans.
 - `skills-auto-update.yml`: weekly, Mondays 04:17 UTC.
+- `supply-chain.yml`: weekly, Mondays 05:00 UTC. `pnpm audit`, CycloneDX SBOM.
+
+`supply-chain.yml` and `open-source-security.yml` also ran on every PR and push
+until 2026-08-24, when they were reduced to scheduled-only for solo pre-release
+development. The header comment in each file records how to restore them.
 
 **Manual dispatch only:**
 
-- `d1-backup.yml`: encrypted D1 export to R2, per environment.
 - `restore-drill.yml`: downloads an encrypted backup, decrypts it under a
   separate environment that holds the AGE private key, and proves it restores.
-- `infra-drift.yml`: compares declared Cloudflare resources against the account.
-- `openapi-nightly.yml`: live-staging contract run against a read-only allowlist.
 - `android-staging-distribution.yml`: Firebase App Distribution.
 - `production-deploy.yml`: requires an explicit release SHA already verified on staging.
 
-> **Why four of those are dispatch-only here and scheduled in the source
-> repository.** `d1-backup`, `infra-drift` and `openapi-nightly` act on shared
-> Cloudflare resources that both repositories can still reach. Running the same
-> schedule from both would double every backup and race every drift check, so
-> the source repository keeps the crons until it is decommissioned and this one
-> takes them over. `restore-drill` is dispatch-only by design, not by phase: it
-> is the only path that decrypts a backup, and that must stay a deliberate,
-> reviewed act rather than something that happens nightly.
+> **Why `restore-drill` alone is dispatch-only.** `d1-backup`, `infra-drift`
+> and `openapi-nightly` run on their own schedules here. `restore-drill` does
+> not: it is the only path that decrypts a backup, and that must stay a
+> deliberate, reviewed act rather than something that happens nightly.

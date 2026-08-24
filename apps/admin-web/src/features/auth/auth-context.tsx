@@ -115,11 +115,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Membership only. The server sends the fully expanded permission set, so
+  // every rule about what implies what — project:view granting the internal
+  // read permissions, theme:rollback implying theme:manage and theme:view —
+  // lives in permissionsForRole() and nowhere else.
+  //
+  // This used to re-derive those rules here and got them wrong: it understood
+  // exact matches and `resource:*` and nothing else, so the UI hid sections the
+  // API would happily have served, and neither implementation could notice the
+  // other drifting.
   const can = useCallback((permission?: string) => {
     if (!permission) return true;
-    if (permissions.includes('*') || permissions.includes(permission)) return true;
-    const resource = permission.split(':')[0];
-    return permissions.includes(`${resource}:*`);
+    return permissions.includes('*') || permissions.includes(permission);
   }, [permissions]);
 
   const value = useMemo(() => ({ admin, permissions, loading, loginState, enrollment, recoveryCodes, login, verifyMfa, enrollMfa, recover, acknowledgeRecoveryCodes, cancelChallenge, logout, refresh, can }), [admin, permissions, loading, loginState, enrollment, recoveryCodes, login, verifyMfa, enrollMfa, recover, acknowledgeRecoveryCodes, cancelChallenge, logout, refresh, can]);

@@ -31,8 +31,7 @@ provenance finding below applies to the whole set.
 ## Source and toolchain
 
 ```text
-Orderak.APP HEAD    45ff6d4fbbe63d0fab453d0e66a018a9b1dd3cc2
-Orderak    HEAD     08c8b665bf4e90252720d61d31bf717dcdf03beb
+HEAD                45ff6d4fbbe63d0fab453d0e66a018a9b1dd3cc2
 pnpm-lock.yaml      sha256 dc1ad63711e88270f561a8ca24a1e039…
 node                v24.18.0
 pnpm                11.20.0
@@ -48,8 +47,7 @@ not exist and cannot be reconstructed.**
 Three facts establish it:
 
 1. **`production-deploy.yml` has never run.** Not "no runs in the retained
-   window" — the workflow's run count is **0**. It exists in the old repository
-   and has never been dispatched.
+   window" — the workflow's run count is **0**. It has never been dispatched.
 2. **Cloudflare records the deployment's origin as `Source: Unknown
    (deployment)`**, not an Actions run.
 3. **The author is `ayman.abdellatif@proton.me`** — the account owner's OAuth

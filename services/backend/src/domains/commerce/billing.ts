@@ -20,14 +20,45 @@ import { runtimeControlEnabled } from "../../platform/config/runtime-config";
 
 type Body = Record<string, unknown>;
 
+/**
+ * Every route in this module, gated as one surface.
+ *
+ * It used to hold six of the nine. `/api/integrations/v1/payment`,
+ * `/api/v1/cancel` and `/api/v1/subscription/status` were outside it, so
+ * `BILLING_ENABLED=false` — the state both environments are in — closed the
+ * front door and left three others open. The webhook is the one that matters:
+ * it is a public POST that writes subscription status, and it was reachable on
+ * an environment that had declared it was not doing billing.
+ *
+ * Nothing is lost by closing them. The Android client never calls this surface
+ * at all — its paid path is Google Play (`/api/v1/billing/catalog`,
+ * `/api/v1/billing/google/verify`), which is a different module with
+ * authoritative server-side verification. This module is the legacy gateway
+ * flow, and while billing is off it has no callers.
+ */
 const BILLING_ACQUISITION_ROUTES = new Set([
 	"/api/v1/subscribe",
+	"/api/v1/cancel",
+	"/api/v1/subscription/status",
 	"/api/v1/coupons/validate",
 	"/api/v1/coupons/apply",
 	"/api/v1/referral/apply",
 	"/api/v1/referral/stats",
 	"/api/v1/plans",
+	"/api/integrations/v1/payment",
 ]);
+
+/**
+ * Whether a real payment can be taken in this environment.
+ *
+ * A gateway that does not move money is fine for local development and for the
+ * test suite, which is where the mock earns its keep. It is not fine on
+ * production, where "checkout succeeded" is the fact that grants a paid plan.
+ */
+function gatewayCanCharge(env: Env): boolean {
+	if (getGateway(env).takesRealPayments) return true;
+	return env.DEPLOYMENT_ENVIRONMENT !== "production";
+}
 
 // ---- coupon validation core (shared by validate + apply + subscribe) ----
 
@@ -42,10 +73,16 @@ interface CouponResult {
 	final_minor?: number;
 }
 
+/**
+ * @param sellerId when known, also rejects a coupon this seller has already
+ *   redeemed. Omitted by the unauthenticated pricing preview, which has no
+ *   seller to check against.
+ */
 async function evaluateCoupon(
 	env: Env,
 	rawCode: string,
 	planPricePiasters: number,
+	sellerId?: string,
 ): Promise<CouponResult> {
 	const code = rawCode.trim().toUpperCase();
 	if (!code) return { valid: false, reason: "code_required" };
@@ -62,6 +99,24 @@ async function evaluateCoupon(
 	}
 	if (Number(c.max_uses) > 0 && Number(c.used_count) >= Number(c.max_uses)) {
 		return { valid: false, reason: "max_uses_reached" };
+	}
+	// One redemption per seller. The schema has said so since 002_billing.sql —
+	// `UNIQUE(coupon_code, seller_id)` on coupon_uses — but nothing enforced it
+	// where it counted: this check lived only in /coupons/apply, which prices a
+	// coupon and charges nothing, while /subscribe applied the discount and took
+	// the money without ever consulting the table. Skipping the advisory call and
+	// posting straight to /subscribe redeemed the same coupon on every purchase,
+	// bounded only by the coupon's global max_uses.
+	//
+	// Here rather than in the callers because this function is the module's
+	// single answer to "is this coupon valid", and a validity rule that only some
+	// callers apply is not one.
+	if (sellerId) {
+		const used = await env.orderak_db
+			.prepare("SELECT 1 FROM coupon_uses WHERE coupon_code = ? AND seller_id = ?")
+			.bind(code, sellerId)
+			.first();
+		if (used) return { valid: false, reason: "already_used" };
 	}
 
 	const finalPiasters = applyDiscount(planPricePiasters, String(c.discount_type), Number(c.value));
@@ -264,9 +319,30 @@ async function subscribe(request: Request, env: Env, url: URL, authenticatedSell
 		return jsonResponse({ ok: true, subscription: sub, requires_payment: false });
 	}
 
+	// -------- Paid plan: refuse outright if nothing can actually charge --------
+	//
+	// MockGateway reports every checkout as `active` without taking a payment, and
+	// getGateway() returns it unconditionally because no real gateway is written
+	// yet. On production that combination hands out any paid plan for free to
+	// anyone who can call this endpoint — the plan is activated, the entitlements
+	// follow, and no money moves.
+	//
+	// BILLING_ENABLED=false is what stands between that and a live system today,
+	// and it is one variable. This is the second lock, and it is the one that
+	// depends on a fact about the gateway rather than on a flag someone may flip
+	// while reasoning about something else. Non-production keeps the mock, which
+	// is what it is for.
+	if (!gatewayCanCharge(env)) {
+		console.error(JSON.stringify({ signal: "paid_checkout_without_gateway", plan_id: planId }));
+		return jsonResponse({
+			error: "payment_gateway_unavailable",
+			message: "Paid plans cannot be purchased until a payment gateway is configured.",
+		}, 503, { "retry-after": "3600" });
+	}
+
 	// -------- Paid plan: apply coupon + referral bonus, then charge --------
 	if (body.coupon_code) {
-		const res = await evaluateCoupon(env, String(body.coupon_code), amount);
+		const res = await evaluateCoupon(env, String(body.coupon_code), amount, String(seller.id));
 		if (!res.valid) return jsonResponse({ error: "coupon_invalid", reason: res.reason }, 400);
 		amount = res.final_minor!;
 		couponCode = res.code!;
@@ -498,9 +574,22 @@ async function couponValidate(request: Request, env: Env, url: URL): Promise<Res
 	const body = (await request.json().catch(() => ({}))) as Body;
 	const { phone } = readCreds(request, url, body);
 
-	// Rate-limit: 10 validations / minute per phone (or IP fallback).
-	const bucket = `coupon:validate:${phone || request.headers.get("cf-connecting-ip") || "anon"}`;
-	if (!(await checkRateLimit(env, bucket, 10, 60))) {
+	// Rate-limit on the phone AND the IP, never one falling back to the other.
+	//
+	// This is an unauthenticated endpoint that reports whether a coupon code
+	// exists, so without a working limit it is a coupon-code oracle. The bucket
+	// used to be `phone || ip`: `phone` is read from the x-orderak-phone header,
+	// which the caller sets, so sending a different value on each request put
+	// every attempt in its own fresh bucket and the IP branch — the only part an
+	// attacker cannot change — was never reached. docs/reference/api.md
+	// documents this endpoint as rate-limited per phone; now it is, and per
+	// source as well.
+	const ip = request.headers.get("cf-connecting-ip")?.trim() || "unknown";
+	const [phoneAllowed, ipAllowed] = await Promise.all([
+		phone ? checkRateLimit(env, `coupon:validate:phone:${phone}`, 10, 60) : Promise.resolve(true),
+		checkRateLimit(env, `coupon:validate:ip:${ip}`, 30, 60),
+	]);
+	if (!phoneAllowed || !ipAllowed) {
 		return jsonResponse({ error: "rate_limited" }, 429);
 	}
 
@@ -534,15 +623,10 @@ async function couponApply(request: Request, env: Env, url: URL, authenticatedSe
 		.first()) as Record<string, unknown> | null;
 	if (!plan) return jsonResponse({ error: "plan_not_found" }, 404);
 
-	const res = await evaluateCoupon(env, String(body.code ?? ""), Number(plan.price_minor));
+	// The already-redeemed check now lives inside evaluateCoupon, so this
+	// endpoint and /subscribe cannot disagree about what "valid" means.
+	const res = await evaluateCoupon(env, String(body.code ?? ""), Number(plan.price_minor), String(seller.id));
 	if (!res.valid) return jsonResponse({ error: "coupon_invalid", reason: res.reason }, 400);
-
-	// Prevent reuse by the same seller.
-	const used = await env.orderak_db
-		.prepare("SELECT 1 FROM coupon_uses WHERE coupon_code = ? AND seller_id = ?")
-		.bind(res.code, seller.id)
-		.first();
-	if (used) return jsonResponse({ error: "coupon_already_used" }, 400);
 
 	// This endpoint only PRICES the coupon; the charge happens in /api/v1/subscribe.
 	return jsonResponse({ ...res, note: "Pass this coupon code to /api/v1/subscribe to charge the discounted amount." });
@@ -635,9 +719,15 @@ async function handleWebhook(request: Request, env: Env): Promise<Response> {
 	const signature = request.headers.get("x-webhook-signature");
 	const gateway = getGateway(env);
 
+	// Any deployed environment must have a webhook secret. Only an undeployed
+	// one — local dev, the test runner — may process an unsigned body, and it
+	// says so by not being production or staging rather than by happening to
+	// have left a secret unset.
+	const deployed = ["production", "staging"].includes(env.DEPLOYMENT_ENVIRONMENT ?? "");
+
 	let event;
 	try {
-		event = await gateway.parseWebhook(raw, signature, env.PAYMENT_WEBHOOK_SECRET);
+		event = await gateway.parseWebhook(raw, signature, env.PAYMENT_WEBHOOK_SECRET, deployed);
 	} catch (e) {
 		console.error("Webhook parse failed:", e);
 		return jsonResponse({ error: "invalid_webhook" }, 400);

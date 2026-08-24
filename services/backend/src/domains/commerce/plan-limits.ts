@@ -7,7 +7,17 @@ export type PlanLimitKey =
 	| "max_orders_per_month"
 	| "max_ai_requests_per_month";
 
-const FREE_LIMITS: Record<PlanLimitKey, number> = {
+/**
+ * What a seller gets with no active subscription.
+ *
+ * Exported because config.ts serves the same numbers to the Android client for
+ * in-app enforcement, and it used to carry its own copy. Two hardcoded copies of
+ * a business rule do not stay equal — and the failure would have been quiet:
+ * the app would enforce one limit while the server enforced another, so a
+ * seller would be stopped by a message quoting a number the server disagreed
+ * with, or allowed past a limit the server then rejected.
+ */
+export const FREE_LIMITS: Record<PlanLimitKey, number> = {
 	max_categories: 5,
 	max_products: 20,
 	max_orders_per_month: 50,

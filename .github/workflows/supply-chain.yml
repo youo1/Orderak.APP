@@ -11,10 +11,14 @@ name: Supply Chain
 # answering "are we affected by this CVE" means reconstructing the dependency
 # tree by hand at exactly the moment nobody has time to.
 
+# TEMPORARY, 2026-08-24 — solo pre-release development. See the note in
+# open-source-security.yml. The weekly audit and SBOM still run; they no longer
+# gate a merge. To restore: uncomment the two triggers below AND re-add "Audit
+# every workspace package" and "Generate SBOM" to the required checks.
 on:
-  pull_request:
-  push:
-    branches: [main]
+  # pull_request:
+  # push:
+  #   branches: [main]
   schedule:
     # A clean dependency tree today is not clean next week — advisories are
     # published against versions already installed.
@@ -50,10 +54,15 @@ jobs:
       - name: Audit (high and critical fail)
         run: pnpm audit --audit-level high
 
+      # continue-on-error already keeps a non-zero audit from failing the job,
+      # so the trailing `|| true` this step also carried was a second belt on
+      # the same trousers - and the more dangerous of the two, because it hides
+      # the exit code from the step summary as well as from the job result. The
+      # gate is the high-and-critical step above; this one only reports.
       - name: Report moderate and low
         if: always()
         continue-on-error: true
-        run: pnpm audit --audit-level low || true
+        run: pnpm audit --audit-level low
 
   sbom:
     name: Generate SBOM

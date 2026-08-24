@@ -1,4 +1,5 @@
 import { verifyFirebasePhone } from "../stores/api-store";
+import { revokeRecentAuthProofsStatement } from "./auth-v2";
 import { playAccountHash, validE164 } from "./identity";
 import { authSeller, hashSecret, jsonResponse, methodNotAllowed, readCreds } from "../../platform/http/shared";
 
@@ -110,6 +111,11 @@ export async function handlePhoneChangeRoutes(request: Request, env: Env, url: U
 				"UPDATE sellers SET phone=?,firebase_uid=?,secret=?,updated_at=datetime('now') WHERE id=? AND phone=?",
 			).bind(challenge.new_phone_e164, newProof.uid, replacementHash, seller.id, challenge.current_phone_e164),
 			env.orderak_db.prepare("DELETE FROM seller_devices WHERE seller_id=?").bind(seller.id),
+			// Every device secret is revoked above, so any step-up proof issued
+			// against the old ones must go with them — otherwise a proof minted
+			// minutes before the change stays usable for the rest of its window
+			// against an account whose credentials have all been replaced.
+			revokeRecentAuthProofsStatement(env, String(seller.id)),
 		]);
 	} catch (error) {
 		const current = await env.orderak_db.prepare(

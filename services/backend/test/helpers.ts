@@ -9,6 +9,7 @@ interface TestMigrationEnv {
 	TEST_GEO_MIGRATIONS: D1Migration[];
 }
 import { invalidateDesignSystemCache } from "../src/domains/design/design-system";
+import { invalidateFeatureFlagCache } from "../src/platform/config/config";
 
 // Derived from ExportedHandler rather than hand-written: its `fetch` takes a
 // Request narrowed with IncomingRequestCfProperties, which a plain `Request`
@@ -131,6 +132,9 @@ let deleteOrder: string[] | null = null;
 
 export async function createSchema(): Promise<void> {
 	invalidateDesignSystemCache();
+	// Feature-flag definitions are cached per isolate for 30s; a suite that seeds
+	// different flags per test would otherwise read the previous test's rows.
+	invalidateFeatureFlagCache();
 	// The real migrations, not a copy of them. See vitest.config.mts.
 	await applyD1Migrations(env.orderak_db, (env as unknown as TestMigrationEnv).TEST_MIGRATIONS);
 	await applyD1Migrations(env.orderak_geo, (env as unknown as TestMigrationEnv).TEST_GEO_MIGRATIONS);

@@ -1,6 +1,9 @@
+// AGP 9 compiles Kotlin itself, so org.jetbrains.kotlin.android is no longer
+// applied here — AGP 9.0 rejects the build outright if it is. The Compose and
+// serialization compiler plugins are separate and still required.
+// https://kotl.in/gradle/agp-built-in-kotlin
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
@@ -15,7 +18,14 @@ plugins {
 android {
     experimentalProperties["android.experimental.enableScreenshotTest"] = true
     namespace = "app.orderak.seller"
-    compileSdk = 36
+    // 37 because Compose BOM 2026.08.00 requires it: material-ripple-android
+    // 1.12.0 refuses to link against anything older. AGP 8.13.2 capped at 36,
+    // which is why the plugin, Gradle, and this all move together.
+    //
+    // targetSdk deliberately stays at 35. compileSdk only widens the APIs the
+    // code may reference; targetSdk opts the app into new runtime behaviour and
+    // is a product decision with its own testing, not a toolchain bump.
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "app.orderak.seller"
@@ -28,9 +38,6 @@ android {
         // Crashlytics: enabled in production/staging release builds only.
         // Overridden to "false" in debug build type and mock flavor below.
         manifestPlaceholders["crashlyticsCollectionEnabled"] = "true"
-        // Keep the app's supported-language list intentional; do not expose
-        // translations contributed incidentally by dependencies.
-        resourceConfigurations += listOf("ar", "en", "fr")
     }
 
     flavorDimensions += "environment"
@@ -76,6 +83,16 @@ android {
     androidResources {
         // Generates LocaleConfig from the default locale and values-* folders.
         generateLocaleConfig = true
+
+        // Keep the app's supported-language list intentional; do not expose
+        // translations contributed incidentally by dependencies.
+        //
+        // Was defaultConfig.resourceConfigurations until 2026-08-22. That was the
+        // single deprecation standing between this build and Gradle 9 — AGP
+        // replaced it with androidResources.localeFilters, which also moves the
+        // setting out of defaultConfig to where the rest of the resource
+        // configuration already lived.
+        localeFilters += listOf("ar", "en", "fr")
     }
     bundle {
         language {
@@ -234,7 +251,7 @@ val verifyLocalizationContract by tasks.registering {
             "AGP-generated LocaleConfig must remain enabled."
         )
         requireContract(
-            "resourceConfigurations += listOf(\"ar\", \"en\", \"fr\")" in buildScript,
+            "localeFilters += listOf(\"ar\", \"en\", \"fr\")" in buildScript,
             "The supported Android locale set must remain ar/en/fr."
         )
         requireContract(

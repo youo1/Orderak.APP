@@ -63,6 +63,18 @@ jobs:
         working-directory: services/backend
         run: pnpm run test:types
 
+      # Added 2026-08-25. This check already existed, but only inside
+      # staging-deploy.yml and production-deploy.yml -- so a dependency bump
+      # that changes generated binding types passed every required pull-request
+      # check and then failed at deploy time instead. That is exactly what
+      # wrangler 4.119.0 -> 4.123.0 did: it moved workerd 1.20260801.1 ->
+      # 1.20260811.1, the runtime types changed, and the first Staging deploy
+      # after the merge failed on stale generated types with all 249 tests
+      # green. Running it here makes the pull request carry the failure.
+      - name: Generated Worker types are current
+        working-directory: services/backend
+        run: pnpm run cf-types:check
+
       - name: Audit dependencies (high+ critical)
         working-directory: services/backend
         run: pnpm audit --audit-level high

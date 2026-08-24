@@ -46,24 +46,6 @@ class BrandingRepository @Inject constructor(
     }
 
     @Serializable
-    data class RemoteTheme(
-        val primary: String? = null,
-        val primary_strong: String? = null,
-        val primary_soft: String? = null,
-        val primary_tint: String? = null,
-        val canvas: String? = null,
-        val surface: String? = null,
-        val ink: String? = null,
-        val muted: String? = null,
-        val line: String? = null,
-        val danger: String? = null,
-        val danger_soft: String? = null,
-        val warning: String? = null,
-        val warning_soft: String? = null,
-        val accent: String? = null,
-    )
-
-    @Serializable
     data class BrandingConfig(
         val schemaVersion: Int = 1,
         val version: String = "",
@@ -71,7 +53,6 @@ class BrandingRepository @Inject constructor(
         val generatorVersion: String = "",
         val source: DesignSystemSource? = null,
         val designSystem: DesignSystemSnapshot? = null,
-        val theme: RemoteTheme = RemoteTheme(),
         val assets: Map<String, String> = emptyMap(),
     )
 

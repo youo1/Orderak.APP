@@ -398,7 +398,7 @@ Legend:
   [PENDING] Employee Offboarding Checklist — not documented
   [PENDING] Google Play Console as organization account — status unknown
   [PENDING] Domain/DNS/email ownership — status unknown
-  [DONE]    Source-code repositories — GitHub (youo1/Orderak)
+  [DONE]    Source-code repositories — GitHub (youo1/Orderak.APP)
   [PENDING] CI/CD platform — not documented
   [PENDING] Individual company accounts vs shared credentials — status
             unknown

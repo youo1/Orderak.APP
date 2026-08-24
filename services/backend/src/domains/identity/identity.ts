@@ -13,10 +13,28 @@ export const STORE_PUBLIC_COLUMNS =
 	"id, store_code, country_code, store_name, slug, public_identifier, phone, " +
 	"whatsapp, instapay, vfcash, description, email, website, address, logo_url, cover_url";
 export const PUBLIC_SITE_URL = "https://orderak.app";
+/**
+ * Slugs a store may not claim, because the first path segment is also how the
+ * public Worker addresses its own pages.
+ *
+ * A store reached at `/{slug}` is only reachable there if no literal route
+ * matches first. public-router.ts registers `/terms`, `/privacy`,
+ * `/delete-account` and `/c/:identifier` ahead of `/:pid`, and the Worker
+ * handles `/verify-email` and `/.well-known/*` before routing reaches the
+ * router at all — so a store that claimed one of those names would pass slug
+ * validation, be told the name was available, and then be permanently
+ * unreachable at its own short URL with no error anywhere to explain why.
+ *
+ * The list guards the alias, not the store: `/{country}-{slug}-{code}` is the
+ * canonical public identifier and always resolves regardless.
+ */
 export const RESERVED_SLUGS = new Set([
 	"api", "admin", "adminx", "c", "p", "s", "health", "www", "app", "orderak",
 	"static", "assets", "favicon", "robots", "sitemap", "media", "offers", "branches",
 	"tables", "events", "coupons", "services",
+	// Literal routes the Worker answers itself. Absent until 2026-08-22, so all
+	// six were claimable and every one of them shadowed a real page.
+	"terms", "privacy", "delete-account", "verify-email", "well-known", "theme",
 ]);
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const ARABIC_MAP: Record<string, string> = {

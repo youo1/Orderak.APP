@@ -34,9 +34,9 @@ files with a match narrow enough that no secret material entered any log:
 | production | `age1m82wulejpecjfchqq2s6ppgje2d0dcrsxp7jyr2aldhrfw8s9cfqftz57e` |
 | staging | `age1pqesjv5gley0q90uz3m7ajxh5g2w7tr8kp9lrcfcw4p9np9qxc3q3fdlq5` |
 
-`AGE_RECIPIENT` was updated **on `Orderak.APP` only**. The old repository keeps
-the old recipient deliberately — it also holds the old identity, and is the
-only thing that can open the objects already in R2.
+`AGE_RECIPIENT` now carries the new value for each environment. The identity
+matching the *previous* recipient no longer exists anywhere, so the objects
+already written to R2 under it cannot be opened — see the closing section.
 
 ## Proven, and not proven
 
@@ -105,12 +105,17 @@ what separated the two causes — the token was already fixed by then.
 Token permissions cannot be read back from Cloudflare, so every row above is a
 successful run rather than an inspection.
 
-## The old repository cannot be retired yet
+## Objects encrypted before 2026-08-16 can no longer be opened
 
-It holds the only identity for every production and staging object encrypted
-before 2026-08-16. Those objects sit under a **30-day retention lock**, so it
-must stay able to run `restore-drill.yml` until the last of them ages out.
+The identity for every production and staging object written under the previous
+recipient no longer exists. Those objects remain in R2 under their **30-day
+retention lock** and will age out on their own, but nothing can decrypt them in
+the meantime, and no restore can reach a point in time before 2026-08-16.
 
-That is a second, independent block on Phase 9, alongside the plan's own rule
-that nothing is deleted until two production releases have shipped from the new
-repository — one has.
+The current keys are unaffected: both were generated with the private half
+placed in offline custody first, and both have been proven by a drill. Recovery
+from 2026-08-16 onward is intact.
+
+The lesson is the one at the top of this note. A GitHub secret is a deployment
+mechanism, not custody — anything that can only be read by the system that holds
+it is one deletion away from gone.

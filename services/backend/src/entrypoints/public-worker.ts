@@ -23,7 +23,7 @@ import { landingPageHtml } from "../landing";
 import { publicDesignSystemCss, publicDesignSystemResponse } from "../domains/admin/admin-theme";
 import { designSystemCss, designSystemFontPreload, loadActiveDesignSystem } from "../domains/design/design-system";
 import { PUBLIC_SITE_URL } from "../domains/identity/identity";
-import { authSeller, logError, jsonResponse, methodNotAllowed, corsHeaders, readCreds, checkRateLimit, recordDeviceMetadata, enforceRequestBodyLimit, type AuthenticatedSeller } from "../platform/http/shared";
+import { authSeller, logError, jsonResponse, methodNotAllowed, corsHeaders, allowedCorsOrigin, readCreds, checkRateLimit, recordDeviceMetadata, enforceRequestBodyLimit, type AuthenticatedSeller } from "../platform/http/shared";
 import { getPlanLimit } from "../domains/commerce/plan-limits";
 import { handleStoreRoutes } from "../domains/stores/api-store";
 import { serveMedia } from "../platform/storage/media";
@@ -44,6 +44,7 @@ import { handleBusinessTaxonomyRoutes } from "../domains/catalog/business-taxono
 import { pickLocale } from "../platform/localization/i18n";
 import { withSentry } from "@sentry/cloudflare";
 import { recordLatency, flushLatencySamples } from "../platform/observability/measurement";
+import { DEFAULT_CURRENCY } from "../platform/money/money";
 import { Hono } from "hono";
 
 // Durable Object classes must be exported from the Worker entrypoint so the
@@ -231,6 +232,38 @@ app.use("*", async (c, next) => {
 	// 204/304 and friends must stay bodyless; their body is already null, so
 	// passing it through is correct for every status.
 	c.res = new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+});
+
+// ---- CORS ------------------------------------------------------------------
+//
+// Access-Control-Allow-Origin is applied here rather than in jsonResponse(),
+// for the same reason X-Request-ID is: the header depends on the request, and
+// jsonResponse() does not have one. It called corsHeaders() with no argument,
+// so the origin header was omitted from every real response and present only on
+// the OPTIONS preflight — a browser saw the preflight pass and then had the
+// actual response blocked, and the allowlist in shared.ts governed nothing.
+//
+// Set after next() so the value is never baked into an edge-cached response:
+// caches.default stores whatever the loader returned, and freezing one caller's
+// Origin into it would hand that header to every subsequent caller. Vary:
+// Origin is set alongside for the same reason.
+//
+// Responses from caches.default have immutable headers, hence the rebuild.
+app.use("*", async (c, next) => {
+	await next();
+
+	const origin = allowedCorsOrigin(c.req.raw);
+	if (!origin) return;
+	// A handler that set its own policy keeps it — the same rule hardenPublic()
+	// follows. /api/v1/theme answers `*` on purpose: it serves public design
+	// tokens with no credentials to any client, and narrowing that to the
+	// allowlist would break every consumer outside it.
+	if (c.res.headers.has("access-control-allow-origin")) return;
+
+	const headers = new Headers(c.res.headers);
+	headers.set("access-control-allow-origin", origin);
+	headers.append("vary", "Origin");
+	c.res = new Response(c.res.body, { status: c.res.status, statusText: c.res.statusText, headers });
 });
 
 app.use("*", async (c, next) => {
@@ -448,7 +481,7 @@ export default withSentry<PublicWorkerEnv, QueuedEmailMessage>(
 	},
 
 	// ---- Inbound email (Cloudflare Email Routing → Worker) ----
-	async email(message, env, ctx): Promise<void> {
+	async email(message, env, _ctx): Promise<void> {
 		await handleInboundEmail(message, env);
 	},
 
@@ -626,7 +659,7 @@ async function handleApi(
 			// items inherit the order's currency rather than carrying their own, so a
 			// line and its order can never disagree.
 			for (const o of orders) {
-				const currency = String(o.currency ?? "EGP");
+				const currency = String(o.currency || DEFAULT_CURRENCY);
 				o.total = { amount_minor: Number(o.total_minor), currency };
 				delete o.total_minor;
 				delete o.currency;
@@ -641,6 +674,101 @@ async function handleApi(
 			// one extra join, one fewer round-trip + one fewer authSeller.
 			const config = await loadClientConfig(env, store as unknown as Record<string, unknown>, request);
 			return jsonResponse({ ok: true, orders, config, has_more: hasMore, next_since: nextSince });
+		}
+
+		// ---- Advance an order through its pipeline ----
+		//
+		// The transition table below is the server's copy of OrderStatus.kt. It is
+		// duplicated rather than shared because the client cannot be the authority
+		// on it: the app writes its own Room row first for responsiveness, and a
+		// client that skips PAID or resurrects a cancelled order must be refused
+		// here regardless of what its enum believes.
+		if (request.method === "PATCH" && url.pathname.startsWith("/api/v1/orders/") && url.pathname.endsWith("/status")) {
+			const { phone, secret } = readCreds(request, url);
+			const store = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret);
+			if (!store) return jsonResponse({ error: "auth" }, 401);
+
+			// Addressed by order_no, not by the UUID primary key. The Android app
+			// stores `remoteId = o.order_no` (SyncRepository) and never keeps the
+			// UUID, so a UUID route would be uncallable by the only client that
+			// needs it without a Room migration. order_no is unique per store
+			// (idx_orders_store_orderno, migration 015) and this route is already
+			// scoped to one store by authentication, so it identifies exactly one
+			// row here. It is also the number the seller reads aloud.
+			const orderNo = Number(decodeURIComponent(url.pathname.split("/")[4] ?? ""));
+			if (!Number.isInteger(orderNo) || orderNo <= 0) {
+				return jsonResponse({ error: "not_found" }, 404);
+			}
+			const body = await request.json().catch(() => null) as { status?: unknown } | null;
+			if (!body || typeof body.status !== "string") {
+				return jsonResponse({ error: "status_required" }, 400);
+			}
+			const target = body.status;
+
+			// Scoped by store_id in the same statement that reads the row: a seller
+			// must not be able to probe another store's orders by the difference
+			// between "not found" and "not yours".
+			const row = await env.orderak_db
+				.prepare("SELECT id, order_no, status FROM orders WHERE order_no = ? AND store_id = ?")
+				.bind(orderNo, store.id)
+				.first<{ id: string; order_no: number; status: string }>();
+			if (!row) return jsonResponse({ error: "not_found" }, 404);
+
+			const current = String(row.status);
+			// Already there. Returned as success rather than as a conflict so a
+			// client that retries a dropped response converges instead of showing
+			// the seller an error for work that landed.
+			if (current === target) {
+				return jsonResponse({ ok: true, id: row.id, order_no: Number(row.order_no), status: current, changed: false });
+			}
+
+			// Mirrors OrderStatus.kt, which has two forward paths out of NEW, not
+			// one: `next` walks the pipeline a step at a time, and `markPaid`
+			// additionally allows NEW -> PAID. That is not a shortcut — a buyer can
+			// pay through InstaPay or Vodafone Cash before the seller has confirmed
+			// anything, so OrderDetailsScreen renders the payment card on NEW as
+			// well as CONFIRMED and the OCR proof flow marks such an order paid
+			// directly.
+			//
+			// A single-valued forward table refused that with 409. Every Android
+			// caller discards the result, so the seller was shown "payment verified"
+			// and a recorded payment row on an order the server kept at NEW.
+			const ALLOWED: Record<string, readonly string[] | undefined> = {
+				NEW: ["CONFIRMED", "PAID"],
+				CONFIRMED: ["PAID"],
+				PAID: ["SHIPPED"],
+				SHIPPED: ["DONE"],
+			};
+			const CANCELLABLE = new Set(["NEW", "CONFIRMED"]);
+			const forward = ALLOWED[current] ?? [];
+			const allowed = target === "CANCELLED"
+				? CANCELLABLE.has(current)
+				: forward.includes(target);
+			if (!allowed) {
+				return jsonResponse({
+					error: "invalid_transition",
+					from: current,
+					to: target,
+					allowed: [...forward, ...(CANCELLABLE.has(current) ? ["CANCELLED"] : [])],
+				}, 409);
+			}
+
+			// Conditional on the status we read, so two devices racing the same
+			// order cannot both apply a transition. The loser sees 0 rows changed
+			// and re-reads rather than overwriting.
+			//
+			// Cancelling returns stock through trg_orders_release_stock_on_cancel
+			// (migration 046), which fires on this UPDATE. The handler deliberately
+			// does not touch products: the claim side is a trigger too, and the two
+			// must not drift apart.
+			const result = await env.orderak_db
+				.prepare("UPDATE orders SET status = ?, status_changed_at = datetime('now') WHERE id = ? AND store_id = ? AND status = ?")
+				.bind(target, row.id, store.id, current)
+				.run();
+			if (!result.meta.changes) {
+				return jsonResponse({ error: "conflict", from: current, to: target }, 409);
+			}
+			return jsonResponse({ ok: true, id: row.id, order_no: Number(row.order_no), status: target, changed: true });
 		}
 
 		return jsonResponse({ error: "not_found" }, 404);
