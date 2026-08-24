@@ -9,7 +9,7 @@ authoritative_for: [deployment-environments]
 # Deployment Environment Map
 
 **Status:** source-of-truth for repository deployment names
-**Source audit:** verified from repository configuration on 2026-08-01
+**Source audit:** verified from repository configuration on 2026-08-24
 **Live audit:** blocked until GitHub CLI and Wrangler are re-authenticated
 
 This map records names only. Secret values must never be copied into documentation,
@@ -130,6 +130,52 @@ Production release — is deliberately not accepted, since that would pass a
 promotion whose staging side had never deployed at all.
 
 Staging migrations, deployments, and smoke tests remain separate from Production.
+
+## Production freeze, 2026-08-24
+
+**Delivery is staging-only while the project is in testing.** Production
+remains deployed and serving — `api.orderak.app` and `admin.orderak.app` both
+answer 200 — but nothing new ships to it.
+
+| | |
+|---|---|
+| Mechanism | First step of `production-deploy.yml` requires repository variable `PRODUCTION_DEPLOYS_ENABLED` to equal `true` |
+| Default | **Frozen.** The variable is absent, so the expression is empty and the gate fails closed |
+| To lift | Set `PRODUCTION_DEPLOYS_ENABLED` to `true`; to re-freeze, unset it or set any other value |
+| Not affected | The running production Workers, the production D1/R2/Queues, the nightly production backup, and the daily production drift check |
+
+The freeze is a variable rather than a code edit so that lifting and re-applying
+it are both single auditable settings changes, and neither requires a commit.
+
+### The base Wrangler config is production
+
+`wrangler deploy` with **no** `--env` flag deploys **production** — the base of
+`services/backend/wrangler.jsonc`, `wrangler.admin.jsonc` and
+`apps/admin-web/wrangler.edge.jsonc` is the production configuration, and
+staging lives under `env.staging`. There is deliberately no `env.production`
+(see the note under End-to-end mapping above), so the safe-looking bare command
+is the dangerous one.
+
+Both files now carry a header banner saying so. The package scripts are the
+supported path and default to staging:
+
+| Command | Target |
+|---|---|
+| `pnpm run deploy` | staging |
+| `pnpm run deploy:staging` | staging |
+| `pnpm run deploy:production` | production — frozen in CI, but **not** frozen from a local shell holding production credentials |
+
+The freeze lives in the workflow, so it cannot stop a local `wrangler deploy`.
+Anyone with account-wide Cloudflare credentials on their machine can still reach
+production directly; that is a known limitation and the reason the banner exists.
+
+### Backups now cover staging on a schedule
+
+Until 2026-08-24 the nightly `d1-backup.yml` cron backed up **production only**
+— `backup-staging` was gated on `workflow_dispatch`. With development happening
+on staging, that left the active environment with no recent restore point for
+`restore-drill.yml` to exercise. The nightly run now covers both, and the
+dispatch default is `staging`.
 
 ## Cloudflare configuration to verify live
 

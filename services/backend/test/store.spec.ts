@@ -312,6 +312,55 @@ describe("POST /api/v1/account/deletion-request", () => {
 			email: null,
 		});
 	});
+
+	// retention-matrix.md §2 promises phone_e164 becomes deleted:<request-id> on
+	// every consent record for the subject. The update was scoped
+	// `WHERE seller_id = ?` and sat inside the `if (sellerUuid)` block, so an
+	// acceptance recorded before registration completed — which carries
+	// seller_id NULL until api-store.ts claims it — kept its phone number, and a
+	// deletion request for a phone with no seller row de-identified nothing at all.
+	it("de-identifies consent records for the phone, not only those linked to the seller", async () => {
+		const r = await registerStore();
+		const seller = await env.orderak_db.prepare("SELECT id FROM sellers WHERE phone=?").bind(r.phone).first<{ id: string }>();
+		await env.orderak_db.batch([
+			env.orderak_db.prepare(
+				`INSERT INTO legal_acceptances(id,seller_id,phone_e164,terms_version,privacy_version,locale,source)
+				 VALUES('linked',?,?,1,1,'ar','android_phone_auth')`,
+			).bind(seller!.id, r.phone),
+			// Same person, same phone, recorded before the account existed.
+			env.orderak_db.prepare(
+				`INSERT INTO legal_acceptances(id,seller_id,phone_e164,terms_version,privacy_version,locale,source)
+				 VALUES('unlinked',NULL,?,1,1,'ar','android_phone_auth')`,
+			).bind(r.phone),
+			// A different subject must be left completely alone.
+			env.orderak_db.prepare(
+				`INSERT INTO legal_acceptances(id,seller_id,phone_e164,terms_version,privacy_version,locale,source)
+				 VALUES('other',NULL,'+201999999999',1,1,'ar','android_phone_auth')`,
+			),
+		]);
+
+		await SELF.fetch(`${BASE}/api/v1/account/deletion-request`, { method: "POST", headers: authHeaders(r), body: "{}" });
+		const deletion = await env.orderak_db.prepare("SELECT id FROM deletion_requests WHERE phone_e164=?").bind(r.phone).first<{ id: string }>();
+		await env.orderak_db.prepare("UPDATE deletion_requests SET deadline_at=datetime('now','-1 minute') WHERE id=?").bind(deletion!.id).run();
+
+		vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+			const url = String(input);
+			if (url === "https://oauth2.googleapis.com/token") return Response.json({ access_token: "firebase-admin-test-token" });
+			if (url.endsWith("/accounts:lookup")) return Response.json({ users: [{ localId: "uid-consent-test" }] });
+			if (url.endsWith("/accounts:delete")) return Response.json({});
+			throw new Error(`Unexpected deletion fetch: ${url}`);
+		}));
+
+		expect(await processDeletionRequests(await deletionTestEnv())).toBe(1);
+
+		const rows = await env.orderak_db.prepare("SELECT id,seller_id,phone_e164 FROM legal_acceptances ORDER BY id")
+			.all<{ id: string; seller_id: string | null; phone_e164: string }>();
+		expect(rows.results).toEqual([
+			{ id: "linked", seller_id: null, phone_e164: `deleted:${deletion!.id}` },
+			{ id: "other", seller_id: null, phone_e164: "+201999999999" },
+			{ id: "unlinked", seller_id: null, phone_e164: `deleted:${deletion!.id}` },
+		]);
+	});
 });
 
 describe("multi-device plan enforcement", () => {
@@ -384,6 +433,121 @@ describe("POST /api/v1/products/sync", () => {
 			})
 		).json()) as { products: { product_code: string }[] };
 		expect(second.products[0].product_code).toBe(first.products[0].product_code);
+	});
+
+	// A mirror endpoint deletes whatever the request omits, so "the field was
+	// absent" and "the catalog is empty" must never resolve to the same value.
+	// They used to: the body was parsed with `.catch(() => ({}))` and `products`
+	// defaulted to `[]`, so a truncated upload returned 200 after wiping the store.
+	it("rejects a sync body that omits products instead of wiping the catalog", async () => {
+		const r = await registerStore();
+		await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({ products: [{ app_id: 1, name: "Cola", price: { amount_minor: 1500, currency: "EGP" }, stock: 10, available: true }] }),
+		});
+
+		const res = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r), body: JSON.stringify({ note: "no products key" }),
+		});
+		expect(res.status).toBe(400);
+		expect(await res.json()).toMatchObject({ code: "products_required" });
+
+		const after = (await (await SELF.fetch(`${BASE}/api/v1/products`, { headers: authHeaders(r) })).json()) as { products: unknown[] };
+		expect(after.products).toHaveLength(1);
+	});
+
+	it("rejects a malformed sync body instead of wiping the catalog", async () => {
+		const r = await registerStore();
+		await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({ products: [{ app_id: 1, name: "Cola", price: { amount_minor: 1500, currency: "EGP" }, stock: 10, available: true }] }),
+		});
+
+		const res = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r), body: "{\"products\": [",
+		});
+		expect(res.status).toBe(400);
+		expect(await res.json()).toMatchObject({ code: "invalid_json" });
+
+		const after = (await (await SELF.fetch(`${BASE}/api/v1/products`, { headers: authHeaders(r) })).json()) as { products: unknown[] };
+		expect(after.products).toHaveLength(1);
+	});
+
+	// The other half of the same contract: an explicitly empty array is a real
+	// state a seller can reach, so it must still clear the catalog — and leave a
+	// trace, because from here it is indistinguishable from client data loss.
+	it("honours an explicitly empty mirror and records that it emptied the catalog", async () => {
+		const r = await registerStore();
+		await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({ products: [{ app_id: 1, name: "Cola", price: { amount_minor: 1500, currency: "EGP" }, stock: 10, available: true }] }),
+		});
+
+		const res = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r), body: JSON.stringify({ products: [] }),
+		});
+		expect(res.status).toBe(200);
+
+		const after = (await (await SELF.fetch(`${BASE}/api/v1/products`, { headers: authHeaders(r) })).json()) as { products: unknown[] };
+		expect(after.products).toHaveLength(0);
+		const audit = await env.orderak_db
+			.prepare("SELECT action,details_json FROM admin_audit WHERE action='catalog.mirror_emptied'")
+			.first<{ action: string; details_json: string }>();
+		expect(audit).not.toBeNull();
+		expect(JSON.parse(audit!.details_json)).toMatchObject({ deleted_product_count: 1 });
+	});
+
+	// ADR-009: an amount and its currency travel together. Migration 044 added
+	// products.currency, the client has always sent one, and nothing read it —
+	// the sync dropped it on the way in and every SELECT feeding a response
+	// omitted the column on the way out, so a row stored as KWD came back as EGP.
+	it("round-trips the currency a product was stored with", async () => {
+		const r = await registerStore();
+		await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({ products: [{ app_id: 1, name: "Dates", price: { amount_minor: 15000, currency: "EGP" }, stock: 1, available: true }] }),
+		});
+		const seller = await env.orderak_db.prepare("SELECT id FROM sellers WHERE phone=?").bind(r.phone).first<{ id: string }>();
+		expect(await env.orderak_db.prepare("SELECT currency FROM products WHERE store_id=?").bind(seller!.id).first())
+			.toMatchObject({ currency: "EGP" });
+
+		// A currency the deployment does not accept is refused, not defaulted:
+		// silently rewriting KWD to EGP is how 15000 fils becomes 150.00 pounds.
+		const rejected = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({ products: [{ app_id: 2, name: "Saffron", price: { amount_minor: 15000, currency: "KWD" }, stock: 1, available: true }] }),
+		});
+		expect(rejected.status).toBe(400);
+		expect(await rejected.json()).toMatchObject({ code: "currency_not_enabled", currency: "KWD" });
+
+		// The stored row is what the read path reports, not a constant.
+		await env.orderak_db.prepare("UPDATE products SET currency='KWD' WHERE store_id=?").bind(seller!.id).run();
+		const listed = (await (await SELF.fetch(`${BASE}/api/v1/products`, { headers: authHeaders(r) })).json()) as {
+			products: { price: { amount_minor: number; currency: string } }[];
+		};
+		expect(listed.products[0].price).toEqual({ amount_minor: 15000, currency: "KWD" });
+	});
+
+	// The upsert binds 13 columns per row and D1 caps a statement at 100 bound
+	// parameters, so the chunk size and the column count are load-bearing
+	// together. A catalog larger than one chunk is the only thing that proves it.
+	it("syncs a catalog larger than one bound-parameter chunk", async () => {
+		const r = await registerStore();
+		const seller = await env.orderak_db.prepare("SELECT id FROM sellers WHERE phone=?").bind(r.phone).first<{ id: string }>();
+		// 30 products also crosses the threshold at which product codes stop being
+		// checked against the database one at a time, so both branches run.
+		await env.orderak_db.batch([
+			env.orderak_db.prepare("INSERT INTO plans(id,name,active,max_products) VALUES('scale','Scale',1,100)"),
+			env.orderak_db.prepare("INSERT INTO subscriptions(seller_id,plan_id,status) VALUES(?,'scale','active')").bind(seller!.id),
+		]);
+		const products = Array.from({ length: 30 }, (_, i) => ({
+			app_id: i + 1, name: `Product ${i}`, price: { amount_minor: 100 * (i + 1), currency: "EGP" }, stock: 2, available: true,
+		}));
+		const res = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r), body: JSON.stringify({ products }),
+		});
+		expect(res.status).toBe(200);
+		expect((await res.json() as { products: unknown[] }).products).toHaveLength(30);
 	});
 
 	it("uses stock revisions so stale mirrors cannot overwrite newer inventory", async () => {

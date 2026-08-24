@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { env } from "cloudflare:test";
-import { handleStoreRoutes, verifyFirebasePhone } from "../src/domains/stores/api-store";
+import { firebaseIdentityFromClaims, handleStoreRoutes, hasFreshFirebaseProof, verifyFirebasePhone } from "../src/domains/stores/api-store";
 import { authSeller, rateLimiterStub } from "../src/platform/http/shared";
 import { BASE, createSchema } from "./helpers";
 
@@ -44,7 +44,7 @@ async function restore(overrides: Record<string, unknown> = {}, ip = "203.0.113.
 		body: JSON.stringify({
 			id_token: freshFirebaseToken(),
 			phone: PHONE,
-			device_secret: "device-secret",
+			device_secret: "device-secret-0000-1111-2222",
 			terms_accepted: true,
 			marketing_consent: false,
 			app_version: "1.0.0",
@@ -63,7 +63,7 @@ async function register() {
 		body: JSON.stringify({
 			id_token: freshFirebaseToken(),
 			phone: PHONE,
-			secret: "device-secret",
+			secret: "device-secret-0000-1111-2222",
 			store_name: "Consent Test Store",
 		}),
 	});
@@ -91,6 +91,42 @@ beforeEach(async () => {
 afterEach(() => {
 	expect(lookupResponses).toHaveLength(0);
 	vi.unstubAllGlobals();
+});
+
+// The local JWKS path used to report `iat` as the authentication time. `iat`
+// is refreshed hourly from a refresh token with no user interaction, so the
+// five-minute "recently proved they hold this SIM" window that gates device
+// enrolment and phone changes was satisfied by any signed-in client, and by
+// anyone holding an exfiltrated refresh token.
+describe("firebaseIdentityFromClaims", () => {
+	const now = Math.floor(Date.now() / 1000);
+
+	it("reports auth_time, not the token's issue time", () => {
+		const identity = firebaseIdentityFromClaims(
+			// A token minted a moment ago from an authentication three days old:
+			// exactly what a long-lived signed-in device presents.
+			{ sub: "uid-1", phone_number: PHONE, auth_time: now - 3 * 86_400, iat: now },
+			PHONE,
+		);
+		expect(identity?.authTime).toBe(now - 3 * 86_400);
+		expect(hasFreshFirebaseProof(identity!)).toBe(false);
+	});
+
+	it("accepts an authentication that really did just happen", () => {
+		const identity = firebaseIdentityFromClaims({ sub: "uid-1", phone_number: PHONE, auth_time: now - 30 }, PHONE);
+		expect(hasFreshFirebaseProof(identity!)).toBe(true);
+	});
+
+	it("fails closed when the token carries no auth_time", () => {
+		const identity = firebaseIdentityFromClaims({ sub: "uid-1", phone_number: PHONE, iat: now }, PHONE);
+		expect(identity?.authTime).toBeUndefined();
+		expect(hasFreshFirebaseProof(identity!)).toBe(false);
+	});
+
+	it("rejects a token whose phone is not the one being claimed", () => {
+		expect(firebaseIdentityFromClaims({ sub: "uid-1", phone_number: "+201009998888", auth_time: now }, PHONE)).toBeNull();
+		expect(firebaseIdentityFromClaims({ phone_number: PHONE, auth_time: now }, PHONE)).toBeNull();
+	});
 });
 
 describe("verifyFirebasePhone", () => {
@@ -173,11 +209,11 @@ describe("POST /api/v1/auth/session", () => {
 		expect((await restore()).status).toBe(200);
 		expect((await register()).status).toBe(200);
 
-		const response = await restore({ device_secret: "replacement-device" });
+		const response = await restore({ device_secret: "replacement-device-0000-1111" });
 		expect(response.status).toBe(200);
 		expect(await response.json()).toMatchObject({ ok: true, exists: true });
-		expect(await authSeller(testEnv, PHONE, "replacement-device")).not.toBeNull();
-		expect(await authSeller(testEnv, PHONE, "device-secret")).toBeNull();
+		expect(await authSeller(testEnv, PHONE, "replacement-device-0000-1111")).not.toBeNull();
+		expect(await authSeller(testEnv, PHONE, "device-secret-0000-1111-2222")).toBeNull();
 		const devices = await env.orderak_db.prepare(
 			"SELECT COUNT(*) AS count FROM seller_devices WHERE seller_id=(SELECT id FROM sellers WHERE phone=?)",
 		).bind(PHONE).first<{ count: number }>();
@@ -192,10 +228,10 @@ describe("POST /api/v1/auth/session", () => {
 			"INSERT INTO plans(id,name,active,multi_device_enabled) VALUES('free','Free',1,1)",
 		).run();
 
-		const response = await restore({ device_secret: "second-device" });
+		const response = await restore({ device_secret: "second-device-0000-1111-2222" });
 		expect(response.status).toBe(200);
-		expect(await authSeller(testEnv, PHONE, "device-secret")).not.toBeNull();
-		expect(await authSeller(testEnv, PHONE, "second-device")).not.toBeNull();
+		expect(await authSeller(testEnv, PHONE, "device-secret-0000-1111-2222")).not.toBeNull();
+		expect(await authSeller(testEnv, PHONE, "second-device-0000-1111-2222")).not.toBeNull();
 	});
 });
 
@@ -222,5 +258,72 @@ describe("POST /api/v1/register", () => {
 		).bind(PHONE).first<Record<string, unknown>>();
 		expect(foundation).toMatchObject({ provider_subject: "firebase-uid", shard_key: "primary" });
 		expect(foundation?.play_account_hash).toBeTruthy();
+	});
+});
+
+// A device secret is a bearer credential — it and the phone are the whole of
+// authSeller — and it is stored as an unsalted SHA-256. completePhoneAuth
+// required 20 characters and this endpoint required only non-empty, so the same
+// account could be handed a one-character credential depending on which door
+// the client came through. The floor now lives in provisionDeviceSecret, which
+// both paths go through.
+describe("device secret strength", () => {
+	it("refuses a device secret below the shared minimum", async () => {
+		// Rate-limit counters live in Durable Objects, which createSchema() does
+		// not clear, and every test in this file shares these two buckets. Three
+		// more attempts would otherwise land on 429 rather than the check under test.
+		for (const bucket of [`session:phone:${PHONE}`, "session:ip:203.0.113.10"]) {
+			await (await rateLimiterStub(env, bucket))!.reset();
+		}
+		mockLookup({ users: [{ phoneNumber: PHONE }] }, 200, 3);
+		expect((await restore()).status).toBe(200);
+		expect((await register()).status).toBe(200);
+
+		const response = await restore({ device_secret: "short" });
+		expect(response.status).toBe(400);
+		expect(await response.json()).toMatchObject({ code: "weak_device_secret", min_length: 20 });
+		// The account keeps the credential it already had.
+		expect(await authSeller(testEnv, PHONE, "device-secret-0000-1111-2222")).not.toBeNull();
+	});
+});
+
+// The gate was `SELECT 1 FROM legal_acceptances WHERE phone_e164=?`, so any
+// acceptance of any version at any time let an account be created under the
+// terms published today — recording agreement to a version the person had never
+// been shown.
+describe("legal acceptance versions", () => {
+	it("refuses registration when the recorded acceptance predates the published terms", async () => {
+		mockLookup({ users: [{ phoneNumber: PHONE }] }, 200, 2);
+		expect((await restore()).status).toBe(200);
+
+		// A new terms version is published after this phone accepted.
+		// Both languages: currentLegalVersion() prefers the caller's locale, and
+		// /register carries no Accept-Language so it resolves to the default (ar)
+		// while /auth/session in these tests asks for en.
+		await env.orderak_db.batch([
+			env.orderak_db.prepare("INSERT INTO content_page_versions(slug,lang,version,status,title,body_html) VALUES('terms','en',2,'published','Terms v2','<p>v2</p>')"),
+			env.orderak_db.prepare("INSERT INTO content_page_versions(slug,lang,version,status,title,body_html) VALUES('terms','ar',2,'published','الشروط v2','<p>v2</p>')"),
+		]);
+
+		const blocked = await register();
+		expect(blocked.status).toBe(400);
+		expect(await blocked.json()).toMatchObject({ code: "legal_acceptance_required", terms_version: 2 });
+	});
+
+	it("allows registration once the current versions are accepted", async () => {
+		mockLookup({ users: [{ phoneNumber: PHONE }] }, 200, 4);
+		expect((await restore()).status).toBe(200);
+		// Both languages: currentLegalVersion() prefers the caller's locale, and
+		// /register carries no Accept-Language so it resolves to the default (ar)
+		// while /auth/session in these tests asks for en.
+		await env.orderak_db.batch([
+			env.orderak_db.prepare("INSERT INTO content_page_versions(slug,lang,version,status,title,body_html) VALUES('terms','en',2,'published','Terms v2','<p>v2</p>')"),
+			env.orderak_db.prepare("INSERT INTO content_page_versions(slug,lang,version,status,title,body_html) VALUES('terms','ar',2,'published','الشروط v2','<p>v2</p>')"),
+		]);
+		expect((await register()).status).toBe(400);
+
+		// Accepting again records the version now in force.
+		expect((await restore()).status).toBe(200);
+		expect((await register()).status).toBe(200);
 	});
 });

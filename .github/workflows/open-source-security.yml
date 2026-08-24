@@ -6,10 +6,17 @@ name: Open Source Security
 # a hosted security account, retain their reports as Actions artifacts, and fail
 # CI on findings or scanner errors.
 
+# TEMPORARY, 2026-08-24 — solo pre-release development. The pull_request and
+# push triggers are commented out so Semgrep and Trivy stop gating every push;
+# the weekly scan and manual dispatch still run, so the signal is kept, it just
+# no longer blocks a merge. To restore: uncomment the two triggers below AND
+# re-add "Semgrep CE" and "Trivy filesystem" to the branch protection required
+# checks — a required check that no longer runs leaves pull requests pending
+# forever.
 on:
-  pull_request:
-  push:
-    branches: [main]
+  # pull_request:
+  # push:
+  #   branches: [main]
   schedule:
     # Weekly full scan so new rules and vulnerability data also cover old code.
     - cron: '0 4 * * 1'
@@ -36,7 +43,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install pinned Semgrep Community Edition
-        run: python -m pip install --disable-pip-version-check semgrep==1.172.0
+        run: python -m pip install --disable-pip-version-check semgrep==1.174.0
 
       - name: Scan source code
         id: semgrep

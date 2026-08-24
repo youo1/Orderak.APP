@@ -13,7 +13,7 @@ import {
 	parsePhoneNumberFromString,
 	type CountryCode,
 } from "libphonenumber-js";
-import { b64urlEncode, randomToken, sha256Hex } from "./auth";
+import { randomToken, sha256Hex } from "./auth";
 import { fullStore, verifyFirebasePhone } from "../stores/api-store";
 import { getEmailService } from "../../integrations/email/emailService";
 import {
@@ -975,6 +975,14 @@ async function requireRecentAuth(
 	env: PublicWorkerEnv,
 	sellerId: string,
 ): Promise<{ method: string } | Response> {
+	// A proof is valid for its whole window, not for a single call, and that is
+	// deliberate: registering a passkey is a two-request ceremony (options, then
+	// complete) and both requests are gated by this function, so a proof burned
+	// on first use would make passkey registration impossible.
+	//
+	// `consumed_at` is therefore a revocation marker rather than a use counter —
+	// see revokeRecentAuthProofs(), which stamps it when the account's
+	// authentication state changes underneath an outstanding proof.
 	const token = request.headers.get("x-orderak-recent-auth")?.trim() ?? "";
 	if (!token) return jsonResponse({ error: "recent_auth_required" }, 401);
 	const row = await env.orderak_db.prepare(
@@ -982,6 +990,28 @@ async function requireRecentAuth(
 		 WHERE token_hash=? AND seller_id=? AND consumed_at IS NULL AND expires_at>datetime('now')`,
 	).bind(await sha256Hex(token), sellerId).first<{ method: string }>();
 	return row ?? jsonResponse({ error: "recent_auth_required" }, 401);
+}
+
+/**
+ * Invalidate every outstanding step-up proof for a seller.
+ *
+ * A proof says "this person completed an SMS or passkey challenge in the last
+ * ten minutes", and it is handed out once and reused for that window. Nothing
+ * ever wrote `consumed_at`, so the column and the `consumed_at IS NULL`
+ * predicate guarding every protected operation had no effect at all: a proof
+ * outlived the credentials that produced it. Changing the phone number on an
+ * account deletes every device secret, and an attacker mid-window kept a valid
+ * proof for operations like registering a passkey.
+ *
+ * Called wherever the authentication state a proof was issued against stops
+ * being true. Returns a statement so callers can include it in the same D1
+ * batch as the change itself — the revocation must not be able to succeed while
+ * the change rolls back, or the reverse.
+ */
+export function revokeRecentAuthProofsStatement(env: Env, sellerId: string): D1PreparedStatement {
+	return env.orderak_db.prepare(
+		"UPDATE recent_auth_proofs SET consumed_at=datetime('now') WHERE seller_id=? AND consumed_at IS NULL",
+	).bind(sellerId);
 }
 
 async function issueRecentAuth(

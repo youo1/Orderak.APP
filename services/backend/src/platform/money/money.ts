@@ -40,6 +40,22 @@ import { z } from "@hono/zod-openapi";
 export const SUPPORTED_CURRENCIES = ["EGP", "SAR", "AED", "QAR", "KWD", "BHD", "OMR"] as const;
 export const ENABLED_CURRENCIES = ["EGP"] as const;
 
+/**
+ * The currency assumed when a stored row or an inbound payload does not carry
+ * one.
+ *
+ * Declared here so the assumption has exactly one home. It used to be a bare
+ * `?? "EGP"` repeated across api-store.ts, catalog.ts and public-router.ts —
+ * and in all three the SELECT feeding it never read the currency column at all,
+ * so the fallback was not a fallback, it was the only value any of them ever
+ * produced. A row stored as KWD came back out of the API as EGP.
+ *
+ * Opening a second market means changing the enabled list above, at which point
+ * every remaining use of this constant is a place that has to be revisited
+ * deliberately rather than one that quietly keeps answering "EGP".
+ */
+export const DEFAULT_CURRENCY: (typeof ENABLED_CURRENCIES)[number] = ENABLED_CURRENCIES[0];
+
 export type Currency = (typeof SUPPORTED_CURRENCIES)[number];
 
 export const CurrencySchema = z.enum(SUPPORTED_CURRENCIES);

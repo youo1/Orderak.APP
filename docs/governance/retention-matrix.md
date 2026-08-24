@@ -56,8 +56,10 @@ applies_to: [internal]
 
 | Data | Retention Period | Trigger | Authority | Disposal Method | Exceptions |
 |---|---|---|---|---|---|
-| `legal_acceptances.*` (including phone_e164) | Account lifetime + 5 years | Sign-up OTP verification | Legal obligation (PDPL consent evidence) | De-identified: `phone_e164` and `ip_address` replaced with `deleted:<request-id>`; all other non‑essential metadata retained; `seller_id` set to NULL | Required as evidence of consent; never fully deleted |
-| `deletion_requests.*` | Permanent | Deletion request submitted | Legal obligation (compliance evidence) | `phone_e164` and `email` de-identified after completion; record retained indefinitely | Proof of compliance with deletion obligation |
+| `legal_acceptances.*` (including phone_e164), linked to an account | Account lifetime + 5 years | Sign-up OTP verification | Legal obligation (PDPL consent evidence) | De-identified: `phone_e164` replaced with `deleted:<request-id>`; all other non‑essential metadata retained; `seller_id` set to NULL. Matched on the phone, so acceptances recorded before registration completed are covered too | Required as evidence of consent; never fully deleted |
+| `legal_acceptances.*` with no account (signup abandoned) | 90 days | Terms accepted without registration completing | Legitimate interest (no account exists to hold evidence for) | De-identified daily: `phone_e164` replaced with `expired:<id>` | A returning user is asked to accept the current terms again |
+| `deletion_requests.*` (verified or completed) | Permanent | Deletion request submitted | Legal obligation (compliance evidence) | `phone_e164` and `email` de-identified after completion; record retained indefinitely | Proof of compliance with deletion obligation |
+| `deletion_requests.*` still `pending` after 180 days | 180 days | Public web form submitted, ownership never verified | Legitimate interest (an unverified request evidences nothing) | De-identified daily: `phone_e164` becomes `expired:<id>`, `email` nulled, `status` set to `rejected` | Twice the 90-day fulfillment deadline, so nothing actionable is reached |
 
 ### 1.3 Product Catalog
 
@@ -144,7 +146,7 @@ applies_to: [internal]
 | **Subscription cancellation** | `subscriptions`, `payment_events` | 5-year clock starts on cancellation |
 | **Ticket closure** | `support_tickets`, `support_messages` | 2-year clock starts on closure |
 | **Ad deactivation** | `ads` | 1-year clock starts on deactivation |
-| **Daily cron** | `error_logs` (30d), `admin_audit.ip` (30d), `admin_sessions` (30d), `rate_limits` (30d), `email_events` (90d), `webhook_events` (90d) | Rolling window from `created_at` |
+| **Daily cron** | `error_logs` (30d), `admin_audit.ip` (30d), `email_template_history.changed_ip` (30d), `admin_sessions` (30d), `rate_limits` (30d), `onboarding_sessions` (30d past expiry), `webauthn_challenges` / `recent_auth_proofs` / `admin_auth_challenges` (1d past expiry), `email_verification_tokens` (30d past expiry), `legal_acceptances` with no account (90d), `deletion_requests` still pending (180d), `webhook_events` / `email_events` / `outbound_email_jobs` / `ad_impressions` (90d), `announcements` (90d past expiry), `inbound_emails` (2y), `admin_audit` (2y) | Rolling window from the row timestamp. The authoritative list is `CLEANUP_RULES` in `services/backend/src/domains/identity/retention.ts` |
 | **Product edit** | Stale `product_translations` rows | Immediate (replaced on next translation generation) |
 
 ---
@@ -276,7 +278,7 @@ The following checklist ensures that the account deletion procedure in Section 3
 |---|---|---|---|
 | 1 | Delete `sellers` row (all fields including `sellers.id`) | g | All seller identity fields removed |
 | 2 | Delete `seller_devices` rows (including `fcm_token`) | e | Device records fully removed |
-| 3 | De-identify `legal_acceptances` (phone_e164 + ip_address → `deleted:<request-id>`) | f | Consent evidence preserved without PII |
+| 3 | De-identify `legal_acceptances` (phone_e164 → `deleted:<request-id>`, matched on the phone so pre-registration rows are covered) | f | Consent evidence preserved without PII. There is no `ip_address` column on this table and none has ever been created |
 | 4 | Delete `products`, `categories`, `product_variants`, `product_media` | e | Full product catalog removed |
 | 5 | Delete R2 product images, logos, covers, and digital product files | d | All R2 objects under `stores/{uuid}/` removed |
 | 6 | Delete `orders`, `order_items` (including `buyer_phone`, `buyer_name`, `buyer_address`, `buyer_email`) | e | Order history removed |

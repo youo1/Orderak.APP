@@ -24,6 +24,20 @@ contract. Inspect relevant code, tests, and documentation before editing.
 Load the relevant Orderak skill automatically when a task concerns Android,
 the admin frontend, services/backend/API work, or verification.
 
+## Capability model
+
+- MCP tool access is least-privilege. Every server in `.github/mcp.json` is
+  allowlisted to an explicit, read-only default set; mutation/build tools are
+  granted only where a documented task requires them and are scoped to the
+  smallest server/agent combination.
+- Read-only personas (Planner, Docs, Security Reviewer, and any architecture
+  review) receive only read-oriented tools. They never hold `execute`, `edit`,
+  or remote/destructive capabilities, and they name verification commands for
+  others to run rather than running them.
+- Do not add server wildcards (`"tools": ["*"]` or `server/*`) to an agent's
+  tool list. Grant named tools only, and default a new server to read-only
+  until a concrete task is shown to need mutation.
+
 ## Agents and skills
 
 - A custom agent defines a selectable persona, scope, behavior, and tool

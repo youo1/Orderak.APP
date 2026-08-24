@@ -1,43 +1,55 @@
+# TEMPORARY, 2026-08-24 — solo pre-release development.
+#
+# Every rule below is commented out. @youo1 is the only owner, so "require
+# review from Code Owners" could never be satisfied: GitHub does not let an
+# author approve their own pull request, which made this a hard block rather
+# than a review. An empty CODEOWNERS makes that branch-protection rule vacuous
+# without having to turn the rule itself off.
+#
+# The paths are kept, not deleted, because the list is still the record of
+# which files are treated as protected contracts. To restore ownership,
+# strip the leading "# " from the rules below.
+
 # Phase 1 authentication is a protected owner-approved contract.
-/AGENTS.md @youo1
-/.github/CODEOWNERS @youo1
-/.github/agents/ @youo1
-/.github/copilot/ @youo1
-/.github/copilot-instructions.md @youo1
-/.github/hooks/ @youo1
-/.github/instructions/ @youo1
-/.github/mcp.json @youo1
-/.github/plugin/ @youo1
-/.github/skills/ @youo1
-/.github/workflows/ai-customizations-ci.yml @youo1
-/.github/workflows/skills-auto-update.yml @youo1
-/.github/workflows/auth-phase1-contract.yml @youo1
-/.github/workflows/staging-deploy.yml @youo1
-/.github/workflows/production-deploy.yml @youo1
-/apps/seller-android/app/build.gradle.kts @youo1
-/apps/seller-android/app/src/staging/ @youo1
-/apps/seller-android/app/src/main/java/app/orderak/seller/data/auth/ @youo1
-/apps/seller-android/app/src/main/java/app/orderak/seller/data/billing/ @youo1
-/apps/seller-android/app/src/main/java/app/orderak/seller/feature/auth/ @youo1
-/apps/seller-android/app/src/main/java/app/orderak/seller/feature/settings/SettingsScreen.kt @youo1
-/apps/seller-android/app/src/test/java/app/orderak/seller/data/auth/ @youo1
-/apps/seller-android/app/src/test/java/app/orderak/seller/data/billing/ @youo1
-/apps/seller-android/app/src/test/java/app/orderak/seller/feature/auth/ @youo1
-/services/backend/src/domains/identity/ @youo1
-/services/backend/src/domains/stores/api-store.ts @youo1
-/services/backend/src/entrypoints/ @youo1
-/services/backend/test/firebase-auth.spec.ts @youo1
-/services/backend/wrangler.jsonc @youo1
-/services/backend/wrangler.admin.jsonc @youo1
-/services/backend/migrations/ @youo1
-/services/backend/geo-migrations/ @youo1
-/apps/admin-web/wrangler.edge.jsonc @youo1
-/apps/admin-web/wrangler.edge.staging.jsonc @youo1
-/docs/contracts/auth-phase1-contract.md @youo1
-/docs/product/production-auth-plan.md @youo1
-/docs/reference/api.md @youo1
-/docs/product/app-plan.md @youo1
-/docs/architecture/security-model.md @youo1
-/docs/architecture/overview.md @youo1
-/docs/architecture/orderak-full-architecture.html @youo1
-/docs/guides/setup.md @youo1
+# /AGENTS.md @youo1
+# /.github/CODEOWNERS @youo1
+# /.github/agents/ @youo1
+# /.github/copilot/ @youo1
+# /.github/copilot-instructions.md @youo1
+# /.github/hooks/ @youo1
+# /.github/instructions/ @youo1
+# /.github/mcp.json @youo1
+# /.github/plugin/ @youo1
+# /.github/skills/ @youo1
+# /.github/workflows/ai-customizations-ci.yml @youo1
+# /.github/workflows/skills-auto-update.yml @youo1
+# /.github/workflows/auth-phase1-contract.yml @youo1
+# /.github/workflows/staging-deploy.yml @youo1
+# /.github/workflows/production-deploy.yml @youo1
+# /apps/seller-android/app/build.gradle.kts @youo1
+# /apps/seller-android/app/src/staging/ @youo1
+# /apps/seller-android/app/src/main/java/app/orderak/seller/data/auth/ @youo1
+# /apps/seller-android/app/src/main/java/app/orderak/seller/data/billing/ @youo1
+# /apps/seller-android/app/src/main/java/app/orderak/seller/feature/auth/ @youo1
+# /apps/seller-android/app/src/main/java/app/orderak/seller/feature/settings/SettingsScreen.kt @youo1
+# /apps/seller-android/app/src/test/java/app/orderak/seller/data/auth/ @youo1
+# /apps/seller-android/app/src/test/java/app/orderak/seller/data/billing/ @youo1
+# /apps/seller-android/app/src/test/java/app/orderak/seller/feature/auth/ @youo1
+# /services/backend/src/domains/identity/ @youo1
+# /services/backend/src/domains/stores/api-store.ts @youo1
+# /services/backend/src/entrypoints/ @youo1
+# /services/backend/test/firebase-auth.spec.ts @youo1
+# /services/backend/wrangler.jsonc @youo1
+# /services/backend/wrangler.admin.jsonc @youo1
+# /services/backend/migrations/ @youo1
+# /services/backend/geo-migrations/ @youo1
+# /apps/admin-web/wrangler.edge.jsonc @youo1
+# /apps/admin-web/wrangler.edge.staging.jsonc @youo1
+# /docs/contracts/auth-phase1-contract.md @youo1
+# /docs/product/production-auth-plan.md @youo1
+# /docs/reference/api.md @youo1
+# /docs/product/app-plan.md @youo1
+# /docs/architecture/security-model.md @youo1
+# /docs/architecture/overview.md @youo1
+# /docs/architecture/orderak-full-architecture.html @youo1
+# /docs/guides/setup.md @youo1

@@ -166,46 +166,6 @@ private fun hex(v: String?): Color? {
     return Color(0xFF000000 or v.substring(1).toLong(16))
 }
 
-private fun contrast(a: Color, b: Color): Double {
-    val la = a.luminance() + 0.05
-    val lb = b.luminance() + 0.05
-    return if (la > lb) la / lb else lb / la
-}
-
-private fun Color?.ifReadableUnder(on: Color): Color? =
-    this?.takeIf { contrast(it, on) >= 4.5 }
-
-private fun ColorScheme.withRemote(
-    t: BrandingRepository.RemoteTheme?,
-    darkTheme: Boolean,
-): ColorScheme {
-    if (t == null) return this
-    return if (darkTheme) copy(
-        primary = hex(t.primary).ifReadableUnder(onPrimary) ?: primary,
-        error = hex(t.danger).ifReadableUnder(onError) ?: error,
-    ) else {
-        val remoteInk = hex(t.ink)
-        val remoteCanvas = hex(t.canvas)
-        val remoteSurface = hex(t.surface)
-        val inkOk = remoteInk != null &&
-            contrast(remoteInk, remoteCanvas ?: background) >= 4.5 &&
-            contrast(remoteInk, remoteSurface ?: surface) >= 4.5
-        val safeInk = remoteInk?.takeIf { inkOk }
-        copy(
-            primary = hex(t.primary).ifReadableUnder(onPrimary) ?: primary,
-            primaryContainer = hex(t.primary_soft) ?: primaryContainer,
-            onPrimaryContainer = safeInk ?: onPrimaryContainer,
-            background = remoteCanvas ?: background,
-            onBackground = safeInk ?: onBackground,
-            surface = remoteSurface ?: surface,
-            onSurface = safeInk ?: onSurface,
-            onSurfaceVariant = hex(t.muted) ?: onSurfaceVariant,
-            outline = hex(t.line) ?: outline,
-            error = hex(t.danger).ifReadableUnder(onError) ?: error,
-        )
-    }
-}
-
 private fun Map<String, String>.color(role: String, fallback: Color): Color =
     hex(this[role]) ?: fallback
 
@@ -322,11 +282,17 @@ fun OrderakTheme(
     val mode = if (darkTheme) "dark" else "light"
     val roles = snapshot?.schemes?.get(safeContrast)?.get(mode)
     val semantics = snapshot?.semantic?.get(safeContrast)?.get(mode)
-    val fallback = if (darkTheme) {
-        OrderakDarkColorScheme.withRemote(remoteConfig?.theme, darkTheme = true)
-    } else {
-        OrderakLightColorScheme.withRemote(remoteConfig?.theme, darkTheme = false)
-    }
+    // Compiled defaults only. The legacy RemoteTheme layer that used to sit here
+    // applied ten roles and was then overwritten wholesale by withSnapshot, which
+    // sets all thirty-six — so whenever the server sent a v2 snapshot its work was
+    // discarded. It survived for clients below versionCode 2, and the app is at 2
+    // with no Play release, so that install base is internal testers on an older
+    // build who can update.
+    //
+    // It also carried the only client-side contrast guard. That is not lost: the
+    // Worker refuses to store a revision whose contrast fails, returning 422 from
+    // admin-theme.ts, so no failing scheme can reach a device to be guarded from.
+    val fallback = if (darkTheme) OrderakDarkColorScheme else OrderakLightColorScheme
     val colorScheme = fallback.withSnapshot(roles)
     val extended = remoteExtended(semantics, roles)
     val spacing = remoteSpacing(snapshot)

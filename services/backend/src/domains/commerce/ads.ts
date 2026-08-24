@@ -5,7 +5,7 @@
 // Impression/click tracking is optional (POST /api/v1/ads/track).
 // ============================================================
 
-import { jsonResponse, readCreds, authSeller, type AuthenticatedSeller } from "../../platform/http/shared";
+import { jsonResponse, readCreds, authSeller, checkRateLimit, type AuthenticatedSeller } from "../../platform/http/shared";
 import { pickI18n, pickLocale } from "../../platform/localization/i18n";
 
 export async function handleAdsRoutes(
@@ -127,6 +127,23 @@ async function trackAd(request: Request, env: Env, authenticatedSeller?: Authent
 		 AND (ends_at IS NULL OR ends_at>=datetime('now'))`,
 	).bind(adId, planId).first();
 	if (!eligible) return jsonResponse({ error: "ad_not_found" }, 404);
+
+	// Two bounds, because the row this writes is a billing-relevant metric and
+	// the caller controls how many of them appear.
+	//
+	// `event_key` is the deduplication key, and it was optional: SQLite treats
+	// NULLs as distinct in a unique index, so INSERT OR IGNORE inserted a fresh
+	// row on every call that omitted it. A seller could inflate impressions and
+	// clicks without limit, and ad_impressions grew without limit alongside.
+	if (!eventKey) return jsonResponse({ error: "event_key_required" }, 400);
+	// And a rate limit, because a unique key the caller chooses is not a bound —
+	// it only stops the same event being counted twice, not a client generating
+	// a million distinct ones. 120/hour is far above what a session that renders
+	// ads at the configured frequency can legitimately produce.
+	if (!(await checkRateLimit(env, `ads:track:${sellerId}`, 120, 3600))) {
+		return jsonResponse({ error: "rate_limited" }, 429);
+	}
+
 	await env.orderak_db.prepare(
 		"INSERT OR IGNORE INTO ad_impressions (ad_id,seller_id,kind,event_key) VALUES(?,?,?,?)",
 	).bind(adId, sellerId, kind, eventKey).run();

@@ -77,7 +77,7 @@ const assertSuffix = (label, names, suffix) => {
 
 for (const directory of [
   "apps/seller-android", "apps/admin-web", "services/backend", "contracts/openapi",
-  "contracts/typescript", "packages/ai-prompts", "quality/performance", "tooling/repository"
+  "contracts/typescript", "quality/performance", "tooling/repository"
 ]) requireFile(directory);
 for (const legacy of ["android-app", "admin-frontend", "backend", "openapi", "shared-types", "ai-prompts", "performance", "outputs", "path", "pmcp"]) requireAbsent(legacy);
 
@@ -110,6 +110,56 @@ assertSuffix("Staging admin", [adminStaging?.name, ...values(adminStaging?.d1_da
 if (adminConfig.d1_databases?.[0]?.database_id !== publicConfig.d1_databases?.[0]?.database_id) fail("Production public/admin Workers must share the mapped production D1.");
 if (adminStaging?.d1_databases?.[0]?.database_id !== publicStaging?.d1_databases?.[0]?.database_id) fail("Staging public/admin Workers must share the mapped staging D1.");
 if (adminStaging?.send_email?.[0]?.name !== "EMAIL") fail("Staging Admin Worker must declare the non-inherited EMAIL binding.");
+
+// ---------------------------------------------------------------------------
+// Key-version selectors must name a key the environment is guaranteed to have.
+//
+// admin-auth.ts resolves ADMIN_TOTP_KEY_CURRENT through keyForVersion(), and
+// admin-control-plane.ts resolves ADMIN_AUDIT_KEY_CURRENT through
+// keyForAuditVersion(). Both return undefined for a version whose secret is
+// unset, and both callers then fail closed at runtime: beginEnrollment() answers
+// 500 so no administrator can enrol MFA or finish a recovery, and
+// archiveAuditBatch() throws every fifteen minutes so the audit trail stops
+// being archived at all.
+//
+// Production declared version 2 for both while requiring only the version-1
+// secrets, so nothing at deploy time established that the keys it had switched
+// to actually existed — the two controls would simply have stopped working, on
+// a schedule, with no failing deploy to say so. Staging required them and
+// production did not, which is the wrong way round.
+//
+// Version 1 stays required alongside the current version because existing
+// material records the version it was written under: the enrolled TOTP
+// ciphertext is version 1, and migration 043 backfilled signing_key_version 1
+// onto every archive written before versioning existed. Dropping V1 would leave
+// that history undecryptable and unverifiable.
+const TOTP_KEY_BY_VERSION = { 1: "ADMIN_TOTP_KEY_V1", 2: "ADMIN_TOTP_KEY_V2" };
+const AUDIT_KEY_BY_VERSION = { 1: "ADMIN_AUDIT_SIGNING_KEY", 2: "ADMIN_AUDIT_KEY_V2" };
+
+function checkKeyVersion(label, environment, selectorName, keysByVersion) {
+  const required = new Set(environment?.secrets?.required ?? []);
+  const raw = environment?.vars?.[selectorName] ?? "1";
+  const version = Number(raw);
+  if (!Number.isInteger(version) || version < 1) {
+    fail(`${label} ${selectorName} is "${raw}", which is not a key version.`);
+    return;
+  }
+  const current = keysByVersion[version];
+  if (!current) {
+    fail(`${label} ${selectorName} selects version ${version}, which no key resolves to. Add it to keyForVersion()/keyForAuditVersion() first.`);
+    return;
+  }
+  for (const name of new Set([keysByVersion[1], current])) {
+    if (!required.has(name)) {
+      fail(`${label} selects ${selectorName}=${version} but does not require ${name}. A key version that is not guaranteed present fails closed at runtime instead of at deploy time.`);
+    }
+  }
+}
+
+for (const [label, environment] of [["Production admin", adminConfig], ["Staging admin", adminStaging]]) {
+  checkKeyVersion(label, environment, "ADMIN_TOTP_KEY_CURRENT", TOTP_KEY_BY_VERSION);
+  checkKeyVersion(label, environment, "ADMIN_AUDIT_KEY_CURRENT", AUDIT_KEY_BY_VERSION);
+}
 
 const edgeProd = loadJsonc("apps/admin-web/wrangler.edge.jsonc");
 const edgeStaging = loadJsonc("apps/admin-web/wrangler.edge.staging.jsonc");
@@ -149,7 +199,13 @@ for (const [relative, expectedServers] of Object.entries(serverExpectations)) {
 // existed; nothing called them, so on a live system verified_at was never written.
 // Phase 7b needed it to prove that archives signed under audit key version 1 still
 // verify after staging moved to version 2.
-if (operationCount !== 246) fail(`OpenAPI operation inventory changed: expected 246, found ${operationCount}.`);
+// Raised to 247 on 2026-08-22 for PATCH /api/v1/orders/{id}/status. Order status
+// had no server route at all: OrderStatus.kt described a pipeline and the app
+// wrote transitions to its own Room database, so the server held every order at
+// NEW and a reinstall replayed work the seller had already done. Cancelling was
+// worse — placing an order takes stock through a trigger, and the Room-only
+// restore meant every cancellation leaked it.
+if (operationCount !== 247) fail(`OpenAPI operation inventory changed: expected 247, found ${operationCount}.`);
 const seller = JSON.parse(read("contracts/openapi/src/seller-v1.json"));
 for (const [route, pathItem] of Object.entries(seller.paths)) {
   for (const method of ["get", "post", "put", "patch", "delete"]) {

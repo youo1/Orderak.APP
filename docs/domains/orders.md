@@ -2,7 +2,7 @@
 status: current
 generated: false
 owner: backend
-last_verified: 2026-08-21
+last_verified: 2026-08-22
 applies_to: [production, staging]
 authoritative_for: [orders-domain]
 ---
@@ -41,10 +41,47 @@ rewrite history.
 `NEW → CONFIRMED → PAID → SHIPPED → DONE`, with `CANCELLED` reachable only
 from `NEW` or `CONFIRMED`. `DONE` and `CANCELLED` are terminal.
 
-The machine is defined in
+The machine is defined twice, deliberately. The client copy is
 `apps/seller-android/app/src/main/java/app/orderak/seller/domain/OrderStatus.kt`
-as an explicit `next` transition plus a `canCancel` predicate. Every order is
-created as `NEW`.
+as an explicit `next` transition plus a `canCancel` predicate; the server copy
+is the transition table in `PATCH /api/v1/orders/{id}/status`. They must agree,
+and the server one is authoritative — the app writes its own row first for
+responsiveness, so a client that skips `PAID` or revives a cancelled order has
+to be refused rather than believed. Every order is created as `NEW`.
+
+### Advancing an order
+
+`PATCH /api/v1/orders/{id}/status` moves one order, scoped by `store_id` in the
+same statement that reads it — a stranger gets `404`, not `403`, because the
+difference would confirm the id exists. An illegal move is `409` and changes
+nothing. Requesting the status an order already holds is `200` with
+`changed: false`, so a client retrying a dropped response converges instead of
+being shown an error for work that landed. The `UPDATE` is conditional on the
+status that was read, so two devices racing the same order cannot both apply a
+transition.
+
+**Cancelling returns the stock.** `trg_orders_release_stock_on_cancel`
+(migration `046`) fires on the transition into `CANCELLED` and adds each line's
+`qty` back. It is guarded on `OLD.status <> 'CANCELLED'`, so a repeat restores
+nothing a second time.
+
+The release is a trigger because the claim is a trigger. Splitting them — claim
+in SQL, release in TypeScript — would let two definitions of "the stock for this
+order" drift, and that drift is silent: it surfaces as a stock count nobody can
+explain.
+
+#### What this replaced
+
+Until 2026-08-22 no route accepted a status change. `OrderRepository.markPaid`
+and `.cancel` wrote to the Android Room database and stopped, so the server held
+every order at `NEW` forever and a reinstall replayed a pipeline the seller had
+already worked through.
+
+The cancel half was worse than cosmetic. Placing an order decrements stock
+through `trg_order_items_claim_stock`; cancelling restored it in Room only. Every
+cancellation therefore leaked stock on the server — the units came off the
+catalog and never went back, and the seller's own phone showed a number the
+store could not sell down to.
 
 ### Payment methods disagree between client and server
 

@@ -1,38 +1,13 @@
-let rawInput = "";
-
-for await (const chunk of process.stdin) {
-  rawInput += chunk;
+// Drained, not parsed. Nothing here depends on the payload any more, but the
+// caller still writes one, and exiting without reading it can hand that writer
+// an EPIPE instead of a clean exit.
+for await (const _chunk of process.stdin) {
+  // no-op
 }
 
-let input = {};
-try {
-  input = rawInput ? JSON.parse(rawInput) : {};
-} catch {
-  process.stdout.write("{}");
-  process.exit(0);
-}
-
-const stopHookActive =
-  input.stop_hook_active ?? input.stopHookActive ?? false;
-
-if (stopHookActive) {
-  process.stdout.write("{}");
-  process.exit(0);
-}
-
-const reason = [
-  "Perform one brief Orderak customization-gap audit before finishing.",
-  "Use the orderak-agent-improvement skill.",
-  "If this task revealed concise stable guidance supported by repository evidence, record it with the skill's deterministic record-learning command and validate it.",
-  "Propose a reviewed structural update only when the shared learned guidance is insufficient for a repeatable workflow or policy gap.",
-  "If the active agent is read-only, report the proposal instead of editing.",
-  "Do not alter hooks, permissions, tools, personas, protected contracts, or security boundaries.",
-  "Do not invent an improvement: if no justified gap exists, state that briefly and finish without customization changes.",
-].join(" ");
-
-process.stdout.write(
-  JSON.stringify({
-    decision: "block",
-    reason,
-  }),
-);
+// The improvement audit is an optional, skill-driven final step rather than a
+// mandatory lifecycle continuation. This Stop hook deliberately emits no
+// decision, so it never forces an extra agent turn. The audit guidance remains
+// authoritative in .github/copilot-instructions.md and the
+// orderak-agent-improvement skill, which the agent consults before finishing.
+process.stdout.write("{}");

@@ -80,3 +80,44 @@ describe("request correlation", () => {
 		expect(response.headers.get("x-request-id")).not.toBe(injected);
 	});
 });
+
+// Access-Control-Allow-Origin depends on the request, and jsonResponse() has no
+// request — it called corsHeaders() with no argument, so the header reached the
+// OPTIONS preflight and nothing else. Browsers saw the preflight pass and then
+// blocked the response it was clearing, which made the origin allowlist inert.
+describe("CORS", () => {
+	const ALLOWED = "https://admin.orderak.app";
+
+	it("echoes an allowed origin on a real response, not only on the preflight", async () => {
+		const preflight = await SELF.fetch(`${BASE}/health`, {
+			method: "OPTIONS",
+			headers: { origin: ALLOWED },
+		});
+		expect(preflight.headers.get("access-control-allow-origin")).toBe(ALLOWED);
+
+		const actual = await SELF.fetch(`${BASE}/health`, { headers: { origin: ALLOWED } });
+		expect(actual.headers.get("access-control-allow-origin")).toBe(ALLOWED);
+		expect(actual.headers.get("vary") ?? "").toContain("Origin");
+	});
+
+	it("omits the header entirely for an origin that is not allowlisted", async () => {
+		const response = await SELF.fetch(`${BASE}/health`, {
+			headers: { origin: "https://not-orderak.example" },
+		});
+		expect(response.headers.get("access-control-allow-origin")).toBeNull();
+	});
+
+	// A handler that sets its own policy keeps it. /api/v1/theme serves public
+	// design tokens to any client and says so with a wildcard; the middleware
+	// must not narrow that to the allowlist.
+	it("leaves a handler's own CORS policy alone", async () => {
+		const response = await SELF.fetch(`${BASE}/api/v1/theme`, { headers: { origin: ALLOWED } });
+		expect(response.headers.get("access-control-allow-origin")).toBe("*");
+	});
+
+	it("covers error responses, which are built by the same helper", async () => {
+		const response = await SELF.fetch(`${BASE}/api/v1/store`, { headers: { origin: ALLOWED } });
+		expect(response.status).toBe(401);
+		expect(response.headers.get("access-control-allow-origin")).toBe(ALLOWED);
+	});
+});

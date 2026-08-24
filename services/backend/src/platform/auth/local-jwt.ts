@@ -31,6 +31,23 @@ export interface FirebaseTokenClaims {
   sub: string;
   exp: number;
   iat: number;
+  /**
+   * When the user last actually authenticated — the SMS challenge, not the
+   * token.
+   *
+   * Distinct from `iat`, and the distinction is the whole point: the Firebase
+   * SDK mints a fresh ID token from a refresh token roughly every hour without
+   * the user proving anything, so `iat` is only ever minutes old for any signed
+   * in device. `auth_time` does not move until someone completes a real
+   * challenge. Anything gating on "was this person just verified" must read
+   * this claim; reading `iat` there turns possession of a refresh token into
+   * proof of possession of the phone.
+   *
+   * Optional because it is absent from a token minted by a custom-token or
+   * anonymous flow. Callers must treat its absence as "not fresh" rather than
+   * substituting `iat`.
+   */
+  auth_time?: number;
   phone_number?: string;
   [key: string]: unknown;
 }

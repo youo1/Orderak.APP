@@ -14,7 +14,7 @@
 // so a category/product can only be reached through the store that owns it.
 // ============================================================
 
-import { findStoreByIdentifier, storeUrl } from "../domains/identity/identity";
+import { findStoreByIdentifier, storeUrl, validE164 } from "../domains/identity/identity";
 import { designSystemCss, loadActiveDesignSystem } from "../domains/design/design-system";
 import {
 	renderStorePage,
@@ -22,7 +22,7 @@ import {
 	renderProductPage,
 	handleCatalogOrder,
 } from "../domains/catalog/catalog";
-import { pickLocale, DEFAULT_LOCALE, type Locale } from "../platform/localization/i18n";
+import { pickLocale, type Locale } from "../platform/localization/i18n";
 import { checkRateLimit, esc } from "../platform/http/shared";
 import { storeCapabilityEnabled } from "../domains/operations/capabilities";
 import { Hono } from "hono";
@@ -56,7 +56,7 @@ function deletionPage(lang: Locale, submitted = false, generatedCss = ""): Respo
 <body><h1>${title}</h1><p>${intro}</p>${result}
 <form method="post" action="/delete-account">
 <label for="phone">${ar ? "رقم الهاتف بصيغة دولية" : "Phone number in international format"}</label>
-<input id="phone" name="phone" type="tel" placeholder="+201001234567" required pattern="\\+20[0-9]{10}" autocomplete="tel">
+<input id="phone" name="phone" type="tel" placeholder="+201001234567" required pattern="\\+[1-9][0-9]{7,14}" autocomplete="tel">
 <label for="email">${ar ? "البريد الإلكتروني (اختياري)" : "Email address (optional)"}</label>
 <input id="email" name="email" type="email" autocomplete="email">
 <input name="company" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px" aria-hidden="true">
@@ -80,7 +80,13 @@ async function handleDeletionRequest(request: Request, env: PublicWorkerEnv, lan
 	if (!form || String(form.get("company") ?? "")) return deletionPage(lang, true);
 	const phone = String(form.get("phone") ?? "").replace(/[\s()-]/g, "");
 	const email = String(form.get("email") ?? "").trim().toLowerCase().slice(0, 254);
-	if (!/^\+20\d{10}$/.test(phone) || (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
+	// Any E.164 number, not `^\+20\d{10}$`. This is the account-deletion page
+	// Google Play requires a published URL for, and it rejected every number
+	// outside Egypt — including the Gulf markets money.ts already declares
+	// currencies for and Countries.kt already offers at sign-up. Someone who
+	// signed up with a Saudi number could not request deletion of their own
+	// account through the only route provided for it.
+	if (!validE164(phone) || (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
 		return new Response("Invalid request", { status: 400 });
 	}
 	const existing = await env.orderak_db.prepare(
@@ -113,7 +119,7 @@ async function handleCategory(env: PublicWorkerEnv, store: Store, code: string, 
 async function handleProduct(env: PublicWorkerEnv, store: Store, code: string, request: Request): Promise<Response> {
 	const product = (await env.orderak_db
 		.prepare(
-			`SELECT id, product_code, name, slug, description, price_minor, stock, available, image_url
+			`SELECT id, product_code, name, slug, description, price_minor, currency, stock, available, image_url
 			 FROM products WHERE store_id = ? AND product_code = ? COLLATE NOCASE`,
 		)
 		.bind(store.id, code)

@@ -75,4 +75,3 @@ from automation. That is a cheap check worth remembering.
   (ledger 45, `signing_key_version` present), which was its blocking
   prerequisite.
 - **Production soak**, which must run *after* the rotation, never before.
-- **Phase 9** — decommissioning the old repository.

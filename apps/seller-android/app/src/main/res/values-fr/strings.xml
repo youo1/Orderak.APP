@@ -189,6 +189,7 @@
     <string name="payment_manual">Confirmer manuellement</string>
     <string name="payment_checking">Vérification de la capture d\'écran…</string>
     <string name="payment_verified_ok">Paiement correspondant — auto-confirmé ✅</string>
+    <string name="order_status_update_failed">Impossible de mettre à jour la commande. Vérifiez votre connexion et réessayez.</string>
     <string name="payment_flagged_title">⚠️ Quelque chose ne correspond pas</string>
     <string name="payment_flag_amount">• Le montant sur la capture d\'écran ne correspond pas à la commande</string>
     <string name="payment_flag_ref">• Aucune référence de transaction claire trouvée dans l\'image</string>
