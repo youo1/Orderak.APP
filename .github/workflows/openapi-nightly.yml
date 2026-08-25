@@ -1,21 +1,33 @@
 name: OpenAPI Nightly Contract and Load
 
-# The staging-contract-tests environment exists; the two secrets it needs are
-# still the remaining gap:
-# measured 2026-08-21, staging-contract-tests holds no secrets and no variables
-# at all.
+# This workflow cannot pass until someone supplies seller credentials, and it is
+# dispatch-only until they do.
 #
-# This comment also claimed the contract job "fails its preflight rather than
-# running blind." There was no preflight. With the secrets unset the headers
-# expanded to empty strings and the suite ran against live staging
-# unauthenticated, which is exactly the blind run the sentence promised could
-# not happen. The preflight below now exists and makes the claim true.
+# It used to run against the staging-contract-tests environment. That environment
+# was deleted on 2026-08-25 having never held a single secret or variable -- so
+# the jobs below no longer name it, deliberately: a job that references a missing
+# environment makes GitHub recreate it, empty, and the deletion would not stick.
+# CONTRACT_SELLER_PHONE and CONTRACT_SELLER_SECRET now resolve at repository
+# level, where they are also unset.
+#
+# The preflight is what makes that safe. An earlier version of this comment
+# claimed the contract job "fails its preflight rather than running blind" when
+# there was no preflight at all: with the secrets unset the headers expanded to
+# empty strings and the suite ran against live staging unauthenticated, which is
+# precisely the blind run the sentence promised could not happen. The preflight
+# below now exists and makes the claim true, which is why this workflow fails
+# loudly instead of testing nothing.
 
+# The nightly schedule was removed on 2026-08-25 along with the
+# staging-contract-tests environment. It had failed every night since the
+# preflight was added, because the environment never held CONTRACT_SELLER_*, and
+# a job that cannot pass its own preflight is not a check -- it is a nightly
+# alarm nobody can act on.
+#
+# Dispatch still works. To make it meaningful again, recreate an environment
+# holding CONTRACT_SELLER_PHONE and CONTRACT_SELLER_SECRET, point the two jobs
+# below at it, and restore the cron.
 on:
-  schedule:
-    # Nightly at 00:20 UTC. Requires the staging-contract-tests environment to
-    # hold CONTRACT_SELLER_* — see the preflight below.
-    - cron: '20 0 * * *'
   workflow_dispatch:
     inputs:
       run_pre_release:
@@ -34,7 +46,6 @@ jobs:
   contract:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    environment: staging-contract-tests
     strategy:
       fail-fast: false
       # Cloudflare's staging edge applies a shared rolling request window. The
@@ -94,11 +105,11 @@ jobs:
           set -euo pipefail
           missing=0
           if [ -z "${CONTRACT_SELLER_PHONE:-}" ]; then
-            echo "::error::CONTRACT_SELLER_PHONE is not set in the 'staging-contract-tests' environment."
+            echo "::error::CONTRACT_SELLER_PHONE is not set. This workflow needs seller credentials; see the header."
             missing=1
           fi
           if [ -z "${CONTRACT_SELLER_SECRET:-}" ]; then
-            echo "::error::CONTRACT_SELLER_SECRET is not set in the 'staging-contract-tests' environment."
+            echo "::error::CONTRACT_SELLER_SECRET is not set. This workflow needs seller credentials; see the header."
             missing=1
           fi
           if [ "$missing" -ne 0 ]; then
@@ -135,7 +146,6 @@ jobs:
 
   staging-load:
     runs-on: ubuntu-latest
-    environment: staging-contract-tests
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: grafana/setup-k6-action@db07bd9765aac508ef18982e52ab937fe633a065 # v1.2.1

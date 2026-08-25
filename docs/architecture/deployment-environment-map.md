@@ -2,7 +2,7 @@
 status: current
 generated: false
 owner: backend
-last_verified: 2026-08-24
+last_verified: 2026-08-25
 applies_to: [production, staging]
 authoritative_for: [deployment-environments]
 ---
@@ -66,10 +66,18 @@ deployment to branch protection: `staging-deploy.yml` runs on the `staging`
 branch, and if that branch loses its protection the deploy fails at the
 environment gate rather than deploying from an unprotected ref.
 
-Workflows in this repository reference **five** environments — `staging`,
-`production`, `staging-contract-tests`, and the two `backup-restore-*`
-environments `restore-drill.yml` selects between. Earlier revisions of this
-paragraph listed only the first three and omitted the restore pair.
+Workflows in this repository reference **three** environments — `staging`,
+`production`, and `backup-restore-production`.
+
+Two were deleted on 2026-08-25. `staging-contract-tests` had never held a single
+secret or variable, so the nightly contract suite failed its preflight every
+night; `openapi-nightly.yml` no longer names it and is dispatch-only.
+`backup-restore-staging` held the sole age identity for staging backups, so
+deleting it made every existing staging export permanently undecryptable — the
+staging export job was removed from `d1-backup.yml` in the same change rather
+than left writing files nobody can open. `restore-drill.yml` is production-only
+as a result, which means it is no longer a rehearsal: it reads real production
+backups.
 
 They reference the **variable** `CLOUDFLARE_ACCOUNT_ID` and the **secrets**
 `ORDERAK_DEPLOY_STAGING`, `ORDERAK_DEPLOY_PRODUCTION`, `ORDERAK_BACKUP_STAGING`,
@@ -113,9 +121,11 @@ human being available:
 The `production` GitHub Environment is retained, and its purpose is credential
 custody rather than approval: `ORDERAK_DEPLOY_PRODUCTION` is scoped to that
 environment, so a workflow that does not declare it cannot reach production
-Cloudflare resources. The same reasoning keeps `staging-contract-tests` separate
-from `staging` — the nightly fuzzer needs seller credentials and must not also
-inherit a deploy token.
+Cloudflare resources. The same reasoning had kept `staging-contract-tests`
+separate from `staging` — the nightly fuzzer needed seller credentials and must
+not also inherit a deploy token. That environment is gone, and the principle
+still applies to any replacement: give the fuzzer its own environment rather
+than reusing `staging`.
 
 Production accepts a full 40-character commit SHA, verifies that a successful
 `staging-deploy.yml` run exists for it, requires `DEPLOY_PRODUCTION`, and then enters
