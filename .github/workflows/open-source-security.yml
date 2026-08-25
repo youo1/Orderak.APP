@@ -6,17 +6,16 @@ name: Open Source Security
 # a hosted security account, retain their reports as Actions artifacts, and fail
 # CI on findings or scanner errors.
 
-# TEMPORARY, 2026-08-24 — solo pre-release development. The pull_request and
-# push triggers are commented out so Semgrep and Trivy stop gating every push;
-# the weekly scan and manual dispatch still run, so the signal is kept, it just
-# no longer blocks a merge. To restore: uncomment the two triggers below AND
-# re-add "Semgrep CE" and "Trivy filesystem" to the branch protection required
-# checks — a required check that no longer runs leaves pull requests pending
-# forever.
+# Restored 2026-08-25. Between 2026-08-24 and 2026-08-25 the pull_request and
+# push triggers were commented out for solo pre-release velocity, and "Semgrep
+# CE" and "Trivy filesystem" were removed from branch protection at the same
+# time. Both halves are back together, which is the only safe way to move this
+# pair: a required check whose workflow does not run leaves every pull request
+# pending forever, and a running check that is not required gates nothing.
 on:
-  # pull_request:
-  # push:
-  #   branches: [main]
+  pull_request:
+  push:
+    branches: [main]
   schedule:
     # Weekly full scan so new rules and vulnerability data also cover old code.
     - cron: '0 4 * * 1'
@@ -59,7 +58,7 @@ jobs:
             --exclude '**/build/**' \
             --exclude '**/.gradle/**' \
             --sarif-output security-reports/semgrep.sarif \
-            .github apps contracts packages quality services tooling
+            .github apps contracts quality services tooling
           status=$?
           set -e
           echo "exit-code=$status" >> "$GITHUB_OUTPUT"

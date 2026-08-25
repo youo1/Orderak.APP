@@ -1,0 +1,104 @@
+name: Promotion Paths
+
+# Enforces the shape of the release pipeline:
+#
+#   feature/* fix/* chore/* docs/* dependabot/*  ->  develop
+#   develop                                      ->  staging
+#   staging  hotfix/*                            ->  main
+#   main                                         ->  staging and develop
+#                                                    (mandatory hotfix back-merge)
+#
+# WHY THIS EXISTS
+#   Branch protection can require checks and reviews, but it cannot say "only
+#   `staging` may merge into `main`". Without that, `feature/x -> main` is a
+#   perfectly ordinary pull request that quietly bypasses Staging entirely.
+#
+#   This is not primarily a security boundary — anyone who can open a pull
+#   request can also read this file and see the rules. It exists so the process
+#   is still obvious six months from now, and so a change cannot reach
+#   production without having passed through Staging first.
+#
+# WHY `pull_request` AND NOT `pull_request_target`
+#   This job needs no secrets and no write permission. `pull_request_target`
+#   would run it with repository credentials against untrusted head code, which
+#   buys nothing here and is the standard way that trigger becomes a
+#   vulnerability.
+#
+# TWO ROUTES THAT LOOK OPTIONAL AND ARE NOT
+#   `dependabot/* -> develop`, because `.github/dependabot.yml` targets
+#   `develop`; and `main -> staging` / `main -> develop`, because a hotfix must
+#   be merged back down or the next promotion silently reverts it. Omitting
+#   either would make this workflow block the very process it is protecting.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: promotion-path-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  promotion-path:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check the base and head combination is a declared route
+        env:
+          BASE: ${{ github.base_ref }}
+          HEAD: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+
+          # `case` globs match against the whole ref, so `feature/*` accepts
+          # `feature/x` and rejects `notfeature/x` and `x-feature/y`. Substring
+          # matching would accept both and is the usual bug in checks like this.
+          allowed=0
+          case "$BASE" in
+            develop)
+              case "$HEAD" in
+                feature/*|fix/*|chore/*|docs/*|dependabot/*|main) allowed=1 ;;
+              esac
+              ;;
+            staging)
+              case "$HEAD" in
+                develop|main) allowed=1 ;;
+              esac
+              ;;
+            main)
+              case "$HEAD" in
+                staging|hotfix/*) allowed=1 ;;
+              esac
+              ;;
+            *)
+              # Base is not one of the three long-lived branches. A pull request
+              # between two short-lived branches is ordinary work and cannot
+              # reach production except through the rules above.
+              allowed=1
+              ;;
+          esac
+
+          if [ "$allowed" -eq 1 ]; then
+            echo "OK: '$HEAD' -> '$BASE' is a declared route."
+            exit 0
+          fi
+
+          echo "::error::'$HEAD' may not merge into '$BASE'."
+          {
+            echo "### Not a declared promotion route"
+            echo
+            echo "\`$HEAD\` → \`$BASE\` is not part of the release pipeline."
+            echo
+            echo "| Target | Accepts |"
+            echo "| --- | --- |"
+            echo "| \`develop\` | \`feature/*\`, \`fix/*\`, \`chore/*\`, \`docs/*\`, \`dependabot/*\`, and \`main\` for a hotfix back-merge |"
+            echo "| \`staging\` | \`develop\`, and \`main\` for a hotfix back-merge |"
+            echo "| \`main\` | \`staging\`, and \`hotfix/*\` |"
+            echo
+            echo "Work reaches production as \`feature/* → develop → staging → main\`."
+            echo "Retarget this pull request at \`develop\`, or if it is an emergency"
+            echo "production fix, branch it from \`main\` as \`hotfix/<name>\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
