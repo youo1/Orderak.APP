@@ -72,19 +72,61 @@ jobs:
         with:
           expected-owner: ${{ vars.DEPLOY_OWNER }}
 
-      # Staging deploys fire on pushes to `main` again as of 2026-08-25, so the
-      # release SHA is the commit Staging ran and this is a direct check once
-      # more. Between 2026-08-24 and 2026-08-25 it also accepted the SHA's second
-      # parent, because promotions arrived as merge commits that Staging had
-      # never itself deployed; with one branch every merge is a squash, so there
-      # is no second parent to consider.
-      - name: Verify the exact SHA passed Staging
+      # RELEASE ELIGIBILITY
+      #
+      #   A release SHA is eligible if and only if it equals origin/main (checked
+      #   in the next step) AND it has successful Staging deployment provenance —
+      #   either directly, or as the promotion merge of a commit that does.
+      #
+      # Provenance comes from GitHub deployment records rather than workflow
+      # runs. staging-deploy.yml's deploy job declares `environment: staging`, so
+      # GitHub already records every Staging deployment against its SHA. A
+      # deployment record states that this commit was deployed to that
+      # environment and succeeded, which is the claim being made here; a
+      # successful workflow run is only evidence for it.
+      #
+      # Two candidates, so the lookup is bounded by construction — no history
+      # scan. Staging deploys fire on pushes to `staging`, so a `staging -> main`
+      # promotion merge is itself a SHA Staging never deployed; the commit that
+      # was deployed is its SECOND parent. The first parent is the previous
+      # production release and is deliberately never consulted — accepting it
+      # would pass a promotion whose staging side had never deployed at all.
+      #
+      # This makes the merge commit load-bearing: a squashed promotion has no
+      # second parent and this gate will refuse the release. That failure is the
+      # safe direction. Recovery is to dispatch Deploy Staging against `main`,
+      # which creates a deployment record for the release SHA itself.
+      - name: Verify the release has Staging deployment provenance
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
-          RUNS=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/staging-deploy.yml/runs?head_sha=${RELEASE_SHA}&status=success&per_page=100" --jq '.workflow_runs | length')
-          test "$RUNS" -gt 0
+
+          deployed_to_staging() {
+            local sha="$1"
+            [ -n "$sha" ] || return 1
+            local ids id state
+            ids=$(gh api "repos/${GITHUB_REPOSITORY}/deployments?environment=staging&sha=${sha}&per_page=100" --jq '.[].id')
+            for id in $ids; do
+              state=$(gh api "repos/${GITHUB_REPOSITORY}/deployments/${id}/statuses?per_page=1" --jq '.[0].state // empty')
+              if [ "$state" = "success" ]; then return 0; fi
+            done
+            return 1
+          }
+
+          # rev-list --parents reads the commit header only, so this works on the
+          # shallow checkout above without fetching the parent objects.
+          SECOND_PARENT=$(git rev-list --parents -n 1 HEAD | awk '{print $3}')
+
+          if deployed_to_staging "$RELEASE_SHA"; then
+            echo "Provenance: $RELEASE_SHA was itself deployed to Staging."
+          elif [ -n "$SECOND_PARENT" ] && deployed_to_staging "$SECOND_PARENT"; then
+            echo "Provenance: promotion merge; second parent $SECOND_PARENT was deployed to Staging."
+          else
+            echo "::error::No successful Staging deployment for $RELEASE_SHA or its second parent (${SECOND_PARENT:-none}). If this promotion was squashed rather than merged, dispatch Deploy Staging against main and retry."
+            exit 1
+          fi
 
       # From main: production may only ever deploy the tip of main. The staging
       # check above proves the commit was exercised; this proves it is also the

@@ -25,16 +25,19 @@ name: Deploy Staging
 #   * On 2026-08-24 it moved to `staging`, when the repository adopted
 #     develop -> staging -> main.
 #   * On 2026-08-25 it moved back to `main`, when the repository collapsed to a
-#     single branch. `develop` and `staging` were deleted after confirming they
-#     held no commit `main` did not already contain.
+#     single branch.
+#   * Later on 2026-08-25 it moved to `staging` again, when develop -> staging
+#     -> main was re-adopted. This is the current value.
 #
-# One long-lived branch, two isolated runtime environments. A merge to `main`
-# deploys Staging; Production stays dispatch-only behind the typed confirmation
-# in production-deploy.yml, and deploys only a SHA that Staging already ran.
+# Three long-lived branches, two isolated runtime environments. `develop`
+# deploys nowhere — there is no Dev environment and Staging serves as the
+# integration environment. A merge to `staging` deploys Staging; Production
+# stays dispatch-only behind the typed confirmation in production-deploy.yml,
+# and deploys only a commit Staging already ran.
 
 on:
   push:
-    branches: [main]
+    branches: [staging]
     paths:
       - 'services/backend/**'
       - 'apps/admin-web/**'

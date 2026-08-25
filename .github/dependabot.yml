@@ -18,8 +18,9 @@
 # this schedule.
 version: 2
 #
-# No target-branch: it defaults to the default branch, which is `main`, and
-# `main` is now the only long-lived branch.
+# target-branch: develop — dependency updates enter the integration branch and
+# reach production the same way everything else does, through
+# develop -> staging -> main.
 #
 # Between 2026-08-24 and 2026-08-25 every entry carried `target-branch: develop`.
 # That was load-bearing while `develop` existed, for a reason worth keeping on
@@ -35,6 +36,7 @@ updates:
   # contracts/ rather than one entry per package.
   - package-ecosystem: npm
     directory: /
+    target-branch: develop
     schedule:
       interval: monthly
       time: "06:00"
@@ -90,6 +92,7 @@ updates:
   # Android / Compose / Kotlin toolchain.
   - package-ecosystem: gradle
     directory: /apps/seller-android
+    target-branch: develop
     schedule:
       interval: monthly
       time: "06:00"
@@ -118,6 +121,7 @@ updates:
   # kept rather than traded away for update coverage.
   - package-ecosystem: github-actions
     directory: /
+    target-branch: develop
     schedule:
       interval: monthly
       time: "06:00"
