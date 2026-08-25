@@ -7,11 +7,13 @@ running.
 
 ## Workflow
 
-1. **Branch from `main`** — use a descriptive name:
+1. **Branch from `develop`** — use a descriptive name:
    `feature/chat-screen`, `fix/order-sync-crash`, `docs/migration-guide`.
-   `main` is the only long-lived branch; everything else is short-lived and
-   merges back through a pull request. How a merged change reaches Staging and
-   then Production is in
+   Those prefixes plus `chore/` are the only ones that may merge into `develop`;
+   CI rejects anything else. Work reaches production as
+   `feature/* → develop → staging → main`.
+   A fault already live in Production is the exception: branch it from `main` as
+   `hotfix/<name>`. Full model, including which merge button to use where, is in
    [the release workflow guide](./docs/guides/staging-production-workflow.md).
 2. **Keep PRs small.** One feature, fix, or doc change per pull request.
 3. **Test before submitting.** See the testing section below.
