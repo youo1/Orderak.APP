@@ -59,6 +59,33 @@ updates:
       # so a breaking change is never bundled with routine upgrades.
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # Each of these was attempted, measured and reverted. They are blocked on
+      # real code work, not on caution, and each one passes a *partial* check --
+      # which is exactly how a "tests pass, ship it" merge lands one.
+      #
+      # typescript 7 removes the compiler API from the package entry point; it
+      # exports only `version` and `versionMajorMinor`. contracts/openapi/scripts/hono-inventory.mjs
+      # uses ts.createSourceFile and ts.ScriptTarget to prove every Hono route is
+      # documented, so route coverage stops running entirely. Backend tests, tsc,
+      # oxlint and the admin-web build all still pass, and openapi-ci.yml is
+      # path-filtered so it does not even run on a package.json bump. Unblocking
+      # means reparenting that script onto another parser.
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
+      # @material/material-color-utilities 0.4 drops `sourceColorArgb` from
+      # DynamicSchemeOptions: 26 backend tests fail, test:types breaks, and
+      # design-system:check crashes. The fix in
+      # services/backend/src/domains/design/design-system.ts changes generated
+      # colour output, so it is a design change needing visual review.
+      - dependency-name: "@material/material-color-utilities"
+        update-types: [version-update:semver-major, version-update:semver-minor]
+      # @types/node tracks the runtime, and .nvmrc pins Node 24. A 26.x bump was
+      # merged on 2026-08-24 and is reverted in this same change: types for APIs
+      # the runtime does not have will typecheck and then fail at run time.
+      # Raise .nvmrc first, then this.
+      - dependency-name: "@types/node"
+        update-types: [version-update:semver-major]
 
   # Android / Compose / Kotlin toolchain.
   - package-ecosystem: gradle
