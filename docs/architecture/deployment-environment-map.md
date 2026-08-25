@@ -21,8 +21,8 @@ resources before any rename, creation, deletion, or Production deployment.
 | Link | Production | Staging |
 |---|---|---|
 | GitHub Environment | `production` | `staging` |
-| Deploying branch | `main` | `main` |
-| Deployment trigger | Manual dispatch only | Push to `main`, path-filtered |
+| Deploying branch | `main` | `staging` |
+| Deployment trigger | Manual dispatch only | Push to `staging`, path-filtered |
 | Workflow | `.github/workflows/production-deploy.yml` | `.github/workflows/staging-deploy.yml` |
 | Public Wrangler config | `services/backend/wrangler.jsonc` base | same file, `env.staging` |
 | Admin Wrangler config | `services/backend/wrangler.admin.jsonc` base | same file, `env.staging` |

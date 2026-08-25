@@ -2,7 +2,7 @@
 status: current
 generated: false
 owner: governance
-last_verified: 2026-08-24
+last_verified: 2026-08-25
 applies_to: [production, staging]
 authoritative_for: [release-workflow]
 ---
@@ -14,75 +14,115 @@ authoritative_for: [release-workflow]
 This guide explains how Orderak uses GitHub, how Staging and Production stay
 isolated, and how a tested change is promoted safely.
 
-**This repository has one long-lived branch, `main`.** That is worth stating
-with its history, because the answer has changed twice and a stale copy of this
-guide is worse than none:
+**This repository has three long-lived branches: `develop`, `staging` and
+`main`.** That is worth stating with its history, because the answer has changed
+three times and a stale copy of this guide is worse than none:
 
 - Before 2026-08-24: `main` only.
-- 2026-08-24: adopted `develop` -> `staging` -> `main`, with the Staging deploy
-  moved onto the `staging` branch.
-- 2026-08-25: collapsed back to `main` only. `develop` and `staging` were
-  deleted after confirming neither held a commit `main` did not already contain,
-  and the Staging deploy trigger moved back to `main`.
+- 2026-08-24: adopted `develop` -> `staging` -> `main`.
+- 2026-08-25 (morning): collapsed back to `main` only.
+- 2026-08-25 (afternoon): re-adopted `develop` -> `staging` -> `main`. **This is
+  the current model.**
 
 Environment isolation never depended on those branches and does not now. It comes
-from configuration, credentials, service bindings, domains and data stores.
+from configuration, credentials, service bindings, domains and data stores. The
+branches decide *which revision* each environment runs; they are not what holds
+the environments apart.
 
 ## Core model
 
-Orderak has three long-lived branches and two isolated runtime environments.
-Cloudflare carries Staging and Production only; there is no Dev environment.
+Three long-lived branches, two isolated runtime environments.
 
 ```text
-short-lived branch -> pull request -> main -> automatic Staging deployment
-                                              |
-                                              +-> test the exact commit SHA
-                                                   |
-                                                   +-> manual Production deployment
+feature/* , fix/*  ->  develop  ->  staging  ->  main  ->  Production
+       |                 |            |           |
+     local            CI only      Staging     manual dispatch
+     machine                      (on push)
+
+hotfix/*  <- from main ->  main  ->  back-merge to staging AND develop
 ```
 
-| Branch | Deploys to | Arrives by |
-| --- | --- | --- |
-| `feature/*`, `fix/*`, `hotfix/*` | nothing — the developer's own machine | branched from `main` |
-| `main` | Staging automatically on push; Production by manual dispatch | squash merge from a short-lived branch |
+| Branch | Deploys to | Arrives by | Protection |
+| --- | --- | --- | --- |
+| `feature/*`, `fix/*`, `chore/*`, `docs/*` | nothing — the developer's own machine | branched from `develop` | none |
+| `hotfix/*` | nothing | branched from `main` | none |
+| `develop` | nothing — integration only | squash merge | 10 required checks |
+| `staging` | Staging, automatically on push | merge commit from `develop` | 13 required checks |
+| `main` | Production, by manual dispatch | merge commit from `staging` | 13 required checks |
 
 - `main` is the source for releasable code and the only revision Production
   will deploy.
-- Feature and fix branches are short-lived and merge into `main` through pull
-  requests.
+- `develop` deploys nowhere. There is no Dev environment — see
+  [Why there is no Dev environment](#why-there-is-no-dev-environment).
 - Staging and Production are GitHub Environments with separate credentials.
 - A Staging deployment does not deploy to Production.
 - Production does not automatically follow the newest commit on `main`; its
   workflow checks out the exact 40-character commit SHA supplied by the release
   owner, and refuses any SHA that is not `main`'s current tip.
-- Environment isolation is implemented through configuration, credentials,
-  service bindings, domains, and data stores. The environment branches select
-  *which revision* each environment runs; they are not what holds the
-  environments apart.
 
-### Everything squashes
+### The pipeline shape is enforced, not just described
 
-A short-lived branch into `main` squashes: one branch, one commit, readable
-history. With a single long-lived branch there are no promotion merges, so there
-is no case where a squash costs anything.
+`promotion-paths.yml` fails any pull request whose base and head are not a
+declared route, because branch protection cannot express "only `staging` may
+merge into `main`" — and without that, `feature/x -> main` is an ordinary pull
+request that bypasses Staging entirely.
 
-This matters to `production-deploy.yml`, which requires the release SHA to have
-a successful `staging-deploy.yml` run. Staging deploys fire on pushes to `main`,
-so the release SHA *is* the commit Staging ran and the check is direct.
+| Target | Accepts |
+| --- | --- |
+| `develop` | `feature/*`, `fix/*`, `chore/*`, `docs/*`, `dependabot/*`, and `main` for a hotfix back-merge |
+| `staging` | `develop`, and `main` for a hotfix back-merge |
+| `main` | `staging`, and `hotfix/*` |
 
-Between 2026-08-24 and 2026-08-25 that gate also accepted the release SHA's
-second parent. It had to: promotions arrived on `main` as merge commits that
-Staging had never itself deployed, and checking the release SHA alone would have
-deadlocked Production permanently. That clause is gone with the branches that
-needed it.
+Two of those rows exist for reasons that are easy to mistake for clutter:
+`dependabot/* -> develop` because `.github/dependabot.yml` targets `develop`,
+and `main -> staging` / `main -> develop` because a hotfix must be merged back
+down. Remove either and this control blocks the process it protects.
+
+### Why there is no Dev environment
+
+`services/backend/wrangler.jsonc` declares only `env.staging`; the base config
+*is* Production. A Dev environment would mean new Workers, D1, R2, queues,
+secrets, variables, a deploy workflow, environment protection, data isolation,
+migrations and monitoring — and `staging` already serves as the integration
+environment.
+
+Revisit that when any of these becomes true: a second developer joins;
+independent QA exists; continuous integration testing is needed;
+infrastructure or migration changes become frequent; real production traffic
+arrives; or multiple features need testing in parallel.
+
+### Features squash, promotions merge — and this is enforced
+
+| Merge | Method |
+| --- | --- |
+| `feature/*`, `fix/*`, `chore/*`, `docs/*` into `develop` | **Squash** |
+| `develop` into `staging` | **Merge commit** |
+| `staging` into `main` | **Merge commit** |
+| `hotfix/*` into `main` | **Merge commit** |
+
+This is not a style preference. `production-deploy.yml` resolves a release to
+the Staging deployment that proved it, and for a promotion that link is the
+merge's **second parent** — the commit Staging actually deployed. A squash has no
+second parent, so a squashed promotion breaks the link and the release is
+refused.
+
+Rather than rely on remembering, the ruleset **"Promotions merge, never squash"**
+restricts `main` and `staging` to `allowed_merge_methods: ["merge"]`. The squash
+button is simply not offered there. `develop` keeps squash, so feature history
+stays one-commit-per-branch.
+
+If a promotion ever does reach `main` squashed, the failure is in the safe
+direction: Production refuses to deploy rather than shipping something
+unverified. Recovery is to dispatch `Deploy Staging` against `main`, which
+creates a deployment record for the release SHA itself.
 
 ## Environment boundaries
 
 | Area | Staging | Production |
 | --- | --- | --- |
 | GitHub Environment | `staging` | `production` |
-| Deploying branch | `main` | `main` |
-| Backend deployment | Automatic after relevant changes merge to `main`; manual dispatch is also supported | Manual dispatch only |
+| Deploying branch | `staging` | `main` |
+| Backend deployment | Automatic after relevant changes merge to `staging`; manual dispatch is also supported | Manual dispatch only |
 | Public API | `https://api.staging.orderak.app` | `https://api.orderak.app` |
 | Public site | `https://staging.orderak.app` | `https://orderak.app` |
 | Admin | `https://admin.staging.orderak.app` | `https://admin.orderak.app` |
@@ -182,25 +222,25 @@ and on a single-maintainer repository it cannot.
 
 ## Daily development workflow
 
-### 1. Start from a clean, current `main`
+### 1. Start from a clean, current `develop`
 
 Do not switch branches while uncommitted work could be lost or mixed into a
 new change.
 
 ```powershell
 git status
-git switch main
+git switch develop
 git pull --ff-only
 git switch -c feature/<short-description>
 ```
 
-Use `fix/<short-description>` for human-authored fixes. Branches created by
-Codex normally use `codex/<short-description>`.
+Use `fix/`, `chore/` or `docs/` prefixes as the change warrants — those four are
+the only heads `promotion-paths.yml` accepts into `develop`, alongside
+`dependabot/*`.
 
-A fault already running in Production is not a special case any more: it also
-branches from `main`, because `main` is what Production runs. Name it
-`hotfix/<short-description>` so the intent is visible, and see
-[Hotfixes](#hotfixes) for the release path.
+**A fault already running in Production branches from `main`, not `develop`**,
+because `main` is what Production runs and `develop` may hold unreleased work.
+Name it `hotfix/<short-description>` and see [Hotfixes](#hotfixes).
 
 ### 2. Implement and verify locally
 
@@ -220,22 +260,33 @@ git commit -m "Describe the change"
 git push -u origin HEAD
 ```
 
-Open a pull request targeting `main`. Review the changed files and wait for all
-required GitHub Actions checks to pass. Fix failures on the same branch; do not
-bypass or weaken a protected contract check.
+Open a pull request targeting `develop`. Review the changed files and wait for
+all ten required checks to pass. Fix failures on the same branch; do not bypass
+or weaken a protected contract check.
 
-### 4. Squash merge into `main`
+Three further checks run here but do not block: `Generate SBOM`,
+`localization-drift` and `Worker size and startup budget` gate `staging` and
+`main` instead. Read them anyway — a failure here is the same failure that will
+block promotion later.
+
+### 4. Squash merge into `develop`
 
 Merge only after the pull request represents one coherent change and required
-checks pass. Use **Squash and merge**. The resulting commit on `main` is what
-triggers the Staging deployment, and it is the candidate Staging acceptance
-verifies.
+checks pass. Use **Squash and merge**. Nothing deploys: `develop` has no
+deployment workflow.
+
+### 5. Promote `develop` to `staging`
+
+Open a pull request from `develop` to `staging` and merge it with **Create a
+merge commit** — the squash button is not offered there, by ruleset. All thirteen
+checks apply. The resulting push to `staging` triggers the Staging deployment,
+and that commit is the candidate Staging acceptance verifies.
 
 ## Deploying and testing Staging
 
 ### Backend and Admin
 
-`Deploy Staging` runs automatically when a merge to `main` changes:
+`Deploy Staging` runs automatically when a merge to `staging` changes:
 
 - `services/backend/**`
 - `apps/admin-web/**`
@@ -256,7 +307,7 @@ deployment.
 ### Android Staging
 
 Run `Distribute Android Staging` manually from GitHub Actions after the intended
-commit is on `main`. It builds `StagingDebug`, runs the protected contract and
+commit is on `staging`. It builds `StagingDebug`, runs the protected contract and
 unit checks, and uploads the APK to the configured Firebase App Distribution
 tester group.
 
@@ -284,14 +335,18 @@ Google Play.
 
 ### Preconditions
 
-1. Identify the exact commit on `main` that passed Staging acceptance.
-2. Confirm it is `main`'s current tip and has not been replaced by a later
-   untested commit. The workflow enforces both: the release SHA must equal
-   `origin/main`, and must itself have a successful `staging-deploy.yml` run.
-3. Confirm required secrets and variables exist in the `production` GitHub
+1. Identify the exact commit on `staging` that passed Staging acceptance.
+2. Open a pull request from `staging` to `main` and merge it with **Create a
+   merge commit**. Nothing deploys — `main` has no push trigger.
+3. Take `main`'s new tip as `release_sha`. The workflow enforces two things
+   independently: the release SHA must equal `origin/main`, and it must have
+   **Staging deployment provenance** — a successful GitHub deployment record for
+   the `staging` environment, either on the release SHA itself or on its second
+   parent, which is the `staging` commit this promotion merged.
+4. Confirm required secrets and variables exist in the `production` GitHub
    Environment.
-4. Review pending Production migrations and operational impact.
-5. Choose a monitored deployment window and ensure a known-good SHA is
+5. Review pending Production migrations and operational impact.
+6. Choose a monitored deployment window and ensure a known-good SHA is
    available for application rollback.
 
 ### GitHub Actions procedure
@@ -329,24 +384,43 @@ After a successful run:
 
 ## Hotfixes
 
-A hotfix is an ordinary change in a hurry. It branches from `main` like
-everything else, and its only distinction is the name and the urgency.
+A hotfix branches from `main`, because the fault is in the revision Production
+is running and `develop` may hold unreleased work that must not ship with the
+fix.
 
 ```text
-main -> hotfix/<short-description> -> main -> Staging -> Production
+main -> hotfix/<short-description> -> main -> back-merge to staging AND develop
 ```
 
 1. `git switch main && git pull --ff-only && git switch -c hotfix/<short-description>`
 2. Fix it, test locally, push, and open a pull request targeting `main`. The same
-   required checks apply: a hotfix skips the queue, not the gates.
-3. Squash merge it. The merge triggers `Deploy Staging` if it touched a path in
-   that workflow's filter.
-4. Verify on Staging, then dispatch `Deploy Production` with `main`'s new tip.
+   thirteen checks apply: a hotfix skips the queue, not the gates.
+3. **Give it Staging provenance before merging.** Dispatch `Deploy Staging` with
+   the workflow ref set to the hotfix branch. That both puts the fix on a real
+   environment and creates the deployment record Production will look for.
+4. Merge with **Create a merge commit**, so the hotfix commit becomes the merge's
+   second parent and carries that record. The squash button is not offered on
+   `main`, by ruleset.
+5. Dispatch `Deploy Production` with `main`'s new tip.
+6. **Back-merge `main` into `staging`, then into `develop`.** Not optional — see
+   below.
 
-If the change touched no path in the Staging filter, no `staging-deploy.yml` run
-exists for that SHA and the "Verify the exact SHA passed Staging" gate will
-refuse the release. That is the gate working, not a bug: dispatch `Deploy
-Staging` manually against `main` first, then dispatch Production.
+If you skip step 3, Production refuses the release because no Staging deployment
+record exists for the SHA or its second parent. That is the gate working.
+Recover by dispatching `Deploy Staging` against `main`, then dispatch Production
+again.
+
+### The back-merge is mandatory
+
+After a hotfix reaches `main`, `main` holds a commit `staging` and `develop` do
+not. Leave it there and the state is `main = A`, `staging = A-1`,
+`develop = A-1` — so the **next ordinary promotion silently reverts the
+hotfix**, reintroducing the production fault with no failing check anywhere to
+announce it.
+
+`promotion-paths.yml` permits `main -> staging` and `main -> develop` precisely
+so this is never blocked. Those two routes exist for the back-merge and nothing
+else; they are not a way to move work backwards down the pipeline.
 
 ## Rollback triggers
 
@@ -547,8 +621,9 @@ For migration problems, stop and follow the [database migration guide](./databas
 and [D1 migration drift runbook](../runbooks/d1-migration-drift.md). Do not edit
 the remote D1 migration ledger manually.
 
-For a Staging regression, open a fix or revert pull request into `main`, run the
-checks, and let the Staging workflow deploy the resulting commit.
+For a Staging regression, open a fix or revert pull request into `develop`, run
+the checks, then promote `develop` to `staging` and let the Staging workflow
+deploy the resulting commit.
 
 ## What does not move between environments
 
@@ -569,11 +644,12 @@ least privilege, before the release that needs it.
 
 | Situation | Correct action |
 | --- | --- |
-| Start a feature | Create a short-lived branch from current `main` |
+| Start a feature | Create a short-lived branch from current `develop` |
 | Fix something already live in Production | Create `hotfix/<name>` from current `main` |
-| Test services/backend/Admin changes | Squash into `main` and use the automatic Staging deployment |
-| Test Android changes | Run `Distribute Android Staging` for the intended `main` commit |
-| Release services/backend/Admin | Dispatch Production with the exact Staging-tested SHA, which must be `main`'s tip |
+| Test services/backend/Admin changes | Squash into `develop`, then promote `develop` to `staging` as a merge commit |
+| Test Android changes | Run `Distribute Android Staging` for the intended `staging` commit |
+| Release services/backend/Admin | Promote `staging` to `main` as a merge commit, then dispatch Production with `main`'s tip |
+| Just shipped a hotfix | Back-merge `main` into `staging` and `develop` before anything else |
 | Release Android publicly | Use the separate, approved Google Play release process when available |
 | Production code regression | Redeploy the last known-good SHA |
 | Production migration problem | Use the migration runbook; do not assume code rollback reverses data changes |

@@ -332,7 +332,7 @@ branch from Dashboard.
   one implemented plan onto a test organization through expiring entitlement
   overrides (maximum 24 hours), audit and one-click reset. Its backend route
   returns `404` outside Staging and it is not a shipped Android bypass.
-- Merges to `main` are eligible for automatic Staging deployment after CI.
+- Merges to `staging` are eligible for automatic Staging deployment after CI.
   Production promotion is manual and uses the exact commit already verified in
   Staging, supplied as a full 40-character SHA. Before 2026-08-24 the Staging
   trigger was `main`, and the promotion input was documented as accepting a
