@@ -2,7 +2,7 @@
 status: current
 generated: false
 owner: security
-last_verified: 2026-08-19
+last_verified: 2026-08-25
 applies_to: [production, staging]
 ---
 # Cloudflare API token inventory
@@ -46,7 +46,7 @@ The splits that *do* reduce capability are the ones by **function**:
 | 4 | `orderak-backup-production` | same as above | `ORDERAK_BACKUP_PRODUCTION` — `production` |
 | 5 | `orderak-drift-check` | **Account:** D1 `Read`, Workers Scripts `Read`, Queues `Read`, Workers R2 Storage `Read` | `ORDERAK_DRIFT_CHECK` — `production` |
 | 6 | `orderak-analytics` | **Account:** Account Analytics `Read` | `ORDERAK_ANALYTICS` — `production` |
-| 7 | `orderak-restore-read` | **Account:** Workers R2 Storage `Read`, D1 `Edit` | `ORDERAK_RESTORE_READ` — `backup-restore-*` |
+| 7 | `orderak-restore-read` | **Account:** Workers R2 Storage `Read`, D1 `Edit` | `ORDERAK_RESTORE_READ` — `backup-restore-production` |
 | 8 | `orderak-rollback-breakglass` | **Account:** Workers Scripts `Edit` | **offline custody only — never in GitHub** |
 
 `Zone` rows apply to the `orderak.app` zone.

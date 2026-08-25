@@ -142,6 +142,7 @@ keeping in full:
 4. `youo1/Orderak.APP` is **public again** — measured 2026-08-24,
    `private=false` — and the reviewer rules returned with it. Measured the same
    day: `production`, `backup-restore-production` and `backup-restore-staging`
+   (the last of these was deleted on 2026-08-25)
    each report `protection_rules: ["required_reviewers", "branch_policy"]`, with
    a single reviewer, `User:youo1`, and `prevent_self_review: false`.
 
@@ -161,9 +162,10 @@ anyway. On a single-maintainer repository the gate could never have done the
 work claimed for it: the sole reviewer is always the change author, so the approval is a
 self-approval, and a control that one person can always satisfy alone constrains
 nothing. Keeping it on the roadmap kept a permanent false finding in every audit.
-(`staging-rollback` also does not exist in `Orderak.APP`; the five environments
-present are `production`, `staging`, `staging-contract-tests`, and the two
-`backup-restore-*`.)
+(`staging-rollback` also does not exist in `Orderak.APP`. As of 2026-08-25 the
+three environments present are `production`, `staging` and
+`backup-restore-production`; `staging-contract-tests` and
+`backup-restore-staging` were deleted that day.)
 
 What does the real work is what always did — checks a machine performs on every
 dispatch, none of which need a second person to be available:
@@ -478,7 +480,10 @@ network variance, not application variance — the two-arm experiment put the
 application's own contribution at 2.5 ms.
 
 The durable place to run this is `openapi-nightly.yml`, which cannot run until
-the `staging-contract-tests` environment exists.
+the `staging-contract-tests` environment exists. That environment was deleted on
+2026-08-25 without ever holding the credentials, so this remains unrun: the
+workflow is dispatch-only and still fails its preflight until seller credentials
+are supplied somewhere.
 
 ### What the parity check actually covered, and what it could not
 

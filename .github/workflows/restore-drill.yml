@@ -30,9 +30,12 @@ on:
       target:
         description: Which environment's backups to restore-drill
         type: choice
-        default: staging
+        # Production only, from 2026-08-25, when backup-restore-staging was
+        # deleted. Staging was the safe rehearsal target; without it this drill
+        # reads real production backups, so treat a run as an operation on
+        # production data rather than a practice run.
+        default: production
         options:
-          - staging
           - production
       database:
         description: Which database to drill (one per run — each has its own backup timestamp)
@@ -57,7 +60,7 @@ jobs:
   restore-drill:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment: ${{ inputs.target == 'production' && 'backup-restore-production' || 'backup-restore-staging' }}
+    environment: backup-restore-production
     # One database per run, deliberately — this was a matrix over both.
     #
     # Each database is backed up by its own matrix leg of d1-backup.yml, and

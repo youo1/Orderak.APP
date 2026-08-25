@@ -40,19 +40,22 @@ on:
     # databases serve, so an export competes with as little live work as
     # possible. Backups are encrypted to the age recipient held as a repository
     # variable; this job never sees the private half.
+    #
+    # Production only. Staging was exported here between 2026-08-24 and
+    # 2026-08-25 and is not any more — see the target input above.
     - cron: '0 2 * * *'
   workflow_dispatch:
     inputs:
       target:
         description: Which environment to export
         type: choice
-        # Staging is where the project is developed; the nightly schedule covers
-        # both environments regardless of this default.
-        default: staging
+        # Production only, from 2026-08-25. The staging export was removed with
+        # the backup-restore-staging environment: that environment held the sole
+        # age identity for staging, so nothing can decrypt a staging export any
+        # more and writing one would only produce files nobody can open.
+        default: production
         options:
           - production
-          - staging
-          - both
 
 permissions:
   contents: read
@@ -228,119 +231,3 @@ jobs:
             echo "/tmp/${DB}.sql.age: ${SIZE_MB} MB — within limits"
           fi
 
-  backup-staging:
-    # Runs on the nightly schedule as of 2026-08-24. Until then only production
-    # was backed up on a schedule and staging was dispatch-only, which left the
-    # environment the project actually develops against with no recent restore
-    # point for restore-drill.yml to exercise.
-    if: >-
-      ${{ github.event_name != 'workflow_dispatch'
-          || inputs.target == 'staging'
-          || inputs.target == 'both' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    environment: staging
-    strategy:
-      fail-fast: false
-      matrix:
-        database: [orderak-db-staging, orderak-geo-staging]
-    env:
-      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-      CLOUDFLARE_API_TOKEN: ${{ secrets.ORDERAK_BACKUP_STAGING }}
-      AGE_RECIPIENT: ${{ vars.AGE_RECIPIENT }}
-      DB: ${{ matrix.database }}
-
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Preflight required staging credentials
-        run: |
-          set -euo pipefail
-          missing=0
-          if [ -z "${CLOUDFLARE_API_TOKEN}" ]; then
-            echo "ERROR: ORDERAK_BACKUP_STAGING is not set in the 'staging' environment."
-            missing=1
-          fi
-          if [ -z "${CLOUDFLARE_ACCOUNT_ID}" ]; then
-            echo "ERROR: CLOUDFLARE_ACCOUNT_ID is not set in the 'staging' environment."
-            missing=1
-          fi
-          if [ -z "${AGE_RECIPIENT}" ]; then
-            echo "ERROR: AGE_RECIPIENT is not set in the 'staging' environment — refusing to export unencrypted."
-            missing=1
-          fi
-          [ "$missing" = "0" ] || exit 1
-          echo "Staging backup credentials are present."
-
-      - name: Install age (pinned, checksum-verified)
-        run: bash .github/scripts/install-age.sh
-
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
-
-      - run: pnpm install --frozen-lockfile
-        working-directory: services/backend
-
-      - name: Compute exportable table allowlist
-        working-directory: services/backend
-        run: |
-          set -euo pipefail
-          npx wrangler d1 execute "$DB" --remote --json \
-            --command "SELECT name, sql FROM sqlite_master WHERE type='table'" \
-            > /tmp/schema.json
-          TABLES=$(node scripts/d1-exportable-tables.mjs < /tmp/schema.json)
-          echo "TABLE_ARGS=$TABLES" >> "$GITHUB_ENV"
-
-      - name: Export ${{ matrix.database }}
-        working-directory: services/backend
-        run: |
-          set -euo pipefail
-          # shellcheck disable=SC2086
-          npx wrangler d1 export "$DB" --remote $TABLE_ARGS --output="/tmp/${DB}.sql"
-
-      - name: Validate staging export is non-empty and contains schema
-        run: |
-          set -euo pipefail
-          F="/tmp/${DB}.sql"
-          [ -s "$F" ] || { echo "ERROR: $F is empty or missing — aborting backup"; exit 1; }
-          grep -q "CREATE TABLE" "$F" || { echo "ERROR: $F has no CREATE TABLE — export may be corrupt"; exit 1; }
-          echo "$F: $(wc -c < "$F") bytes OK"
-
-      - name: Append index and trigger definitions — wrangler d1 export omits them entirely
-        working-directory: services/backend
-        run: |
-          set -euo pipefail
-          npx wrangler d1 execute "$DB" --remote --json \
-            --command "SELECT type, name, tbl_name, sql FROM sqlite_master WHERE type IN ('table','index','trigger')" \
-            > /tmp/schema-with-indexes.json
-          node scripts/d1-export-schema-extras.mjs < /tmp/schema-with-indexes.json >> "/tmp/${DB}.sql"
-
-      - name: Restore drill — prove the export is recoverable
-        working-directory: services/backend
-        run: |
-          set -euo pipefail
-          node scripts/verify-d1-restore.mjs "/tmp/${DB}.sql" \
-            --manifest "/tmp/${DB}.manifest.json" --min-tables 1
-
-      - name: Encrypt export
-        run: |
-          set -euo pipefail
-          age -r "$AGE_RECIPIENT" -o "/tmp/${DB}.sql.age" "/tmp/${DB}.sql"
-          shred -u "/tmp/${DB}.sql" 2>/dev/null || rm -f "/tmp/${DB}.sql"
-          echo "Encrypted: ${DB}.sql.age ($(wc -c < "/tmp/${DB}.sql.age") bytes)"
-
-      - name: Upload staging to R2
-        working-directory: services/backend
-        run: |
-          set -euo pipefail
-          TIMESTAMP=$(date -u +%Y-%m-%dT%H%MZ)
-          cd /tmp && sha256sum "${DB}.sql.age" > "${DB}.sql.age.sha256" && cd - >/dev/null
-          for artifact in "sql.age" "sql.age.sha256" "manifest.json"; do
-            npx wrangler r2 object put "orderak-backups/d1/${DB}/${TIMESTAMP}.${artifact}" \
-              --file="/tmp/${DB}.${artifact}" --content-type="application/octet-stream" --remote
-            echo "Uploaded: d1/${DB}/${TIMESTAMP}.${artifact}"
-          done
