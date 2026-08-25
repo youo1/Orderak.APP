@@ -21,8 +21,8 @@ resources before any rename, creation, deletion, or Production deployment.
 | Link | Production | Staging |
 |---|---|---|
 | GitHub Environment | `production` | `staging` |
-| Deploying branch | `main` | `staging` |
-| Deployment trigger | Manual dispatch only | Push to `staging`, path-filtered |
+| Deploying branch | `main` | `main` |
+| Deployment trigger | Manual dispatch only | Push to `main`, path-filtered |
 | Workflow | `.github/workflows/production-deploy.yml` | `.github/workflows/staging-deploy.yml` |
 | Public Wrangler config | `services/backend/wrangler.jsonc` base | same file, `env.staging` |
 | Admin Wrangler config | `services/backend/wrangler.admin.jsonc` base | same file, `env.staging` |
@@ -104,7 +104,7 @@ human being available:
 |---|---|
 | Typed `DEPLOY_PRODUCTION` confirmation | An accidental dispatch |
 | 40-character SHA, matched against `origin/main` | Deploying a side branch |
-| A successful `staging-deploy.yml` run on the SHA **or on its second parent** | Deploying an unexercised commit |
+| A successful `staging-deploy.yml` run on the SHA | Deploying an unexercised commit |
 | `require-deploy-owner` against `DEPLOY_OWNER` | Deploying from the wrong repository |
 | `verify-deployment-map.mjs` | Deploying at the wrong resources |
 | Full test, type-check, lint, and `wrangler --dry-run` | Shipping a broken build or config |

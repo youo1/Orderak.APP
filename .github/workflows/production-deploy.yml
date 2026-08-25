@@ -72,33 +72,18 @@ jobs:
         with:
           expected-owner: ${{ vars.DEPLOY_OWNER }}
 
-      # Staging deploys fire on pushes to `staging`, not to `main` (changed
-      # 2026-08-24). A promotion merge commit on main is therefore a SHA that
-      # staging never deployed, and checking it alone would deadlock production
-      # permanently: the commit that was exercised is the merge's SECOND parent,
-      # the staging tip at promotion time.
-      #
-      # Accepted: the release commit itself (a fast-forward promotion, or a merge
-      # commit someone re-ran staging-deploy against by dispatch) and its second
-      # parent. Deliberately NOT accepted: the first parent, which is the previous
-      # production release. Accepting that one would pass a promotion whose
-      # staging side had never deployed at all, which is the whole point of this
-      # gate.
+      # Staging deploys fire on pushes to `main` again as of 2026-08-25, so the
+      # release SHA is the commit Staging ran and this is a direct check once
+      # more. Between 2026-08-24 and 2026-08-25 it also accepted the SHA's second
+      # parent, because promotions arrived as merge commits that Staging had
+      # never itself deployed; with one branch every merge is a squash, so there
+      # is no second parent to consider.
       - name: Verify the exact SHA passed Staging
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
-
-          # rev-list --parents reads the commit header only, so this works on the
-          # shallow checkout above without fetching the parent objects.
-          SECOND_PARENT=$(git rev-list --parents -n 1 HEAD | awk '{print $3}')
-
-          RUNS=0
-          for candidate in $RELEASE_SHA $SECOND_PARENT; do
-            found=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/staging-deploy.yml/runs?head_sha=${candidate}&status=success&per_page=100" --jq '.workflow_runs | length')
-            RUNS=$((RUNS + found))
-          done
+          RUNS=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/staging-deploy.yml/runs?head_sha=${RELEASE_SHA}&status=success&per_page=100" --jq '.workflow_runs | length')
           test "$RUNS" -gt 0
 
       # From main: production may only ever deploy the tip of main. The staging
