@@ -2,6 +2,16 @@
 
 <!-- Brief description of what this PR does and why. -->
 
+## Target branch
+
+CI rejects any base/head combination that is not a declared route.
+
+- [ ] `feature/*` `fix/*` `chore/*` `docs/*` into **`develop`** — squash
+- [ ] `develop` into **`staging`** — merge commit (squash is not offered)
+- [ ] `staging` into **`main`** — merge commit (squash is not offered)
+- [ ] `hotfix/*` into **`main`** — merge commit, after dispatching `Deploy Staging` against the hotfix branch
+- [ ] `main` into **`staging`** / **`develop`** — mandatory hotfix back-merge
+
 ## Type of change
 
 - [ ] Bug fix
