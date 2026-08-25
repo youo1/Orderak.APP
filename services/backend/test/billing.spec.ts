@@ -94,25 +94,71 @@ describe("coupon redemption", () => {
 	// The bucket was `phone || ip`, and `phone` comes from a request header the
 	// caller sets — so rotating it gave every attempt a fresh bucket and the IP
 	// branch was never reached.
+	//
+	// WHY THE BURST IS RETRIED, AND WHY THE COUNT IS EXACT
+	//
+	// checkRateLimit uses a *calendar-aligned* fixed window —
+	// `windowStart = now - (now % windowSec)` — so a burst that straddles a
+	// minute boundary is counted as two partial bursts. Forty probes split
+	// 18/22 across a boundary never reach thirty, and the endpoint correctly
+	// returns no 429 at all. That is what made this test flaky: it failed in CI
+	// on 2026-08-25 on a documentation-only pull request and passed on re-run
+	// with the same commit.
+	//
+	// The fix is not to loosen the assertion. RATE_LIMITER is bound at the top
+	// level of wrangler.jsonc, so the test runs against the Durable Object,
+	// whose increments the runtime serialises — within one window the outcome is
+	// exact, not approximate. So: detect the straddle, retry on a fresh IP, and
+	// then assert the precise number of rejections. A weaker `.some(...)` would
+	// have passed just as happily if the limit silently became 39.
 	it("rate-limits coupon probing per source, not per caller-supplied phone", async () => {
 		await seedPaidPlan();
-		// The IP window allows 30/minute. Fired together rather than in sequence:
-		// forty sequential round trips through the limiter Durable Object is slow
-		// enough to time out when the whole suite is running.
-		const probe = (attempt: number) => call("/api/v1/coupons/validate", {
-			method: "POST",
-			headers: {
-				"content-type": "application/json",
-				// A different phone every time — previously enough to evade the
-				// limit entirely, because the bucket was `phone || ip` and the
-				// phone comes from a header the caller sets.
-				"x-orderak-phone": `+2010000${String(attempt).padStart(5, "0")}`,
-				"cf-connecting-ip": "203.0.113.77",
-			},
-			body: JSON.stringify({ plan_id: "growth", code: `GUESS${attempt}` }),
-		});
-		const responses = await Promise.all(Array.from({ length: 40 }, (_, index) => probe(index)));
-		expect(responses.some((response) => response.status === 429)).toBe(true);
+
+		// Mirrors the coupon:validate:ip bucket in domains/commerce/billing.ts,
+		// which is limited to 30 requests per 60 seconds. If that limit is retuned
+		// this test should fail, and be updated deliberately rather than relaxed.
+		const IP_LIMIT = 30;
+		const WINDOW_SEC = 60;
+		const PROBES = IP_LIMIT + 10;
+
+		const currentWindow = () => Math.floor(Date.now() / 1000 / WINDOW_SEC);
+
+		// Fired together rather than in sequence: forty sequential round trips
+		// through the limiter Durable Object is slow enough to time out when the
+		// whole suite is running.
+		const burst = async (ip: string) => {
+			const probe = (attempt: number) => call("/api/v1/coupons/validate", {
+				method: "POST",
+				headers: {
+					"content-type": "application/json",
+					// A different phone every time — previously enough to evade the
+					// limit entirely, because the bucket was `phone || ip` and the
+					// phone comes from a header the caller sets. Each phone is used
+					// once per burst, so the 10/minute phone bucket never trips and
+					// every 429 below is attributable to the IP bucket.
+					"x-orderak-phone": `+2010000${String(attempt).padStart(5, "0")}`,
+					"cf-connecting-ip": ip,
+				},
+				body: JSON.stringify({ plan_id: "growth", code: `GUESS${attempt}` }),
+			});
+			const openedIn = currentWindow();
+			const responses = await Promise.all(Array.from({ length: PROBES }, (_, index) => probe(index)));
+			return { responses, straddled: currentWindow() !== openedIn };
+		};
+
+		// A fresh IP per attempt, so a partial count left by a straddled burst
+		// cannot leak into the next one. A burst takes about a second against a
+		// boundary that comes once a minute, so needing even the second attempt
+		// is uncommon and the third is vanishingly unlikely.
+		let result = await burst("203.0.113.77");
+		for (const retryIp of ["203.0.113.78", "203.0.113.79"]) {
+			if (!result.straddled) break;
+			result = await burst(retryIp);
+		}
+		expect(result.straddled).toBe(false);
+
+		const rateLimited = result.responses.filter((response) => response.status === 429).length;
+		expect(rateLimited).toBe(PROBES - IP_LIMIT);
 	});
 });
 
