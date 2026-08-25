@@ -2,19 +2,6 @@
 
 <!-- Brief description of what this PR does and why. -->
 
-## Target branch
-
-Tick the one that applies. The merge button matters: squashing a promotion or a
-hotfix severs the link to its Staging run and the Production release gate will
-refuse it. See
-[the release workflow guide](../docs/guides/staging-production-workflow.md).
-
-- [ ] `feature/*` or `fix/*` into **`develop`** — **Squash and merge**
-- [ ] `develop` into **`staging`** promotion — **Create a merge commit**
-- [ ] `staging` into **`main`** promotion — **Create a merge commit**
-- [ ] `hotfix/*` into **`main`** — **Create a merge commit**, after dispatching
-      `Deploy Staging` against the hotfix branch
-
 ## Type of change
 
 - [ ] Bug fix
