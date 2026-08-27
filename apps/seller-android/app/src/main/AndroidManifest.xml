@@ -40,6 +40,17 @@
             android:name="firebase_crashlytics_collection_enabled"
             android:value="${crashlyticsCollectionEnabled}" />
 
+        <!-- Performance Monitoring: same variant rule as Crashlytics, but this
+             one is a crash guard rather than a noise filter. Firebase Perf's
+             TransportManager resolves a Firebase Installations ID on a
+             background executor and does not catch IllegalArgumentException,
+             so a Firebase config the SDK rejects takes the whole process down
+             seconds after launch. Leaving it on only where the configuration
+             is known-good keeps a config problem a config problem. -->
+        <meta-data
+            android:name="firebase_performance_collection_enabled"
+            android:value="${performanceCollectionEnabled}" />
+
         <!-- WorkManager: on-demand init (Hilt provides the configuration) -->
         <provider
             android:name="androidx.startup.InitializationProvider"

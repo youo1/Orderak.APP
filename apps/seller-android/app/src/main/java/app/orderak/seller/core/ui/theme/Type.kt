@@ -8,7 +8,6 @@ import androidx.compose.ui.text.googlefonts.GoogleFont
 import androidx.compose.ui.text.googlefonts.Font as GoogleFontRef
 import androidx.compose.ui.unit.sp
 import app.orderak.seller.R
-import app.orderak.seller.data.remote.BrandingRepository
 
 /**
  * Cairo, loaded via the Downloadable Fonts API — no APK size cost, and it's
@@ -161,13 +160,13 @@ val OrderakTypography = Typography(
     ),
 )
 
-private fun remoteFontFamily(id: String): FontFamily = when (id) {
+private fun generatedFontFamily(id: String): FontFamily = when (id) {
     "tajawal" -> TajawalFontFamily
     "noto-arabic" -> NotoArabicFontFamily
     else -> CairoFontFamily
 }
 
-private fun remoteFontWeight(value: Int): FontWeight = when {
+private fun generatedFontWeight(value: Int): FontWeight = when {
     value >= 700 -> FontWeight.Bold
     value >= 600 -> FontWeight.SemiBold
     value >= 500 -> FontWeight.Medium
@@ -175,21 +174,25 @@ private fun remoteFontWeight(value: Int): FontWeight = when {
 }
 
 /**
- * Applies all 15 published roles. Compose `sp` applies the OS font scale after
- * the published multiplier, avoiding double accessibility scaling.
+ * Applies all 15 generated roles. Compose `sp` applies the OS font scale after
+ * the generated multiplier, avoiding double accessibility scaling.
+ *
+ * Values come from GeneratedDesignSystem, which is emitted by the design-system
+ * generator. There is no runtime typography source.
  */
-fun Typography.withRemote(snapshot: BrandingRepository.TypographySnapshot?): Typography {
-    if (snapshot == null || snapshot.roles.size != 15) return this
-    val family = remoteFontFamily(snapshot.family)
+fun Typography.withGenerated(): Typography {
+    val roles = GeneratedDesignSystem.typography
+    if (roles.size != 15) return this
+    val family = generatedFontFamily(GeneratedDesignSystem.FONT_FAMILY)
     fun role(name: String, fallback: TextStyle): TextStyle {
-        val token = snapshot.roles[name] ?: return fallback
-        if (token.sizeSp <= 0.0 || token.lineHeight <= 0.0) return fallback
+        val token = roles[name] ?: return fallback
+        if (token.sizeSp <= 0f || token.lineHeight <= 0f) return fallback
         return fallback.copy(
             fontFamily = family,
-            fontWeight = remoteFontWeight(token.weight),
-            fontSize = token.sizeSp.toFloat().sp,
-            lineHeight = (token.lineHeight * 16.0).toFloat().sp,
-            letterSpacing = (token.sizeSp * token.letterSpacingEm).toFloat().sp,
+            fontWeight = generatedFontWeight(token.weight),
+            fontSize = token.sizeSp.sp,
+            lineHeight = (token.lineHeight * 16f).sp,
+            letterSpacing = (token.sizeSp * token.letterSpacingEm).sp,
         )
     }
     return copy(

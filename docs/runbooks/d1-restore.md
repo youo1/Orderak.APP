@@ -2,8 +2,8 @@
 status: current
 generated: false
 owner: backend
-last_verified: 2026-08-16
-applies_to: [production, staging]
+last_verified: 2026-08-27
+applies_to: [production]
 authoritative_for: [d1-restore]
 ---
 # D1 restore from backup
@@ -98,11 +98,12 @@ sha256sum --check restore.sql.age.sha256
 
 **Decrypt.** The private key is not in this checkout, this machine's normal
 environment, or any workflow the backup job can reach. It lives only as the
-`AGE_IDENTITY` secret in the `backup-restore-staging` /
-`backup-restore-production` GitHub Environment, both of which require a
-reviewer to release it. Retrieve it there (Settings → Environments → the
-matching `backup-restore-*` environment), save it to a file that never gets
-committed, and decrypt:
+`AGE_IDENTITY` secret in the `backup-restore-production` GitHub Environment.
+There is **no reviewer gate** on it — see
+[key custody](#appendix-encryption-key-custody-and-rotation) for why, and for
+what holds instead. Retrieve it there (Settings → Environments →
+`backup-restore-production`), save it to a file that never gets committed, and
+decrypt:
 
 ```bash
 age -d -i ./age-identity.txt -o ./restore.sql ./restore.sql.age
@@ -132,8 +133,16 @@ npx wrangler d1 execute orderak-db-restore-YYYYMMDD --remote --file=./restore.sq
 There is no `wrangler d1 import` command — `d1 execute --file` is the restore
 path.
 
-If the export exceeds D1's 100 MB import ceiling, split it per table and
-restore in dependency order (parents before children).
+`d1 execute --file` accepts up to 5 GiB, the same as the R2 upload limit. Both
+databases are far below it (2.4 MB and 39 MB as of 2026-08-27), so a single-file
+restore is the normal path. Only if an export ever exceeds 5 GiB should you
+split it per table and restore in dependency order (parents before children).
+
+> This step said "100 MB" until 2026-08-27. That was D1's old import ceiling.
+> Checked against the current
+> [import/export documentation](https://developers.cloudflare.com/d1/best-practices/import-export-data/)
+> — splitting a 40 MB export because the runbook said to would cost time during
+> an incident and add ordering mistakes for no reason.
 
 ## 4. Reconcile
 
@@ -222,13 +231,19 @@ account.
 ## Appendix: encryption key custody and rotation
 
 Every backup is encrypted with [age](https://age-encryption.org) to a
-recipient (public key) held by the backup job. Staging and production use
-**separate keypairs** — a staging identity cannot decrypt a production
-backup, and vice versa.
+recipient (public key) held by the backup job.
+
+> **Production is the only keypair, from 2026-08-25.** Staging previously had
+> its own, and the two could not decrypt each other's backups. The
+> `backup-restore-staging` environment held the sole copy of the staging
+> identity and was deleted with it, so no staging export written before that
+> date can ever be opened again. `d1-backup.yml` stopped writing them on the
+> same day rather than producing files nobody can read. Everything below
+> describes production only.
 
 | | Backup job (`d1-backup.yml`) | Restore drill / manual restore |
 | --- | --- | --- |
-| Holds | `AGE_RECIPIENT` (public key) — a GitHub **variable**, `staging` and `production` environments | `AGE_IDENTITY` (private key) — a GitHub **secret**, `backup-restore-staging` and `backup-restore-production` environments |
+| Holds | `AGE_RECIPIENT` (public key) — a GitHub **variable**, `production` environment | `AGE_IDENTITY` (private key) — a GitHub **secret**, `backup-restore-production` environment |
 | Can | Encrypt new backups | Decrypt existing backups |
 | Cannot | Decrypt anything — the public key alone cannot | Write backups — no D1 or R2-write credential in scope |
 | Gated by | Whatever already gates the backup job | **Custody of `AGE_IDENTITY`**, scoped to the `backup-restore-*` environment — a job that does not declare that environment cannot decrypt at all. Manual dispatch only; no schedule, and no reviewer (see below) |
@@ -276,10 +291,11 @@ under the 30-day lock; there is nothing to migrate.
    age-keygen -o new-identity.txt
    ```
 
-2. Update the GitHub **variable** `AGE_RECIPIENT` (staging or production
-   environment) to the new public key printed above.
-3. Update the GitHub **secret** `AGE_IDENTITY` in the matching
-   `backup-restore-*` environment to the full contents of `new-identity.txt`.
+2. Update the GitHub **variable** `AGE_RECIPIENT` in the `production`
+   environment to the new public key printed above.
+3. Update the GitHub **secret** `AGE_IDENTITY` in the
+   `backup-restore-production` environment to the full contents of
+   `new-identity.txt`.
 4. **Put `new-identity.txt` into offline custody before deleting the local
    copy** — a password manager entry, or equivalent storage outside this
    repository and outside GitHub. Only then `shred -u new-identity.txt`.

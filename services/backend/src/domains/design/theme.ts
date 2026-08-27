@@ -2,52 +2,53 @@
 // Project design tokens — the single source of truth for colors
 // across every server-rendered surface (landing, catalog, legal
 // pages, admin panel) and the public /api/v1/theme endpoint that the
-// Android app can read.
+// storefront reads.
 //
 // Overrides live in the `settings` table under the `theme_colors`
 // key (JSON object of token -> hex). Anything not overridden falls
 // back to DEFAULT_THEME, so a partial override is always safe.
-// Edited from the admin panel's Theme tab in one click.
 //
-// Navy + gold palette. Deep navy (#1E3A8A) passes WCAG AA both
-// directions at ~10.4:1. Gold (#D4A017) is reserved for decorative
-// fills only (badges, highlights) — never use it as text or icon color.
+// Dark Teal palette. These values are the standard/light roles emitted by
+// generateDesignSystem() from the seeds primary #0A9A8E, secondary #F2751A,
+// tertiary #3B82F6, and every pair was contrast-validated at generation.
+// Keep them in step with design/tokens.json and LEGACY_DEFAULT_THEME; they are
+// the same projection rendered for different consumers.
 // ============================================================
 
 import { invalidateDesignSystemCache, loadActiveDesignSystem } from "./design-system";
 
 export interface Theme {
-	primary: string;        // buttons, links, focus states — #1E3A8A, 10.4:1 on white
-	primary_strong: string; // hover/pressed — #14275C
-	primary_soft: string;   // container/badge fills — #EDF1FC, pair with --ink
-	primary_tint: string;   // icons/decorative accents — #3B5BA9, 5.8:1
-	canvas: string;         // page background — #F5F7FC
-	surface: string;        // cards, inputs — #FFFFFF
-	ink: string;            // primary text — #14141F
-	muted: string;          // secondary text — #5C6470, 6.0:1
-	line: string;           // borders — #E1E5EE
-	danger: string;         // error text/icons/borders — #C1362B, 5.5:1
-	danger_soft: string;    // error container fill — #FBEAE8
-	warning: string;        // warning text/icons — #9A6700, 4.9:1
-	warning_soft: string;   // warning container fill — #FBF1DE
-	accent: string;         // GOLD decorative fill — #D4A017, 2.4:1 on white (fill-only)
+	primary: string;        // buttons, links, focus states — #006A62, 6.2:1 on canvas
+	primary_strong: string; // hover/pressed — #00332E
+	primary_soft: string;   // container/badge fills — #84F5E7, pair with --ink
+	primary_tint: string;   // icons/decorative accents — #66D9CB
+	canvas: string;         // page background — #F3FBFA
+	surface: string;        // cards, inputs — #F3FBFA
+	ink: string;            // primary text — #151D1D
+	muted: string;          // secondary text — #3B4A49, 8.8:1
+	line: string;           // borders — #B9CAC9
+	danger: string;         // error text/icons/borders — #BA1A1A
+	danger_soft: string;    // error container fill — #FFDAD5
+	warning: string;        // warning text/icons — #755B00
+	warning_soft: string;   // warning container fill — #FFDF91
+	accent: string;         // decorative fill — #9B4500 (fill-only)
 }
 
 export const DEFAULT_THEME: Theme = {
-	primary: "#1E3A8A",
-	primary_strong: "#14275C",
-	primary_soft: "#EDF1FC",
-	primary_tint: "#3B5BA9",
-	canvas: "#F5F7FC",
-	surface: "#FFFFFF",
-	ink: "#14141F",
-	muted: "#5C6470",
-	line: "#E1E5EE",
-	danger: "#C1362B",
-	danger_soft: "#FBEAE8",
-	warning: "#9A6700",
-	warning_soft: "#FBF1DE",
-	accent: "#D4A017",
+	primary: "#006A62",
+	primary_strong: "#00332E",
+	primary_soft: "#84F5E7",
+	primary_tint: "#66D9CB",
+	canvas: "#F3FBFA",
+	surface: "#F3FBFA",
+	ink: "#151D1D",
+	muted: "#3B4A49",
+	line: "#B9CAC9",
+	danger: "#BA1A1A",
+	danger_soft: "#FFDAD5",
+	warning: "#755B00",
+	warning_soft: "#FFDF91",
+	accent: "#9B4500",
 };
 
 export const THEME_KEYS = Object.keys(DEFAULT_THEME) as (keyof Theme)[];

@@ -20,7 +20,6 @@ export const DESIGN_SYSTEM_SCHEMA_VERSION = 2;
 export const DESIGN_SYSTEM_GENERATOR_VERSION = "orderak-mcu-0.3.0+3";
 export const MAX_PUBLIC_PAYLOAD_BYTES = 128 * 1024;
 export const MAX_REQUEST_BYTES = 64 * 1024;
-export const MAX_OVERRIDES = 128;
 export const FIRST_SCHEMA_V2_ANDROID_VERSION_CODE = 2;
 
 export type SchemeVariant =
@@ -60,13 +59,6 @@ export interface DesignSystemSource {
 	};
 }
 
-export interface RoleOverride {
-	value: string;
-	reason: string;
-}
-
-export type DesignSystemOverrides = Record<string, RoleOverride>;
-
 export interface ValidationMessage {
 	code: string;
 	message: string;
@@ -98,7 +90,6 @@ export interface GeneratedDesignSystem {
 	web: {
 		colors: Record<ContrastName, Record<ThemeMode, Record<string, { hex: string; rgb: string; oklch: string }>>>;
 	};
-	overrides: DesignSystemOverrides;
 	validation: ValidationSummary;
 	contentHash: string;
 }
@@ -121,27 +112,27 @@ export interface LegacyTheme {
 }
 
 export const LEGACY_DEFAULT_THEME: LegacyTheme = {
-	primary: "#1E3A8A",
-	primary_strong: "#14275C",
-	primary_soft: "#EDF1FC",
-	primary_tint: "#3B5BA9",
-	canvas: "#F5F7FC",
-	surface: "#FFFFFF",
-	ink: "#14141F",
-	muted: "#5C6470",
-	line: "#E1E5EE",
-	danger: "#C1362B",
-	danger_soft: "#FBEAE8",
-	warning: "#9A6700",
-	warning_soft: "#FBF1DE",
-	accent: "#D4A017",
+	primary: "#006A62",
+	primary_strong: "#00332E",
+	primary_soft: "#84F5E7",
+	primary_tint: "#66D9CB",
+	canvas: "#F3FBFA",
+	surface: "#F3FBFA",
+	ink: "#151D1D",
+	muted: "#3B4A49",
+	line: "#B9CAC9",
+	danger: "#BA1A1A",
+	danger_soft: "#FFDAD5",
+	warning: "#755B00",
+	warning_soft: "#FFDF91",
+	accent: "#9B4500",
 };
 
 export const DEFAULT_DESIGN_SYSTEM_SOURCE: DesignSystemSource = {
 	colors: {
-		primary: "#1E3A8A",
-		secondary: "#D4A017",
-		tertiary: "#0F766E",
+		primary: "#0A9A8E",
+		secondary: "#F2751A",
+		tertiary: "#3B82F6",
 		error: "#BA1A1A",
 		warning: "#9A6700",
 		success: "#2E7D32",
@@ -443,35 +434,13 @@ function validateSource(raw: unknown): { source: DesignSystemSource; errors: Val
 	};
 }
 
-function normalizeOverrides(raw: unknown): { overrides: DesignSystemOverrides; errors: ValidationMessage[] } {
-	const errors: ValidationMessage[] = [];
-	const input = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
-	const entries = Object.entries(input);
-	if (entries.length > MAX_OVERRIDES) errors.push({ code: "too_many_overrides", message: `No more than ${MAX_OVERRIDES} overrides are allowed.`, severity: "error" });
-	const result: DesignSystemOverrides = {};
-	for (const [path, item] of entries.slice(0, MAX_OVERRIDES)) {
-		const match = /^(standard|medium|high)\.(light|dark)\.([A-Za-z][A-Za-z0-9]*)$/.exec(path);
-		if (!match || !COLOR_ROLES.includes(match[3] as typeof COLOR_ROLES[number])) {
-			errors.push({ code: "unsupported_override_role", path, message: "Unknown or unsupported generated role.", severity: "error" });
-			continue;
-		}
-		const value = normalizeHex((item as RoleOverride)?.value);
-		const reason = String((item as RoleOverride)?.reason ?? "").trim();
-		if (!value) errors.push({ code: "invalid_override_color", path, message: "Override must be a six-digit hex color.", severity: "error" });
-		if (reason.length < 12 || reason.length > 240) errors.push({ code: "invalid_override_reason", path, message: "Override reason must contain 12–240 characters.", severity: "error" });
-		if (value) result[path] = { value, reason };
-	}
-	return { overrides: result, errors };
-}
-
 async function contentHash(value: unknown): Promise<string> {
 	const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(value)));
 	return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-export async function generateDesignSystem(rawSource: unknown, rawOverrides: unknown = {}): Promise<GeneratedDesignSystem> {
+export async function generateDesignSystem(rawSource: unknown): Promise<GeneratedDesignSystem> {
 	const normalized = validateSource(rawSource);
-	const overrideResult = normalizeOverrides(rawOverrides);
 	const source = normalized.source;
 	const warnings: ValidationMessage[] = [];
 	const schemes = {} as GeneratedDesignSystem["schemes"];
@@ -483,10 +452,6 @@ export async function generateDesignSystem(rawSource: unknown, rawOverrides: unk
 			schemes[contrast][mode] = schemeRoles(customizedScheme(source, mode === "dark", CONTRAST_LEVEL[contrast]));
 			semantic[contrast][mode] = semanticRoles(source, mode === "dark", contrast);
 		}
-	}
-	for (const [path, override] of Object.entries(overrideResult.overrides)) {
-		const [contrast, mode, role] = path.split(".") as [ContrastName, ThemeMode, string];
-		schemes[contrast][mode][role] = override.value;
 	}
 	if (!["neutral", "monochrome"].includes(source.colors.variant)) {
 		const seeds = [
@@ -541,7 +506,7 @@ export async function generateDesignSystem(rawSource: unknown, rawOverrides: unk
 			web[contrast][mode] = Object.fromEntries(Object.entries({ ...schemes[contrast][mode], ...semantic[contrast][mode] }).map(([key, value]) => [key, webColor(value)]));
 		}
 	}
-	const errors = [...normalized.errors, ...overrideResult.errors, ...contrastErrors];
+	const errors = [...normalized.errors, ...contrastErrors];
 	const base = {
 		schemaVersion: DESIGN_SYSTEM_SCHEMA_VERSION as 2,
 		generatorVersion: DESIGN_SYSTEM_GENERATOR_VERSION,
@@ -553,7 +518,6 @@ export async function generateDesignSystem(rawSource: unknown, rawOverrides: unk
 		shapes: { extraSmall: shapeValues[0], small: shapeValues[1], medium: shapeValues[2], large: shapeValues[3], extraLarge: shapeValues[4] },
 		components: { minimumTouchTargetDp: 48 as const },
 		web: { colors: web },
-		overrides: overrideResult.overrides,
 		validation: { valid: errors.length === 0, errors, warnings, contrast: contrastChecks },
 	};
 	return { ...base, contentHash: await contentHash(base) };
@@ -584,7 +548,13 @@ export interface DesignSystemRevision {
 	id: number;
 	name: string | null;
 	source: DesignSystemSource;
-	overrides: DesignSystemOverrides;
+	/**
+	 * Retained for the design_system_revisions.overrides_json column, which is
+	 * kept rather than dropped (a destructive migration with no upside). Per-role
+	 * overrides were removed: colour now comes only from the seeds, so that every
+	 * emitted value has passed contrast validation.
+	 */
+	overrides: Record<string, never>;
 	snapshot: GeneratedDesignSystem;
 	validation: ValidationSummary;
 	legacyTheme: LegacyTheme;
