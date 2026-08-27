@@ -18,78 +18,6 @@ import { Hono } from "hono";
 import type { AdminEnv } from "./admin-context";
 
 
-export function findDuplicateOverrideRoles(input: string): string[] {
-	const duplicates: string[] = [];
-	let index = 0;
-	const whitespace = () => { while (/\s/.test(input[index] ?? "")) index++; };
-	const stringValue = (): string => {
-		const start = index;
-		if (input[index++] !== "\"") throw new Error("string expected");
-		while (index < input.length) {
-			if (input[index] === "\\") {
-				index += 2;
-				continue;
-			}
-			if (input[index++] === "\"") return JSON.parse(input.slice(start, index));
-		}
-		throw new Error("unterminated string");
-	};
-	const value = (path: string[]): void => {
-		whitespace();
-		if (input[index] === "{") {
-			index++;
-			const seen = new Set<string>();
-			whitespace();
-			while (input[index] !== "}") {
-				const key = stringValue();
-				const duplicate = seen.has(key);
-				seen.add(key);
-				whitespace();
-				if (input[index++] !== ":") throw new Error("colon expected");
-				if (duplicate && path.length === 1 && path[0] === "overrides") duplicates.push(key);
-				value([...path, key]);
-				whitespace();
-				if (input[index] === ",") {
-					index++;
-					whitespace();
-					continue;
-				}
-				if (input[index] !== "}") throw new Error("object delimiter expected");
-			}
-			index++;
-			return;
-		}
-		if (input[index] === "[") {
-			index++;
-			whitespace();
-			let item = 0;
-			while (input[index] !== "]") {
-				value([...path, String(item++)]);
-				whitespace();
-				if (input[index] === ",") {
-					index++;
-					whitespace();
-					continue;
-				}
-				if (input[index] !== "]") throw new Error("array delimiter expected");
-			}
-			index++;
-			return;
-		}
-		if (input[index] === "\"") {
-			stringValue();
-			return;
-		}
-		while (index < input.length && !/[\s,\]}]/.test(input[index])) index++;
-	};
-	try {
-		value([]);
-	} catch {
-		return [];
-	}
-	return [...new Set(duplicates)];
-}
-
 function publicRevision(revision: DesignSystemRevision) {
 	return {
 		id: revision.id,
@@ -140,8 +68,6 @@ async function readBoundedJson(request: Request): Promise<Record<string, unknown
 	const text = await request.text();
 	if (new TextEncoder().encode(text).byteLength > MAX_REQUEST_BYTES) return jsonResponse({ error: "payload_too_large", maximumBytes: MAX_REQUEST_BYTES }, 413);
 	try {
-		const duplicateRoles = findDuplicateOverrideRoles(text);
-		if (duplicateRoles.length) return jsonResponse({ error: "duplicate_override_roles", roles: duplicateRoles }, 400);
 		const parsed = JSON.parse(text || "{}");
 		return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
 	} catch {
@@ -177,7 +103,7 @@ th.get(TB, async (c) => {
 		const active = await loadActiveDesignSystem(env, request);
 		const currentGenerator = active.generatorVersion === DESIGN_SYSTEM_GENERATOR_VERSION
 			? null
-			: await generateDesignSystem(active.source, active.overrides);
+			: await generateDesignSystem(active.source);
 		return jsonResponse({
 			ok: true,
 			activeRevisionId: active.id,
@@ -187,7 +113,6 @@ th.get(TB, async (c) => {
 			capabilities: {
 				schemaVersion: DESIGN_SYSTEM_SCHEMA_VERSION,
 				generatorVersion: DESIGN_SYSTEM_GENERATOR_VERSION,
-				maxOverrides: 128,
 				maxBodyBytes: MAX_REQUEST_BYTES,
 				contrasts: ["standard", "medium", "high"],
 				variants: ["tonal-spot", "vibrant", "expressive", "fidelity", "content", "neutral", "monochrome"],
@@ -211,7 +136,7 @@ th.post(`${TB}/preview`, async (c) => {
 		const body = await readBoundedJson(request);
 		if (body instanceof Response) return body;
 		const started = performance.now();
-		const snapshot = await generateDesignSystem(body.source, body.overrides);
+		const snapshot = await generateDesignSystem(body.source);
 		return jsonResponse({
 			ok: snapshot.validation.valid,
 			snapshot,
@@ -311,7 +236,7 @@ async function publishRevision(
 	const active = await loadActiveDesignSystem(env, request);
 	const baseRevisionId = Number(body.baseRevisionId);
 	if (!Number.isInteger(baseRevisionId)) return jsonResponse({ error: "base_revision_required" }, 400);
-	const snapshot = await generateDesignSystem(body.source, body.overrides);
+	const snapshot = await generateDesignSystem(body.source);
 	if (!snapshot.validation.valid) return jsonResponse({ error: "validation_failed", validation: snapshot.validation }, 422);
 	const projection = legacyProjection(snapshot);
 	const inserted = await env.orderak_db.prepare(
@@ -322,7 +247,7 @@ async function publishRevision(
 		DESIGN_SYSTEM_SCHEMA_VERSION,
 		DESIGN_SYSTEM_GENERATOR_VERSION,
 		JSON.stringify(snapshot.source),
-		JSON.stringify(snapshot.overrides),
+		JSON.stringify({}),
 		JSON.stringify(snapshot),
 		JSON.stringify(snapshot.validation),
 		JSON.stringify(projection),

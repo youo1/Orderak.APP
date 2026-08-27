@@ -1,5 +1,7 @@
 package app.orderak.seller.app
 
+import android.app.UiModeManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -13,10 +15,11 @@ import app.orderak.seller.core.ads.AdManager
 import app.orderak.seller.core.ads.LocalAdManager
 import app.orderak.seller.data.auth.CurrentActivityHolder
 import app.orderak.seller.data.billing.EntitlementRepository
-import app.orderak.seller.data.remote.BrandingRepository
 import app.orderak.seller.data.theme.ThemePreferencesRepository
 import app.orderak.seller.data.theme.selectHighestContrast
+import app.orderak.seller.data.theme.systemContrastLevel
 import app.orderak.seller.app.navigation.OrderakNavHost
+import app.orderak.seller.core.ui.theme.GeneratedDesignSystem
 import app.orderak.seller.core.ui.theme.OrderakTheme
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -30,9 +33,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
     private val designSystemReady = MutableStateFlow(false)
-
-    /** Server-driven theme/branding (cached, refreshed silently). */
-    @Inject lateinit var branding: BrandingRepository
 
     /** Provided to the UI via [LocalAdManager] instead of through ViewModels. */
     @Inject lateinit var adManager: AdManager
@@ -54,7 +54,6 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
 
         setContent {
-            val remoteConfig by branding.config.collectAsStateWithLifecycle()
             val ready by designSystemReady.collectAsStateWithLifecycle()
             val preferences by themePreferences.preferences.collectAsStateWithLifecycle()
             val darkTheme = when (preferences.themeMode) {
@@ -62,15 +61,20 @@ class MainActivity : AppCompatActivity() {
                 ThemePreferencesRepository.ThemeMode.Dark -> true
                 ThemePreferencesRepository.ThemeMode.System -> isSystemInDarkTheme()
             }
-            val systemContrast = if (
-                android.provider.Settings.Secure.getInt(
+            val systemContrast = systemContrastLevel(
+                uiModeContrast = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    getSystemService(UiModeManager::class.java)?.contrast
+                } else {
+                    null
+                },
+                highTextContrastEnabled = android.provider.Settings.Secure.getInt(
                     contentResolver,
                     "high_text_contrast_enabled",
                     0,
-                ) == 1
-            ) "high" else "standard"
+                ) == 1,
+            )
             val contrast = selectHighestContrast(
-                remoteConfig?.source?.colors?.defaultContrast ?: "standard",
+                GeneratedDesignSystem.DEFAULT_CONTRAST,
                 preferences.contrastLevel.key,
                 systemContrast,
             )
@@ -80,7 +84,6 @@ class MainActivity : AppCompatActivity() {
                 OrderakTheme(
                     darkTheme = darkTheme,
                     contrastLevel = contrast,
-                    remoteConfig = remoteConfig,
                 ) {
                     if (ready) OrderakNavHost()
                 }
@@ -105,11 +108,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        designSystemReady.value = false
+        // The design system is compiled into the app, so there is nothing to wait
+        // for: no revision to promote and no network round trip before the first
+        // frame can be themed correctly.
+        designSystemReady.value = true
         lifecycleScope.launch {
-            branding.applyPendingOnForeground()
-            designSystemReady.value = true
-            branding.refresh()
             entitlements.refresh()
         }
     }

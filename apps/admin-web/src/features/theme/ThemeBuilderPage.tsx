@@ -14,14 +14,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Slider } from '@/shared/ui/slider';
 import { Switch } from '@/shared/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/tabs';
-import type { ActiveRevision, ContrastName, DesignSystemOverrides, DesignSystemSource, RevisionSummary, RoleOverride, Snapshot, ThemeGetResponse, ThemeMode } from './types';
+import type { ActiveRevision, ContrastName, DesignSystemSource, RevisionSummary, Snapshot, ThemeGetResponse, ThemeMode } from './types';
 import { RECOVERY_DAYS_MS, clone, deepEqual, patchChanged, recoveryIsCurrent, recoveryKey } from './theme-utils';
 
 const COLOR_SEEDS = ['primary', 'secondary', 'tertiary', 'error', 'warning', 'success', 'information'] as const;
 const PRESETS: Record<string, number> = { Compact: 0.94, Standard: 1, Large: 1.08 };
 
-interface Recovery { expiresAt: number; original: DesignSystemSource; source: DesignSystemSource; overrides: DesignSystemOverrides }
-interface ConflictState { original: ActiveRevision; current: ActiveRevision; localSource: DesignSystemSource; localOverrides: DesignSystemOverrides }
+interface Recovery { expiresAt: number; original: DesignSystemSource; source: DesignSystemSource }
+interface ConflictState { original: ActiveRevision; current: ActiveRevision; localSource: DesignSystemSource }
 
 function humanize(value: string) { return value.replace(/[A-Z]/g, letter => ` ${letter.toLowerCase()}`).replace(/^./, letter => letter.toUpperCase()); }
 
@@ -128,10 +128,8 @@ export default function ThemeBuilderPage() {
   const [payload, setPayload] = useState<ThemeGetResponse | null>(null);
   const [original, setOriginal] = useState<ActiveRevision | null>(null);
   const [source, setSource] = useState<DesignSystemSource | null>(null);
-  const [overrides, setOverrides] = useState<DesignSystemOverrides>({});
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [expert, setExpert] = useState(false);
-  const [overrideEnabled, setOverrideEnabled] = useState(false);
   const [previewMode, setPreviewMode] = useState<ThemeMode>('light');
   const [previewContrast, setPreviewContrast] = useState<ContrastName>('standard');
   const [loading, setLoading] = useState(true);
@@ -140,7 +138,7 @@ export default function ThemeBuilderPage() {
   const [applyOpen, setApplyOpen] = useState(false);
   const [recovery, setRecovery] = useState<Recovery | null>(null);
   const [conflict, setConflict] = useState<ConflictState | null>(null);
-  const dirty = Boolean(original && source && (!deepEqual(original.source, source) || !deepEqual(original.overrides, overrides)));
+  const dirty = Boolean(original && source && !deepEqual(original.source, source));
   const canApply = auth.can('theme:manage');
 
   const load = useCallback(async () => {
@@ -148,7 +146,6 @@ export default function ThemeBuilderPage() {
     setPayload(result);
     setOriginal(result.active);
     setSource(clone(result.active.source));
-    setOverrides(clone(result.active.overrides));
     setSnapshot(result.active.snapshot);
     const saved = localStorage.getItem(recoveryKey(auth.admin!.id, result.active.id));
     if (saved) {
@@ -164,10 +161,10 @@ export default function ThemeBuilderPage() {
   useEffect(() => {
     if (!source || !original || !dirty) return;
     const timer = window.setTimeout(() => localStorage.setItem(recoveryKey(auth.admin!.id, original.id), JSON.stringify({
-      expiresAt: Date.now() + RECOVERY_DAYS_MS, original: original.source, source, overrides,
+      expiresAt: Date.now() + RECOVERY_DAYS_MS, original: original.source, source,
     } satisfies Recovery)), 350);
     return () => window.clearTimeout(timer);
-  }, [source, overrides, original, dirty, auth.admin]);
+  }, [source, original, dirty, auth.admin]);
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => { if (dirty) event.preventDefault(); };
     window.addEventListener('beforeunload', beforeUnload);
@@ -179,7 +176,7 @@ export default function ThemeBuilderPage() {
     const timer = window.setTimeout(() => {
       setPreviewing(true);
       api<{ snapshot: Snapshot }>('/api/admin/v1/theme/preview', {
-        method: 'POST', body: JSON.stringify({ source, overrides }), signal: controller.signal,
+        method: 'POST', body: JSON.stringify({ source }), signal: controller.signal,
       }).then(result => setSnapshot(result.snapshot)).catch(error => {
         if (error instanceof ApiError && error.status === 422 && typeof error.details === 'object') {
           const candidate = (error.details as { snapshot?: Snapshot }).snapshot;
@@ -188,27 +185,27 @@ export default function ThemeBuilderPage() {
       }).finally(() => setPreviewing(false));
     }, 220);
     return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [source, overrides, original]);
+  }, [source, original]);
 
   const changeSource = <K extends keyof DesignSystemSource>(section: K, next: Partial<DesignSystemSource[K]>) => {
     setSource(current => current ? { ...current, [section]: { ...current[section], ...next } } : current);
   };
-  const reset = () => { if (payload) { setSource(clone(payload.defaults)); setOverrides({}); } };
+  const reset = () => { if (payload) setSource(clone(payload.defaults)); };
   const applyCurrent = async () => {
     if (!original || !source) return;
     try {
       const result = await api<{ active: ActiveRevision }>('/api/admin/v1/theme', {
-        method: 'PUT', body: JSON.stringify({ baseRevisionId: original.id, source, overrides }),
+        method: 'PUT', body: JSON.stringify({ baseRevisionId: original.id, source }),
       });
       localStorage.removeItem(recoveryKey(auth.admin!.id, original.id));
       setPayload(current => current ? { ...current, activeRevisionId: result.active.id, active: result.active } : current);
-      setOriginal(result.active); setSource(clone(result.active.source)); setOverrides(clone(result.active.overrides)); setSnapshot(result.active.snapshot);
+      setOriginal(result.active); setSource(clone(result.active.source)); setSnapshot(result.active.snapshot);
       setApplyOpen(false); setMessage(`Revision ${result.active.id} is now current.`);
       applySnapshotToAdmin(result.active.snapshot);
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
         const current = (await api<ThemeGetResponse>('/api/admin/v1/theme')).active;
-        setConflict({ original, current, localSource: source, localOverrides: overrides });
+        setConflict({ original, current, localSource: source });
         setApplyOpen(false);
       } else setMessage(error instanceof Error ? error.message : 'Unable to apply this configuration');
     }
@@ -216,7 +213,6 @@ export default function ThemeBuilderPage() {
   const rebase = () => {
     if (!conflict) return;
     setSource(patchChanged(conflict.original.source, conflict.current.source, conflict.localSource));
-    setOverrides(patchChanged(conflict.original.overrides, conflict.current.overrides, conflict.localOverrides));
     setOriginal(conflict.current); setConflict(null); setMessage('Local changes rebased. Review the new preview before publishing.');
   };
 
@@ -235,7 +231,7 @@ export default function ThemeBuilderPage() {
     </div>
     {message && <Alert><AlertTitle>Status</AlertTitle><AlertDescription>{message}</AlertDescription></Alert>}
     {payload?.generatorUpgradePreview && <Alert className="upgrade-alert"><AlertTriangle className="size-4" /><AlertTitle>Generator upgrade requires review</AlertTitle><AlertDescription>{payload.generatorUpgradePreview.from} → {payload.generatorUpgradePreview.to}. The active source has been regenerated for comparison; publication is never automatic.</AlertDescription><GeneratorUpgradeDiff active={original.snapshot} regenerated={payload.generatorUpgradePreview.snapshot} /></Alert>}
-    {recovery && <Alert><AlertTitle>Unsaved edits found</AlertTitle><AlertDescription>Edits from this revision are available for seven days.</AlertDescription><div className="alert-actions"><Button size="sm" onClick={() => { setSource(recovery.source); setOverrides(recovery.overrides); setRecovery(null); }}>Restore edits</Button><Button size="sm" variant="outline" onClick={() => { localStorage.removeItem(recoveryKey(auth.admin!.id, original.id)); setRecovery(null); }}>Discard</Button></div></Alert>}
+    {recovery && <Alert><AlertTitle>Unsaved edits found</AlertTitle><AlertDescription>Edits from this revision are available for seven days.</AlertDescription><div className="alert-actions"><Button size="sm" onClick={() => { setSource(recovery.source); setRecovery(null); }}>Restore edits</Button><Button size="sm" variant="outline" onClick={() => { localStorage.removeItem(recoveryKey(auth.admin!.id, original.id)); setRecovery(null); }}>Discard</Button></div></Alert>}
     <div className="theme-builder-layout">
       <main>
         <Tabs defaultValue="colors">
@@ -271,11 +267,9 @@ export default function ThemeBuilderPage() {
             <div className="summary-grid"><Card><CardHeader><CardTitle>Spacing</CardTitle></CardHeader><CardContent>{snapshot?.spacing.values.join(' · ')} px/dp</CardContent></Card><Card><CardHeader><CardTitle>Shapes</CardTitle></CardHeader><CardContent>{Object.entries(snapshot?.shapes ?? {}).map(([key, value]) => <Badge key={key}>{key}: {value}px</Badge>)}</CardContent></Card><Card><CardHeader><CardTitle>Component constraint</CardTitle></CardHeader><CardContent>minimumTouchTarget = <strong>48dp</strong></CardContent></Card></div>
           </TabsContent>
           <TabsContent value="roles">
-            <Card><CardHeader><div className="role-heading"><div><CardTitle>Generated roles</CardTitle><CardDescription>Overrides sever generated relationships and require a documented reason.</CardDescription></div><div className="switch-inline"><Label>Override generated role</Label><Switch checked={overrideEnabled} onCheckedChange={setOverrideEnabled} /></div></div></CardHeader><CardContent>
+            <Card><CardHeader><div className="role-heading"><div><CardTitle>Generated roles</CardTitle><CardDescription>Derived from the primitives above. Every pair is contrast-validated at generation, which is why roles are not individually editable.</CardDescription></div></div></CardHeader><CardContent>
               <div className="mode-controls"><FieldSelect label="Mode" value={previewMode} options={['light','dark']} onChange={value => setPreviewMode(value as ThemeMode)} /><FieldSelect label="Contrast" value={previewContrast} options={['standard','medium','high']} onChange={value => setPreviewContrast(value as ContrastName)} /></div>
-              <div className="role-grid">{Object.entries(roles).map(([role, value]) => <RoleEditor key={role} role={role} value={value} path={`${previewContrast}.${previewMode}.${role}`} enabled={overrideEnabled} override={overrides[`${previewContrast}.${previewMode}.${role}`]} onChange={next => setOverrides(current => {
-                const copy = { ...current }; if (next) copy[`${previewContrast}.${previewMode}.${role}`] = next; else delete copy[`${previewContrast}.${previewMode}.${role}`]; return copy;
-              })} />)}</div>
+              <div className="role-grid">{Object.entries(roles).map(([role, value]) => <RoleEditor key={role} role={role} value={value} />)}</div>
             </CardContent></Card>
           </TabsContent>
           <TabsContent value="history"><RevisionHistory active={original} dirty={dirty} canManage={auth.can('theme:manage')} canDelete={auth.can('theme:rollback')} onActivated={load} /></TabsContent>
@@ -287,12 +281,12 @@ export default function ThemeBuilderPage() {
       </aside>
     </div>
     <Dialog open={applyOpen} onOpenChange={setApplyOpen}><DialogContent><DialogHeader><DialogTitle>Apply this configuration as current?</DialogTitle><DialogDescription>A new unnamed technical checkpoint becomes current immediately. Android applies it on its next foreground transition.</DialogDescription></DialogHeader>
-      <div className="publish-summary"><p><strong>Primitive changes:</strong> {sourceDiffCount(original.source, source)}</p><p><strong>Expert overrides:</strong> {Object.keys(overrides).length}</p><p><strong>Warnings:</strong> {snapshot?.validation.warnings.length ?? 0}</p><p><strong>Affected:</strong> Android, admin, landing, catalogs, public and legal pages.</p></div>
+      <div className="publish-summary"><p><strong>Primitive changes:</strong> {sourceDiffCount(original.source, source)}</p><p><strong>Warnings:</strong> {snapshot?.validation.warnings.length ?? 0}</p><p><strong>Affected:</strong> admin, landing, catalogs, public and legal pages. The Android app is themed from code and is not affected.</p></div>
       <DialogFooter><Button variant="outline" onClick={() => setApplyOpen(false)}>Cancel</Button><Button onClick={applyCurrent}>Apply as current</Button></DialogFooter>
     </DialogContent></Dialog>
     <Dialog open={Boolean(conflict)} onOpenChange={open => !open && setConflict(null)}><DialogContent><DialogHeader><DialogTitle>Revision conflict</DialogTitle><DialogDescription>Another administrator published first. Force overwrite is not available.</DialogDescription></DialogHeader>
       {conflict && <div className="three-way-diff"><DiffBlock title={`Original base #${conflict.original.id}`} value={conflict.original.source} /><DiffBlock title={`New active #${conflict.current.id}`} value={conflict.current.source} /><DiffBlock title="Your local changes" value={conflict.localSource} /></div>}
-      <DialogFooter><Button variant="outline" onClick={() => { if (conflict) { setOriginal(conflict.current); setSource(clone(conflict.current.source)); setOverrides(clone(conflict.current.overrides)); } setConflict(null); }}>Discard local changes</Button><Button onClick={rebase}>Rebase my changes</Button></DialogFooter>
+      <DialogFooter><Button variant="outline" onClick={() => { if (conflict) { setOriginal(conflict.current); setSource(clone(conflict.current.source)); } setConflict(null); }}>Discard local changes</Button><Button onClick={rebase}>Rebase my changes</Button></DialogFooter>
     </DialogContent></Dialog>
   </div>;
 }
@@ -300,11 +294,8 @@ export default function ThemeBuilderPage() {
 function FieldSelect({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange(value: string): void }) {
   return <div className="field-stack"><Label>{label}</Label><Select value={value} onValueChange={onChange}><SelectTrigger aria-label={label}><SelectValue /></SelectTrigger><SelectContent>{options.map(option => <SelectItem key={option} value={option}>{humanize(option)}</SelectItem>)}</SelectContent></Select></div>;
 }
-function RoleEditor({ role, value, path, enabled, override, onChange }: { role: string; value: string; path: string; enabled: boolean; override?: RoleOverride; onChange(value?: RoleOverride): void }) {
-  const active = Boolean(override);
+function RoleEditor({ role, value }: { role: string; value: string }) {
   return <div className="role-token"><span className="role-swatch" style={{ background: value }} /><div><strong>{humanize(role)}</strong><code>{value}</code></div>
-    {enabled && <Switch checked={active} onCheckedChange={checked => onChange(checked ? { value, reason: '' } : undefined)} aria-label={`Override ${role}`} />}
-    {active && <div className="role-override"><input type="color" value={override!.value} onChange={event => onChange({ ...override!, value: event.target.value.toUpperCase() })} /><Input value={override!.reason} placeholder="Required reason (12–240 characters)" minLength={12} maxLength={240} onChange={event => onChange({ ...override!, reason: event.target.value })} aria-label={`Reason for ${path}`} /><small>Relationship severed. Recheck: {relatedRoles(role).join(', ')}. These roles are not silently recalculated.</small></div>}
   </div>;
 }
 function ValidationPanel({ snapshot }: { snapshot: Snapshot }) {
@@ -320,13 +311,6 @@ function sourceDiffCount(original: DesignSystemSource, current: DesignSystemSour
     ? Number(!deepEqual(a, b))
     : Object.keys(b as object).reduce((sum, key) => sum + walk((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]), 0);
   return walk(original, current);
-}
-function relatedRoles(role: string): string[] {
-  const lowered = role.replace(/^on/, '').replace(/Container$/, '').replace(/Fixed(Dim|Variant)?$/, '');
-  const base = lowered.charAt(0).toLowerCase() + lowered.slice(1);
-  const title = base.charAt(0).toUpperCase() + base.slice(1);
-  const related = [base, `on${title}`, `${base}Container`, `on${title}Container`, `inverse${title}`, `${base}Fixed`, `${base}FixedDim`, `on${title}Fixed`, `on${title}FixedVariant`];
-  return [...new Set(related.filter(item => item !== role))];
 }
 function applySnapshotToAdmin(snapshot: Snapshot) {
   const root = document.documentElement;

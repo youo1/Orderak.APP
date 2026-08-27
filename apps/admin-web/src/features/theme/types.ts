@@ -19,8 +19,6 @@ export interface DesignSystemSource {
   shapes: { preset: 'sharp' | 'balanced' | 'rounded' | 'custom'; baseRadius?: number };
 }
 
-export interface RoleOverride { value: string; reason: string }
-export type DesignSystemOverrides = Record<string, RoleOverride>;
 export interface ValidationMessage { code: string; message: string; path?: string; severity: 'error' | 'warning' }
 export interface Validation {
   valid: boolean;
@@ -39,7 +37,6 @@ export interface Snapshot {
   spacing: { values: number[]; tokens: Record<string, number> };
   shapes: Record<string, number>;
   components: { minimumTouchTargetDp: 48 };
-  overrides: DesignSystemOverrides;
   validation: Validation;
   contentHash: string;
 }
@@ -48,7 +45,6 @@ export interface ActiveRevision {
   id: number;
   name: string | null;
   source: DesignSystemSource;
-  overrides: DesignSystemOverrides;
   snapshot: Snapshot;
   validation: Validation;
   contentHash: string;
@@ -75,6 +71,6 @@ export interface ThemeGetResponse {
   active: ActiveRevision;
   defaults: DesignSystemSource;
   approvedFonts: string[];
-  capabilities: { generatorVersion: string; maxOverrides: number; maxBodyBytes: number };
+  capabilities: { generatorVersion: string; maxBodyBytes: number };
   generatorUpgradePreview: { from: string; to: string; snapshot: Snapshot } | null;
 }

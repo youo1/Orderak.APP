@@ -531,7 +531,6 @@ val verifySellerApiContract by tasks.registering {
         val mainRoot = appRoot.resolve("src/main/java/app/orderak/seller")
         val routes = mainRoot.resolve("core/network/ApiRoutes.kt").readText()
         val backendApi = mainRoot.resolve("data/remote/BackendApi.kt").readText()
-        val branding = mainRoot.resolve("data/remote/BrandingRepository.kt").readText()
         val networkJson = mainRoot.resolve("core/network/NetworkJson.kt").readText()
         val clientContext = mainRoot.resolve("core/platform/ClientContext.kt").readText()
         val apiContract = workspaceRoot.resolve(
@@ -553,10 +552,6 @@ val verifySellerApiContract by tasks.registering {
             "Seller calls must cross the central v1-only routing boundary."
         )
         requireContract(
-            ".url(Backend.BASE_URL + ApiRoutes.v1(\"theme\"))" in branding,
-            "The branding request must use the explicit v1 path."
-        )
-        requireContract(
             "interface ClientContextProvider" in clientContext &&
                 ".header(\"x-request-id\", clientContextProvider.newRequestId())" in backendApi &&
                 "x-orderak-platform" in backendApi,
@@ -564,8 +559,7 @@ val verifySellerApiContract by tasks.registering {
         )
         requireContract(
             "ignoreUnknownKeys = true" in networkJson &&
-                "NetworkJson.decoder" in backendApi &&
-                "NetworkJson.decoder" in branding,
+                "NetworkJson.decoder" in backendApi,
             "All backend response decoding must keep the central forward-compatible decoder."
         )
         val disallowedApiLiterals = mainRoot.walkTopDown()
@@ -588,26 +582,24 @@ val verifySellerApiContract by tasks.registering {
 
 val verifyDesignSystemContract by tasks.registering {
     group = "verification"
-    description = "Verifies schema-v2 coverage and the generated offline fallback identity"
+    description = "Verifies the generated design system is complete, accessible and code-only"
 
     doLast {
         val appRoot = project.projectDir
         val workspaceRoot = appRoot.parentFile.parentFile.parentFile
         val themeRoot = appRoot.resolve("src/main/java/app/orderak/seller/core/ui/theme")
-        val branding = appRoot.resolve(
-            "src/main/java/app/orderak/seller/data/remote/BrandingRepository.kt"
-        ).readText()
         val theme = themeRoot.resolve("Theme.kt").readText()
         val type = themeRoot.resolve("Type.kt").readText()
-        val colors = themeRoot.resolve("Color.kt").readText()
         val contract = themeRoot.resolve("DesignSystemContract.kt").readText()
+        val generated = themeRoot.resolve("GeneratedDesignSystem.kt").readText()
         val fixture = workspaceRoot.resolve("design/design-system.default.json").readText()
         val legacy = workspaceRoot.resolve("design/tokens.json").readText()
 
         fun requireContract(condition: Boolean, message: String) {
             if (!condition) {
                 throw GradleException(
-                    "DESIGN SYSTEM CONTRACT WARNING: $message\n" +
+                    "DESIGN SYSTEM CONTRACT WARNING: $message" +
+                        "\n" +
                         "Run services/backend/npm run design-system:generate; do not bypass this guard."
                 )
             }
@@ -618,6 +610,9 @@ val verifyDesignSystemContract by tasks.registering {
                 "\"schemaVersion\": 2" in fixture,
             "The schema-v2 fallback contract drifted."
         )
+
+        // The generator writes the hash into two files. If they disagree, one of
+        // them was edited by hand.
         val hash = Regex("""const val DEFAULT_FALLBACK_HASH = "([a-f0-9]{64})"""")
             .find(contract)?.groupValues?.get(1)
         requireContract(
@@ -625,21 +620,55 @@ val verifyDesignSystemContract by tasks.registering {
             "Android and canonical fallback hashes differ."
         )
         requireContract(
-            listOf("\"cairo\"", "\"tajawal\"", "\"noto-arabic\"").all { it in branding } &&
-                "snapshot.typography.roles.size == 15" in branding,
-            "Approved fonts or the complete 15-role typography guard changed."
+            hash != null && "const val CONTENT_HASH = \"$hash\"" in generated,
+            "GeneratedDesignSystem.kt was not produced by the same generator run as the fixture."
+        )
+
+        // Completeness. These used to be validated on the remote payload as it
+        // arrived; the payload is gone, so they are asserted on the generated
+        // source that replaced it. Same coverage, different source of truth.
+        val contrastModes = listOf("standard", "medium", "high").flatMap { contrast ->
+            listOf("light", "dark").map { mode -> "\"$mode\" to \"$contrast\"" }
+        }
+        requireContract(
+            contrastModes.all { it in generated },
+            "The generated schemes no longer cover every contrast and mode."
         )
         requireContract(
-            listOf("\"standard\", \"medium\", \"high\"", "\"light\", \"dark\"").all { it in branding } &&
-                "requiredDesignSystemColorRoles" in branding,
-            "Mode, contrast, or color-role validation coverage changed."
+            listOf(
+                "displayLarge", "displayMedium", "displaySmall",
+                "headlineLarge", "headlineMedium", "headlineSmall",
+                "titleLarge", "titleMedium", "titleSmall",
+                "bodyLarge", "bodyMedium", "bodySmall",
+                "labelLarge", "labelMedium", "labelSmall",
+            ).all { "\"$it\" to GeneratedTypeRole(" in generated },
+            "The complete 15-role typography scale is no longer generated."
         )
         requireContract(
-            "applyPendingOnForeground" in branding &&
-                "PENDING_JSON" in branding &&
-                "minimumTouchTargetDp >= 48.0" in branding,
-            "Foreground-safe activation or the 48dp constraint changed."
+            Regex("""const val MINIMUM_TOUCH_TARGET_DP = (\d+(?:\.\d+)?)f""")
+                .find(generated)?.groupValues?.get(1)?.toDoubleOrNull()?.let { it >= 48.0 } == true,
+            "The 48dp minimum touch target constraint changed."
         )
+        requireContract(
+            listOf("cairo", "tajawal", "noto-arabic").any {
+                "const val FONT_FAMILY = \"$it\"" in generated
+            },
+            "The generated font family is not an approved Orderak font."
+        )
+
+        // Colour must reach the UI only through the generator, because
+        // generateDesignSystem() is where contrast is validated. A theme that
+        // reads colour from anywhere else is unguarded by construction.
+        requireContract(
+            "GeneratedDesignSystem.colorScheme(" in theme &&
+                "GeneratedDesignSystem.extendedColors(" in theme,
+            "Theme.kt no longer sources its colours from the generated design system."
+        )
+        requireContract(
+            "BrandingRepository" !in theme && "remoteConfig" !in theme,
+            "Runtime theming was reintroduced; colour must stay code-only and contrast-gated."
+        )
+
         requireContract(
             "dynamicColorEnabled = false" in
                 appRoot.resolve("src/main/java/app/orderak/seller/data/theme/ThemePreferencesRepository.kt").readText() &&
@@ -647,15 +676,19 @@ val verifyDesignSystemContract by tasks.registering {
             "Material You must remain disabled; published Orderak colors have precedence."
         )
         requireContract(
-            "OrderakTypography.withRemote" in theme &&
+            "OrderakTypography.withGenerated" in theme &&
                 "LocalOrderakSpacing provides spacing" in theme &&
-                "remoteShapes" in theme &&
+                "generatedShapes" in theme &&
                 "Surface(" in theme,
-            "Runtime Compose token mapping is incomplete."
+            "Compose token mapping is incomplete."
         )
+
+        // Brand identity. The seed lives in the fixture; the tone-corrected
+        // light primary is what the app actually renders, so both are pinned.
         requireContract(
-            "0xFF1E3A8A" in colors && "\"primary\": \"#1E3A8A\"" in fixture &&
-                "\"primary\": \"#1E3A8A\"" in legacy,
+            "\"primary\": \"#0A9A8E\"" in fixture &&
+                "\"primary\": \"#006A62\"" in legacy &&
+                "0xFF006A62" in generated,
             "The protected default brand source or legacy projection changed."
         )
         requireContract(

@@ -2,7 +2,6 @@ import { SELF, env } from "cloudflare:test";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { callWorker, createSchema } from "./helpers";
 import { MAX_PUBLIC_PAYLOAD_BYTES, invalidateDesignSystemCache, loadActiveDesignSystem } from "../src/domains/design/design-system";
-import { findDuplicateOverrideRoles } from "../src/domains/admin/admin-theme";
 import { signJwt, type AdminRole } from "../src/domains/identity/auth";
 import adminWorker from "../src/entrypoints/admin-worker";
 
@@ -35,20 +34,14 @@ describe("public design-system contract", () => {
 		const body = JSON.parse(text);
 		expect(body.schemaVersion).toBe(2);
 		expect(body.designSystem.schemaVersion).toBe(2);
-		expect(body.theme.primary).toBe("#1E3A8A");
-		expect(body.theme.accent).toBe("#D4A017");
+		expect(body.theme.primary).toBe("#006A62");
+		expect(body.theme.accent).toBe("#9B4500");
 		expect(body.version).toHaveLength(64);
 
 		const notModified = await SELF.fetch("https://api.orderak.app/api/v1/theme", {
 			headers: { "if-none-match": response.headers.get("etag")! },
 		});
 		expect(notModified.status).toBe(304);
-	});
-
-	it("detects duplicate override roles before JSON decoding can collapse them", () => {
-		const body = `{"source":{},"overrides":{"standard.light.primary":{"value":"#111111","reason":"first approved reason"},"standard.light.primary":{"value":"#222222","reason":"second approved reason"}}}`;
-		expect(findDuplicateOverrideRoles(body)).toEqual(["standard.light.primary"]);
-		expect(findDuplicateOverrideRoles('{"overrides":{"standard.light.primary":{"value":"#111111","reason":"approved reason"}}}')).toEqual([]);
 	});
 
 	it("keeps an inaccessible legacy projection for v1 clients without activating an invalid v2 snapshot", async () => {
@@ -126,7 +119,7 @@ describe("public design-system contract", () => {
 		invalidateDesignSystemCache();
 		const fallback = await loadActiveDesignSystem(env);
 		expect(fallback.id).toBe(0);
-		expect(fallback.legacyTheme.primary).toBe("#1E3A8A");
+		expect(fallback.legacyTheme.primary).toBe("#006A62");
 		const error = await env.orderak_db.prepare(
 			"SELECT context FROM error_logs WHERE context='design_system_fallback' ORDER BY id DESC LIMIT 1",
 		).first<{ context: string }>();

@@ -50,33 +50,36 @@ describe("generated design system", () => {
 			...DEFAULT_DESIGN_SYSTEM_SOURCE,
 			colors: {
 				...DEFAULT_DESIGN_SYSTEM_SOURCE.colors,
-				secondary: "#1E3A8A",
+				// Near-neighbour of the teal primary in CAM16-UCS. The literal value
+				// matters only in that it must be *similar* to the brand primary; when
+				// the brand was navy this was #1E3A8A for the same reason.
+				secondary: "#0F766E",
 			},
 		});
 		expect(result.validation.warnings.some((warning) => warning.code === "seed_similarity")).toBe(true);
 		expect(result.validation.valid).toBe(true);
 	});
 
-	it("requires justified overrides and blocks failed contrast pairs", async () => {
-		const result = await generateDesignSystem(DEFAULT_DESIGN_SYSTEM_SOURCE, {
-			"standard.light.primary": { value: "#FFFFFF", reason: "Approved temporary campaign exception" },
-		});
-		expect(result.validation.valid).toBe(false);
-		expect(result.validation.errors.some((error) => error.code === "contrast_failed")).toBe(true);
+	it("validates every generated contrast pair against its required ratio", async () => {
+		// Per-role overrides were removed, so a failing pair can no longer be
+		// injected by an operator. What this gate now protects against is a
+		// regression in the generator itself: if MCU tone mapping or the seeds
+		// ever stopped producing accessible pairs, the build must fail rather
+		// than ship an unreadable theme.
+		const result = await generateDesignSystem(DEFAULT_DESIGN_SYSTEM_SOURCE);
+		expect(result.validation.valid).toBe(true);
+		expect(result.validation.errors).toEqual([]);
 
-		const missingReason = await generateDesignSystem(DEFAULT_DESIGN_SYSTEM_SOURCE, {
-			"standard.light.primary": { value: "#005A30", reason: "short" },
-		});
-		expect(missingReason.validation.errors.some((error) => error.code === "invalid_override_reason")).toBe(true);
+		const checks = result.validation.contrast;
+		expect(checks.length).toBeGreaterThan(0);
+		expect(checks.every((check) => check.valid)).toBe(true);
+		expect(checks.every((check) => check.ratio >= check.required)).toBe(true);
 
-		const fixedPairBase = await generateDesignSystem(DEFAULT_DESIGN_SYSTEM_SOURCE);
-		const fixedPair = await generateDesignSystem(DEFAULT_DESIGN_SYSTEM_SOURCE, {
-			"standard.light.primaryFixed": {
-				value: fixedPairBase.schemes.standard.light.onPrimaryFixed,
-				reason: "Approved fixed role verification",
-			},
-		});
-		expect(fixedPair.validation.errors.some((error) => error.path?.includes("onPrimaryFixed/primaryFixed"))).toBe(true);
+		for (const contrast of ["standard", "medium", "high"]) {
+			for (const mode of ["light", "dark"]) {
+				expect(checks.some((check) => check.path.startsWith(`${contrast}.${mode}.`))).toBe(true);
+			}
+		}
 	});
 
 });

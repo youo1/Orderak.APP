@@ -23,6 +23,13 @@ const protectedTasks = [
 	["verifyLocalizationContract", "verifyAuthPhase1Contract"],
 	["verifyAuthPhase1Contract", "androidComponents"],
 	["verifySellerApiContract", "verifyDesignSystemContract"],
+	// verifyDesignSystemContract used to appear only as the boundary marker
+	// above, so its body was never scanned for bypass patterns and the
+	// workflow-inclusion assertion never ran for it. It guards the only
+	// contrast validation left in the system now that colour is generated
+	// rather than published, which makes it the last one that should have
+	// been unprotected.
+	["verifyDesignSystemContract", "tasks.named(\"preBuild\")"],
 ];
 
 const forbiddenTaskPatterns = [
