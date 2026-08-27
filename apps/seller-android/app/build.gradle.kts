@@ -38,6 +38,14 @@ android {
         // Crashlytics: enabled in production/staging release builds only.
         // Overridden to "false" in debug build type and mock flavor below.
         manifestPlaceholders["crashlyticsCollectionEnabled"] = "true"
+        // Performance Monitoring follows the same rule, and for a sharper
+        // reason than noise: its TransportManager calls
+        // FirebaseInstallations.getId() on a background executor and lets
+        // IllegalArgumentException escape. An unusable Firebase config - a
+        // placeholder google-services.json, or a device with no working Play
+        // Services - therefore kills the process on launch rather than
+        // degrading. Off wherever the config is not guaranteed real.
+        manifestPlaceholders["performanceCollectionEnabled"] = "true"
     }
 
     flavorDimensions += "environment"
@@ -62,6 +70,7 @@ android {
             // package lets the Firebase Gradle plugin process local mock builds.
             versionNameSuffix = "-mock"
             manifestPlaceholders["crashlyticsCollectionEnabled"] = "false"
+            manifestPlaceholders["performanceCollectionEnabled"] = "false"
             buildConfigField("String", "DEPLOYMENT_ENVIRONMENT", "\"mock\"")
             buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:4010\"")
             buildConfigField("String", "SITE_BASE_URL", "\"https://staging.orderak.app\"")
@@ -71,6 +80,7 @@ android {
     buildTypes {
         debug {
             manifestPlaceholders["crashlyticsCollectionEnabled"] = "false"
+            manifestPlaceholders["performanceCollectionEnabled"] = "false"
             // en-XA catches expansion/hard-coded text; ar-XB catches RTL issues.
             isPseudoLocalesEnabled = true
         }
@@ -703,4 +713,105 @@ tasks.named("preBuild") {
     dependsOn(verifyAuthPhase1Contract)
     dependsOn(verifySellerApiContract)
     dependsOn(verifyDesignSystemContract)
+}
+
+// ============================================================
+// WHY THIS SITS BELOW tasks.named("preBuild") AND NOT NEXT TO THE CONTRACT TASKS
+//
+// tooling/repository/verify-contract-guards.mjs scans each protected contract
+// task by slicing this file from the task's declaration to the next declaration
+// named in its `protectedTasks` table — for verifyDesignSystemContract, that
+// boundary is `tasks.named("preBuild")`. Anything written in between is read as
+// part of that task's body and checked for bypass patterns.
+//
+// This block legitimately uses `return@doLast` and `System.getenv`, both of
+// which that guard forbids, so placing it in between made the guard fail on
+// verifyDesignSystemContract — code the guard was never looking at.
+//
+// It belongs outside the protected set rather than inside it. A contract task
+// must have no environment-dependent path, because that path is how enforcement
+// gets switched off. This check is the opposite: it exists to describe the
+// environment, and CI genuinely does build with the placeholder on purpose.
+// Below the boundary is where a task like that goes; nothing about the contract
+// guard is weakened by it, and the scanned ranges are exactly what they were.
+// ============================================================
+
+/**
+ * google-services.json is a Firebase secret, so it is gitignored and CI
+ * synthesizes a placeholder (.github/scripts/write-ci-google-services.sh) just
+ * to give the Google Services plugin something well-formed to parse. That file
+ * compiles perfectly and runs not at all: Firebase rejects its API key, and
+ * Performance Monitoring surfaces the rejection as an uncaught
+ * IllegalArgumentException on a background executor, so the process dies a few
+ * seconds after launch on every Android version alike.
+ *
+ * Nothing about that failure points at Firebase from the outside - it reads as
+ * an OS-compatibility problem - which is what earns it a build check. The
+ * manifest now also keeps Performance Monitoring off in debug and mock builds,
+ * so a placeholder config degrades instead of crashing; this task makes sure
+ * nobody has to discover the degradation by hand.
+ *
+ * CI builds with the placeholder deliberately, so CI is exempt.
+ */
+// The placeholder's project_id. A real console download never carries it.
+private val CI_FIREBASE_PLACEHOLDER_MARKER = "orderak-ci"
+
+/**
+ * The google-services.json the Google Services plugin will actually read for a
+ * variant, most specific source set first. Checking every file in the module
+ * instead would fail a staging build over an unrelated placeholder sitting at
+ * the production path, which is a normal state for a developer who only holds
+ * staging credentials.
+ */
+fun firebaseConfigFor(moduleRoot: java.io.File, flavor: String, buildType: String): java.io.File? = listOf(
+    "src/$buildType/$flavor/google-services.json",
+    "src/$flavor/$buildType/google-services.json",
+    "src/$buildType/google-services.json",
+    "src/$flavor/google-services.json",
+    "google-services.json",
+).asSequence()
+    .map { moduleRoot.resolve(it) }
+    .firstOrNull { it.isFile }
+
+androidComponents {
+    onVariants { variant ->
+        val suffix = variant.name.replaceFirstChar(Char::uppercaseChar)
+        val flavor = variant.flavorName.orEmpty()
+        val buildType = variant.buildType.orEmpty()
+        val shippable = buildType == "release"
+        val projectRoot = project.projectDir
+        val runningInCi = System.getenv("CI") != null
+
+        val verify = tasks.register("verifyFirebaseConfiguration$suffix") {
+            group = "verification"
+            description = "Checks that ${variant.name} is not built against the CI placeholder Firebase configuration"
+
+            doLast {
+                // A missing file is processGoogleServices' error to report, not this one.
+                val config = firebaseConfigFor(projectRoot, flavor, buildType) ?: return@doLast
+                if (runningInCi || CI_FIREBASE_PLACEHOLDER_MARKER !in config.readText()) return@doLast
+
+                val detail = buildString {
+                    appendLine("Firebase configuration for ${variant.name} is the CI placeholder, not a real project:")
+                    appendLine("  " + config.relativeTo(projectRoot).invariantSeparatorsPath)
+                    appendLine()
+                    appendLine("An app built against it launches and then dies within seconds on every")
+                    appendLine("Android version, and Phone Auth never works at all.")
+                    appendLine()
+                    appendLine("Fix: download google-services.json from the Firebase console. Production")
+                    appendLine("config goes at app/google-services.json, staging config at")
+                    appendLine("app/src/staging/google-services.json - docs/guides/setup.md, section 6.")
+                }
+
+                // Debug builds warn: driving screens against a dead Firebase is a
+                // legitimate way to work on UI. Anything shippable fails.
+                if (shippable) throw GradleException(detail)
+                logger.warn("\nWARNING: $detail")
+            }
+        }
+
+        // Not the shared preBuild: the check has to know which variant, and so
+        // which configuration file, is in play.
+        tasks.matching { it.name == "pre${suffix}Build" }.configureEach { dependsOn(verify) }
+    }
 }

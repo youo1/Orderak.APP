@@ -96,7 +96,9 @@ class AdManagerImpl @Inject constructor(
                     if (phone.isNotBlank()) withTimeoutOrNull(1_500) {
                         backendApi.trackAd(phone, sessionStore.getOrCreateSecret(), campaign.id, "click", "android-click:${campaign.id}:${UUID.randomUUID()}")
                     }
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                    // No browser installed resolves nothing for ACTION_VIEW; an
+                    // ad tap must not be able to take the app down.
+                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
                 }
             }) {
                 Column {
