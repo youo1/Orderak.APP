@@ -531,7 +531,18 @@ belong to a separate Firebase project:
 4. Download **`google-services.json`**. Place Production configuration at
    `apps/seller-android/app/google-services.json` and Staging configuration at
    `apps/seller-android/app/src/staging/google-services.json`. Both paths are ignored
-   by Git. **The matching variant build fails without its configuration.**
+   by Git. Those two paths are exact: the Google Services plugin reads source-set
+   roots only, so a file left under `src/staging/res/` is not picked up and the
+   build silently falls back to `app/google-services.json`.
+
+   **A build with no configuration at all fails, but a build with the wrong
+   configuration does not.** CI synthesizes a placeholder
+   (`.github/scripts/write-ci-google-services.sh`) so Gradle has something
+   well-formed to parse, and a copy of that file left on a developer machine
+   compiles perfectly and produces an APK that Firebase rejects at runtime.
+   `verifyFirebaseConfiguration<Variant>` catches this: release builds fail,
+   debug builds warn, and CI is exempt because it uses the placeholder on
+   purpose. If you see that warning, this step is the fix.
 5. Add your debug signing SHA-1/SHA-256 fingerprints (printed by
    `gradlew.bat signingReport` from `apps/seller-android/`) to the Firebase Android
    app so Phone Auth works on your builds.

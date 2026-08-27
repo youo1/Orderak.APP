@@ -961,7 +961,15 @@ fun RestrictedAccountScreen(
             Text(stringResource(R.string.common_retry))
         }
         OutlinedButton(
-            onClick = { context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:support@orderak.app"))) },
+            // runCatching, not a bare start: a device with no mail app resolves
+            // nothing for ACTION_SENDTO and throws ActivityNotFoundException,
+            // and a restricted account losing the app entirely is worse than
+            // the button doing nothing.
+            onClick = {
+                runCatching {
+                    context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:support@orderak.app")))
+                }
+            },
             modifier = Modifier.fillMaxWidth(),
         ) { Text(stringResource(R.string.restricted_contact)) }
         OutlinedButton(onClick = { vm.logout(onLogout) }, modifier = Modifier.fillMaxWidth()) {
