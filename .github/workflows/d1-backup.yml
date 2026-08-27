@@ -219,14 +219,29 @@ jobs:
       - name: Check export size against D1 limits
         run: |
           set -euo pipefail
-          # D1's import path caps at 100 MB per file. Warn before we get there.
+          # The restore path is `wrangler d1 execute --file`, and its ceiling is
+          # 5 GiB — "the same as the R2 upload limit", per
+          # https://developers.cloudflare.com/d1/best-practices/import-export-data/
+          # and the 5 GB "maximum file import" row in /d1/platform/limits/.
+          #
+          # This said 100 MB and warned at 95 until 2026-08-27. That was the old
+          # limit and it had moved; nobody noticed because the threshold sat so
+          # far above these databases that the branch never ran either way.
+          # A stale ceiling that never fires still teaches the wrong number to
+          # whoever reads it during a restore, which is when it matters.
+          #
           # Measured on the ciphertext: age's overhead is a small fixed header
           # plus ChaCha20-Poly1305 framing, not a multiplier, so this stays a
-          # valid proxy for the plaintext size that mattered to the importer.
-          LIMIT_MB=95
+          # valid proxy for the plaintext size the importer sees.
+          #
+          # At 2.4 MB and 39 MB, the import ceiling is not the constraint these
+          # databases will meet first — D1 caps a single database at 10 GB, and
+          # that cap cannot be raised. Treat a warning here as a signal to shard
+          # rather than to split the export.
+          LIMIT_MB=4096
           SIZE_MB=$(( $(wc -c < "/tmp/${DB}.sql.age") / 1048576 ))
           if [ "$SIZE_MB" -gt "$LIMIT_MB" ]; then
-            echo "WARNING: /tmp/${DB}.sql.age is ${SIZE_MB} MB — approaching the 100 MB import limit. Consider per-table exports."
+            echo "WARNING: /tmp/${DB}.sql.age is ${SIZE_MB} MB — approaching D1's 5 GiB import limit. Consider per-table exports."
           else
             echo "/tmp/${DB}.sql.age: ${SIZE_MB} MB — within limits"
           fi
