@@ -7,6 +7,7 @@ import app.orderak.seller.data.remote.BackendApi
 import app.orderak.seller.data.remote.StoreIdentityResolver
 import app.orderak.seller.data.catalog.CatalogRepository
 import app.orderak.seller.data.orders.OrderRepository
+import app.orderak.seller.data.demo.DemoDataSeeder
 import app.orderak.seller.data.session.SessionStore
 import app.orderak.seller.data.billing.EntitlementRepository
 import app.orderak.seller.data.billing.EntitlementRefreshResult
@@ -32,8 +33,16 @@ class MainViewModel @Inject constructor(
     private val storeIdentityResolver: StoreIdentityResolver,
     private val catalogRepo: CatalogRepository,
     private val entitlementRepository: EntitlementRepository,
-    orderRepo: OrderRepository
+    orderRepo: OrderRepository,
+    demoDataSeeder: DemoDataSeeder,
 ) : ViewModel() {
+
+    init {
+        // Seeds a local shop the first time the demo account opens the shell.
+        // No-ops on every other account, and in production the constant it
+        // matches against is empty, so it can never fire there.
+        viewModelScope.launch { demoDataSeeder.seedIfNeeded() }
+    }
 
     /**
      * Whether the store has any products (drives the dashboard empty/share

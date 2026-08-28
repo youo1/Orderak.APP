@@ -6,6 +6,7 @@ import app.orderak.seller.data.db.OrderItemEntity
 import app.orderak.seller.data.db.CustomerEntity
 import app.orderak.seller.data.db.OrderakDatabase
 import app.orderak.seller.data.db.ProductEntity
+import app.orderak.seller.data.demo.DemoDataSeeder
 import app.orderak.seller.data.session.SessionStore
 import app.orderak.seller.data.auth.AuthRepository
 import app.orderak.seller.data.billing.EntitlementRepository
@@ -35,6 +36,7 @@ class SyncRepository @Inject constructor(
     private val db: OrderakDatabase,
     private val entitlementRepository: EntitlementRepository,
     private val authRepository: AuthRepository,
+    private val demoDataSeeder: DemoDataSeeder,
 ) {
 
     /** Whether shop config changed since last sync — if not, skip register call. */
@@ -63,6 +65,13 @@ class SyncRepository @Inject constructor(
     }
 
     private suspend fun doSync(): Boolean {
+        // The demo account's catalogue exists only on this device. The product
+        // push below is a full mirror, so syncing would not merely upload the
+        // seeded rows — it would delete whatever that account genuinely has on
+        // the server and replace it with a demo shop. Never in production:
+        // DEMO_SELLER_PHONE is empty there, so this is always false.
+        if (demoDataSeeder.isDemoSeller()) return false
+
         val phone = sessionStore.phone.first() ?: return false
         val shopName = sessionStore.shopName.first() ?: return false
         val secret = sessionStore.getOrCreateSecret()
