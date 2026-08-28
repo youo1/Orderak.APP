@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Devices
@@ -39,12 +38,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -63,6 +65,7 @@ import app.orderak.seller.data.remote.SyncScheduler
 import app.orderak.seller.data.remote.BackendApi
 import app.orderak.seller.data.db.OrderakDatabase
 import app.orderak.seller.data.session.SessionStore
+import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -186,7 +189,6 @@ data class BillingPlanUi(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    onBack: () -> Unit,
     onLogout: () -> Unit,
     onOpenStoreInfo: () -> Unit = {},
     onOpenCategories: () -> Unit = {},
@@ -218,17 +220,20 @@ fun SettingsScreen(
     var confirmLogout by rememberSaveable { mutableStateOf(false) }
     var deletionResult by rememberSaveable { mutableStateOf<Boolean?>(null) }
 
+    // Saving payout details used to call the screen's onBack, which dismissed
+    // it. As a tab there is nothing to dismiss, so the save reported itself by
+    // doing nothing at all. It says so now.
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val payoutSaved = stringResource(R.string.settings_payout_saved)
+
     if (showLanguage) LanguageSheet { showLanguage = false }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.settings_title), modifier = Modifier.semantics { heading() }) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
                 actions = {
                     IconButton(onClick = { showLanguage = true }) {
                         Icon(Icons.Outlined.Language, contentDescription = stringResource(R.string.cd_language))
@@ -379,7 +384,11 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             )
             Button(
-                onClick = { viewModel.savePayout(instapay, vfcash, slug, onBack) },
+                onClick = {
+                    viewModel.savePayout(instapay, vfcash, slug) {
+                        scope.launch { snackbarHostState.showSnackbar(payoutSaved) }
+                    }
+                },
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             ) {
                 Text(stringResource(R.string.settings_save))

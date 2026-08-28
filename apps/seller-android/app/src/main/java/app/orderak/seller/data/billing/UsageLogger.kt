@@ -11,14 +11,6 @@ import javax.inject.Singleton
  */
 @Singleton
 class UsageLogger @Inject constructor() {
-    fun logFeatureAttempt(feature: Feature, planKey: String, success: Boolean) {
-        if (BuildConfig.DEBUG) {
-            val status = if (success) "ALLOWED" else "DENIED"
-            Log.d("UsageLogger", "Feature: ${feature.name} | Plan: $planKey | Status: $status")
-        }
-        // TODO: firebaseAnalytics.logEvent("feature_usage") { ... }
-    }
-
     /**
      * Keyed counterpart for gates addressed by catalogue key.
      *

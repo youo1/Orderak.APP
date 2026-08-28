@@ -125,7 +125,6 @@
     <string name="ai_test_message_label">Message</string>
     <string name="ai_test_send">Send to backend</string>
     <string name="ai_test_error">Backend error: %1$s</string>
-    <string name="cd_settings">Settings</string>
 
     <string name="nav_dashboard">Today</string>
     <string name="nav_orders">Orders</string>
@@ -209,6 +208,7 @@
     <string name="settings_instapay">InstaPay address (e.g. name@instapay)</string>
     <string name="settings_vfcash">Vodafone Cash number</string>
     <string name="settings_save">Save</string>
+    <string name="settings_payout_saved">Payout details saved</string>
     <string name="settings_logout">Log out</string>
     <string name="settings_delete_account">Request account deletion</string>
     <!-- Backend link -->

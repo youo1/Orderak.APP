@@ -46,9 +46,9 @@ enum class SellerSurface(
     /**
      * Identity, plan, devices, support — grouped rather than listed flat.
      *
-     * Absorbs what `SettingsRoute` used to show. The route stays reachable until
-     * the surface is verified against it; deleting it first would take any
-     * undocumented behaviour with it.
+     * Absorbs what the settings screen used to show. The old route was kept
+     * reachable until this surface had been checked against it entry by entry;
+     * it has been, so the route is gone and this is the only way in.
      */
     Account(R.string.nav_account, Icons.Outlined.Person),
     ;

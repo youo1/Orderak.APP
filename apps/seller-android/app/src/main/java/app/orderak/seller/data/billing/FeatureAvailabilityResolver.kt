@@ -143,3 +143,15 @@ class FeatureAvailabilityResolver @Inject constructor(
         const val EXPIRY_PROBE_KEY = "max_products"
     }
 }
+
+/**
+ * Catalogue keys the app gates on by name.
+ *
+ * A key written inline at the call site is a string nothing checks. Named here,
+ * it sits next to the resolver that consumes it, and
+ * `tooling/ux/verify-implementation-status.mjs` verifies the catalogue still
+ * carries the feature and still calls it built.
+ */
+object FeatureKeys {
+    const val OCR_RECEIPT_ASSISTANCE = "payments_finance.ocr_receipt_assistance"
+}
