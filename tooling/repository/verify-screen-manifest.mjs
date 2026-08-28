@@ -62,25 +62,41 @@ const entries = manifestSource
   .map((line) => line.trim())
   .filter((line) => line.startsWith("{ name:") && line.includes("android_route:"));
 
-const field = (block, key) => {
-  const m = block.match(new RegExp(`${key}: (null|true|false|"[^"]*"|\\[[^\\]]*\\])`));
-  return m ? m[1] : undefined;
+/**
+ * Every `key: value` pair on a manifest line, read in one pass with a static
+ * pattern. Building the pattern from the key instead would leave the search
+ * unanchored — `name` would happily match a `display_name` added later — and a
+ * regex assembled from a variable is a finding in its own right.
+ *
+ * First occurrence wins, so a key nested inside `transitions: [...]` cannot
+ * shadow the screen's own.
+ */
+const PAIR = /([a-z_]+): (null|true|false|"[^"]*"|\[[^\]]*\])/g;
+const fieldsOf = (block) => {
+  const found = new Map();
+  for (const [, key, value] of block.matchAll(PAIR)) {
+    if (!found.has(key)) found.set(key, value);
+  }
+  return found;
 };
 const unquote = (v) => (v && v.startsWith('"') ? v.slice(1, -1) : v);
 const arrayOf = (v) => (v && v.startsWith("[") ? [...v.matchAll(/"([^"]+)"/g)].map((m) => m[1]) : []);
 
-const screens = entries.map((block) => ({
-  block,
-  name: unquote(field(block, "name")),
-  route: unquote(field(block, "android_route")),
-  parent: unquote(field(block, "parent_route")),
-  surface: unquote(field(block, "surface")),
-  states: arrayOf(field(block, "states")),
-  offline: field(block, "offline_capable") === "true",
-  entitlement: unquote(field(block, "entitlement_key")),
-  status: unquote(field(block, "feature_status")),
-  transitions: [...block.matchAll(/\{ to: "([^"]+)"/g)].map((m) => m[1]),
-}));
+const screens = entries.map((block) => {
+  const f = fieldsOf(block);
+  return {
+    block,
+    name: unquote(f.get("name")),
+    route: unquote(f.get("android_route")),
+    parent: unquote(f.get("parent_route")),
+    surface: unquote(f.get("surface")),
+    states: arrayOf(f.get("states")),
+    offline: f.get("offline_capable") === "true",
+    entitlement: unquote(f.get("entitlement_key")),
+    status: unquote(f.get("feature_status")),
+    transitions: [...block.matchAll(/\{ to: "([^"]+)"/g)].map((m) => m[1]),
+  };
+});
 
 if (screens.length === 0) problems.push(`${rel(manifestPath)}: parsed no screens — the manifest shape changed`);
 
