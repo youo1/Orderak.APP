@@ -47,6 +47,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import app.orderak.seller.R
+import app.orderak.seller.core.ui.NoticeBanner
+import app.orderak.seller.core.ui.SemanticRole
+import app.orderak.seller.data.billing.EntitlementManager
 import app.orderak.seller.data.db.CategoryEntity
 import app.orderak.seller.data.db.OrderakDatabase
 import app.orderak.seller.data.remote.BackendApi
@@ -70,6 +73,8 @@ class CategoriesViewModel @Inject constructor(
     private val sessionStore: SessionStore,
     private val api: BackendApi,
     private val db: OrderakDatabase,
+    /** Exposed so the screen can ask whether an upgrade can actually be bought. */
+    val entitlements: EntitlementManager,
 ) : ViewModel() {
 
     private val _categories = MutableStateFlow<List<CategoryDto>>(emptyList())
@@ -78,6 +83,9 @@ class CategoriesViewModel @Inject constructor(
     val loading: StateFlow<Boolean> = _loading.asStateFlow()
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
+
+    /** Distinguishes a plan boundary from a failure, so the UI can explain it. */
+    fun clearError() { _error.value = null }
     private val _busy = MutableStateFlow(false)
     val busy: StateFlow<Boolean> = _busy.asStateFlow()
 
@@ -109,10 +117,22 @@ class CategoriesViewModel @Inject constructor(
         _busy.value = true
         val phone = sessionStore.phone.first() ?: run { _busy.value = false; onResult(false); return@launch }
         val secret = sessionStore.getOrCreateSecret()
-        val ok = api.createCategory(phone, secret, CategoryReq(name = n)).ok
+        val response = api.createCategory(phone, secret, CategoryReq(name = n))
         _busy.value = false
-        if (ok) refresh() else _error.value = "create_failed"
-        onResult(ok)
+        if (response.ok) {
+            refresh()
+        } else {
+            // The backend answers 409 PLAN_LIMIT_REACHED when the category limit
+            // is hit, and this mapped it to the same "create_failed" as a network
+            // fault. A seller on the free plan adding a sixth category was told
+            // only that something went wrong — not what, and not what to do.
+            _error.value = if (response.error == PLAN_LIMIT_REACHED) {
+                LIMIT_REACHED
+            } else {
+                "create_failed"
+            }
+        }
+        onResult(response.ok)
     }
 
     fun rename(code: String, name: String) = viewModelScope.launch {
@@ -142,6 +162,7 @@ fun CategoriesScreen(
     val categories by viewModel.categories.collectAsStateWithLifecycle()
     val loading by viewModel.loading.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
+    val entitlements: EntitlementManager = viewModel.entitlements
     val busy by viewModel.busy.collectAsStateWithLifecycle()
     val storeUrl by viewModel.storeUrl.collectAsStateWithLifecycle()
     var newName by rememberSaveable { mutableStateOf("") }
@@ -172,7 +193,26 @@ fun CategoriesScreen(
             }
             Spacer(Modifier.height(12.dp))
             if (loading) CircularProgressIndicator()
-            if (error != null) Text(stringResource(R.string.categories_error), color = MaterialTheme.colorScheme.error)
+            when (error) {
+                null -> Unit
+                // A limit is not a fault. It reads as a notice, keeps the existing
+                // categories on screen, and offers an upgrade only when one can
+                // actually be bought.
+                LIMIT_REACHED -> NoticeBanner(
+                    role = SemanticRole.Commerce,
+                    title = stringResource(R.string.categories_limit_title),
+                    message = if (entitlements.isPurchaseOpen()) {
+                        stringResource(R.string.categories_limit_body)
+                    } else {
+                        stringResource(R.string.categories_limit_body_purchase_closed)
+                    },
+                )
+                else -> NoticeBanner(
+                    role = SemanticRole.Danger,
+                    title = stringResource(R.string.categories_error),
+                    message = stringResource(R.string.categories_error_body),
+                )
+            }
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(categories, key = { it.category_code }) { c ->
                     Card(Modifier.fillMaxWidth()) {
@@ -232,3 +272,9 @@ fun CategoriesScreen(
         )
     }
 }
+
+/** The backend's code for a plan boundary, from plan-limits.ts. */
+private const val PLAN_LIMIT_REACHED = "PLAN_LIMIT_REACHED"
+
+/** Internal marker so the screen can render a boundary as a notice, not a fault. */
+private const val LIMIT_REACHED = "plan_limit_reached"

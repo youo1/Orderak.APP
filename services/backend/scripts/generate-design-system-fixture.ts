@@ -63,6 +63,14 @@ const EXTENDED_FROM_SEMANTIC: ReadonlyArray<readonly [string, string]> = [
 	["informationSoft", "informationContainer"],
 	["onInformation", "onInformation"],
 	["onInformationContainer", "onInformationContainer"],
+	["commerce", "commerce"],
+	["commerceSoft", "commerceContainer"],
+	["onCommerce", "onCommerce"],
+	["onCommerceContainer", "onCommerceContainer"],
+	["warningContainerOutline", "warningContainerOutline"],
+	["successContainerOutline", "successContainerOutline"],
+	["informationContainerOutline", "informationContainerOutline"],
+	["commerceContainerOutline", "commerceContainerOutline"],
 ];
 
 const EXTENDED_FROM_SCHEME: ReadonlyArray<readonly [string, string]> = [

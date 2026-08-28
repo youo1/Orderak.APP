@@ -42,6 +42,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.orderak.seller.R
 import app.orderak.seller.core.money.DEFAULT_CURRENCY
 import app.orderak.seller.core.money.formatAmount
+import app.orderak.seller.core.ui.FullScreenEmpty
+import app.orderak.seller.core.ui.PriorityListRow
+import app.orderak.seller.core.ui.SemanticChip
+import app.orderak.seller.core.ui.SemanticRole
 import app.orderak.seller.data.db.OrderEntity
 import app.orderak.seller.domain.OrderStatus
 import java.text.DateFormat
@@ -59,23 +63,14 @@ fun OrdersScreen(
 
     Box(Modifier.fillMaxSize()) {
         if (orders.isEmpty() && filter == null) {
-            // Empty state when no orders exist at all (unfiltered).
-            Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Outlined.Inbox,
-                        contentDescription = null,
-                        modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Text(
-                        stringResource(R.string.orders_empty),
-                        style = MaterialTheme.typography.bodyLarge,
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            }
+            // The shared empty state, and it carries an action. "Nothing here"
+            // without a next step is a dead end, and a seller on day one meets
+            // this screen before any other.
+            FullScreenEmpty(
+                message = stringResource(R.string.orders_empty),
+                actionLabel = stringResource(R.string.order_new_title),
+                onAction = onNew,
+            )
         } else {
             Column {
                 LazyRow(
@@ -92,13 +87,14 @@ fun OrdersScreen(
                     }
                 }
                 if (orders.isEmpty()) {
-                    Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-                        Text(
-                            stringResource(R.string.orders_empty),
-                            style = MaterialTheme.typography.bodyLarge,
-                            textAlign = TextAlign.Center,
-                        )
-                    }
+                    // Filtered to nothing is a different situation from having no
+                    // orders at all: the fix is to clear the filter, not to sell
+                    // something.
+                    FullScreenEmpty(
+                        message = stringResource(R.string.orders_empty_filtered),
+                        actionLabel = stringResource(R.string.orders_all),
+                        onAction = { viewModel.setFilter(null) },
+                    )
                 } else {
                     LazyColumn(
                         contentPadding = PaddingValues(16.dp),
@@ -131,55 +127,53 @@ fun OrderCard(o: OrderEntity, onClick: () -> Unit) {
     val status = remember(o.status) {
         runCatching { OrderStatus.valueOf(o.status) }.getOrDefault(OrderStatus.NEW)
     }
-    Card(Modifier.fillMaxWidth().clickable(onClick = onClick).semantics(mergeDescendants = true) {}) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    o.buyerName ?: o.buyerPhone,
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        textDirection = TextDirection.Content,
-                    ),
-                )
-                Text(
-                    dateText,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+    // The list's job is "which of these still need me?", not "what stage is
+    // each one at". The rail answers that by shape, so the sort survives
+    // greyscale, colour blindness and a phone in the sun; the chip repeats it.
+    PriorityListRow(
+        title = o.buyerName ?: o.buyerPhone,
+        subtitle = dateText,
+        needsAction = status.needsSeller,
+        modifier = Modifier.clickable(onClick = onClick).semantics(mergeDescendants = true) {},
+        trailing = {
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    stringResource(R.string.currency_egp, formatAmount(o.totalMinor, o.currency)),
+                    // Same locale the date above uses. Reading the ambient default
+                    // here would let money keep Latin digits on a screen whose
+                    // dates have already switched to Arabic-Indic.
+                    stringResource(R.string.currency_egp, formatAmount(o.totalMinor, o.currency, locale)),
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
                 )
+                Spacer(Modifier.height(4.dp))
                 StatusChip(status)
             }
-        }
-    }
+        },
+    )
 }
+
+/** True while the order is still the seller's problem. */
+private val OrderStatus.needsSeller: Boolean
+    get() = this != OrderStatus.DONE && this != OrderStatus.CANCELLED
+
+/**
+ * One semantic role per meaning, not one hue per status.
+ *
+ * The mapping this replaces gave six statuses five different colours, and put
+ * PAID on `primaryContainer` — the brand. A pipeline reads as a sequence, so the
+ * sequence shares a role and only the exceptional outcome and the milestone
+ * stand apart.
+ */
+private val OrderStatus.role: SemanticRole
+    get() = when (this) {
+        OrderStatus.NEW, OrderStatus.CONFIRMED, OrderStatus.SHIPPED -> SemanticRole.Info
+        OrderStatus.PAID -> SemanticRole.Success
+        OrderStatus.DONE -> SemanticRole.Neutral
+        OrderStatus.CANCELLED -> SemanticRole.Danger
+    }
 
 @Composable
 fun StatusChip(status: OrderStatus) {
-    val (bg, fg) = when (status) {
-        OrderStatus.NEW -> MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.onTertiaryContainer
-        OrderStatus.CONFIRMED -> MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer
-        OrderStatus.PAID -> MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
-        OrderStatus.SHIPPED -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
-        OrderStatus.DONE -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
-        OrderStatus.CANCELLED -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
-    }
-    // minimumInteractiveComponentSize ensures ≥48dp touch target (M3 requirement).
-    Surface(
-        color = bg,
-        shape = MaterialTheme.shapes.small,
-        modifier = Modifier.minimumInteractiveComponentSize(),
-    ) {
-        Text(
-            statusLabel(status), color = fg,
-            style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-        )
-    }
+    SemanticChip(role = status.role, label = statusLabel(status))
 }
 
 @Composable

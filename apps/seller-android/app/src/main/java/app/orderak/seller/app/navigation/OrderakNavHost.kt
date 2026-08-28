@@ -132,6 +132,19 @@ fun OrderakNavHost() {
                 onOpenCustomer = { phone: String -> navController.navigate(CustomerRoute(phone)) },
                 onOpenSettings = { navController.navigate(SettingsRoute) },
                 onOpenAnnouncements = { navController.navigate(AnnouncementsRoute) },
+                // The account surface hosts what SettingsRoute shows, so the
+                // shell needs that route's destinations. SettingsRoute itself
+                // stays reachable until the surface is verified against it.
+                onLogout = { navController.navigateAsRoot(SplashRoute) },
+                onOpenStoreInfo = { navController.navigate(StoreInfoRoute) },
+                onOpenCategories = { navController.navigate(CategoriesRoute) },
+                onOpenSupport = { navController.navigate(SupportRoute) },
+                onOpenCatalogLanguages = { navController.navigate(CatalogLanguagesRoute) },
+                onOpenDevices = { navController.navigate(DevicesRoute) },
+                onOpenDeletionStatus = { navController.navigate(DeletionStatusRoute) },
+                onOpenSubscription = { navController.navigate(SubscriptionRoute) },
+                onOpenAiAssistant = { navController.navigate(AiAssistantRoute) },
+                onOpenSellerProfile = { navController.navigate(SellerProfileRoute) },
             )
         }
 

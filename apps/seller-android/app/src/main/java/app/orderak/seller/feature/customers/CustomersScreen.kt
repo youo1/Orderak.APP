@@ -37,6 +37,9 @@ import androidx.lifecycle.viewModelScope
 import app.orderak.seller.R
 import app.orderak.seller.core.money.DEFAULT_CURRENCY
 import app.orderak.seller.core.money.formatAmount
+import app.orderak.seller.core.ui.FullScreenEmpty
+import app.orderak.seller.core.ui.PriorityListRow
+import androidx.compose.ui.platform.LocalConfiguration
 import app.orderak.seller.data.db.CustomerSummary
 import app.orderak.seller.data.orders.OrderRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -58,46 +61,37 @@ fun CustomersScreen(
     viewModel: CustomersViewModel = hiltViewModel()
 ) {
     val customers by viewModel.customers.collectAsStateWithLifecycle()
+    // No action offered: a customer record is created by an order arriving, so
+    // there is nothing a seller can press here. An empty state with a button
+    // that does not help is worse than one without.
     if (customers.isEmpty()) {
-        Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    imageVector = Icons.Outlined.Inbox,
-                    contentDescription = null,
-                    modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(16.dp))
-                Text(stringResource(R.string.customers_empty),
-                    style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
-            }
-        }
+        FullScreenEmpty(message = stringResource(R.string.customers_empty))
         return
     }
+    val locale = LocalConfiguration.current.locales[0]
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         items(customers, key = { it.phone }) { c ->
-            Card(Modifier.fillMaxWidth().clickable { onOpen(c.phone) }) {
-                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            c.name ?: c.phone,
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                textDirection = TextDirection.Content,
-                            ),
-                        )
-                        Text(
-                            pluralStringResource(R.plurals.customer_orders_count, c.ordersCount, c.ordersCount),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+            // The shared row, with no priority rail: a customer is never
+            // "waiting on the seller" the way an order is, so claiming a rail
+            // here would put a signal on a list that has nothing to triage.
+            PriorityListRow(
+                title = c.name ?: c.phone,
+                subtitle = pluralStringResource(
+                    R.plurals.customer_orders_count,
+                    c.ordersCount,
+                    c.ordersCount,
+                ),
+                modifier = Modifier.clickable { onOpen(c.phone) },
+                trailing = {
                     Text(
-                        stringResource(R.string.currency_egp, formatAmount(c.totalMinor, DEFAULT_CURRENCY)),
+                        stringResource(
+                            R.string.currency_egp,
+                            formatAmount(c.totalMinor, DEFAULT_CURRENCY, locale),
+                        ),
                         style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary
                     )
-                }
-            }
+                },
+            )
         }
     }
 }

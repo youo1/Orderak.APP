@@ -18,4 +18,18 @@ class UsageLogger @Inject constructor() {
         }
         // TODO: firebaseAnalytics.logEvent("feature_usage") { ... }
     }
+
+    /**
+     * Keyed counterpart for gates addressed by catalogue key.
+     *
+     * Carries the reason, not just the outcome: "denied" is not actionable,
+     * while UnknownKey, NotImplemented and PlanExcluded each point at a
+     * different fix — a mis-seeded snapshot, a catalogue status, or a plan.
+     */
+    fun logKeyedFeatureAttempt(key: String, planKey: String, availability: String, reason: String) {
+        if (BuildConfig.DEBUG) {
+            Log.d("UsageLogger", "Feature: $key | Plan: $planKey | $availability ($reason)")
+        }
+        // TODO: firebaseAnalytics.logEvent("feature_usage") { ... }
+    }
 }

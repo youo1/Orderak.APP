@@ -157,7 +157,10 @@ fun OrderakTheme(
 // ============================================================
 // Previews for visual verification
 // ============================================================
-@Preview(name = "Light Theme", showBackground = true, backgroundColor = 0xFFF3FBFA)
+// No backgroundColor: OrderakTheme paints its own from colorScheme.background,
+// so a literal here can only duplicate it and then go stale. These two carried
+// the pre-#014D4E backdrop for exactly that reason.
+@Preview(name = "Light Theme")
 @Composable
 private fun PreviewOrderakLightTheme() {
     OrderakTheme(darkTheme = false) {
@@ -165,7 +168,7 @@ private fun PreviewOrderakLightTheme() {
     }
 }
 
-@Preview(name = "Dark Theme", showBackground = true, backgroundColor = 0xFF0D1514)
+@Preview(name = "Dark Theme")
 @Composable
 private fun PreviewOrderakDarkTheme() {
     OrderakTheme(darkTheme = true) {

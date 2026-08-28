@@ -77,6 +77,11 @@ class EntitlementManager @Inject constructor(
         }
     }
 
+    /** Keyed counterpart of [logAttempt] for gates addressed by catalogue key. */
+    fun logKeyedAttempt(key: String, availability: String, reason: String) {
+        usageLogger.logKeyedFeatureAttempt(key, planId(), availability, reason)
+    }
+
     fun logAttempt(feature: Feature) {
         usageLogger.logFeatureAttempt(feature, planId(), isFeatureEnabled(feature))
     }
@@ -89,6 +94,21 @@ class EntitlementManager @Inject constructor(
         val limits = _config.value?.limits ?: return 20
         return limits.max_products ?: Int.MAX_VALUE
     }
+
+    /**
+     * Whether a seller can actually buy anything right now.
+     *
+     * The six acquisition routes answer 403 while billing is closed, so an
+     * upgrade affordance shown without consulting this leads nowhere. The
+     * backend has always sent the flag in `governance.features.billing`; the app
+     * simply never asked, and offered the upgrade on the strength of a higher
+     * plan existing.
+     *
+     * Absent governance means absent permission: a snapshot that predates the
+     * flag must not be read as consent to sell.
+     */
+    fun isPurchaseOpen(): Boolean =
+        _config.value?.governance?.features?.get("billing")?.enabled == true
 
     fun nextUpgradePlanKey(): String? = when (planId()) {
         "free" -> "paid1"

@@ -1,6 +1,7 @@
 package app.orderak.seller.core.money
 
 import java.text.NumberFormat
+import java.util.Locale
 import java.text.ParsePosition
 import java.util.Currency as JavaCurrency
 import kotlin.math.roundToLong
@@ -59,18 +60,27 @@ fun exponentOf(currency: String): Int =
  *
  * The screens wrap this in `R.string.currency_*`, so the symbol comes from the
  * string resources. The number of decimal places still comes from the currency.
+ *
+ * [locale] decides the digit shape and the grouping separator, and defaults to
+ * the ambient one so existing callers are unchanged. A Compose caller should
+ * pass the composition locale instead: the app switches language in-process via
+ * AppCompatDelegate, and reading the ambient default there risks money keeping
+ * Latin digits on a screen whose dates have already turned Arabic-Indic.
  */
-fun formatMoney(money: Money): String {
+fun formatMoney(money: Money, locale: Locale = Locale.getDefault()): String {
     val exponent = exponentOf(money.currency)
-    val nf = NumberFormat.getNumberInstance()
+    val nf = NumberFormat.getNumberInstance(locale)
     nf.minimumFractionDigits = 0
     nf.maximumFractionDigits = exponent
     return nf.format(money.amountMinor / pow10(exponent))
 }
 
 /** Convenience for the common case of formatting a raw amount in a known currency. */
-fun formatAmount(amountMinor: Long, currency: String): String =
-    formatMoney(Money(amountMinor, currency))
+fun formatAmount(
+    amountMinor: Long,
+    currency: String,
+    locale: Locale = Locale.getDefault(),
+): String = formatMoney(Money(amountMinor, currency), locale)
 
 /**
  * Parse a user-entered major-unit amount into minor units.
