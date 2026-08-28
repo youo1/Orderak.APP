@@ -25,7 +25,7 @@ five surfaces can hold the whole product.
 | Surface | Features | Screens | Sections | Fields | L1 | Built today |
 | --- | --- | --- | --- | --- | --- | --- |
 | today | 25 | 11 | 13 | 1 | 4 | 2 |
-| orders | 33 | 11 | 22 | 0 | 6 | 4 |
+| orders | 33 | 11 | 22 | 0 | 6 | 5 |
 | store | 48 | 25 | 16 | 7 | 6 | 4 |
 | customers | 34 | 19 | 10 | 5 | 3 | 2 |
 | account | 75 | 42 | 23 | 10 | 12 | 13 |
@@ -124,7 +124,7 @@ Until then `account` keeps its four groups and no L4 screen is built.
 | `orders_fulfilment.fulfilment_sla_tracking` | SECTION | L4 | planned |
 | `payments_finance.manual_payment_confirmation` | SECTION | L1 | planned |
 | `payments_finance.receipt_image_attachment` | SECTION | L2 | planned |
-| `payments_finance.ocr_receipt_assistance` | SECTION | L3 | planned |
+| `payments_finance.ocr_receipt_assistance` | SECTION | L3 | implemented |
 | `payments_finance.partial_payments_and_deposits` | SECTION | L3 | planned |
 | `payments_finance.cash_on_delivery_tracking` | SECTION | L2 | planned |
 | `payments_finance.payment_links` | SCREEN | L3 | planned |

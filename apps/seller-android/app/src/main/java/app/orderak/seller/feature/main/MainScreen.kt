@@ -16,7 +16,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Group
@@ -98,10 +97,9 @@ fun MainScreen(
     onAddProduct: () -> Unit,
     onEditProduct: (Long) -> Unit,
     onOpenCustomer: (String) -> Unit,
-    onOpenSettings: () -> Unit,
     onOpenAnnouncements: () -> Unit,
-    // The account surface hosts what SettingsRoute used to, so the shell now
-    // needs the destinations that route owned.
+    // The account surface is where settings live now, so the shell owns the
+    // destinations the deleted SettingsRoute used to reach.
     onLogout: () -> Unit = {},
     onOpenStoreInfo: () -> Unit = {},
     onOpenCategories: () -> Unit = {},
@@ -157,11 +155,6 @@ fun MainScreen(
         topBar = {
             TopAppBar(
                 title = { Text(shopName ?: stringResource(R.string.app_name), modifier = Modifier.semantics { heading() }) },
-                actions = {
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.cd_settings))
-                    }
-                }
             )
         },
         floatingActionButton = {
@@ -216,11 +209,9 @@ fun MainScreen(
                     sellerPhone = sellerPhone,
                 )
                 SellerSurface.Customers -> CustomersScreen(onOpen = onOpenCustomer)
-                // Hosted, not reimplemented. Phase 8 rebuilds this against its
-                // contract; until then the surface shows exactly what the route
-                // showed, so nothing a seller relies on disappears in between.
+                // Hosted, not reimplemented: this is the same screen the old
+                // settings route showed, now reached only as a surface.
                 SellerSurface.Account -> SettingsScreen(
-                    onBack = {},
                     onLogout = onLogout,
                     onOpenStoreInfo = onOpenStoreInfo,
                     onOpenCategories = onOpenCategories,

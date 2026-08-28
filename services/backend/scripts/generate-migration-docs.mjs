@@ -223,6 +223,12 @@ const descriptions = {
     "transitions and states are JSON text, not child tables: they are read whole, written only by the manifest sync, and never queried by element. A join table would cost two migrations and buy nothing.",
     "entitlement_key holds the key alone. Per-plan values stay in plan_revision_entitlements as versioned revisions; copying them here would rebuild the drift this work exists to remove.",
   ],
+  "049_delete_settings_route.sql": [
+    "Retires `SettingsRoute` from the screen registry: the row becomes the `MainRoute#account` surface entry, the nine screens that named it as parent now name the surface, and the transition targets are repointed.",
+    "The route and the account tab rendered the same composable, and the route was kept reachable on purpose until the surface had been checked against it entry by entry. Deleting it first would have taken any undocumented behaviour with it.",
+    "The check found two defects that only existed because the screen had two ways in: the top bar drew a back arrow that did nothing on the tab, and saving payout details called the screen's dismiss callback, so a successful save on the tab reported itself by doing nothing at all. Both are fixed in the same change.",
+    "It also corrects `payments_finance.ocr_receipt_assistance` to `implemented`. The feature ships - PaymentVerifier reads a transfer screenshot and matches the amount - but the stale `planned` status made the gate answer \"not built\" to a seller whose plan simply did not include it.",
+  ],
 };
 
 function anchor(name) {

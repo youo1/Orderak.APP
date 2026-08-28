@@ -19,8 +19,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.orderak.seller.R
 import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
-import app.orderak.seller.data.billing.EntitlementManager
-import app.orderak.seller.data.billing.Feature
 import app.orderak.seller.data.billing.FeatureAvailabilityResolver
 
 /**
@@ -138,28 +136,4 @@ private fun NotBuiltNotice(modifier: Modifier = Modifier) {
             SemanticChip(SemanticRole.Neutral, stringResource(R.string.gate_not_built_badge))
         }
     }
-}
-
-/**
- * Legacy overload for the six-value [Feature] enum.
- *
- * Kept so existing call sites keep compiling while they migrate to catalogue
- * keys. The enum addresses six features out of 242, which is why it cannot stay:
- * every new gated surface would need a new enum constant and a new branch in
- * [EntitlementManager.isFeatureEnabled].
- */
-@Deprecated(
-    message = "Address features by catalogue key so the gate can tell " +
-        "'not on your plan' from 'not built'. The enum cannot express that.",
-    replaceWith = ReplaceWith("FeatureGate(resolver, featureKey, modifier, onUpgrade, content)"),
-)
-@Composable
-fun FeatureGate(
-    entitlementManager: EntitlementManager,
-    feature: Feature,
-    content: @Composable () -> Unit,
-) {
-    val isEnabled = entitlementManager.isFeatureEnabled(feature)
-    LaunchedEffect(isEnabled) { entitlementManager.logAttempt(feature) }
-    if (isEnabled) content() else NotBuiltNotice()
 }

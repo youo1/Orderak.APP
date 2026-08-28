@@ -126,7 +126,6 @@
     <string name="ai_test_message_label">Message</string>
     <string name="ai_test_send">Envoyer au backend</string>
     <string name="ai_test_error">Erreur backend : %1$s</string>
-    <string name="cd_settings">Paramètres</string>
 
     <string name="nav_dashboard">Aujourd’hui</string>
     <string name="nav_orders">Commandes</string>
@@ -208,6 +207,7 @@
     <string name="settings_instapay">Adresse InstaPay (ex: nom@instapay)</string>
     <string name="settings_vfcash">Numéro Vodafone Cash</string>
     <string name="settings_save">Enregistrer</string>
+    <string name="settings_payout_saved">Coordonnées de paiement enregistrées</string>
     <string name="settings_logout">Déconnexion</string>
     <string name="settings_delete_account">Demander la suppression du compte</string>
     <!-- Backend link -->

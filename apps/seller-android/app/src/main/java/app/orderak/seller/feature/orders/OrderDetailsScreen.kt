@@ -57,7 +57,7 @@ import app.orderak.seller.R
 import app.orderak.seller.core.money.DEFAULT_CURRENCY
 import app.orderak.seller.core.money.formatAmount
 import app.orderak.seller.core.ui.FeatureGate
-import app.orderak.seller.data.billing.Feature
+import app.orderak.seller.data.billing.FeatureKeys.OCR_RECEIPT_ASSISTANCE
 import app.orderak.seller.data.db.PaymentEntity
 import app.orderak.seller.domain.OrderStatus
 import app.orderak.seller.domain.PayMethod
@@ -223,7 +223,11 @@ fun OrderDetailsScreen(
                                 Text(stringResource(R.string.payment_checking))
                             }
                         } else {
-                            FeatureGate(entitlementManager, Feature.OCR_PAYMENT_VERIFICATION) {
+                            FeatureGate(
+                                resolver = viewModel.featureAvailability,
+                                featureKey = OCR_RECEIPT_ASSISTANCE,
+                                onUpgrade = null,
+                            ) {
                                 Button(
                                     onClick = {
                                         picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))

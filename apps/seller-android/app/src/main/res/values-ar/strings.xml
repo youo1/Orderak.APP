@@ -130,7 +130,6 @@
     <string name="ai_test_message_label">Message</string>
     <string name="ai_test_send">Send to backend</string>
     <string name="ai_test_error">Backend error: %1$s</string>
-    <string name="cd_settings">الإعدادات</string>
 
     <!-- Bottom nav -->
     <string name="nav_dashboard">اليوم</string>
@@ -225,6 +224,7 @@
     <string name="settings_instapay">عنوان انستاباي (مثال: name@instapay)</string>
     <string name="settings_vfcash">رقم فودافون كاش</string>
     <string name="settings_save">احفظ</string>
+    <string name="settings_payout_saved">تم حفظ بيانات التحصيل</string>
     <string name="settings_logout">تسجيل خروج</string>
     <string name="settings_delete_account">طلب حذف الحساب</string>
     <!-- Backend link -->

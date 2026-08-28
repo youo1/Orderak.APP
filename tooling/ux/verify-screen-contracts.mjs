@@ -39,8 +39,15 @@ const catalogKeys = new Set(catalog.features.map(f => f.key));
 
 /** Routes the migration adds; not expected in Routes.kt yet. */
 const NEW_ROUTES = new Set(["PlansRoute", "PaywallRoute"]);
-/** Route absorbed by the account surface; must no longer have a contract. */
-const ABSORBED_ROUTES = new Set(["SettingsRoute"]);
+/**
+ * Deleted, and must stay deleted.
+ *
+ * The account surface absorbed the settings screen, and the route was removed
+ * once the surface had been checked entry by entry against it. Naming it here
+ * means a contract that reintroduces it fails rather than quietly re-creating
+ * the second way in.
+ */
+const DELETED_ROUTES = new Set(["SettingsRoute"]);
 /** Exit/entry targets that are not screens. */
 const EXTERNAL = [
   "رجوع", "cold start", "warm start", "تسجيل خروج", "متجر Play",
@@ -64,8 +71,8 @@ for (const c of CONTRACTS) {
   if (!SURFACES.includes(c.surface)) push(c, `unknown surface "${c.surface}"`);
 
   if (c.kotlinRoute !== null) {
-    if (ABSORBED_ROUTES.has(c.kotlinRoute)) {
-      push(c, `${c.kotlinRoute} is absorbed by the account surface — it must not keep a contract`);
+    if (DELETED_ROUTES.has(c.kotlinRoute)) {
+      push(c, `${c.kotlinRoute} was deleted — the account surface hosts it, so no contract may name it`);
     } else if (!declaredRoutes.has(c.kotlinRoute) && !NEW_ROUTES.has(c.kotlinRoute)) {
       push(c, `kotlinRoute "${c.kotlinRoute}" is not declared in Routes.kt`);
     }
@@ -98,7 +105,7 @@ for (const c of CONTRACTS) {
 /* every declared Kotlin route must be covered, unless deliberately absorbed */
 const covered = new Set(CONTRACTS.map(c => c.kotlinRoute).filter(Boolean));
 for (const r of declaredRoutes) {
-  if (!covered.has(r) && !ABSORBED_ROUTES.has(r)) {
+  if (!covered.has(r) && !DELETED_ROUTES.has(r)) {
     problems.push(`Routes.kt declares ${r} but no contract covers it`);
   }
 }
@@ -162,7 +169,8 @@ out.push(`**${CONTRACTS.length} contracts.** Every route declared in \`Routes.kt
 out.push("five surfaces hosted inside `MainRoute`, the version-governance overlay, and the");
 out.push("two routes the migration adds.");
 out.push("");
-out.push("`SettingsRoute` is deliberately absent: the account surface absorbs it.");
+out.push("`SettingsRoute` is gone: the account surface hosts what it showed, and");
+out.push("the route was deleted once the surface had been checked against it.");
 out.push("");
 out.push("| Surface | Contracts |");
 out.push("| --- | --- |");

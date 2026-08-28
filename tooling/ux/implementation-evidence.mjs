@@ -45,6 +45,15 @@ export const EVIDENCE = {
   "orders_fulfilment.order_status_updates":  { kind: "screen", value: "OrderDetailsScreen" },
   "orders_fulfilment.paid_unpaid_tracking":  { kind: "screen", value: "OrderDetailsScreen" },
 
+  // ---- payments & finance ----
+  // The seller picks a transfer screenshot, ML Kit reads it, and the amount is
+  // matched against the order total. Built since before the migration; the
+  // catalogue said "planned" until the gate migration went looking for its key.
+  "payments_finance.ocr_receipt_assistance": {
+    kind: "module",
+    value: "apps/seller-android/app/src/main/java/app/orderak/seller/feature/payment/PaymentVerifier.kt",
+  },
+
   // ---- team & security ----
   "team_security.owner_account":          { kind: "screen", value: "SellerProfileScreen" },
   "team_security.multiple_owner_devices": { kind: "route", value: "DevicesRoute" },
