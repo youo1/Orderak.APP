@@ -61,6 +61,49 @@ jobs:
       - name: Verify documentation claims about paths, scripts and resources
         run: node tooling/repository/verify-doc-claims.mjs
 
+      # The screen manifest drives the admin screen tree and, from phase 5, the
+      # navigation model. Nothing checked it before and it had already drifted:
+      # SellerProfileRoute shipped in Routes.kt and the NavHost without ever
+      # being registered.
+      - name: Verify app screen manifest against routes and catalogue
+        run: node tooling/repository/verify-screen-manifest.mjs
+
+      # The document said the billing gate held six routes and carved out
+      # subscription/status; the code held nine and gated it. No check read a
+      # prose claim about a route set, so a documented rule stopped being true
+      # without anything failing.
+      - name: Verify the billing gate matches its documentation
+        run: node tooling/repository/verify-billing-gate.mjs
+
+      # Colour reaches the app through the generator, and the generator's
+      # contrast validation is the only gate it passes through. A value written
+      # by hand arrives unchecked. The admin panel is the worked example: 34 of
+      # its 51 distinct colours sit outside the system, one exception at a time.
+      - name: Verify no hand-written colour in the Android app
+        run: node tooling/repository/verify-no-hardcoded-colors.mjs
+
+      # formatAmount defaults to the ambient locale, which is right for a library
+      # and wrong for a screen: the order list shipped Latin-digit money beside
+      # Arabic-Indic dates in the same row until a greyscale screenshot put them
+      # side by side.
+      - name: Verify money formatting names its locale
+        run: node tooling/repository/verify-money-locale.mjs
+
+      # implementation_status was a claim nobody verified, and it was wrong in
+      # seven places - all in the direction of understating what shipped. These
+      # three keep the UX model, the catalogue and the code from parting ways.
+      - name: Verify feature to surface map
+        run: node tooling/ux/verify-feature-surface-map.mjs
+
+      - name: Verify screen contracts
+        run: node tooling/ux/verify-screen-contracts.mjs
+
+      - name: Verify implementation status against the code
+        run: node tooling/ux/verify-implementation-status.mjs
+
+      - name: Verify every declared screen state has a design
+        run: node tooling/ux/design-coverage.mjs
+
       # The plan asks for a generated-doc drift check and there was none. Its
       # absence let a real break go unnoticed: database-migrations.md is
       # generated, so frontmatter added to it by hand survived only until the

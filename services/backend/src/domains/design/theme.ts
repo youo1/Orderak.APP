@@ -9,8 +9,10 @@
 // back to DEFAULT_THEME, so a partial override is always safe.
 //
 // Dark Teal palette. These values are the standard/light roles emitted by
-// generateDesignSystem() from the seeds primary #0A9A8E, secondary #F2751A,
-// tertiary #3B82F6, and every pair was contrast-validated at generation.
+// generateDesignSystem() from the brand seed #014D4E (HCT hue 198.1, chroma
+// 28.7) with secondary #F2751A and tertiary #3B82F6. `primary` is pinned to the
+// tone the seed occupies, so the published brand colour and the primary action
+// colour are the same colour. Every pair was contrast-validated at generation.
 // Keep them in step with design/tokens.json and LEGACY_DEFAULT_THEME; they are
 // the same projection rendered for different consumers.
 // ============================================================
@@ -18,15 +20,15 @@
 import { invalidateDesignSystemCache, loadActiveDesignSystem } from "./design-system";
 
 export interface Theme {
-	primary: string;        // buttons, links, focus states — #006A62, 6.2:1 on canvas
-	primary_strong: string; // hover/pressed — #00332E
-	primary_soft: string;   // container/badge fills — #84F5E7, pair with --ink
-	primary_tint: string;   // icons/decorative accents — #66D9CB
-	canvas: string;         // page background — #F3FBFA
-	surface: string;        // cards, inputs — #F3FBFA
-	ink: string;            // primary text — #151D1D
-	muted: string;          // secondary text — #3B4A49, 8.8:1
-	line: string;           // borders — #B9CAC9
+	primary: string;        // buttons, links, focus states — #014D4E, 9.7:1 on canvas
+	primary_strong: string; // hover/pressed — #002929
+	primary_soft: string;   // container/badge fills — #B0EEEE, pair with --ink
+	primary_tint: string;   // icons/decorative accents — #95D1D2
+	canvas: string;         // page background — #F3FBFC
+	surface: string;        // cards, inputs — #F3FBFC
+	ink: string;            // primary text — #151D1E
+	muted: string;          // secondary text — #3B494B
+	line: string;           // borders — #BAC9CB
 	danger: string;         // error text/icons/borders — #BA1A1A
 	danger_soft: string;    // error container fill — #FFDAD5
 	warning: string;        // warning text/icons — #755B00
@@ -35,15 +37,15 @@ export interface Theme {
 }
 
 export const DEFAULT_THEME: Theme = {
-	primary: "#006A62",
-	primary_strong: "#00332E",
-	primary_soft: "#84F5E7",
-	primary_tint: "#66D9CB",
-	canvas: "#F3FBFA",
-	surface: "#F3FBFA",
-	ink: "#151D1D",
-	muted: "#3B4A49",
-	line: "#B9CAC9",
+	primary: "#014D4E",
+	primary_strong: "#002929",
+	primary_soft: "#B0EEEE",
+	primary_tint: "#95D1D2",
+	canvas: "#F3FBFC",
+	surface: "#F3FBFC",
+	ink: "#151D1E",
+	muted: "#3B494B",
+	line: "#BAC9CB",
 	danger: "#BA1A1A",
 	danger_soft: "#FFDAD5",
 	warning: "#755B00",

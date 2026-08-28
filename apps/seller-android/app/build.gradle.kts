@@ -55,12 +55,17 @@ android {
             applicationIdSuffix = ".staging"
             versionNameSuffix = "-staging"
             buildConfigField("String", "DEPLOYMENT_ENVIRONMENT", "\"staging\"")
+            buildConfigField("String", "DEMO_SELLER_PHONE", "\"01066971791\"")
             buildConfigField("String", "API_BASE_URL", "\"https://api.staging.orderak.app\"")
             buildConfigField("String", "SITE_BASE_URL", "\"https://staging.orderak.app\"")
         }
         create("production") {
             dimension = "environment"
             buildConfigField("String", "DEPLOYMENT_ENVIRONMENT", "\"production\"")
+            // Empty, and verifyDemoDataContract fails the build if it ever is
+            // not: demo data seeds a local database and suppresses sync, which
+            // would silently stop a real seller's catalogue reaching the server.
+            buildConfigField("String", "DEMO_SELLER_PHONE", "\"\"")
             buildConfigField("String", "API_BASE_URL", "\"https://api.orderak.app\"")
             buildConfigField("String", "SITE_BASE_URL", "\"https://orderak.app\"")
         }
@@ -72,6 +77,7 @@ android {
             manifestPlaceholders["crashlyticsCollectionEnabled"] = "false"
             manifestPlaceholders["performanceCollectionEnabled"] = "false"
             buildConfigField("String", "DEPLOYMENT_ENVIRONMENT", "\"mock\"")
+            buildConfigField("String", "DEMO_SELLER_PHONE", "\"01066971791\"")
             buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:4010\"")
             buildConfigField("String", "SITE_BASE_URL", "\"https://staging.orderak.app\"")
         }
@@ -199,6 +205,26 @@ dependencies {
     implementation(libs.kotlinx.coroutines.play.services)
 
     implementation(libs.play.services.auth)
+}
+
+/**
+ * Screenshot rendering must not read the machine it runs on.
+ *
+ * `OrderCard` formats `createdAt` with `DateFormat`, which resolves the JVM's
+ * default time zone. A reference rendered in Cairo shows a time three hours
+ * ahead of the same reference rendered on a UTC runner, so the image compares
+ * unequal and the failure looks like a rendering bug rather than what it is.
+ * The app is right to show the seller local time; it is the test that has to be
+ * reproducible, so the render process is pinned rather than the app changed.
+ *
+ * The locale is pinned for the same reason: `@Preview(locale = "ar")` sets the
+ * composition locale, but anything reaching `Locale.getDefault()` during a
+ * render would still read the host.
+ */
+tasks.withType<Test>().matching { it.name.contains("ScreenshotTest") }.configureEach {
+    systemProperty("user.timezone", "UTC")
+    systemProperty("user.language", "en")
+    systemProperty("user.country", "US")
 }
 
 // Satisfy IDE requirement for unitTestClasses task (missing in some AGP/Studio combinations)
@@ -693,13 +719,34 @@ val verifyDesignSystemContract by tasks.registering {
             "Compose token mapping is incomplete."
         )
 
-        // Brand identity. The seed lives in the fixture; the tone-corrected
-        // light primary is what the app actually renders, so both are pinned.
+        // Brand identity. The seed lives in the fixture; the tone-anchored light
+        // primary is what the app actually renders, so both are pinned. Migrated
+        // 2026-08-28 from #0A9A8E/#006A62 to Dark Teal #014D4E: the seed is now
+        // rendered literally, because `primaryLightTones` pins the role to the
+        // tone the seed occupies. Changing these three lines is how an approved
+        // rebrand lands; changing them without one is how a rebrand escapes.
         requireContract(
-            "\"primary\": \"#0A9A8E\"" in fixture &&
-                "\"primary\": \"#006A62\"" in legacy &&
-                "0xFF006A62" in generated,
+            "\"primary\": \"#014D4E\"" in fixture &&
+                "\"primary\": \"#014D4E\"" in legacy &&
+                "0xFF014D4E" in generated,
             "The protected default brand source or legacy projection changed."
+        )
+
+        // Monetisation is its own role. Without it, "locked by plan" has to
+        // borrow a status colour, and the seller cannot tell an upsell from a
+        // warning - the collision this migration exists to remove.
+        requireContract(
+            "\"commerce\"" in fixture && "commerceContainerOutline" in generated,
+            "The commerce role or its container outline is no longer generated."
+        )
+
+        // Every semantic container carries an outline. A container on a near-white
+        // surface separates by hue alone, which fails a colour-blind reader.
+        requireContract(
+            listOf("warningContainerOutline", "successContainerOutline",
+                "informationContainerOutline", "commerceContainerOutline")
+                .all { it in generated },
+            "A semantic container lost its outline role."
         )
         requireContract(
             "Tajawal" in type && "Noto Sans Arabic" in type,
@@ -708,7 +755,68 @@ val verifyDesignSystemContract by tasks.registering {
     }
 }
 
+/**
+ * Demo data must never be reachable in a production build.
+ *
+ * `DemoDataSeeder` writes a shop into the local database and switches sync off
+ * for that account. The second half is the dangerous one: the product push is a
+ * full mirror, so a production build that entered demo mode would replace a
+ * real seller's catalogue with a demo shop, or — with sync suppressed — quietly
+ * stop uploading their real one.
+ *
+ * The whole guarantee rests on the production flavour's DEMO_SELLER_PHONE being
+ * empty, which is one careless edit away from not being true. This asserts it.
+ */
+val verifyDemoDataContract by tasks.registering {
+    group = "verification"
+    description = "Fails when demo data could reach a production build"
+
+    val buildScript = project.projectDir.resolve("build.gradle.kts")
+    val seeder = project.projectDir.resolve(
+        "src/main/java/app/orderak/seller/data/demo/DemoDataSeeder.kt",
+    )
+    inputs.files(buildScript, seeder)
+
+    doLast {
+        val script = buildScript.readText()
+
+        val production = script
+            .substringAfter("""create("production")""", "")
+            .substringBefore("""create("mock")""", "")
+        check(production.isNotBlank()) { "Could not read the production flavour block." }
+
+        val declaration = production.lineSequence()
+            .firstOrNull { "DEMO_SELLER_PHONE" in it }
+            ?: error("The production flavour must declare DEMO_SELLER_PHONE explicitly.")
+        // A phone number is digits. An empty constant has none.
+        check(declaration.none(Char::isDigit)) {
+            "The production flavour's DEMO_SELLER_PHONE must be empty, but reads: " +
+                declaration.trim() + ". " +
+                "Demo data suppresses sync, which would stop a real seller's " +
+                "catalogue reaching the server."
+        }
+
+        val source = seeder.readText()
+        check("BuildConfig.DEMO_SELLER_PHONE.isEmpty()) return false" in source) {
+            "DemoDataSeeder.isDemoSeller must return false on an empty " +
+                "DEMO_SELLER_PHONE before looking at the signed-in phone. " +
+                "That check is what makes the production flavour's empty " +
+                "constant sufficient."
+        }
+
+        val sync = project.projectDir.resolve(
+            "src/main/java/app/orderak/seller/data/remote/SyncRepository.kt",
+        ).readText()
+        check("if (demoDataSeeder.isDemoSeller()) return false" in sync) {
+            "SyncRepository.doSync must refuse to run for the demo account. " +
+                "Its product push is a full mirror: syncing a seeded device " +
+                "would delete the account's real catalogue."
+        }
+    }
+}
+
 tasks.named("preBuild") {
+    dependsOn(verifyDemoDataContract)
     dependsOn(verifyLocalizationContract)
     dependsOn(verifyAuthPhase1Contract)
     dependsOn(verifySellerApiContract)

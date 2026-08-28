@@ -34,7 +34,7 @@ describe("public design-system contract", () => {
 		const body = JSON.parse(text);
 		expect(body.schemaVersion).toBe(2);
 		expect(body.designSystem.schemaVersion).toBe(2);
-		expect(body.theme.primary).toBe("#006A62");
+		expect(body.theme.primary).toBe("#014D4E");
 		expect(body.theme.accent).toBe("#9B4500");
 		expect(body.version).toHaveLength(64);
 
@@ -119,7 +119,7 @@ describe("public design-system contract", () => {
 		invalidateDesignSystemCache();
 		const fallback = await loadActiveDesignSystem(env);
 		expect(fallback.id).toBe(0);
-		expect(fallback.legacyTheme.primary).toBe("#006A62");
+		expect(fallback.legacyTheme.primary).toBe("#014D4E");
 		const error = await env.orderak_db.prepare(
 			"SELECT context FROM error_logs WHERE context='design_system_fallback' ORDER BY id DESC LIMIT 1",
 		).first<{ context: string }>();

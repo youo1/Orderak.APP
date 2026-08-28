@@ -33,6 +33,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextDirection
@@ -45,6 +46,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.orderak.seller.R
+import app.orderak.seller.core.ui.NoticeBanner
+import app.orderak.seller.core.ui.SemanticRole
 import app.orderak.seller.core.money.DEFAULT_CURRENCY
 import app.orderak.seller.core.money.formatAmount
 import app.orderak.seller.domain.PayMethod
@@ -57,6 +60,7 @@ fun NewOrderScreen(
     onCreated: (Long) -> Unit,
     viewModel: NewOrderViewModel = hiltViewModel()
 ) {
+    val locale = LocalConfiguration.current.locales[0]
     val state by viewModel.state.collectAsStateWithLifecycle()
     val products by viewModel.products.collectAsStateWithLifecycle()
 
@@ -108,7 +112,7 @@ fun NewOrderScreen(
                                 ),
                             )
                             Text(
-                                stringResource(R.string.currency_egp, formatAmount(p.priceMinor, p.currency)),
+                                stringResource(R.string.currency_egp, formatAmount(p.priceMinor, p.currency, locale)),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.primary
                             )
@@ -155,14 +159,22 @@ fun NewOrderScreen(
             ) }
 
             if (state.stockError) {
-                item { Text(stringResource(R.string.order_stock_error), color = MaterialTheme.colorScheme.error) }
+                // Red text alone. A seller who cannot distinguish it from the
+                // label above never learns the order was blocked on stock.
+                item {
+                    NoticeBanner(
+                        role = SemanticRole.Danger,
+                        title = stringResource(R.string.order_stock_error),
+                        message = stringResource(R.string.order_stock_error_body),
+                    )
+                }
             }
 
             item { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(stringResource(R.string.order_total), style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    stringResource(R.string.currency_egp, formatAmount(viewModel.totalMinor(), DEFAULT_CURRENCY)),
+                    stringResource(R.string.currency_egp, formatAmount(viewModel.totalMinor(), DEFAULT_CURRENCY, locale)),
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.primary
                 )

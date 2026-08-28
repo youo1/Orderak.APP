@@ -60,7 +60,13 @@ function readFrontmatter(filePath) {
 		return null;
 	}
 
-	const block = raw.slice(raw.indexOf("\n") + 1, end);
+	// `end` points at the "\n" before the closing "---", so on a CRLF file the
+	// block keeps the previous line's "\r". Splitting on /\r?\n/ removes every
+	// interior one and leaves exactly that last one behind, which then failed
+	// the field regex and was reported as an unparseable line — describing the
+	// content rather than the line ending, and sending the reader looking in
+	// the wrong place.
+	const block = raw.slice(raw.indexOf("\n") + 1, end).replace(/\r$/, "");
 	const fields = {};
 	let currentListKey = null;
 

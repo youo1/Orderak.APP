@@ -130,8 +130,19 @@ fun OrderakNavHost() {
                 onAddProduct = { navController.navigate(ProductEditRoute()) },
                 onEditProduct = { id: Long -> navController.navigate(ProductEditRoute(id)) },
                 onOpenCustomer = { phone: String -> navController.navigate(CustomerRoute(phone)) },
-                onOpenSettings = { navController.navigate(SettingsRoute) },
                 onOpenAnnouncements = { navController.navigate(AnnouncementsRoute) },
+                // The account surface owns the settings destinations now, so
+                // the shell passes them straight through.
+                onLogout = { navController.navigateAsRoot(SplashRoute) },
+                onOpenStoreInfo = { navController.navigate(StoreInfoRoute) },
+                onOpenCategories = { navController.navigate(CategoriesRoute) },
+                onOpenSupport = { navController.navigate(SupportRoute) },
+                onOpenCatalogLanguages = { navController.navigate(CatalogLanguagesRoute) },
+                onOpenDevices = { navController.navigate(DevicesRoute) },
+                onOpenDeletionStatus = { navController.navigate(DeletionStatusRoute) },
+                onOpenSubscription = { navController.navigate(SubscriptionRoute) },
+                onOpenAiAssistant = { navController.navigate(AiAssistantRoute) },
+                onOpenSellerProfile = { navController.navigate(SellerProfileRoute) },
             )
         }
 
@@ -152,23 +163,6 @@ fun OrderakNavHost() {
             CustomerDetailsScreen(
                 onBack = { navController.popBackStack() },
                 onOpenOrder = { id: Long -> navController.navigate(OrderDetailsRoute(id)) }
-            )
-        }
-
-        composable<SettingsRoute> {
-            SettingsScreen(
-                onBack = { navController.popBackStack() },
-                onLogout = { navController.navigateAsRoot(SplashRoute) },
-                onOpenStoreInfo = { navController.navigate(StoreInfoRoute) },
-                onOpenCategories = { navController.navigate(CategoriesRoute) },
-                onOpenSupport = { navController.navigate(SupportRoute) },
-                onOpenAnnouncements = { navController.navigate(AnnouncementsRoute) },
-                onOpenCatalogLanguages = { navController.navigate(CatalogLanguagesRoute) },
-                onOpenDevices = { navController.navigate(DevicesRoute) },
-                onOpenDeletionStatus = { navController.navigate(DeletionStatusRoute) },
-                onOpenSubscription = { navController.navigate(SubscriptionRoute) },
-                onOpenAiAssistant = { navController.navigate(AiAssistantRoute) },
-                onOpenSellerProfile = { navController.navigate(SellerProfileRoute) },
             )
         }
 

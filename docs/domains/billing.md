@@ -26,25 +26,40 @@ separate fact, controlled by the flags in `services/backend/wrangler.jsonc`:
 | `GOOGLE_PLAY_LIFECYCLE_ENABLED` | `false` | `false` | Play verification, RTDN, restore, reconciliation, acknowledgement |
 
 The gate covers acquisition only. `BILLING_ACQUISITION_ROUTES` in
-`services/backend/src/domains/commerce/billing.ts` holds exactly six paths:
+`services/backend/src/domains/commerce/billing.ts` holds exactly eight paths:
 
 ```text
 /api/v1/subscribe
+/api/v1/cancel
 /api/v1/plans
 /api/v1/coupons/validate
 /api/v1/coupons/apply
 /api/v1/referral/apply
 /api/v1/referral/stats
+/api/integrations/v1/payment
 ```
 
 Each returns a non-retryable `403` with
 `{"error":"feature_disabled","feature":"billing"}`. This is a product-policy
 refusal, not an outage — clients must not retry it until the flag changes.
 
+`/api/v1/cancel` and `/api/integrations/v1/payment` were added after this
+document first described the set as six. Closing the front door while leaving a
+public webhook that writes subscription status reachable was the gap worth
+closing, and both stay closed.
+
 `/api/v1/subscription/status` is deliberately **not** in that set. A seller can
 always read their own subscription state, even while nothing can be bought;
-closing billing must not blind a merchant to what they already have. The Play
-verification routes are gated separately by `GOOGLE_PLAY_LIFECYCLE_ENABLED`.
+closing billing must not blind a merchant to what they already have. It was
+briefly gated alongside the other two and has been carved back out: it is an
+authenticated GET that returns the caller's own state and grants nothing, so
+closing it protected nothing and cost the rule above. The Play verification
+routes are gated separately by `GOOGLE_PLAY_LIFECYCLE_ENABLED`.
+
+`tooling/repository/verify-billing-gate.mjs` compares this list against the code
+on every run. The drift it now prevents went unnoticed because no check read a
+prose claim about a route set, and this document went on describing a carve-out
+the code had removed.
 
 The Free plan is unaffected. It activates instantly and indefinitely with no
 payment, which is the entire commercial surface of the current launch. See
