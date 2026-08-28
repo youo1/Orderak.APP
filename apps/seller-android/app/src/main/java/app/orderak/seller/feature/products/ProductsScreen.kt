@@ -38,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
@@ -48,6 +49,11 @@ import androidx.compose.foundation.clickable
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.orderak.seller.R
+import app.orderak.seller.core.ui.SemanticChip
+import app.orderak.seller.core.ui.SemanticRole
+import app.orderak.seller.core.ui.UsageMeter
+import app.orderak.seller.data.billing.EntitlementManager
+import androidx.hilt.navigation.compose.hiltViewModel as hiltVm
 import app.orderak.seller.core.money.DEFAULT_CURRENCY
 import app.orderak.seller.core.money.formatAmount
 import app.orderak.seller.data.db.ProductEntity
@@ -62,13 +68,15 @@ fun ProductsScreen(
     onEdit: (Long) -> Unit,
     onUpgrade: () -> Unit,
     sellerPhone: String?,
-    viewModel: ProductsViewModel = hiltViewModel()
+    viewModel: ProductsViewModel = hiltViewModel(),
+    entitlements: EntitlementManager = hiltVm<EntitlementHolderViewModel>().entitlements,
 ) {
     val products by viewModel.products.collectAsStateWithLifecycle()
     val shopName by viewModel.shopName.collectAsStateWithLifecycle()
     val storeUrl by viewModel.storeUrl.collectAsStateWithLifecycle()
     val quota by viewModel.quota.collectAsStateWithLifecycle()
     var showLimitDialog by rememberSaveable { mutableStateOf(false) }
+    val purchaseOpen = entitlements.isPurchaseOpen()
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -87,17 +95,25 @@ fun ProductsScreen(
                         limit,
                         quota.used,
                     )
-                    quota.upgradePlanKey != null -> stringResource(
+                    quota.upgradePlanKey != null && purchaseOpen -> stringResource(
                         R.string.products_limit_body,
                         limit,
                         upgradeName,
+                    )
+                    quota.upgradePlanKey != null -> stringResource(
+                        R.string.products_limit_body_purchase_closed,
+                        limit,
                     )
                     else -> stringResource(R.string.products_limit_body_max_plan, limit)
                 }
                 Text(message)
             },
             confirmButton = {
-                if (quota.upgradePlanKey != null) {
+                // A higher plan existing is not the same as being able to buy it.
+                // Purchase is closed platform-wide, and the six acquisition routes
+                // answer 403, so offering the upgrade on plan shape alone sends the
+                // seller into a dead end.
+                if (quota.upgradePlanKey != null && purchaseOpen) {
                     TextButton(onClick = {
                         showLimitDialog = false
                         onUpgrade()
@@ -132,12 +148,24 @@ fun ProductsScreen(
         }
     } else {
         Column(Modifier.fillMaxSize()) {
-            Text(
-                text = quota.limit?.let { stringResource(R.string.products_usage_header, quota.used, it) }
-                    ?: stringResource(R.string.products_usage_unlimited, quota.used),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
+            // The shared meter rather than a sentence: the same component the
+            // dashboard and the subscription screen use, so "how close am I to
+            // the limit" reads identically wherever a seller meets it.
+            val limitValue = quota.limit
+            if (limitValue != null) {
+                UsageMeter(
+                    label = stringResource(R.string.nav_products),
+                    used = quota.used,
+                    limit = limitValue,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            } else {
+                Text(
+                    text = stringResource(R.string.products_usage_unlimited, quota.used),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
             Box(Modifier.fillMaxWidth().weight(1f)) {
                 LazyColumn(
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
@@ -188,6 +216,7 @@ private fun planName(planKey: String?): String = when (planKey) {
 
 @Composable
 private fun ProductCard(p: ProductEntity, onClick: () -> Unit) {
+    val locale = LocalConfiguration.current.locales[0]
     Card(Modifier.fillMaxWidth().clickable(onClick = onClick).semantics(mergeDescendants = true) {}) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             if (p.imagePath != null) {
@@ -211,16 +240,43 @@ private fun ProductCard(p: ProductEntity, onClick: () -> Unit) {
                     ),
                 )
                 Text(
-                    stringResource(R.string.currency_egp, formatAmount(p.priceMinor, p.currency)),
+                    stringResource(R.string.currency_egp, formatAmount(p.priceMinor, p.currency, locale)),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
             }
+            // Low stock used to be the number in red and nothing else, which is
+            // invisible to a colour-blind seller and to anyone in bright sun. The
+            // chip carries an icon and a word as well.
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("${p.stock}", style = MaterialTheme.typography.titleMedium,
-                    color = if (p.stock <= 2) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
-                Text(stringResource(R.string.product_stock_label), style = MaterialTheme.typography.labelSmall)
+                if (p.stock <= LOW_STOCK_THRESHOLD) {
+                    SemanticChip(
+                        role = if (p.stock <= 0) SemanticRole.Danger else SemanticRole.Warning,
+                        label = if (p.stock <= 0) {
+                            stringResource(R.string.product_stock_out)
+                        } else {
+                            stringResource(R.string.product_stock_low, p.stock)
+                        },
+                    )
+                } else {
+                    Text("${p.stock}", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.product_stock_label), style = MaterialTheme.typography.labelSmall)
+                }
             }
         }
     }
 }
+
+/** Stock at or below this draws a warning; at or below zero, a failure. */
+private const val LOW_STOCK_THRESHOLD = 2
+
+/**
+ * Hands the screen the shared [EntitlementManager].
+ *
+ * A thin holder rather than a constructor parameter so existing call sites keep
+ * working while the screen learns to ask whether purchase is open at all.
+ */
+@dagger.hilt.android.lifecycle.HiltViewModel
+class EntitlementHolderViewModel @javax.inject.Inject constructor(
+    val entitlements: EntitlementManager,
+) : androidx.lifecycle.ViewModel()

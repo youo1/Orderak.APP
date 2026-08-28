@@ -11,10 +11,16 @@ import javax.inject.Singleton
  */
 @Singleton
 class UsageLogger @Inject constructor() {
-    fun logFeatureAttempt(feature: Feature, planKey: String, success: Boolean) {
+    /**
+     * Keyed counterpart for gates addressed by catalogue key.
+     *
+     * Carries the reason, not just the outcome: "denied" is not actionable,
+     * while UnknownKey, NotImplemented and PlanExcluded each point at a
+     * different fix — a mis-seeded snapshot, a catalogue status, or a plan.
+     */
+    fun logKeyedFeatureAttempt(key: String, planKey: String, availability: String, reason: String) {
         if (BuildConfig.DEBUG) {
-            val status = if (success) "ALLOWED" else "DENIED"
-            Log.d("UsageLogger", "Feature: ${feature.name} | Plan: $planKey | Status: $status")
+            Log.d("UsageLogger", "Feature: $key | Plan: $planKey | $availability ($reason)")
         }
         // TODO: firebaseAnalytics.logEvent("feature_usage") { ... }
     }

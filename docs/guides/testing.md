@@ -156,6 +156,33 @@ behind `ClientContextProvider`.
 gradlew.bat verifyAuthPhase1Contract verifySellerApiContract testStagingDebugUnitTest
 ```
 
+## Demo data (`verifyDemoDataContract`)
+
+Staging and mock builds carry a demo shop for one account, so the app can be
+reviewed with something in it. `DemoDataSeeder` fills the local database on the
+first launch of the shell — 18 products against a limit of 20, all six order
+statuses interleaved, three verified transfers, one order still waiting for
+proof — and installs a plan snapshot that puts all three gate states on screen
+at once.
+
+**It never runs in production.** `DEMO_SELLER_PHONE` is empty for the
+production flavour, and `isDemoSeller()` returns false on an empty constant
+whatever phone is signed in.
+
+The dangerous half is not the seed but the sync. `SyncRepository` pushes the
+product catalogue as a full mirror, so a device in demo mode must not sync: it
+would replace the account's real catalogue with the demo shop. `doSync` refuses
+to run for the demo account, and `verifyDemoDataContract` fails the build if
+either that refusal or the empty production constant is removed.
+
+```cmd
+gradlew.bat verifyDemoDataContract
+```
+
+To use it: install `assembleStagingDebug`, sign in as the demo account, complete
+shop setup once, and the shell seeds on first open. Clearing app data is the way
+back out.
+
 ## When to run each suite
 
 | Before committing | Before release |

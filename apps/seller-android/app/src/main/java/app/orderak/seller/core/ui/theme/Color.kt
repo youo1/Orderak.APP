@@ -32,6 +32,20 @@ data class OrderakExtendedColors(
     val informationSoft: Color,
     val onInformation: Color,
     val onInformationContainer: Color,
+    // Monetisation. Its own role so "locked by plan" can never share a colour
+    // with a status: a seller sees hundreds of these and must not read them
+    // as warnings.
+    val commerce: Color,
+    val commerceSoft: Color,
+    val onCommerce: Color,
+    val onCommerceContainer: Color,
+    // A container on a near-white surface separates by hue alone, which fails a
+    // colour-blind reader. These give every semantic chip an edge that survives
+    // greyscale. Contrast-checked against the container at generation.
+    val warningContainerOutline: Color,
+    val successContainerOutline: Color,
+    val informationContainerOutline: Color,
+    val commerceContainerOutline: Color,
     val accent: Color,
     val onAccent: Color,
     val primaryTint: Color,

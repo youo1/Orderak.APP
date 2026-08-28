@@ -41,6 +41,22 @@ export interface DesignSystemSource {
 		warning: string;
 		success: string;
 		information: string;
+		/** Monetisation. Its own role so that "locked by plan" can never share a
+		    colour with a status. See docs/ux/feature-surface-map.md. */
+		commerce: string;
+		/**
+		 * Chroma floor for the primary palette. The generator otherwise raises a
+		 * muted seed to 36, which changes the published brand colour. Set this to
+		 * the seed's own chroma to keep the brand exactly as approved.
+		 */
+		primaryChromaFloor?: number;
+		/**
+		 * Light-mode tones for `primary`, as [standard, medium, high]. M3 puts the
+		 * role at T40; a dark brand seed lives lower than that, and the published
+		 * brand colour and the primary action colour must be the same colour.
+		 * The ladder must descend so contrast still rises with the contrast level.
+		 */
+		primaryLightTones?: [number, number, number];
 		surfaceTemperature: SurfaceTemperature;
 		variant: SchemeVariant;
 		defaultContrast: ContrastName;
@@ -112,15 +128,15 @@ export interface LegacyTheme {
 }
 
 export const LEGACY_DEFAULT_THEME: LegacyTheme = {
-	primary: "#006A62",
-	primary_strong: "#00332E",
-	primary_soft: "#84F5E7",
-	primary_tint: "#66D9CB",
-	canvas: "#F3FBFA",
-	surface: "#F3FBFA",
-	ink: "#151D1D",
-	muted: "#3B4A49",
-	line: "#B9CAC9",
+	primary: "#014D4E",
+	primary_strong: "#002929",
+	primary_soft: "#B0EEEE",
+	primary_tint: "#95D1D2",
+	canvas: "#F3FBFC",
+	surface: "#F3FBFC",
+	ink: "#151D1E",
+	muted: "#3B494B",
+	line: "#BAC9CB",
 	danger: "#BA1A1A",
 	danger_soft: "#FFDAD5",
 	warning: "#755B00",
@@ -130,13 +146,16 @@ export const LEGACY_DEFAULT_THEME: LegacyTheme = {
 
 export const DEFAULT_DESIGN_SYSTEM_SOURCE: DesignSystemSource = {
 	colors: {
-		primary: "#0A9A8E",
+		primary: "#014D4E",
 		secondary: "#F2751A",
 		tertiary: "#3B82F6",
 		error: "#BA1A1A",
 		warning: "#9A6700",
 		success: "#2E7D32",
 		information: "#0061A4",
+		commerce: "#6D509A",
+		primaryChromaFloor: 28.7,
+		primaryLightTones: [29.1, 22, 14],
 		surfaceTemperature: "cool",
 		variant: "tonal-spot",
 		defaultContrast: "standard",
@@ -207,6 +226,13 @@ const SEMANTIC_REQUIRED_PAIRS: Array<[string, string, number]> = [
 	["onSuccessContainer", "successContainer", 4.5],
 	["onInformation", "information", 4.5],
 	["onInformationContainer", "informationContainer", 4.5],
+	["onCommerce", "commerce", 4.5],
+	["onCommerceContainer", "commerceContainer", 4.5],
+	// The outline must be visible over its own container, or it is decoration.
+	["warningContainerOutline", "warningContainer", 1.3],
+	["successContainerOutline", "successContainer", 1.3],
+	["informationContainerOutline", "informationContainer", 1.3],
+	["commerceContainerOutline", "commerceContainer", 1.3],
 ];
 
 function validateAllContrast(
@@ -298,7 +324,7 @@ function customizedScheme(source: DesignSystemSource, dark: boolean, contrast: n
 		variant: base.variant,
 		contrastLevel: contrast,
 		isDark: dark,
-		primaryPalette: TonalPalette.fromHueAndChroma(primaryHct.hue, Math.max(primaryHct.chroma, 36)),
+		primaryPalette: TonalPalette.fromHueAndChroma(primaryHct.hue, Math.max(primaryHct.chroma, source.colors.primaryChromaFloor ?? 36)),
 		secondaryPalette: TonalPalette.fromHueAndChroma(secondary.hue, Math.max(secondary.chroma, 24)),
 		tertiaryPalette: TonalPalette.fromHueAndChroma(tertiary.hue, Math.max(tertiary.chroma, 28)),
 		neutralPalette: TonalPalette.fromHueAndChroma((temperatureHue + 360) % 360, neutralChroma),
@@ -307,6 +333,27 @@ function customizedScheme(source: DesignSystemSource, dark: boolean, contrast: n
 	const error = Hct.fromInt(argbFromHex(source.colors.error));
 	result.errorPalette = TonalPalette.fromHueAndChroma(error.hue, Math.max(error.chroma, 48));
 	return result;
+}
+
+/**
+ * Pins light-mode `primary` to the tone the brand seed actually occupies.
+ *
+ * M3 places the role at T40. A dark brand seed sits lower, so without this the
+ * published brand colour and the primary action colour are two different
+ * colours. The ladder descends with the contrast level, so contrast still rises.
+ * Every pair this touches is re-checked by validateAllContrast afterwards.
+ */
+function anchorBrandTone(
+	roles: Record<string, string>,
+	source: DesignSystemSource,
+	dark: boolean,
+	contrast: ContrastName,
+): Record<string, string> {
+	if (dark || !source.colors.primaryLightTones) return roles;
+	const seed = Hct.fromInt(argbFromHex(source.colors.primary));
+	const palette = TonalPalette.fromHueAndChroma(seed.hue, Math.max(seed.chroma, source.colors.primaryChromaFloor ?? 36));
+	const index = contrast === "high" ? 2 : contrast === "medium" ? 1 : 0;
+	return { ...roles, primary: hex(palette.tone(source.colors.primaryLightTones[index])) };
 }
 
 function schemeRoles(scheme: DynamicScheme): Record<string, string> {
@@ -325,26 +372,37 @@ function semanticRoles(source: DesignSystemSource, dark: boolean, contrast: Cont
 		const hct = Hct.fromInt(argb);
 		const palette = TonalPalette.fromHueAndChroma(hct.hue, Math.max(hct.chroma, 36));
 		const tones = dark
-			? contrast === "high" ? [95, 0, 20, 100]
-				: contrast === "medium" ? [90, 10, 25, 95]
-					: [80, 20, 30, 90]
-			: contrast === "high" ? [20, 100, 70, 0]
-				: contrast === "medium" ? [30, 100, 80, 10]
-					: [40, 100, 90, 10];
+			? contrast === "high" ? [95, 0, 20, 100, 60]
+				: contrast === "medium" ? [90, 10, 25, 95, 65]
+					: [80, 20, 30, 90, 70]
+			: contrast === "high" ? [20, 100, 70, 0, 35]
+				: contrast === "medium" ? [30, 100, 80, 10, 45]
+					: [40, 100, 90, 10, 50];
 		return {
 			color: hex(palette.tone(tones[0])),
 			onColor: hex(palette.tone(tones[1])),
 			container: hex(palette.tone(tones[2])),
 			onContainer: hex(palette.tone(tones[3])),
+			// A container at T90 on a T98 surface separates by hue alone, which fails
+			// a colour-blind reader. The outline gives it an edge that survives
+			// greyscale, and is contrast-checked against the surface like any other pair.
+			containerOutline: hex(palette.tone(tones[4])),
 		};
 	};
+	// Harmonisation rotates a hue toward the brand, which reads as one family but
+	// costs separation. With the brand at 198.1 degrees only the warm role can
+	// afford it: harmonising success collapses brand<->success to 27 degrees, and
+	// harmonising information and commerce pulls them onto each other and onto the
+	// brand. Measured, not assumed - see docs/ux/feature-surface-map.md.
 	const warning = create(source.colors.warning, true);
-	const success = create(source.colors.success, true);
-	const information = create(source.colors.information, true);
+	const success = create(source.colors.success, false);
+	const information = create(source.colors.information, false);
+	const commerce = create(source.colors.commerce, false);
 	return {
-		warning: warning.color, onWarning: warning.onColor, warningContainer: warning.container, onWarningContainer: warning.onContainer,
-		success: success.color, onSuccess: success.onColor, successContainer: success.container, onSuccessContainer: success.onContainer,
-		information: information.color, onInformation: information.onColor, informationContainer: information.container, onInformationContainer: information.onContainer,
+		warning: warning.color, onWarning: warning.onColor, warningContainer: warning.container, onWarningContainer: warning.onContainer, warningContainerOutline: warning.containerOutline,
+		success: success.color, onSuccess: success.onColor, successContainer: success.container, onSuccessContainer: success.onContainer, successContainerOutline: success.containerOutline,
+		information: information.color, onInformation: information.onColor, informationContainer: information.container, onInformationContainer: information.onContainer, informationContainerOutline: information.containerOutline,
+		commerce: commerce.color, onCommerce: commerce.onColor, commerceContainer: commerce.container, onCommerceContainer: commerce.onContainer, commerceContainerOutline: commerce.containerOutline,
 	};
 }
 
@@ -396,7 +454,7 @@ function validateSource(raw: unknown): { source: DesignSystemSource; errors: Val
 	const spacing = (input.spacing ?? {}) as Partial<DesignSystemSource["spacing"]>;
 	const shapes = (input.shapes ?? {}) as Partial<DesignSystemSource["shapes"]>;
 	const errors: ValidationMessage[] = [];
-	const color = (key: keyof Omit<DesignSystemSource["colors"], "surfaceTemperature" | "variant" | "defaultContrast">) => {
+	const color = (key: keyof Omit<DesignSystemSource["colors"], "surfaceTemperature" | "variant" | "defaultContrast" | "primaryChromaFloor" | "primaryLightTones">) => {
 		const normalized = normalizeHex(colors[key] ?? DEFAULT_DESIGN_SYSTEM_SOURCE.colors[key]);
 		if (!normalized) errors.push({ code: "invalid_hex", path: `colors.${key}`, message: "Use a six-digit hex color.", severity: "error" });
 		return normalized || DEFAULT_DESIGN_SYSTEM_SOURCE.colors[key];
@@ -424,6 +482,11 @@ function validateSource(raw: unknown): { source: DesignSystemSource; errors: Val
 			colors: {
 				primary: color("primary"), secondary: color("secondary"), tertiary: color("tertiary"),
 				error: color("error"), warning: color("warning"), success: color("success"), information: color("information"),
+				commerce: color("commerce"),
+				// Structural, not seller-editable: these fall back to the defaults so a
+				// published revision that predates them cannot silently unpin the brand.
+				primaryChromaFloor: Number(colors.primaryChromaFloor ?? DEFAULT_DESIGN_SYSTEM_SOURCE.colors.primaryChromaFloor),
+				primaryLightTones: (colors.primaryLightTones ?? DEFAULT_DESIGN_SYSTEM_SOURCE.colors.primaryLightTones) as [number, number, number],
 				surfaceTemperature, variant, defaultContrast,
 			},
 			typography: { family, multiplier: clamp(multiplier || 1, 0.9, 1.15) },
@@ -449,7 +512,10 @@ export async function generateDesignSystem(rawSource: unknown): Promise<Generate
 		schemes[contrast] = {} as Record<ThemeMode, Record<string, string>>;
 		semantic[contrast] = {} as Record<ThemeMode, Record<string, string>>;
 		for (const mode of ["light", "dark"] as ThemeMode[]) {
-			schemes[contrast][mode] = schemeRoles(customizedScheme(source, mode === "dark", CONTRAST_LEVEL[contrast]));
+			schemes[contrast][mode] = anchorBrandTone(
+				schemeRoles(customizedScheme(source, mode === "dark", CONTRAST_LEVEL[contrast])),
+				source, mode === "dark", contrast,
+			);
 			semantic[contrast][mode] = semanticRoles(source, mode === "dark", contrast);
 		}
 	}

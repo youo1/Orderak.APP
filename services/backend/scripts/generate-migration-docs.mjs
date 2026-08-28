@@ -210,6 +210,25 @@ const descriptions = {
     "The cancel path leaked stock. trg_order_items_claim_stock (026, restored by 041) decrements stock when an order is placed, and the cancel handler restored it in Room only, so units came off the catalog server-side and never went back. Release is a trigger rather than handler code because the claim side already is one, and splitting the pair across SQL and TypeScript lets the two definitions drift - a drift that surfaces only as a stock count nobody can explain.",
     "Guarded on the transition (WHEN OLD.status <> 'CANCELLED') rather than on the value, so a repeated UPDATE to CANCELLED restores stock once and not twice.",
   ],
+  "047_correct_entitlement_implementation_status.sql": [
+    "Corrects `implementation_status` for seven entitlement definitions that migration 025 seeded as `planned` while the feature was already shipping in the app.",
+    "The catalogue was never checked against the code, and the drift ran one way: CustomersScreen, CustomerDetailsScreen, MainScreen, the support-ticket, devices and catalog-translation endpoints, and AiAssistantScreen all exist, and all seven rows still claimed the work had not been done. The published figure of 23 implemented features out of 242 was understated by seven; the real count is 30. Every plan and roadmap decision framed on that number was framed on a wrong one.",
+    "Written as idempotent UPDATEs rather than a regenerated 025, because 025 is applied in both environments and the ledger records it. Same shape as 039b: keep history immutable, converge forward.",
+    "`ai_capabilities.basic_ai_assistance` is the row worth reading twice. The screen is built and wired but fail-closed behind AI_ASSISTANT_ENABLED, so `implemented` is now truthful about the code while the seller still cannot reach it. The UI must render that as `not built yet`, never as an upgrade: no plan change opens the flag, so an upgrade path would be a dead end.",
+    "tooling/ux/verify-implementation-status.mjs now fails the build when an `implemented` claim names no evidence or names evidence that no longer resolves, which is what stops this drift recurring.",
+  ],
+  "048_app_screen_surface_and_transitions.sql": [
+    "Adds `surface`, `transitions`, `states`, `offline_capable`, `entitlement_key` and `feature_status` to app_screens, so the admin screen tree can show a flow rather than only a hierarchy.",
+    "`parent_id` (016) answers what sits under what. It cannot answer what moves a seller from here to there, which is why the branch the product plan documents - a valid cached session goes Splash straight to Dashboard - was unrepresentable while Dashboard's recorded parent was Shop Setup.",
+    "transitions and states are JSON text, not child tables: they are read whole, written only by the manifest sync, and never queried by element. A join table would cost two migrations and buy nothing.",
+    "entitlement_key holds the key alone. Per-plan values stay in plan_revision_entitlements as versioned revisions; copying them here would rebuild the drift this work exists to remove.",
+  ],
+  "049_delete_settings_route.sql": [
+    "Retires `SettingsRoute` from the screen registry: the row becomes the `MainRoute#account` surface entry, the nine screens that named it as parent now name the surface, and the transition targets are repointed.",
+    "The route and the account tab rendered the same composable, and the route was kept reachable on purpose until the surface had been checked against it entry by entry. Deleting it first would have taken any undocumented behaviour with it.",
+    "The check found two defects that only existed because the screen had two ways in: the top bar drew a back arrow that did nothing on the tab, and saving payout details called the screen's dismiss callback, so a successful save on the tab reported itself by doing nothing at all. Both are fixed in the same change.",
+    "It also corrects `payments_finance.ocr_receipt_assistance` to `implemented`. The feature ships - PaymentVerifier reads a transfer screenshot and matches the amount - but the stale `planned` status made the gate answer \"not built\" to a seller whose plan simply did not include it.",
+  ],
 };
 
 function anchor(name) {

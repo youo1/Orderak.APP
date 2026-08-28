@@ -210,15 +210,32 @@ describe("payment webhook", () => {
 	});
 
 	// BILLING_ENABLED=false is the state both environments ship in. It used to
-	// close six of this module's nine routes and leave the public webhook open.
+	// close six of this module's routes and leave the public webhook open.
 	it("is closed with the rest of the surface when billing is disabled", async () => {
 		const testEnv = deployedEnv();
 		testEnv.BILLING_ENABLED = "false";
-		for (const path of ["/api/integrations/v1/payment", "/api/v1/cancel", "/api/v1/subscription/status"]) {
-			const response = await call(path, { method: path === "/api/v1/subscription/status" ? "GET" : "POST", body: path === "/api/v1/subscription/status" ? undefined : body }, testEnv);
+		for (const path of ["/api/integrations/v1/payment", "/api/v1/cancel"]) {
+			const response = await call(path, { method: "POST", body }, testEnv);
 			expect(response.status, path).toBe(403);
 			expect(await response.json()).toMatchObject({ code: "feature_disabled" });
 		}
+	});
+
+	// The carve-out this domain is written around: closing billing must not blind
+	// a merchant to what they already have. subscription/status was briefly gated
+	// with the two above and is deliberately open again — it is an authenticated
+	// GET that returns the caller's own state and grants nothing, so closing it
+	// protected nothing and cost the rule.
+	//
+	// 401 rather than 200 because this call carries no credentials: the point is
+	// that the request reaches authentication at all instead of being refused as
+	// a disabled feature before anyone looks at who is asking.
+	it("still lets a seller read their own subscription state", async () => {
+		const testEnv = deployedEnv();
+		testEnv.BILLING_ENABLED = "false";
+		const response = await call("/api/v1/subscription/status", { method: "GET" }, testEnv);
+		expect(response.status).not.toBe(403);
+		expect(await response.json()).not.toMatchObject({ code: "feature_disabled" });
 	});
 });
 

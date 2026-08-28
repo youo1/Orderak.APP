@@ -130,12 +130,11 @@
     <string name="ai_test_message_label">Message</string>
     <string name="ai_test_send">Send to backend</string>
     <string name="ai_test_error">Backend error: %1$s</string>
-    <string name="cd_settings">الإعدادات</string>
 
     <!-- Bottom nav -->
-    <string name="nav_dashboard">الرئيسية</string>
-    <string name="nav_orders">الأوردرات</string>
-    <string name="nav_products">المنتجات</string>
+    <string name="nav_dashboard">اليوم</string>
+    <string name="nav_orders">الطلبات</string>
+    <string name="nav_products">المتجر</string>
     <string name="nav_customers">العملاء</string>
 
     <!-- S8/S9 Products -->
@@ -225,6 +224,7 @@
     <string name="settings_instapay">عنوان انستاباي (مثال: name@instapay)</string>
     <string name="settings_vfcash">رقم فودافون كاش</string>
     <string name="settings_save">احفظ</string>
+    <string name="settings_payout_saved">تم حفظ بيانات التحصيل</string>
     <string name="settings_logout">تسجيل خروج</string>
     <string name="settings_delete_account">طلب حذف الحساب</string>
     <!-- Backend link -->
@@ -463,4 +463,25 @@
     <string name="setup_city_no_results">لم نجد مدينة مطابقة. يمكنك استخدام الإدخال اليدوي أدناه.</string>
     <string name="setup_city_use_manual">استخدم «%1$s» كما كتبته</string>
     <string name="setup_city_data_attribution">بيانات المدن: Countries States Cities Database (ODbL)</string>
+    <string name="gate_locked_by_plan_title">مش متضمّنة في خطتك</string>
+    <string name="gate_locked_by_plan_body">بياناتك الحالية زي ما هي بالظبط. الخاصية دي بس هي غير المتاحة.</string>
+    <string name="gate_upgrade_action">ترقية</string>
+    <string name="gate_not_built_title">لسه مش متاحة</string>
+    <string name="gate_not_built_body">الخاصية دي مش جاهزة. مفيش تغيير خطة بيفتحها.</string>
+    <string name="gate_not_built_badge">قريباً</string>
+    <string name="nav_account">حسابي</string>
+    <string name="products_limit_body_purchase_closed">وصلت لـ %1$d منتج. الخطط المدفوعة لسه مفتحتش للشراء — منتجاتك الحالية زي ما هي.</string>
+    <string name="product_stock_out">نفد المخزون</string>
+    <string name="product_stock_low">فاضل %1$d</string>
+    <string name="categories_limit_title">وصلت لحد التصنيفات</string>
+    <string name="categories_limit_body">تصنيفاتك الحالية زي ما هي. الخطة الأعلى بترفع الحد.</string>
+    <string name="categories_limit_body_purchase_closed">تصنيفاتك الحالية زي ما هي. الخطط المدفوعة لسه مفتحتش للشراء.</string>
+    <string name="categories_error_body">اتأكد من الاتصال وجرّب تاني. مفيش حاجة اتفقدت.</string>
+    <string name="orders_empty_filtered">مفيش طلبات مطابقة للفلتر ده.</string>
+    <string name="subscription_purchase_closed_title">الترقية لسه مفتحتش</string>
+    <string name="subscription_purchase_closed_body">الخطط المدفوعة متجهّزة بس مش معروضة للبيع. مفيش حاجة عندك هتتغيّر، وهنبلّغك أول ما تفتح.</string>
+    <string name="plan_using_offline_settings_body">حدود الخطة المعروضة هي آخر حاجة اتزامنت. هتتحدّث أول ما الاتصال يرجع.</string>
+    <string name="plan_notice_title">محتاج انتباهك</string>
+    <string name="order_stock_error_body">قلّل الكمية أو شيل المنتج وجرّب تاني.</string>
+    <string name="subscription_verification_error_body">خطتك زي ما هي. جرّب تاني، ولو فضل يفشل كلّم الدعم.</string>
 </resources>

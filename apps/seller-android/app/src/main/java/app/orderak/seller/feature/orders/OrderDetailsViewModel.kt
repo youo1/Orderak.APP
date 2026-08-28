@@ -7,7 +7,9 @@ import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import app.orderak.seller.core.images.ImageStore
 import app.orderak.seller.data.billing.EntitlementManager
-import app.orderak.seller.data.billing.Feature
+import app.orderak.seller.core.ui.FeatureAvailability
+import app.orderak.seller.data.billing.FeatureAvailabilityResolver
+import app.orderak.seller.data.billing.FeatureKeys.OCR_RECEIPT_ASSISTANCE
 import app.orderak.seller.data.db.OrderWithItems
 import app.orderak.seller.data.db.PaymentEntity
 import app.orderak.seller.data.orders.OrderRepository
@@ -45,6 +47,7 @@ class OrderDetailsViewModel @Inject constructor(
     private val verifier: PaymentVerifier,
     private val imageStore: ImageStore,
     val entitlementManager: EntitlementManager,
+    val featureAvailability: FeatureAvailabilityResolver,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -104,11 +107,12 @@ class OrderDetailsViewModel @Inject constructor(
     fun verifyProof(uri: Uri) {
         val o = order.value?.order ?: return
         viewModelScope.launch {
-            if (!entitlementManager.isFeatureEnabled(Feature.OCR_PAYMENT_VERIFICATION)) {
-                entitlementManager.logAttempt(Feature.OCR_PAYMENT_VERIFICATION)
-                return@launch
-            }
-            entitlementManager.logAttempt(Feature.OCR_PAYMENT_VERIFICATION)
+            // Addressed by catalogue key, so a plan that lacks OCR is told
+            // apart from a build that lacks it. The enum could say neither, and
+            // logged both as the same "not enabled".
+            val decision = featureAvailability.decide(OCR_RECEIPT_ASSISTANCE)
+            featureAvailability.log(OCR_RECEIPT_ASSISTANCE, decision)
+            if (decision.availability != FeatureAvailability.Available) return@launch
 
             _proof.value = ProofUiState.Running
             val text = verifier.ocr(uri)

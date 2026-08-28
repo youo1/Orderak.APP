@@ -12,11 +12,16 @@ import java.util.TimeZone
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * The two features still addressed by enum rather than catalogue key.
+ *
+ * Both resolve to a platform governance flag rather than a plan entitlement, so
+ * a catalogue key would not describe them: they are on or off for everyone.
+ * Everything that is genuinely per-plan is addressed by key through
+ * [FeatureAvailabilityResolver]; four members that were never referenced outside
+ * this file have been removed with the gate that used them.
+ */
 enum class Feature {
-    OCR_PAYMENT_VERIFICATION,
-    CATALOG_SLUG_CUSTOMIZATION,
-    UNLIMITED_PRODUCTS,
-    ADVANCED_ANALYTICS,
     AI_ASSISTANT,
     SHOW_ADS
 }
@@ -56,18 +61,9 @@ class EntitlementManager @Inject constructor(
 
     fun isFeatureEnabled(feature: Feature): Boolean {
         val current = _config.value
-        val c = current?.features
         if (current == null) return feature == Feature.SHOW_ADS
         if (isAuthoritativePeriodExpired(current)) return feature == Feature.SHOW_ADS
         return when (feature) {
-            Feature.OCR_PAYMENT_VERIFICATION -> isEntitlementAvailable("payments_finance.ocr_receipt_assistance")
-            Feature.CATALOG_SLUG_CUSTOMIZATION -> isEntitlementAvailable("products_catalog.custom_catalog_slug")
-			Feature.UNLIMITED_PRODUCTS -> if (current.entitlements.isNotEmpty()) {
-				integerLimit("max_products") == Int.MAX_VALUE
-			} else {
-				current.limits?.max_products == null
-			}
-            Feature.ADVANCED_ANALYTICS -> isEntitlementAvailable("analytics_reporting.operational_dashboard") || c?.analytics == true
             Feature.AI_ASSISTANT -> current.governance?.features?.get("ai_assistant")?.enabled
                 ?: (integerLimit("max_ai_requests_per_month")?.let { it > 0 }
                     ?: current.limits?.max_ai_requests_per_month?.let { it > 0 }
@@ -77,8 +73,9 @@ class EntitlementManager @Inject constructor(
         }
     }
 
-    fun logAttempt(feature: Feature) {
-        usageLogger.logFeatureAttempt(feature, planId(), isFeatureEnabled(feature))
+    /** Usage log for gates addressed by catalogue key. */
+    fun logKeyedAttempt(key: String, availability: String, reason: String) {
+        usageLogger.logKeyedFeatureAttempt(key, planId(), availability, reason)
     }
 
     fun getProductLimit(): Int {
@@ -89,6 +86,21 @@ class EntitlementManager @Inject constructor(
         val limits = _config.value?.limits ?: return 20
         return limits.max_products ?: Int.MAX_VALUE
     }
+
+    /**
+     * Whether a seller can actually buy anything right now.
+     *
+     * The six acquisition routes answer 403 while billing is closed, so an
+     * upgrade affordance shown without consulting this leads nowhere. The
+     * backend has always sent the flag in `governance.features.billing`; the app
+     * simply never asked, and offered the upgrade on the strength of a higher
+     * plan existing.
+     *
+     * Absent governance means absent permission: a snapshot that predates the
+     * flag must not be read as consent to sell.
+     */
+    fun isPurchaseOpen(): Boolean =
+        _config.value?.governance?.features?.get("billing")?.enabled == true
 
     fun nextUpgradePlanKey(): String? = when (planId()) {
         "free" -> "paid1"

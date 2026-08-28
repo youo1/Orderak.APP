@@ -72,12 +72,20 @@ jobs:
       - name: Validate Compose screenshot tests
         working-directory: apps/seller-android
         run: bash ./gradlew :app:validateStagingDebugScreenshotTest --stacktrace
+      # The plugin writes under outputs/screenshotTest-results, not the
+      # screenshot-test directory this step used to name. The mismatch was
+      # invisible while the task passed, and produced an empty artifact the
+      # first time it failed — leaving nothing to look at for the one failure
+      # a screenshot test exists to explain.
       - name: Upload screenshot diff report
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: screenshot-diffs
-          path: apps/seller-android/app/build/screenshot-test/**/*.png
+          path: |
+            apps/seller-android/app/build/outputs/screenshotTest-results/**/*.png
+            apps/seller-android/app/build/reports/screenshotTest/**
+          if-no-files-found: error
           retention-days: 7
 
   apk-size:

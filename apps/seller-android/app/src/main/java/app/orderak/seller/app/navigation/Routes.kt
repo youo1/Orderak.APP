@@ -10,7 +10,6 @@ import kotlinx.serialization.Serializable
 @Serializable data object NewOrderRoute
 @Serializable data class OrderDetailsRoute(val id: Long)
 @Serializable data class CustomerRoute(val phone: String)
-@Serializable data object SettingsRoute
 @Serializable data object StoreInfoRoute
 @Serializable data object CategoriesRoute
 @Serializable data object RestrictedAccountRoute
