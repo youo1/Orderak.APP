@@ -201,6 +201,26 @@ dependencies {
     implementation(libs.play.services.auth)
 }
 
+/**
+ * Screenshot rendering must not read the machine it runs on.
+ *
+ * `OrderCard` formats `createdAt` with `DateFormat`, which resolves the JVM's
+ * default time zone. A reference rendered in Cairo shows a time three hours
+ * ahead of the same reference rendered on a UTC runner, so the image compares
+ * unequal and the failure looks like a rendering bug rather than what it is.
+ * The app is right to show the seller local time; it is the test that has to be
+ * reproducible, so the render process is pinned rather than the app changed.
+ *
+ * The locale is pinned for the same reason: `@Preview(locale = "ar")` sets the
+ * composition locale, but anything reaching `Locale.getDefault()` during a
+ * render would still read the host.
+ */
+tasks.withType<Test>().matching { it.name.contains("ScreenshotTest") }.configureEach {
+    systemProperty("user.timezone", "UTC")
+    systemProperty("user.language", "en")
+    systemProperty("user.country", "US")
+}
+
 // Satisfy IDE requirement for unitTestClasses task (missing in some AGP/Studio combinations)
 tasks.register("unitTestClasses") {
     description = "Compiles unit test classes for all variants"
