@@ -201,6 +201,26 @@ dependencies {
     implementation(libs.play.services.auth)
 }
 
+/**
+ * Screenshot rendering must not read the machine it runs on.
+ *
+ * `OrderCard` formats `createdAt` with `DateFormat`, which resolves the JVM's
+ * default time zone. A reference rendered in Cairo shows a time three hours
+ * ahead of the same reference rendered on a UTC runner, so the image compares
+ * unequal and the failure looks like a rendering bug rather than what it is.
+ * The app is right to show the seller local time; it is the test that has to be
+ * reproducible, so the render process is pinned rather than the app changed.
+ *
+ * The locale is pinned for the same reason: `@Preview(locale = "ar")` sets the
+ * composition locale, but anything reaching `Locale.getDefault()` during a
+ * render would still read the host.
+ */
+tasks.withType<Test>().matching { it.name.contains("ScreenshotTest") }.configureEach {
+    systemProperty("user.timezone", "UTC")
+    systemProperty("user.language", "en")
+    systemProperty("user.country", "US")
+}
+
 // Satisfy IDE requirement for unitTestClasses task (missing in some AGP/Studio combinations)
 tasks.register("unitTestClasses") {
     description = "Compiles unit test classes for all variants"
@@ -693,13 +713,34 @@ val verifyDesignSystemContract by tasks.registering {
             "Compose token mapping is incomplete."
         )
 
-        // Brand identity. The seed lives in the fixture; the tone-corrected
-        // light primary is what the app actually renders, so both are pinned.
+        // Brand identity. The seed lives in the fixture; the tone-anchored light
+        // primary is what the app actually renders, so both are pinned. Migrated
+        // 2026-08-28 from #0A9A8E/#006A62 to Dark Teal #014D4E: the seed is now
+        // rendered literally, because `primaryLightTones` pins the role to the
+        // tone the seed occupies. Changing these three lines is how an approved
+        // rebrand lands; changing them without one is how a rebrand escapes.
         requireContract(
-            "\"primary\": \"#0A9A8E\"" in fixture &&
-                "\"primary\": \"#006A62\"" in legacy &&
-                "0xFF006A62" in generated,
+            "\"primary\": \"#014D4E\"" in fixture &&
+                "\"primary\": \"#014D4E\"" in legacy &&
+                "0xFF014D4E" in generated,
             "The protected default brand source or legacy projection changed."
+        )
+
+        // Monetisation is its own role. Without it, "locked by plan" has to
+        // borrow a status colour, and the seller cannot tell an upsell from a
+        // warning - the collision this migration exists to remove.
+        requireContract(
+            "\"commerce\"" in fixture && "commerceContainerOutline" in generated,
+            "The commerce role or its container outline is no longer generated."
+        )
+
+        // Every semantic container carries an outline. A container on a near-white
+        // surface separates by hue alone, which fails a colour-blind reader.
+        requireContract(
+            listOf("warningContainerOutline", "successContainerOutline",
+                "informationContainerOutline", "commerceContainerOutline")
+                .all { it in generated },
+            "A semantic container lost its outline role."
         )
         requireContract(
             "Tajawal" in type && "Noto Sans Arabic" in type,

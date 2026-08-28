@@ -19,7 +19,12 @@ fun shareCatalogText(context: Context, shopName: String?, sellerPhone: String?, 
         appendLine(context.getString(R.string.share_catalog_header, shopName.orEmpty()))
         appendLine()
         products.filter { it.available && it.stock > 0 }.forEach { p ->
-            val priceStr = context.getString(R.string.currency_egp, formatAmount(p.priceMinor, p.currency))
+            // Not a composable: the locale comes from the context the share text is
+            // built in, which is the same one the rest of the screen is drawing with.
+            val priceStr = context.getString(
+                R.string.currency_egp,
+                formatAmount(p.priceMinor, p.currency, context.resources.configuration.locales[0]),
+            )
 
             append("• ${p.name}")
             append(" — $priceStr")

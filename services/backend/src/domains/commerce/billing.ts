@@ -21,25 +21,29 @@ import { runtimeControlEnabled } from "../../platform/config/runtime-config";
 type Body = Record<string, unknown>;
 
 /**
- * Every route in this module, gated as one surface.
+ * Every acquisition route in this module, gated as one surface.
  *
- * It used to hold six of the nine. `/api/integrations/v1/payment`,
- * `/api/v1/cancel` and `/api/v1/subscription/status` were outside it, so
- * `BILLING_ENABLED=false` — the state both environments are in — closed the
- * front door and left three others open. The webhook is the one that matters:
- * it is a public POST that writes subscription status, and it was reachable on
- * an environment that had declared it was not doing billing.
+ * It used to hold six. `/api/integrations/v1/payment` and `/api/v1/cancel` were
+ * outside it, so `BILLING_ENABLED=false` — the state both environments are in —
+ * closed the front door and left them open. The webhook is the one that
+ * matters: it is a public POST that writes subscription status, and it was
+ * reachable on an environment that had declared it was not doing billing. Both
+ * stay closed.
  *
- * Nothing is lost by closing them. The Android client never calls this surface
- * at all — its paid path is Google Play (`/api/v1/billing/catalog`,
- * `/api/v1/billing/google/verify`), which is a different module with
- * authoritative server-side verification. This module is the legacy gateway
- * flow, and while billing is off it has no callers.
+ * `/api/v1/subscription/status` was closed with them and is deliberately open
+ * again. It is an authenticated GET that returns the caller's own state and
+ * grants nothing, so closing it protected nothing while breaking the rule this
+ * domain is written around: closing billing must not blind a merchant to what
+ * they already have. A seller who cannot buy must still be able to see the plan
+ * they are on. See docs/domains/billing.md.
+ *
+ * The Android client calls none of this surface — its paid path is Google Play
+ * (`/api/v1/billing/catalog`, `/api/v1/billing/google/verify`), a different
+ * module with authoritative server-side verification.
  */
 const BILLING_ACQUISITION_ROUTES = new Set([
 	"/api/v1/subscribe",
 	"/api/v1/cancel",
-	"/api/v1/subscription/status",
 	"/api/v1/coupons/validate",
 	"/api/v1/coupons/apply",
 	"/api/v1/referral/apply",

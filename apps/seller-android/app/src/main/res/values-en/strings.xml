@@ -127,9 +127,9 @@
     <string name="ai_test_error">Backend error: %1$s</string>
     <string name="cd_settings">Settings</string>
 
-    <string name="nav_dashboard">Home</string>
+    <string name="nav_dashboard">Today</string>
     <string name="nav_orders">Orders</string>
-    <string name="nav_products">Products</string>
+    <string name="nav_products">Store</string>
     <string name="nav_customers">Customers</string>
 
     <string name="products_empty">No products yet — tap ➕ and add your first product with a photo</string>
@@ -441,4 +441,25 @@
     <string name="setup_city_no_results">No matching cities found. You can use manual entry below.</string>
     <string name="setup_city_use_manual">Use “%1$s” as entered</string>
     <string name="setup_city_data_attribution">City data: Countries States Cities Database (ODbL)</string>
+    <string name="gate_locked_by_plan_title">Not included in your plan</string>
+    <string name="gate_locked_by_plan_body">Your current data stays exactly as it is. Only this feature is unavailable.</string>
+    <string name="gate_upgrade_action">Upgrade</string>
+    <string name="gate_not_built_title">Not available yet</string>
+    <string name="gate_not_built_body">This feature is not ready. No plan change unlocks it.</string>
+    <string name="gate_not_built_badge">Coming soon</string>
+    <string name="nav_account">Account</string>
+    <string name="products_limit_body_purchase_closed">You have reached %1$d products. Paid plans are not open for purchase yet — your existing products are unaffected.</string>
+    <string name="product_stock_out">Out of stock</string>
+    <string name="product_stock_low">%1$d left</string>
+    <string name="categories_limit_title">Category limit reached</string>
+    <string name="categories_limit_body">Your existing categories are unaffected. A higher plan raises the limit.</string>
+    <string name="categories_limit_body_purchase_closed">Your existing categories are unaffected. Paid plans are not open for purchase yet.</string>
+    <string name="categories_error_body">Check your connection and try again. Nothing was lost.</string>
+    <string name="orders_empty_filtered">No orders match this filter.</string>
+    <string name="subscription_purchase_closed_title">Upgrading is not open yet</string>
+    <string name="subscription_purchase_closed_body">Paid plans are prepared but not on sale. Nothing you have changes, and we will tell you when they open.</string>
+    <string name="plan_using_offline_settings_body">Plan limits shown are the last synced ones. They refresh when the connection returns.</string>
+    <string name="plan_notice_title">Needs your attention</string>
+    <string name="order_stock_error_body">Reduce the quantity or remove the item, then try again.</string>
+    <string name="subscription_verification_error_body">Your plan is unchanged. Try again, or reach support if it keeps failing.</string>
 </resources>

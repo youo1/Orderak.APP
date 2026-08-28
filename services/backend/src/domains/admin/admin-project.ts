@@ -285,16 +285,31 @@ async function syncScreens(env: AdminWorkerEnv, admin: AdminClaims): Promise<Res
 			parentId = pr?.id ?? null;
 		}
 
+		// Structure comes from the manifest and is overwritten on every sync;
+		// design_status, development_status, figma_url and screenshot_url are the
+		// admin's own workflow columns and are deliberately left alone.
+		const transitions = JSON.stringify(screen.transitions);
+		const states = JSON.stringify(screen.states);
+
 		const existing = await env.orderak_db.prepare("SELECT id FROM app_screens WHERE android_route=? ORDER BY id LIMIT 1").bind(screen.android_route).first<{id:number}>();
 		if (existing) {
-			await env.orderak_db.prepare("UPDATE app_screens SET name=?,description=?,sort_order=?,parent_id=?,source='android_manifest',last_synced_at=datetime('now'),updated_at=datetime('now') WHERE id=?")
-				.bind(screen.name,screen.description,screen.sort_order,parentId,existing.id).run();
+			await env.orderak_db.prepare(`UPDATE app_screens SET
+				name=?,description=?,sort_order=?,parent_id=?,
+				surface=?,transitions=?,states=?,offline_capable=?,entitlement_key=?,feature_status=?,
+				source='android_manifest',last_synced_at=datetime('now'),updated_at=datetime('now')
+				WHERE id=?`)
+				.bind(screen.name,screen.description,screen.sort_order,parentId,
+					screen.surface,transitions,states,screen.offline_capable ? 1 : 0,
+					screen.entitlement_key,screen.feature_status,existing.id).run();
 			updated++;
 		} else {
 			await env.orderak_db.prepare(`INSERT INTO app_screens
-				(name,description,status,design_status,development_status,android_route,sort_order,parent_id,source,last_synced_at)
-				VALUES (?,?,'planned','not_started','not_started',?,?,?,'android_manifest',datetime('now'))`)
-				.bind(screen.name,screen.description,screen.android_route,screen.sort_order,parentId).run();
+				(name,description,status,design_status,development_status,android_route,sort_order,parent_id,
+				 surface,transitions,states,offline_capable,entitlement_key,feature_status,source,last_synced_at)
+				VALUES (?,?,'planned','not_started','not_started',?,?,?,?,?,?,?,?,?,'android_manifest',datetime('now'))`)
+				.bind(screen.name,screen.description,screen.android_route,screen.sort_order,parentId,
+					screen.surface,transitions,states,screen.offline_capable ? 1 : 0,
+					screen.entitlement_key,screen.feature_status).run();
 			created++;
 		}
 	}

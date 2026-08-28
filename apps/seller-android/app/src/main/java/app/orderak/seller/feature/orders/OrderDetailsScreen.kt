@@ -71,6 +71,11 @@ fun OrderDetailsScreen(
     onBack: () -> Unit,
     viewModel: OrderDetailsViewModel = hiltViewModel()
 ) {
+    // LocalConfiguration, not LocalContext.resources.configuration: the latter is
+    // not read observably, so formatted dates and amounts would not recompose on
+    // a language change (LocalContextConfigurationRead lint). Declared once for
+    // the screen so money and dates cannot end up on different numeral systems.
+    val locale = LocalConfiguration.current.locales[0]
     val orderWithItems by viewModel.order.collectAsStateWithLifecycle()
     val payments by viewModel.payments.collectAsStateWithLifecycle()
     val proof by viewModel.proof.collectAsStateWithLifecycle()
@@ -190,7 +195,7 @@ fun OrderDetailsScreen(
                             Text("${item.qty}×", style = MaterialTheme.typography.bodyMedium)
                             Spacer(Modifier.width(8.dp))
                             Text(item.productName, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                            Text(stringResource(R.string.currency_egp, formatAmount(item.qty * item.priceMinor, order.currency)),
+                            Text(stringResource(R.string.currency_egp, formatAmount(item.qty * item.priceMinor, order.currency, locale)),
                                 style = MaterialTheme.typography.bodyMedium)
                         }
                     }
@@ -198,7 +203,7 @@ fun OrderDetailsScreen(
                     Row(Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.order_total), Modifier.weight(1f),
                             style = MaterialTheme.typography.titleMedium)
-                        Text(stringResource(R.string.currency_egp, formatAmount(order.totalMinor, order.currency)),
+                        Text(stringResource(R.string.currency_egp, formatAmount(order.totalMinor, order.currency, locale)),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.primary)
                     }
@@ -239,10 +244,6 @@ fun OrderDetailsScreen(
                 Card {
                     Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(stringResource(R.string.payment_history_title), style = MaterialTheme.typography.titleMedium)
-                        // LocalConfiguration, not LocalContext.resources.configuration: the
-                        // latter is not read observably, so the formatted dates would not
-                        // recompose on a language change (LocalContextConfigurationRead lint).
-                        val locale = LocalConfiguration.current.locales[0]
                         val dateFormat = remember(locale) {
                             SimpleDateFormat("yyyy-MM-dd HH:mm", locale)
                         }
@@ -259,7 +260,7 @@ fun OrderDetailsScreen(
                                             color = if (payment.verified) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                                         )
                                     }
-                                    Text(stringResource(R.string.currency_egp, formatAmount(payment.amountMinor, payment.currency)),
+                                    Text(stringResource(R.string.currency_egp, formatAmount(payment.amountMinor, payment.currency, locale)),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Text(dateFormat.format(Date(payment.createdAt)),

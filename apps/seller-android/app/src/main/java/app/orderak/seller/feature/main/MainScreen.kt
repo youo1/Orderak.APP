@@ -32,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -60,6 +61,11 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.orderak.seller.R
+import app.orderak.seller.app.navigation.SellerSurface
+import app.orderak.seller.core.ui.NoticeBanner
+import app.orderak.seller.core.ui.SemanticRole
+import app.orderak.seller.core.ui.UsageMeter
+import app.orderak.seller.feature.settings.SettingsScreen
 import app.orderak.seller.core.ads.LocalAdManager
 import app.orderak.seller.core.ui.SyncStatusBanner
 import app.orderak.seller.feature.customers.CustomersScreen
@@ -94,6 +100,18 @@ fun MainScreen(
     onOpenCustomer: (String) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAnnouncements: () -> Unit,
+    // The account surface hosts what SettingsRoute used to, so the shell now
+    // needs the destinations that route owned.
+    onLogout: () -> Unit = {},
+    onOpenStoreInfo: () -> Unit = {},
+    onOpenCategories: () -> Unit = {},
+    onOpenSupport: () -> Unit = {},
+    onOpenCatalogLanguages: () -> Unit = {},
+    onOpenDevices: () -> Unit = {},
+    onOpenDeletionStatus: () -> Unit = {},
+    onOpenSubscription: () -> Unit = {},
+    onOpenAiAssistant: () -> Unit = {},
+    onOpenSellerProfile: () -> Unit = {},
     viewModel: MainViewModel = hiltViewModel()
 ) {
     val shopName by viewModel.shopName.collectAsStateWithLifecycle()
@@ -113,7 +131,10 @@ fun MainScreen(
         return
     }
 
-    var tab by rememberSaveable { mutableIntStateOf(0) }
+    // Saved by name rather than index: an ordinal survives process death only
+    // until the surface list changes, and then restores the wrong screen.
+    var surfaceName by rememberSaveable { mutableStateOf(SellerSurface.Default.name) }
+    val surface = SellerSurface.valueOf(surfaceName)
 
     val appContext = LocalContext.current.applicationContext
     LaunchedEffect(Unit) {
@@ -144,7 +165,7 @@ fun MainScreen(
             )
         },
         floatingActionButton = {
-            if (tab == 0) {
+            if (surface == SellerSurface.Today) {
                 FloatingActionButton(onClick = onNewOrder) {
                     Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.order_new_title))
                 }
@@ -152,24 +173,28 @@ fun MainScreen(
         },
         bottomBar = {
             NavigationBar {
-                NavigationBarItem(selected = tab == 0, onClick = { tab = 0 },
-                    icon = { Icon(Icons.Filled.Home, contentDescription = stringResource(R.string.nav_dashboard)) },
-                    label = { Text(stringResource(R.string.nav_dashboard)) })
-                NavigationBarItem(selected = tab == 1, onClick = { tab = 1 },
-                    icon = { Icon(Icons.AutoMirrored.Outlined.ReceiptLong, contentDescription = stringResource(R.string.nav_orders)) },
-                    label = { Text(stringResource(R.string.nav_orders)) })
-                NavigationBarItem(selected = tab == 2, onClick = { tab = 2 },
-                    icon = { Icon(Icons.Outlined.Inventory2, contentDescription = stringResource(R.string.nav_products)) },
-                    label = { Text(stringResource(R.string.nav_products)) })
-                NavigationBarItem(selected = tab == 3, onClick = { tab = 3 },
-                    icon = { Icon(Icons.Outlined.Group, contentDescription = stringResource(R.string.nav_customers)) },
-                    label = { Text(stringResource(R.string.nav_customers)) })
+                SellerSurface.entries.forEach { item ->
+                    val label = stringResource(item.labelRes)
+                    NavigationBarItem(
+                        selected = surface == item,
+                        onClick = { surfaceName = item.name },
+                        icon = { Icon(item.icon, contentDescription = label) },
+                        label = { Text(label) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
+                    )
+                }
             }
         }
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
-            when (tab) {
-                0 -> DashboardTab(
+            when (surface) {
+                SellerSurface.Today -> DashboardTab(
                     viewModel = viewModel,
                     sellerPhone = sellerPhone,
                     storeUrl = storeUrl,
@@ -179,18 +204,35 @@ fun MainScreen(
                     versionPolicy = versionPolicy,
                     onRetrySync = { SyncScheduler.syncNow(appContext) },
                     onRefresh = viewModel::refreshPlanSettings,
-                    onSeeOrders = { tab = 1 },
+                    onSeeOrders = { surfaceName = SellerSurface.Orders.name },
                     onOpenAnnouncements = onOpenAnnouncements,
                 )
 
-                1 -> OrdersScreen(onOpen = onOpenOrder, onNew = onNewOrder)
-                2 -> ProductsScreen(
+                SellerSurface.Orders -> OrdersScreen(onOpen = onOpenOrder, onNew = onNewOrder)
+                SellerSurface.Store -> ProductsScreen(
                     onAdd = onAddProduct,
                     onEdit = onEditProduct,
-                    onUpgrade = onOpenSettings,
+                    onUpgrade = onOpenSubscription,
                     sellerPhone = sellerPhone,
                 )
-                else -> CustomersScreen(onOpen = onOpenCustomer)
+                SellerSurface.Customers -> CustomersScreen(onOpen = onOpenCustomer)
+                // Hosted, not reimplemented. Phase 8 rebuilds this against its
+                // contract; until then the surface shows exactly what the route
+                // showed, so nothing a seller relies on disappears in between.
+                SellerSurface.Account -> SettingsScreen(
+                    onBack = {},
+                    onLogout = onLogout,
+                    onOpenStoreInfo = onOpenStoreInfo,
+                    onOpenCategories = onOpenCategories,
+                    onOpenSupport = onOpenSupport,
+                    onOpenAnnouncements = onOpenAnnouncements,
+                    onOpenCatalogLanguages = onOpenCatalogLanguages,
+                    onOpenDevices = onOpenDevices,
+                    onOpenDeletionStatus = onOpenDeletionStatus,
+                    onOpenSubscription = onOpenSubscription,
+                    onOpenAiAssistant = onOpenAiAssistant,
+                    onOpenSellerProfile = onOpenSellerProfile,
+                )
             }
         }
     }
@@ -294,15 +336,14 @@ private fun PlanStatusBanners(state: EntitlementSyncState, versionMode: VersionU
             )
         }
         if (state.freshness == EntitlementFreshness.OFFLINE) {
-            Surface(
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                shape = MaterialTheme.shapes.medium,
-            ) {
-                Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.CloudOff, contentDescription = null)
-                    Text(stringResource(R.string.plan_using_offline_settings), Modifier.padding(start = 8.dp))
-                }
-            }
+            // Was a hand-rolled surface on secondaryContainer — the orange this
+            // system reserves for nothing in particular. The shared banner makes
+            // offline read the same here as on every other surface.
+            NoticeBanner(
+                role = SemanticRole.Info,
+                title = stringResource(R.string.plan_using_offline_settings),
+                message = stringResource(R.string.plan_using_offline_settings_body),
+            )
         }
         if (config?.subscription_status == "grace") {
             PlanNotice(text = stringResource(R.string.plan_billing_grace), dismissible = false)
@@ -361,16 +402,20 @@ private fun localizedVersionMessage(policy: AppVersionPolicy?, blocking: Boolean
 
 @Composable
 private fun PlanNotice(text: String, dismissible: Boolean, onDismiss: () -> Unit = {}) {
-    Surface(
-        color = MaterialTheme.colorScheme.tertiaryContainer,
-        shape = MaterialTheme.shapes.medium,
-    ) {
-        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(text, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-            if (dismissible) {
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.common_dismiss))
-                }
+    // Drew on `tertiaryContainer` with no icon at all, so it carried its meaning
+    // in hue alone and in a hue the semantic layer does not assign. A version
+    // that needs attention, or settings that have gone stale, is a warning — and
+    // the shared banner brings the glyph that survives greyscale.
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        NoticeBanner(
+            role = SemanticRole.Warning,
+            title = stringResource(R.string.plan_notice_title),
+            message = text,
+            modifier = Modifier.weight(1f),
+        )
+        if (dismissible) {
+            IconButton(onClick = onDismiss) {
+                Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.common_dismiss))
             }
         }
     }
@@ -398,27 +443,18 @@ private fun PlanUsageCard(config: BackendConfig) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(R.string.plan_usage_title), style = MaterialTheme.typography.titleMedium)
             rows.forEach { (label, used, limit) ->
-                val ratio = if (limit == null || limit <= 0) 0f else (used.toFloat() / limit).coerceIn(0f, 1f)
-                val extendedColors = LocalOrderakExtendedColors.current
-                val color = when {
-                    limit == null || ratio < 0.70f -> MaterialTheme.colorScheme.primary
-                    ratio < 0.90f -> extendedColors.warning
-                    else -> MaterialTheme.colorScheme.error
-                }
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                // This card used to draw its own bar and pick its own thresholds,
+                // so the dashboard and the products screen disagreed about how
+                // close to a limit counts as close. UsageMeter owns that now, and
+                // carries the icon that keeps the warning readable without colour.
+                if (limit != null) {
+                    UsageMeter(label = stringResource(label), used = used, limit = limit)
+                } else {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(stringResource(label), style = MaterialTheme.typography.labelLarge)
+                        Text(stringResource(label), style = MaterialTheme.typography.bodyMedium)
                         Text(
-                            if (limit == null) stringResource(R.string.usage_value_unlimited, used)
-                            else stringResource(R.string.usage_value, used, limit),
-                            style = MaterialTheme.typography.labelLarge,
-                        )
-                    }
-                    if (limit != null) {
-                        LinearProgressIndicator(
-                            progress = { ratio },
-                            modifier = Modifier.fillMaxWidth(),
-                            color = color,
+                            stringResource(R.string.usage_value_unlimited, used),
+                            style = MaterialTheme.typography.labelMedium,
                         )
                     }
                 }
