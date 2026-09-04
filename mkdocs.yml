@@ -53,6 +53,7 @@ nav:
     - Entitlements: domains/entitlements.md
     - Growth: domains/growth.md
     - Design System: domains/design-system.md
+    - Design System Reference: domains/design-system-reference.md
     - Admin Control Plane: domains/admin-control-plane.md
   - Contracts:
     - Authentication Invariants: contracts/authentication-security-invariants.md
