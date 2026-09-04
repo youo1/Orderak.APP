@@ -18,7 +18,7 @@ const ThemeBuilderPage = lazy(() => import('@/features/theme/ThemeBuilderPage'))
 
 export default function App() {
   const auth = useAuth();
-  if (auth.loading) return <div className="splash"><div className="brand-mark">O</div><div className="spinner" /><span>Securing session…</span></div>;
+  if (auth.loading) return <div className="splash"><div className="brand-mark">O</div><div className="ork-spinner" /><span>Securing session…</span></div>;
   if (!auth.admin || auth.loginState === 'recovery-codes') return <LoginScreen />;
   if (auth.admin.mustChangePassword) return <AccountSecurityGate />;
   return <Routes><Route element={<AppShell />}>

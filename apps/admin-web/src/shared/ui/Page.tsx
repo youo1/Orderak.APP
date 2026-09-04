@@ -5,7 +5,7 @@ export function PageHeader({ title, description, actions }: { title: string; des
   return <header className="page-header"><div><p className="eyebrow">ADMIN CONTROL CENTER</p><h1>{title}</h1><p>{description}</p></div>{actions && <div className="page-actions">{actions}</div>}</header>;
 }
 
-export function LoadingState() { return <div className="state-card"><div className="spinner" /><p>Loading current data…</p></div>; }
+export function LoadingState() { return <div className="state-card"><div className="ork-spinner" /><p>Loading current data…</p></div>; }
 export function ErrorState({ error, retry }: { error: Error; retry: () => void }) { return <div className="state-card error"><h2>Could not load this section</h2><p>{error.message}</p><button className="button" onClick={retry}>Try again</button></div>; }
 
 export function DetailPanel({ title, row, onClose, actions }: { title: string; row: Record<string, unknown>; onClose: () => void; actions?: React.ReactNode }) {
