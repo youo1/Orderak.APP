@@ -49,9 +49,9 @@
   "dependencies": {
     "@hono/zod-openapi": "^1.6.1",
     "@material/material-color-utilities": "0.3.0",
-    "@sentry/cloudflare": "^10.70.0",
+    "@sentry/cloudflare": "^10.71.0",
     "@simplewebauthn/server": "^13.3.2",
-    "hono": "^4.13.3",
+    "hono": "^4.13.4",
     "jose": "^6.2.9",
     "libphonenumber-js": "^1.13.11",
     "postal-mime": "^2.7.5",
