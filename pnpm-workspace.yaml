@@ -25,9 +25,11 @@ allowBuilds:
 # the tree - contracts/openapi had one for lodash and the workspace still
 # resolved a vulnerable copy alongside the patched one.
 #
-# All three entries are dev and build-time dependencies (the OpenAPI mock
-# server, miniflare via wrangler, and Vite's PostCSS pipeline), not anything the
-# production Workers ship.
+# All three entries are dev and build-time dependencies, and all three now
+# reach the tree through the same place -- @stoplight/prism-cli, the OpenAPI
+# mock server. Nothing the production Workers ship is involved. (This note used
+# to name miniflare and Vite's PostCSS pipeline as two of the sources; those
+# entries are gone and the sentence had outlived them.)
 overrides:
   # GHSA-r5fr-rjxr-66jc (high) — code injection through `_.template`, plus
   # GHSA-f23m-r3pf-42rh and GHSA-xxjr-mmjv-4gpg, both prototype pollution.
@@ -37,7 +39,7 @@ overrides:
   #
   # Same path as the uuid entry below — @stoplight/prism-cli >
   # @stoplight/http-spec > postman-collection — so the OpenAPI mock is the sole
-  # source of every open advisory here. Retire Prism and both entries can go.
+  # source of every open advisory here. Retire Prism and all three can go.
   lodash@<4.17.24: ">=4.17.24"
   # GHSA-w5hq-g745-h8pq — missing buffer bounds check in v3/v5/v6 when buf is
   # supplied. Reaches the tree only as @stoplight/prism-cli > @stoplight/http-spec
@@ -46,3 +48,47 @@ overrides:
   # not reachable here; the override exists so the advisory stops being an open
   # alert that has to be re-triaged on every audit.
   uuid@<11.1.1: ">=11.1.1"
+  # GHSA-fph4-wmhf-6fwf and GHSA-jqff-g426-hqxp (both high) — host confusion
+  # through percent-encoded scheme normalization, and a related parsing
+  # disagreement. Published after 2026-08-28, which is why an audit that had
+  # been green since then began failing every pull request at once.
+  #
+  # Reaches the tree only as @stoplight/prism-cli > @stoplight/prism-http >
+  # ajv > fast-uri (and the ajv-formats variant of the same path), so it runs
+  # in schema validation inside the OpenAPI mock and never in a Worker. One
+  # copy was resolved, 3.1.5; the advisory is fixed in 3.1.6 and this pins past
+  # it to 3.1.7 to avoid re-triaging the same alert on the next audit.
+  #
+  # The upper bound is load-bearing. ajv 8.20.0 declares `fast-uri: ^3.0.1`, and
+  # an open-ended ">=3.1.7" resolves to 4.x, overriding ajv past the range it
+  # says it supports -- an audit-green tree whose URI resolution is untested
+  # against its consumer. Keep this inside major 3 until ajv widens its range.
+  fast-uri@<3.1.6: ">=3.1.7 <4"
+
+# One advisory is not fixed here, because the fix is not one this tree can take.
+#
+# GHSA-qxc2-j82w-r537 (high) — @faker-js/faker's `helpers.fake()` evaluates the
+# template string it is handed, so a caller that passes attacker-controlled text
+# into it gets arbitrary code execution. Patched in 10.4.1.
+#
+# The vulnerable copy is 5.5.3, and the only thing asking for it is
+# postman-collection 4.5.0 — which does not declare a range that could resolve
+# to the fix. It pins `"@faker-js/faker": "5.5.3"` exactly. An override to
+# >=10.4.1 therefore does not upgrade postman-collection; it hands it a library
+# five majors from the one it was written against, which is the trade the
+# fast-uri upper bound above exists to refuse: a green audit over a dependency
+# that has never been exercised against its consumer.
+#
+# Prism's own copy is 10.5.0 and is not affected — that is the one the dynamic
+# mock generates data with. postman-collection is reached only when Prism is
+# given a Postman collection to parse, and the single place that runs Prism
+# hands it an OpenAPI document (`prism mock src/seller-v1.json --dynamic`, in
+# contracts/openapi). Nothing here reaches `helpers.fake()` at all.
+#
+# So this is ignored rather than silenced generally: one GHSA id, not a
+# severity threshold or a package. If postman-collection widens its pin, the
+# override belongs above and this entry goes. Retire Prism and this entry goes
+# with all three overrides.
+auditConfig:
+  ignoreGhsas:
+    - GHSA-qxc2-j82w-r537

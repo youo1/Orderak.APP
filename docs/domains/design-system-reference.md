@@ -176,7 +176,7 @@ to *their data*. A shopkeeper's tool, not a SaaS dashboard.
 - **Sentence case** for body, guidance and buttons. UPPERCASE eyebrows in admin
   at .13em tracking: `ADMIN CONTROL CENTER`, `AUDITED ACTION`, `RECORD DETAIL`.
 - **Optional is marked, required is not** — "Description (optional)"; admin
-  required fields take a trailing ` *`.
+  required fields take a trailing " *".
 - **Money** is always minor units server-side, always formatted for the locale
   on screen, always prefixed with the currency word: "EGP 480.00".
 
