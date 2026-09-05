@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { env } from "cloudflare:test";
 import { createSchema } from "./helpers";
-import { runRetentionCleanup } from "../src/domains/identity/retention";
+import { RETENTION_EXEMPT_TABLES, retentionRuleTables, runRetentionCleanup } from "../src/domains/identity/retention";
 
 beforeEach(async () => {
 	await createSchema();
@@ -93,5 +93,51 @@ describe("privacy retention cleanup", () => {
 			// de-identified by the deletion job rather than by this one.
 			{ id: "verified", phone_e164: "+201000000006", email: "c@example.com", status: "verified" },
 		]);
+	});
+	/**
+	 * The stock ledger outlives this job.
+	 *
+	 * Work item 06 built `stock_movements` because `admin_audit` could not answer
+	 * "why is this product's stock what it is" — no index on the entity, detail in
+	 * an unindexed blob, and rows deleted after two years by the rule in this very
+	 * file. A ledger that inherited that deletion would have reproduced the defect
+	 * it was built to fix: the opening balance is a row, and reconciliation
+	 * measures against it, so pruning the ledger does not shorten history, it
+	 * makes every balance after the pruned point unprovable.
+	 *
+	 * Two assertions, because they fail for different reasons. The first is the
+	 * behaviour a seller depends on. The second catches the change that would
+	 * break it — a new cleanup rule naming the table — at the point it is written,
+	 * rather than two years later when the rows are already gone.
+	 */
+	it("never prunes the stock ledger", async () => {
+		await env.orderak_db.batch([
+			env.orderak_db.prepare(`INSERT INTO stock_movements(id,store_id,product_id,product_code,delta,balance_after,cause,actor,created_at)
+				VALUES('mv-opening','ledger-store','prod-x','p-XXXXXX',10,10,'OPENING_BALANCE','system',datetime('now','-5 years'))`),
+			env.orderak_db.prepare(`INSERT INTO stock_movements(id,store_id,product_id,product_code,delta,balance_after,cause,actor,created_at)
+				VALUES('mv-sale','ledger-store','prod-x','p-XXXXXX',-3,7,'SALE','buyer',datetime('now','-3 years'))`),
+			env.orderak_db.prepare(`INSERT INTO stock_movements(id,store_id,product_id,product_code,delta,balance_after,cause,actor,created_at)
+				VALUES('mv-recent','ledger-store','prod-x','p-XXXXXX',-1,6,'SALE','buyer',datetime('now','-1 day'))`),
+		]);
+
+		await runRetentionCleanup(env);
+
+		const rows = await env.orderak_db.prepare("SELECT id FROM stock_movements ORDER BY id").all<{ id: string }>();
+		expect(rows.results?.map((row) => row.id)).toEqual(["mv-opening", "mv-recent", "mv-sale"]);
+		// The five-year-old opening balance is the one that matters: without it
+		// the remaining rows sum to -4 and explain nothing.
+		const balance = await env.orderak_db.prepare("SELECT SUM(delta) AS total FROM stock_movements WHERE product_id='prod-x'").first<{ total: number }>();
+		expect(balance?.total).toBe(6);
+	});
+
+	it("names no exempt table in any cleanup rule", async () => {
+		const written = retentionRuleTables();
+		for (const table of RETENTION_EXEMPT_TABLES) {
+			expect(written).not.toContain(table);
+		}
+		// The extractor has to actually see the rules, or the assertion above
+		// passes by finding nothing at all.
+		expect(written).toContain("admin_audit");
+		expect(written.length).toBeGreaterThan(10);
 	});
 });
