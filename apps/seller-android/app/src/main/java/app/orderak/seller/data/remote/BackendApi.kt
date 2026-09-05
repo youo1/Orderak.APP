@@ -567,6 +567,13 @@ data class ConfigRes(
     val ads_enabled: Boolean = true,
     val limits: ConfigLimits? = null,
     val features: ConfigFeatures? = null,
+    // The keyed entitlement map, in the same shape /api/v1/entitlements returns.
+    //
+    // Without it this response carried only the flat limits/features blocks, so
+    // the fallback below built a BackendConfig whose entitlements map was empty
+    // — and an empty map is what every gate and every usage meter reads as
+    // "not built". The server sends both now; see loadPlanConfig.
+    val entitlements: Map<String, EntitlementDto> = emptyMap(),
     val governance: GovernanceConfig? = null,
     @SerialName("code") val error: String? = null,
 )
