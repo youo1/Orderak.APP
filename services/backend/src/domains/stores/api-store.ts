@@ -861,6 +861,11 @@ async function pullProducts(env: Env, store: Row): Promise<Response> {
 		catalog_version: version,
 		products: (results ?? []).map((r: Row) => ({
 			app_id: Number(r.app_id),
+			// The identity the device sends back on every later push. app_id is
+			// this store's internal numbering and means nothing on the device
+			// receiving it; product_code is public and shareable. Neither is the
+			// key the mirror matches on.
+			remote_uuid: String(r.id),
 			product_code: String(r.product_code),
 			name: r.name,
 			slug: r.slug ?? null,
@@ -890,6 +895,17 @@ async function pullProducts(env: Env, store: Row): Promise<Response> {
 const BULK_DELETE_MIN_CATALOG = 10;
 const BULK_DELETE_FRACTION = 0.5;
 
+
+/**
+ * The server-assigned product id a submitted row carries, or null when it has
+ * never synced. Blank is null: a client with nothing to send must not be able
+ * to claim the product whose id is the empty string.
+ */
+function remoteUuidOf(raw: Row): string | null {
+	if (raw.remote_uuid == null) return null;
+	const uuid = String(raw.remote_uuid);
+	return uuid === "" ? null : uuid;
+}
 
 async function syncProducts(request: Request, env: Env, store: Row): Promise<Response> {
 	// This endpoint is a MIRROR: anything the submitted list omits is deleted at
@@ -967,11 +983,22 @@ async function syncProducts(request: Request, env: Env, store: Row): Promise<Res
 		.prepare("SELECT id, app_id, product_code, stock, stock_version FROM products WHERE store_id = ?")
 		.bind(storeId)
 		.all()) as { results: Row[] };
-	type ExistingProduct = { id: string; productCode: string; stock: number; stockVersion: number };
-	const existing = new Map<number, ExistingProduct>();
-	for (const r of existingRows ?? []) existing.set(Number(r.app_id), {
-		id: String(r.id), productCode: String(r.product_code), stock: Number(r.stock), stockVersion: Number(r.stock_version ?? 0),
-	});
+	type ExistingProduct = { id: string; appId: number; productCode: string; stock: number; stockVersion: number };
+	// Keyed by the server's own product id, because that is the identity two
+	// devices agree on. The app_id index beside it serves the one case that has
+	// nothing better — see the identity resolution below.
+	const existing = new Map<string, ExistingProduct>();
+	const existingByAppId = new Map<number, ExistingProduct>();
+	const takenAppIds = new Set<number>();
+	for (const r of existingRows ?? []) {
+		const item: ExistingProduct = {
+			id: String(r.id), appId: Number(r.app_id), productCode: String(r.product_code),
+			stock: Number(r.stock), stockVersion: Number(r.stock_version ?? 0),
+		};
+		existing.set(item.id, item);
+		existingByAppId.set(item.appId, item);
+		takenAppIds.add(item.appId);
+	}
 
 	const { results: catRows } = (await env.orderak_db
 		.prepare("SELECT id, category_code FROM categories WHERE store_id = ?")
@@ -980,18 +1007,77 @@ async function syncProducts(request: Request, env: Env, store: Row): Promise<Res
 	const catByCode = new Map<string, string>();
 	for (const c of catRows ?? []) catByCode.set(String(c.category_code), String(c.id));
 
+	// ---- Which submitted row is which stored product? -----------------------
+	//
+	// `app_id` is the Android Room autoincrement row id. It identifies a row on
+	// ONE device: two phones signed into the same store both allocate 1, 2, 3…
+	// for different products. Matching on it made the second phone's product an
+	// overwrite of the first phone's, silently, and no version check can help —
+	// that is an identity collision, not a staleness problem.
+	//
+	// The client has stored the server's id since its first sync (`remoteUuid`
+	// in ProductEntity, written back from the `remote_uuid` this endpoint
+	// returns). It now sends it, and it is the identity: the same product
+	// carries the same value on every device, and nothing else does.
+	//
+	// app_id survives as a hint, honoured under two conditions:
+	//
+	//   * The row sent no remote_uuid. A row that names an identity is not
+	//     guessing; if the server no longer holds it, the product was deleted
+	//     there, and falling through to app_id would let the resurrection land
+	//     on top of an unrelated product.
+	//   * Nothing else in this request has already claimed that product. A
+	//     stored product matched by its id belongs to the row that named it, so
+	//     a hint pointing at the same product is pointing at the wrong thing —
+	//     which is exactly the collision, and the row is a new product instead.
+	//
+	// The hint has to stay, or the next push from an app built before this
+	// change — which sends app_id alone — would duplicate its whole catalogue.
+	const claimed = new Set<string>();
+	const matches: Array<ExistingProduct | null> = list.map(() => null);
+	const seenUuids = new Set<string>();
+	for (let index = 0; index < list.length; index++) {
+		const raw = list[index];
+		if (!Number.isFinite(Number(raw.app_id))) continue;
+		const uuid = remoteUuidOf(raw);
+		if (uuid === null) continue;
+		// Two rows claiming one product would upsert the same row twice in one
+		// statement, which SQLite refuses; and it means the device has lost track
+		// of which local row is which, which guessing here would not repair.
+		if (seenUuids.has(uuid)) return jsonResponse({ error: "duplicate_remote_uuid", remote_uuid: uuid }, 400);
+		seenUuids.add(uuid);
+		const row = existing.get(uuid);
+		if (!row) continue;
+		matches[index] = row;
+		claimed.add(row.id);
+	}
+	for (let index = 0; index < list.length; index++) {
+		const raw = list[index];
+		const hint = Number(raw.app_id);
+		if (!Number.isFinite(hint) || matches[index] !== null || remoteUuidOf(raw) !== null) continue;
+		const row = existingByAppId.get(hint);
+		if (!row || claimed.has(row.id)) continue;
+		matches[index] = row;
+		claimed.add(row.id);
+	}
+
 	const records: Array<{
-		id: string; categoryId: string | null; productCode: string; appId: number; name: string;
+		id: string; categoryId: string | null; productCode: string; appId: number; storedAppId: number; name: string;
 		slug: string | null; description: string | null; price: number; currency: string; stock: number;
 		available: number; imageUrl: string | null; categoryCode: string | null;
 		existed: boolean; stockDirty: boolean; expectedStockVersion: number | null;
 	}> = [];
 	const seenAppIds = new Set<number>();
 	const generatedCodes = new Set([...existing.values()].map((item) => item.productCode));
+	let nextFreeAppId = 1;
 
-	for (const raw of list) {
+	for (let index = 0; index < list.length; index++) {
+		const raw = list[index];
 		const appId = Number(raw.app_id);
 		if (!Number.isFinite(appId)) continue;
+		// Still rejected, even though app_id no longer decides identity: it is
+		// the key this endpoint answers on, so two rows sharing one would leave
+		// the device unable to tell which of its products the reply describes.
 		if (seenAppIds.has(appId)) return jsonResponse({ error: "duplicate_app_id", app_id: appId }, 400);
 		seenAppIds.add(appId);
 		const name = String(raw.name ?? "").slice(0, 80);
@@ -1023,15 +1109,34 @@ async function syncProducts(request: Request, env: Env, store: Row): Promise<Res
 		const categoryCode = raw.category_code != null ? String(raw.category_code) : null;
 		const categoryId = categoryCode ? catByCode.get(categoryCode) ?? null : null;
 
-		const previous = existing.get(appId);
+		const previous = matches[index];
 		let productCode = previous?.productCode;
 		if (!productCode) {
 			if (requested.length <= 20) productCode = await uniqueResourceCode(env, "p");
 			else do productCode = newResourceCode("p", 8); while (generatedCodes.has(productCode));
 			generatedCodes.add(productCode);
 		}
+
+		// The app_id column keeps its per-store uniqueness, so a colliding hint
+		// cannot be stored verbatim. A product already here keeps the number it
+		// was stored with; a new one takes the sending device's number when that
+		// number is free, and the next free number when it is not.
+		//
+		// The device is never told, and does not need to be: the reply echoes the
+		// app_id it sent, which is its own row id and the only value it can act
+		// on. The stored number is what an app built before this change reads
+		// back as a row id, which is why it stays unique rather than repeating.
+		let storedAppId: number;
+		if (previous) storedAppId = previous.appId;
+		else if (Number.isSafeInteger(appId) && !takenAppIds.has(appId)) storedAppId = appId;
+		else {
+			while (takenAppIds.has(nextFreeAppId)) nextFreeAppId++;
+			storedAppId = nextFreeAppId;
+		}
+		takenAppIds.add(storedAppId);
+
 		records.push({
-			id: previous?.id ?? newUuid(), categoryId, productCode, appId, name, slug, description,
+			id: previous?.id ?? newUuid(), categoryId, productCode, appId, storedAppId, name, slug, description,
 			price, currency, stock, available, imageUrl, categoryCode, existed: previous != null,
 			stockDirty: raw.stock_dirty === true,
 			expectedStockVersion: raw.expected_stock_version != null && Number.isSafeInteger(Number(raw.expected_stock_version))
@@ -1041,7 +1146,7 @@ async function syncProducts(request: Request, env: Env, store: Row): Promise<Res
 
 	// What this push would do to what is already there. Computed before anything
 	// is written, because the baseline rule below depends on both answers.
-	const removedCodes = [...existing.entries()].filter(([appId]) => !seenAppIds.has(appId)).map(([, item]) => item.productCode);
+	const removedCodes = [...existing.values()].filter((item) => !claimed.has(item.id)).map((item) => item.productCode);
 	const wipesEverything = records.length === 0 && existing.size > 0;
 	const deletionCount = wipesEverything ? existing.size : removedCodes.length;
 	const modifiesExisting = records.some((record) => record.existed);
@@ -1108,7 +1213,7 @@ async function syncProducts(request: Request, env: Env, store: Row): Promise<Res
 		const chunk = records.slice(offset, offset + SYNC_CHUNK_ROWS);
 		const values = chunk.map(() => `(${Array(SYNC_COLUMNS).fill("?").join(",")})`).join(",");
 		const bindings = chunk.flatMap((record) => [
-			record.id, storeId, record.categoryId, record.productCode, record.appId, record.name,
+			record.id, storeId, record.categoryId, record.productCode, record.storedAppId, record.name,
 			record.slug, record.description, record.price, record.currency, record.stock, record.available, record.imageUrl,
 		]);
 		stmts.push(env.orderak_db.prepare(
@@ -1118,7 +1223,7 @@ async function syncProducts(request: Request, env: Env, store: Row): Promise<Res
 			// below or a buyer's order.
 			`INSERT INTO products (id,store_id,category_id,product_code,app_id,name,slug,description,price_minor,currency,stock,available,image_url)
 			 VALUES ${values}
-			 ON CONFLICT(store_id,app_id) DO UPDATE SET
+			 ON CONFLICT(id) DO UPDATE SET
 			 category_id=excluded.category_id,name=excluded.name,slug=excluded.slug,description=excluded.description,
 			 price_minor=excluded.price_minor,currency=excluded.currency,available=excluded.available,
 			 image_url=excluded.image_url,updated_at=datetime('now')`,
@@ -1170,8 +1275,8 @@ async function syncProducts(request: Request, env: Env, store: Row): Promise<Res
 	for (const record of versionedStock) {
 		stmts.push(env.orderak_db.prepare(
 			`UPDATE products SET stock=?,stock_version=stock_version+1,updated_at=datetime('now')
-			 WHERE store_id=? AND app_id=? AND stock_version=?`,
-		).bind(record.stock, storeId, record.appId, record.expectedStockVersion));
+			 WHERE store_id=? AND id=? AND stock_version=?`,
+		).bind(record.stock, storeId, record.id, record.expectedStockVersion));
 	}
 
 	// The seller setting a figure themselves is the one stock movement made in
@@ -1185,7 +1290,10 @@ async function syncProducts(request: Request, env: Env, store: Row): Promise<Res
 	// record a movement that did not happen — which is worse than the silence it
 	// replaces, because reconciliation would then believe it.
 	for (const record of versionedStock) {
-		const previous = existing.get(record.appId);
+		// By the product's own id, like everything else that addresses a stored
+		// row: `record.appId` is the sending device's numbering, which is not
+		// what this store is keyed by and can belong to another device's product.
+		const previous = existing.get(record.id);
 		if (!previous) continue;
 		const delta = record.stock - previous.stock;
 		if (delta === 0) continue;
@@ -1197,14 +1305,14 @@ async function syncProducts(request: Request, env: Env, store: Row): Promise<Res
 			 SELECT lower(hex(randomblob(16))), p.store_id, p.id, p.product_code, ?, p.stock,
 			        'MANUAL_ADJUSTMENT', NULL, 'seller', 0
 			 FROM products p
-			 WHERE p.store_id=? AND p.app_id=? AND p.stock_version=? AND p.stock=?`,
+			 WHERE p.store_id=? AND p.id=? AND p.stock_version=? AND p.stock=?`,
 		// Both halves are needed. The version alone is not proof the update
 		// applied: an order's trigger bumps it too, so a push whose stale
 		// revision was refused can still find the row sitting at expected+1 and
 		// record a movement that never happened. Requiring the new stock as well
 		// distinguishes "this statement wrote it" from "it happens to look like
 		// this", and within one batch nothing else can move it in between.
-		).bind(delta, storeId, record.appId, Number(record.expectedStockVersion) + 1, record.stock));
+		).bind(delta, storeId, record.id, Number(record.expectedStockVersion) + 1, record.stock));
 	}
 
 	// Every accepted push moves the version, so the next device to send this
@@ -1237,16 +1345,30 @@ async function syncProducts(request: Request, env: Env, store: Row): Promise<Res
 		}, request);
 	}
 
+	// One entry per submitted row, keyed by the app_id that row was sent with.
+	//
+	// It used to be every product in the store, keyed by the stored app_id. For
+	// a single device those are the same list — a mirror leaves the store
+	// holding exactly what was pushed — but for a second device they are not:
+	// the reply carried the other device's products under app_ids that collide
+	// with this device's local row ids, and the client writes this reply back by
+	// app_id. Answering only about what was asked removes the ambiguity rather
+	// than asking the client to resolve it.
 	const { results: syncedRows } = (await env.orderak_db.prepare(
-		`SELECT p.id AS remote_uuid,p.app_id,p.product_code,p.stock,p.stock_version,c.category_code
+		`SELECT p.id,p.stock,p.stock_version,c.category_code
 		 FROM products p LEFT JOIN categories c ON c.id=p.category_id
 		 WHERE p.store_id=?`,
 	).bind(storeId).all()) as { results: Row[] };
-	const mapping = (syncedRows ?? []).map((row) => ({
-		app_id: Number(row.app_id), product_code: String(row.product_code),
-		remote_uuid: String(row.remote_uuid), category_code: row.category_code == null ? null : String(row.category_code),
-		stock: Number(row.stock), stock_version: Number(row.stock_version ?? 0),
-	}));
+	const storedById = new Map<string, Row>();
+	for (const row of syncedRows ?? []) storedById.set(String(row.id), row);
+	const mapping = records.map((record) => {
+		const row = storedById.get(record.id);
+		return {
+			app_id: record.appId, product_code: record.productCode, remote_uuid: record.id,
+			category_code: row?.category_code == null ? null : String(row.category_code),
+			stock: Number(row?.stock ?? record.stock), stock_version: Number(row?.stock_version ?? 0),
+		};
+	});
 	await refreshProductTranslations(env, storeId);
 	// The push moved the version, so the baseline the device just used is spent.
 	// Returning the new one saves a round trip and, more to the point, keeps the
