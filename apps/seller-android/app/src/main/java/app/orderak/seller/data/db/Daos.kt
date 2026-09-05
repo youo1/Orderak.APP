@@ -36,6 +36,40 @@ interface ProductDao {
     @Query("SELECT * FROM products")
     suspend fun allOnce(): List<ProductEntity>
 
+    /** The local row holding a given server product, if this device has one. */
+    @Query("SELECT * FROM products WHERE remoteUuid = :uuid LIMIT 1")
+    suspend fun byRemoteUuid(uuid: String): ProductEntity?
+
+    @Query("SELECT * FROM products WHERE productCode = :code LIMIT 1")
+    suspend fun byProductCode(code: String): ProductEntity?
+
+    /**
+     * Take the server's catalogue onto this device, establishing a baseline.
+     *
+     * Upsert rather than replace. A device can reach this point with rows of its
+     * own — cleared preferences, an app upgrade that predates baselines — and
+     * deleting those to adopt the server's view would be the same data loss this
+     * whole change exists to stop, only pointed the other way. Anything local and
+     * unknown to the server survives and is pushed as an addition.
+     *
+     * Which local row a server product belongs to is decided by identity, never
+     * by row id. Each of these arrives with the server's uuid and public code
+     * and no local id, and this looks the row up. It used to arrive with
+     * `id = app_id`, which is the row id on whichever device first pushed the
+     * product — so adopting another device's catalogue upserted straight over
+     * this device's own row 1, 2, 3… and the products that lived there were
+     * gone. Nothing matching means the product is new here, and [adoptedProduct]
+     * gives it a fresh row rather than claiming an occupied one.
+     */
+    @Transaction
+    suspend fun adoptServerCatalog(products: List<ProductEntity>) {
+        for (product in products) {
+            val local = product.remoteUuid?.let { byRemoteUuid(it) }
+                ?: product.productCode?.let { byProductCode(it) }
+            upsert(adoptedProduct(product, local))
+        }
+    }
+
     @Query("UPDATE products SET productCode=:code, remoteUuid=:uuid, stock=:stock, syncedStockVersion=:version, stockDirty=0 WHERE id=:id")
     suspend fun acceptSync(id: Long, code: String?, uuid: String?, stock: Int, version: Long)
 
@@ -54,6 +88,16 @@ interface ProductDao {
     @Query("SELECT id FROM products WHERE productCode = :code")
     suspend fun idByCode(code: String): Long?
 
+    /**
+     * Write back the identity the server assigned to each product just pushed.
+     *
+     * Keyed by `app_id`, which is safe here and nowhere else: the sync reply
+     * answers about the rows this device sent and echoes the app_id each was
+     * sent with, so the number is this device's own row id by construction. It
+     * used to describe every product in the store, including ones created on
+     * another phone under app_ids that collide with this phone's row ids — which
+     * stamped another device's product code onto a local product.
+     */
     @Transaction
     suspend fun applySync(codes: List<ProductCodeDto>, conflicts: Set<Long>) {
         for (item in codes) {
@@ -121,6 +165,20 @@ interface OrderDao {
 
     @Query("UPDATE orders SET status = :status WHERE id = :id")
     suspend fun updateStatus(id: Long, status: String)
+
+    /**
+     * Orders this device created that the server has not acknowledged.
+     *
+     * `remoteId IS NULL` alone would also match nothing useful for pulled
+     * orders; pairing it with a key means "created here, not yet posted". Oldest
+     * first so the seller's order numbers come out in the order they took them.
+     */
+    @Query("SELECT * FROM orders WHERE remoteId IS NULL AND idempotencyKey IS NOT NULL ORDER BY createdAt")
+    suspend fun pendingUpload(): List<OrderEntity>
+
+    /** Record the order number the server assigned. This is what retires the marker. */
+    @Query("UPDATE orders SET remoteId = :remoteId WHERE id = :id")
+    suspend fun acceptRemoteId(id: Long, remoteId: Long)
 
     @Query("SELECT COUNT(*) FROM orders WHERE createdAt >= :since")
     fun countSince(since: Long): Flow<Int>

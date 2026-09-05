@@ -2,6 +2,8 @@ package app.orderak.seller.feature.payment
 
 import android.content.Context
 import android.net.Uri
+import app.orderak.seller.core.money.Money
+import app.orderak.seller.core.money.parseMinorUnits
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
@@ -43,13 +45,32 @@ class PaymentVerifier @Inject constructor(
     }
 
     companion object {
-        /** Pure rules — static & context-free so it's unit-testable. */
-        fun evaluate(rawText: String, expectedTotalPiasters: Long, duplicateCheck: (String) -> Boolean): VerificationResult {
+        /**
+         * Pure rules — static & context-free so it's unit-testable.
+         *
+         * Takes the order's [Money], not a bare number. The previous signature was
+         * `expectedTotalPiasters: Long` and carried four separate assumptions that
+         * every currency has two decimal places: the parameter name, a literal
+         * `/ 100.0`, a candidate regex bounded at two decimals, and a 0.01
+         * tolerance. In Kuwait, Bahrain and Oman — all three already in
+         * SUPPORTED_CURRENCIES — every one of them is wrong by a factor of ten,
+         * and the failure is a receipt for the right amount being rejected, or one
+         * for a tenth of it being accepted.
+         *
+         * The comparison is in minor units, as integers. Comparing majors as
+         * doubles needs a tolerance, and a tolerance is exactly where a
+         * factor-of-ten error hides: 0.01 is one piastre and it is ten fils.
+         */
+        fun evaluate(rawText: String, expected: Money, duplicateCheck: (String) -> Boolean): VerificationResult {
             val normalized = normalizeDigits(rawText)
-            val egp = expectedTotalPiasters / 100.0
-            val candidates = Regex("\\d+(?:\\.\\d{1,2})?").findAll(normalized)
-                .mapNotNull { it.value.toDoubleOrNull() }
-            val amountMatched = candidates.any { kotlin.math.abs(it - egp) < 0.01 }
+            // Take whole numeric tokens and let the currency judge them. Bounding
+            // the fraction in the pattern instead looks equivalent and is not: on
+            // "250.001" a two-decimal pattern matches the prefix "250.00", which
+            // parses to exactly the expected 250.00 and accepts a receipt for an
+            // amount nobody wrote. The token has to arrive intact to be refused.
+            val amountMatched = Regex("\\d+(?:\\.\\d+)?").findAll(normalized)
+                .mapNotNull { parseMinorUnits(it.value, expected.currency) }
+                .any { it == expected.amountMinor }
             val ref = Regex("\\d{9,}").findAll(normalized).map { it.value }.maxByOrNull { it.length }
             val duplicate = ref != null && duplicateCheck(ref)
             return VerificationResult(amountMatched, ref, duplicate, rawText)

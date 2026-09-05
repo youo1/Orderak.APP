@@ -1,20 +1,38 @@
----
-status: current
-generated: false
-owner: governance
-last_verified: 2026-08-21
-applies_to: [internal]
----
+# Repository and Contract Workstream — 2026-08-21
 
-# Where the work stands
+> **Status:** Historical point-in-time record. This page describes ONE
+> workstream — the one that began with a review of the Git and GitHub setup and
+> ended in a currency and API-contract migration — as it stood on 2026-08-21. It
+> is not, and never was, a status page for the product. It was titled "Where the
+> work stands" and published in the navigation as "Status", which is how it came
+> to be read as one.
 
-A single page answering "what is finished, what is not, and what is safe to
-merge". Written 2026-08-21, covering the workstream that began with a review of
-the Git and GitHub setup and ended in a currency and API-contract migration.
+**Reviewed:** 2026-08-21
+**Archived:** 2026-09-05
+**Purpose:** Preserve what this workstream finished, what it did not, and the two
+decisions it took without an ADR.
 
-> **How to trust this page.** Every "done" below is backed by a gate that runs,
-> not by a claim. The gates are listed in [What makes this verifiable](#what-makes-this-verifiable).
-> If a row here disagrees with a gate, the gate is right.
+## What changed after this was written
+
+Everything below is left as it was recorded. Four things are no longer true, and
+are corrected here rather than edited into the record:
+
+1. **The branch merged.** `followup/phases-0-9-review` no longer exists. The
+   "Where the work lives" and "Read this before merging" sections describe a
+   merge that has since happened; migration 044 has been applied to staging.
+2. **The product is deployed.** "Deployed: **Nowhere**" was true of that branch,
+   not of Orderak. Production has deployed from this repository since
+   2026-08-16 — see the README, which is authoritative for deployment state.
+3. **The route-coverage figure was wrong when written.** "100%, 252 operations"
+   was measured by a scanner that could not read the dispatch expression in
+   `phone-change.ts`, so two live POST routes were invisible to it and to the
+   contract. Corrected on 2026-09-05: coverage is 100% across 255 operations,
+   and the scanner now fails closed rather than skipping what it cannot parse.
+4. **Route discovery and payload modelling moved on.** The figures in the
+   Finished table are as of the review date.
+
+The "Not finished" table is the part still worth reading; most of it remains
+accurate, and the Android production release path is unchanged.
 
 ## Where the work lives
 

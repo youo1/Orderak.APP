@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { SELF, BASE, env, createSchema, registerStore, authHeaders } from "./helpers";
+import { SELF, BASE, env, createSchema, registerStore, authHeaders, type Registered } from "./helpers";
 import { hashSecret } from "../src/platform/http/shared";
 import { processDeletionRequests } from "../src/domains/identity/deletion";
 
@@ -380,6 +380,19 @@ describe("multi-device plan enforcement", () => {
 	});
 });
 
+/**
+ * The catalogue version this store is currently at.
+ *
+ * A push that modifies or deletes an existing product must send it back, which
+ * is how the server knows the device is not writing over something it has never
+ * seen. A real client gets this from GET /api/v1/products alongside the
+ * catalogue itself; these tests read it the same way.
+ */
+async function baselineVersion(r: Registered): Promise<number> {
+	const res = await SELF.fetch(`${BASE}/api/v1/products`, { headers: authHeaders(r) });
+	return ((await res.json()) as { catalog_version: number }).catalog_version;
+}
+
 describe("POST /api/v1/products/sync", () => {
 	it("requires seller credentials in headers", async () => {
 		const r = await registerStore();
@@ -429,7 +442,7 @@ describe("POST /api/v1/products/sync", () => {
 			await SELF.fetch(`${BASE}/api/v1/products/sync`, {
 				method: "POST",
 				headers: authHeaders(r),
-				body: JSON.stringify({ products: [{ app_id: 7, name: "Water Bottle", price: { amount_minor: 600, currency: "EGP" }, stock: 5, available: true }] }),
+				body: JSON.stringify({ baseline_version: await baselineVersion(r), products: [{ app_id: 7, name: "Water Bottle", price: { amount_minor: 600, currency: "EGP" }, stock: 5, available: true }] }),
 			})
 		).json()) as { products: { product_code: string }[] };
 		expect(second.products[0].product_code).toBe(first.products[0].product_code);
@@ -484,7 +497,7 @@ describe("POST /api/v1/products/sync", () => {
 		});
 
 		const res = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
-			method: "POST", headers: authHeaders(r), body: JSON.stringify({ products: [] }),
+			method: "POST", headers: authHeaders(r), body: JSON.stringify({ baseline_version: await baselineVersion(r), products: [] }),
 		});
 		expect(res.status).toBe(200);
 
@@ -561,18 +574,365 @@ describe("POST /api/v1/products/sync", () => {
 
 		const passive = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
 			method: "POST", headers: authHeaders(r),
-			body: JSON.stringify({ products: [{ app_id: 1, name: "Water", price: { amount_minor: 500, currency: "EGP" }, stock: 99, available: true, stock_dirty: false, expected_stock_version: 0 }] }),
+			body: JSON.stringify({ baseline_version: await baselineVersion(r), products: [{ app_id: 1, name: "Water", price: { amount_minor: 500, currency: "EGP" }, stock: 99, available: true, stock_dirty: false, expected_stock_version: 0 }] }),
 		});
 		expect(passive.status).toBe(200);
 		expect(await env.orderak_db.prepare("SELECT stock FROM products WHERE store_id=? AND app_id=1").bind(seller!.id).first()).toMatchObject({ stock: 7 });
 
 		const stale = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
 			method: "POST", headers: authHeaders(r),
-			body: JSON.stringify({ products: [{ app_id: 1, name: "Water", price: { amount_minor: 500, currency: "EGP" }, stock: 99, available: true, stock_dirty: true, expected_stock_version: 0 }] }),
+			body: JSON.stringify({ baseline_version: await baselineVersion(r), products: [{ app_id: 1, name: "Water", price: { amount_minor: 500, currency: "EGP" }, stock: 99, available: true, stock_dirty: true, expected_stock_version: 0 }] }),
 		});
 		expect(stale.status).toBe(409);
 		expect(await stale.json()).toMatchObject({ code: "stale_stock", conflicts: [1] });
 		expect(await env.orderak_db.prepare("SELECT stock,stock_version FROM products WHERE store_id=? AND app_id=1").bind(seller!.id).first()).toMatchObject({ stock: 7, stock_version: 1 });
+	});
+
+	// ---- the catalogue baseline -------------------------------------------
+	//
+	// The mirror deletes whatever the payload omits. Absence is therefore not
+	// evidence of deletion: a device with an empty database and a seller who
+	// deleted their last product send byte-identical requests. These cover the
+	// two ways that used to end in silent data loss, and the ways it must not.
+
+	it("refuses an empty mirror from a device that has not proved it is current", async () => {
+		const r = await registerStore();
+		await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({ products: [{ app_id: 1, name: "Cola", price: { amount_minor: 1500, currency: "EGP" }, stock: 10, available: true }] }),
+		});
+
+		// Signing in on a second phone looked exactly like this.
+		const wiped = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r), body: JSON.stringify({ products: [] }),
+		});
+		expect(wiped.status).toBe(409);
+		expect(await wiped.json()).toMatchObject({ code: "catalog_baseline_required" });
+
+		const after = (await (await SELF.fetch(`${BASE}/api/v1/products`, { headers: authHeaders(r) })).json()) as { products: unknown[] };
+		expect(after.products).toHaveLength(1);
+	});
+
+	it("lets a device with a current baseline delete the last product", async () => {
+		const r = await registerStore();
+		await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({ products: [{ app_id: 1, name: "Cola", price: { amount_minor: 1500, currency: "EGP" }, stock: 10, available: true }] }),
+		});
+		const emptied = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({ baseline_version: await baselineVersion(r), products: [] }),
+		});
+		expect(emptied.status).toBe(200);
+		const after = (await (await SELF.fetch(`${BASE}/api/v1/products`, { headers: authHeaders(r) })).json()) as { products: unknown[] };
+		expect(after.products).toHaveLength(0);
+	});
+
+	it("accepts a purely additive push with no baseline at all", async () => {
+		// A device that only adds products it invented cannot destroy anything it
+		// has not seen, and the first sync of a new store has no baseline to send.
+		const r = await registerStore();
+		const res = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({ products: [{ app_id: 1, name: "Cola", price: { amount_minor: 1500, currency: "EGP" }, stock: 10, available: true }] }),
+		});
+		expect(res.status).toBe(200);
+	});
+
+	it("refuses a stale device that would revert an edit made from another device", async () => {
+		const r = await registerStore();
+		const product = { app_id: 1, name: "Water", price: { amount_minor: 500, currency: "EGP" }, stock: 10, available: true };
+		await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r), body: JSON.stringify({ products: [product] }),
+		});
+		// Both devices downloaded here.
+		const shared = await baselineVersion(r);
+
+		// Device A renames and reprices.
+		const deviceA = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({ baseline_version: shared, products: [{ ...product, name: "Sparkling Water", price: { amount_minor: 900, currency: "EGP" } }] }),
+		});
+		expect(deviceA.status).toBe(200);
+
+		// Device B, still holding the same baseline, pushes what it has. Every one
+		// of these fields was unconditional last-write-wins before.
+		const deviceB = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({ baseline_version: shared, products: [product] }),
+		});
+		expect(deviceB.status).toBe(409);
+		expect(await deviceB.json()).toMatchObject({ code: "stale_catalog" });
+
+		const after = (await (await SELF.fetch(`${BASE}/api/v1/products`, { headers: authHeaders(r) })).json()) as {
+			products: { name: string; price: { amount_minor: number } }[];
+		};
+		expect(after.products[0].name).toBe("Sparkling Water");
+		expect(after.products[0].price.amount_minor).toBe(900);
+	});
+
+	it("refuses a stale device that would delete a product created after its baseline", async () => {
+		const r = await registerStore();
+		const first = { app_id: 1, name: "Water", price: { amount_minor: 500, currency: "EGP" }, stock: 10, available: true };
+		await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r), body: JSON.stringify({ products: [first] }),
+		});
+		const shared = await baselineVersion(r);
+
+		const second = { app_id: 2, name: "Juice", price: { amount_minor: 700, currency: "EGP" }, stock: 4, available: true };
+		await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({ baseline_version: shared, products: [first, second] }),
+		});
+
+		// Device B never saw Juice, so its mirror omits it — which is a deletion.
+		const stale = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({ baseline_version: shared, products: [first] }),
+		});
+		expect(stale.status).toBe(409);
+		expect(await stale.json()).toMatchObject({ code: "stale_catalog" });
+
+		const after = (await (await SELF.fetch(`${BASE}/api/v1/products`, { headers: authHeaders(r) })).json()) as { products: unknown[] };
+		expect(after.products).toHaveLength(2);
+	});
+
+	it("asks for confirmation before a current device deletes most of the catalog", async () => {
+		const r = await registerStore();
+		const products = Array.from({ length: 12 }, (_, index) => ({
+			app_id: index + 1, name: `Product ${index + 1}`,
+			price: { amount_minor: 100, currency: "EGP" }, stock: 1, available: true,
+		}));
+		await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r), body: JSON.stringify({ products }),
+		});
+
+		const unconfirmed = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({ baseline_version: await baselineVersion(r), products: products.slice(0, 2) }),
+		});
+		expect(unconfirmed.status).toBe(409);
+		expect(await unconfirmed.json()).toMatchObject({ code: "bulk_deletion_unconfirmed", deleting: 10, of: 12 });
+
+		const confirmed = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({ baseline_version: await baselineVersion(r), confirm_deletion: true, products: products.slice(0, 2) }),
+		});
+		expect(confirmed.status).toBe(200);
+		const after = (await (await SELF.fetch(`${BASE}/api/v1/products`, { headers: authHeaders(r) })).json()) as { products: unknown[] };
+		expect(after.products).toHaveLength(2);
+	});
+
+	it("moves the catalog version on every accepted push, so one baseline is good once", async () => {
+		const r = await registerStore();
+		const product = { app_id: 1, name: "Water", price: { amount_minor: 500, currency: "EGP" }, stock: 10, available: true };
+		await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r), body: JSON.stringify({ products: [product] }),
+		});
+		const before = await baselineVersion(r);
+		await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({ baseline_version: before, products: [{ ...product, name: "Still Water" }] }),
+		});
+		expect(await baselineVersion(r)).toBeGreaterThan(before);
+
+		// Replaying the same baseline is exactly the stale-device case.
+		const replay = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({ baseline_version: before, products: [{ ...product, name: "Fizzy Water" }] }),
+		});
+		expect(replay.status).toBe(409);
+	});
+
+	// ---- Two devices, one store -------------------------------------------
+	//
+	// `app_id` is the Android Room autoincrement row id, so two phones signed
+	// into one store both allocate 1, 2, 3… for DIFFERENT products. Matching a
+	// push on it filed the second phone's product as an edit of the first
+	// phone's and silently overwrote it. No version check can catch that: it is
+	// an identity collision, not a staleness problem. The server's own product
+	// id is the one value both phones agree on, and it is what the mirror
+	// matches on now — with app_id demoted to a local row id that the reply
+	// echoes back so a device can find its own rows again.
+
+	type PulledCatalog = {
+		catalog_version: number;
+		products: { app_id: number; remote_uuid: string; product_code: string; name: string }[];
+	};
+	type SyncReply = {
+		count: number;
+		products: { app_id: number; remote_uuid: string; product_code: string }[];
+	};
+
+	async function pullCatalog(r: Registered): Promise<PulledCatalog> {
+		const res = await SELF.fetch(`${BASE}/api/v1/products`, { headers: authHeaders(r) });
+		return (await res.json()) as PulledCatalog;
+	}
+
+	const cola = { name: "Cola", price: { amount_minor: 1500, currency: "EGP" }, stock: 10, available: true };
+	const juice = { name: "Juice", price: { amount_minor: 700, currency: "EGP" }, stock: 4, available: true };
+
+	/**
+	 * The collision, played out the way the two phones actually play it.
+	 *
+	 * Phone A invented Cola offline and Room numbered it 1. Phone B invented
+	 * Juice offline and Room numbered it 1 as well. B pushes blind first, is
+	 * refused for having no baseline, downloads, files Cola on a local row of
+	 * its own (row 2 — row 1 is Juice), and pushes both.
+	 */
+	async function twoDevicesCollide(r: Registered) {
+		const pushA = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({ products: [{ app_id: 1, ...cola }] }),
+		});
+		expect(pushA.status).toBe(200);
+
+		const blind = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({ products: [{ app_id: 1, ...juice }] }),
+		});
+		expect(blind.status).toBe(409);
+
+		const downloaded = await pullCatalog(r);
+		const serverCola = downloaded.products[0];
+		const pushB = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({
+				baseline_version: downloaded.catalog_version,
+				products: [
+					{ app_id: 2, remote_uuid: serverCola.remote_uuid, ...cola },
+					{ app_id: 1, ...juice },
+				],
+			}),
+		});
+		expect(pushB.status).toBe(200);
+		return { serverCola, reply: (await pushB.json()) as SyncReply };
+	}
+
+	it("keeps both products when two devices invent one at the same app_id", async () => {
+		const r = await registerStore();
+		const { serverCola } = await twoDevicesCollide(r);
+
+		const after = await pullCatalog(r);
+		expect(after.products.map((product) => product.name).sort()).toEqual(["Cola", "Juice"]);
+		// Cola is still the product phone A created, not a row Juice landed on.
+		expect(after.products.find((product) => product.name === "Cola")?.remote_uuid).toBe(serverCola.remote_uuid);
+		expect(new Set(after.products.map((product) => product.remote_uuid)).size).toBe(2);
+		expect(new Set(after.products.map((product) => product.product_code)).size).toBe(2);
+		// app_id keeps its per-store uniqueness even though it stopped being an
+		// identity: an app built before this change reads it back as a row id.
+		expect(new Set(after.products.map((product) => product.app_id)).size).toBe(2);
+	});
+
+	it("answers a push about the rows it was sent, under the app_ids it was sent", async () => {
+		// The client writes this reply back keyed by app_id, which is its own
+		// Room row id. The reply used to describe every product in the store,
+		// including the other phone's under the other phone's row ids — so
+		// applying it stamped a stranger's identity onto a local product.
+		const r = await registerStore();
+		const { serverCola, reply } = await twoDevicesCollide(r);
+
+		expect(reply.count).toBe(2);
+		expect(reply.products.map((product) => product.app_id).sort()).toEqual([1, 2]);
+		expect(reply.products.find((product) => product.app_id === 2)?.remote_uuid).toBe(serverCola.remote_uuid);
+		expect(reply.products.find((product) => product.app_id === 1)?.remote_uuid).not.toBe(serverCola.remote_uuid);
+	});
+
+	it("re-downloading after a collision names each product by the identity its device was given", async () => {
+		// This is what stops the device losing its own product on the way back
+		// down: it recognises Juice as the row it already holds, and Cola as
+		// something new, instead of filing both by a row id they share.
+		const r = await registerStore();
+		const { serverCola, reply } = await twoDevicesCollide(r);
+		const ownJuice = reply.products.find((product) => product.app_id === 1)!;
+
+		const after = await pullCatalog(r);
+		const downloadedJuice = after.products.find((product) => product.name === "Juice")!;
+		expect(downloadedJuice.remote_uuid).toBe(ownJuice.remote_uuid);
+		expect(downloadedJuice.product_code).toBe(ownJuice.product_code);
+		expect(downloadedJuice.remote_uuid).not.toBe(serverCola.remote_uuid);
+	});
+
+	it("treats a remote_uuid the store no longer holds as a new product, not as its app_id", async () => {
+		// A row that names an identity is not guessing. If the server no longer
+		// has it the product was deleted there, and falling back to app_id would
+		// land the resurrection on top of whichever product holds that number.
+		const r = await registerStore();
+		await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({ products: [{ app_id: 1, ...cola }, { app_id: 2, name: "Water", price: { amount_minor: 500, currency: "EGP" }, stock: 2, available: true }] }),
+		});
+		const downloaded = await pullCatalog(r);
+		const storedCola = downloaded.products.find((product) => product.name === "Cola")!;
+		const storedWater = downloaded.products.find((product) => product.name === "Water")!;
+
+		const res = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({
+				baseline_version: downloaded.catalog_version,
+				confirm_deletion: true,
+				products: [
+					{ app_id: storedCola.app_id, remote_uuid: "018f-deleted-elsewhere", ...juice },
+					{ app_id: storedWater.app_id, remote_uuid: storedWater.remote_uuid, name: "Water", price: { amount_minor: 500, currency: "EGP" }, stock: 2, available: true },
+				],
+			}),
+		});
+		expect(res.status).toBe(200);
+
+		const after = await pullCatalog(r);
+		const rebornJuice = after.products.find((product) => product.name === "Juice")!;
+		expect(rebornJuice.remote_uuid).not.toBe(storedCola.remote_uuid);
+		expect(rebornJuice.product_code).not.toBe(storedCola.product_code);
+		// Water was named by its identity and is untouched; Cola was claimed by
+		// nothing, so the mirror deleted it rather than renaming it.
+		expect(after.products.find((product) => product.name === "Water")?.remote_uuid).toBe(storedWater.remote_uuid);
+		expect(after.products.some((product) => product.name === "Cola")).toBe(false);
+	});
+
+	it("refuses two rows claiming one product instead of writing the row twice", async () => {
+		const r = await registerStore();
+		await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({ products: [{ app_id: 1, ...cola }] }),
+		});
+		const downloaded = await pullCatalog(r);
+
+		const res = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({
+				baseline_version: downloaded.catalog_version,
+				products: [
+					{ app_id: 1, remote_uuid: downloaded.products[0].remote_uuid, ...cola },
+					{ app_id: 2, remote_uuid: downloaded.products[0].remote_uuid, ...juice },
+				],
+			}),
+		});
+		expect(res.status).toBe(400);
+		expect(await res.json()).toMatchObject({ code: "duplicate_remote_uuid" });
+	});
+
+	it("still matches an app that sends no identity at all by its app_id", async () => {
+		// Every phone in the field today sends app_id alone. Refusing to match on
+		// it would file that phone's whole catalogue as new products on its next
+		// push, which is a duplicate catalogue rather than a lost one — but still
+		// wrong, and it would happen to every installed app at once.
+		const r = await registerStore();
+		const first = (await (await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({ products: [{ app_id: 1, ...cola }] }),
+		})).json()) as SyncReply;
+
+		const second = (await (await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({ baseline_version: await baselineVersion(r), products: [{ app_id: 1, ...cola, name: "Cola 500ml" }] }),
+		})).json()) as SyncReply;
+
+		expect(second.products).toHaveLength(1);
+		expect(second.products[0].remote_uuid).toBe(first.products[0].remote_uuid);
+		expect(second.products[0].product_code).toBe(first.products[0].product_code);
+		const after = await pullCatalog(r);
+		expect(after.products).toHaveLength(1);
+		expect(after.products[0].name).toBe("Cola 500ml");
 	});
 
 	it("rejects a product sync above the free-plan limit", async () => {
@@ -606,7 +966,7 @@ describe("POST /api/v1/products/sync", () => {
 		expect(first.status).toBe(200);
 		expect((await first.json()) as { count: number }).toMatchObject({ count: 200 });
 		const second = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
-			method: "POST", headers: authHeaders(r), body: JSON.stringify({ products: products.slice(0, 150) }),
+			method: "POST", headers: authHeaders(r), body: JSON.stringify({ baseline_version: await baselineVersion(r), products: products.slice(0, 150) }),
 		});
 		expect(second.status).toBe(200);
 		expect((await env.orderak_db.prepare("SELECT COUNT(*) AS count FROM products WHERE store_id=?").bind(seller?.id).first<{ count: number }>())?.count).toBe(150);
@@ -634,14 +994,14 @@ describe("POST /api/v1/products/sync", () => {
 		await env.orderak_db.prepare("UPDATE plans SET max_products=20 WHERE id='downgrade-plan'").run();
 		const edited = products.map((product) => ({ ...product, stock: 2 }));
 		expect((await SELF.fetch(`${BASE}/api/v1/products/sync`, {
-			method: "POST", headers: authHeaders(r), body: JSON.stringify({ products: edited }),
+			method: "POST", headers: authHeaders(r), body: JSON.stringify({ baseline_version: await baselineVersion(r), products: edited }),
 		})).status).toBe(200);
 
 		expect((await SELF.fetch(`${BASE}/api/v1/products/sync`, {
-			method: "POST", headers: authHeaders(r), body: JSON.stringify({ products: edited.slice(0, 24) }),
+			method: "POST", headers: authHeaders(r), body: JSON.stringify({ baseline_version: await baselineVersion(r), products: edited.slice(0, 24) }),
 		})).status).toBe(200);
 		const growth = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
-			method: "POST", headers: authHeaders(r), body: JSON.stringify({ products: edited }),
+			method: "POST", headers: authHeaders(r), body: JSON.stringify({ baseline_version: await baselineVersion(r), products: edited }),
 		});
 		expect(growth.status).toBe(409);
 		expect(await growth.json()).toMatchObject({ code: "plan_limit_reached", limit: 20, used: 24 });

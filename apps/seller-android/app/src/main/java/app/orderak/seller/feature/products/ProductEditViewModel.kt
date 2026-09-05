@@ -10,6 +10,8 @@ import app.orderak.seller.core.images.ImageStore
 import app.orderak.seller.data.remote.SyncScheduler
 import dagger.hilt.android.qualifiers.ApplicationContext
 import app.orderak.seller.core.money.DEFAULT_CURRENCY
+import app.orderak.seller.core.money.Money
+import app.orderak.seller.core.money.majorUnitsText
 import app.orderak.seller.core.money.parseMoney
 import app.orderak.seller.data.billing.EntitlementManager
 import app.orderak.seller.data.db.CategoryEntity
@@ -32,6 +34,9 @@ data class ProductEditUiState(
     val name: String = "",
     val description: String = "",
     val priceText: String = "",
+    /** The product's currency. Price display and parsing both read it, so a
+     *  three-decimal currency is not silently treated as a two-decimal one. */
+    val currency: String = DEFAULT_CURRENCY,
     val stockText: String = "1",
     val discountType: String? = null,
     val discountValueText: String = "",
@@ -45,7 +50,7 @@ data class ProductEditUiState(
 ) {
     val canSave: Boolean
         get() = (name.trim().length >= 2) &&
-                (parseMoney(priceText, DEFAULT_CURRENCY) != null) &&
+                (parseMoney(priceText, currency) != null) &&
                 ((stockText.toIntOrNull() ?: -1) >= 0) &&
                 (discountValueText.isEmpty() || (discountValueText.toDoubleOrNull() ?: -1.0) >= 0)
 }
@@ -76,7 +81,8 @@ class ProductEditViewModel @Inject constructor(
                     _state.value = ProductEditUiState(
                         id = p.id, createdAt = p.createdAt, name = p.name,
                         description = p.description.orEmpty(),
-                        priceText = (p.priceMinor / 100.0).let { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString() },
+                        currency = p.currency,
+                        priceText = majorUnitsText(Money(p.priceMinor, p.currency)),
                         stockText = p.stock.toString(),
                         discountType = p.discountType,
                         discountValueText = p.discountValue?.let { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString() }.orEmpty(),
@@ -112,7 +118,7 @@ class ProductEditViewModel @Inject constructor(
 
     fun save(onDone: () -> Unit) {
         val s = _state.value
-        val price = parseMoney(s.priceText, DEFAULT_CURRENCY)?.amountMinor ?: return
+        val price = parseMoney(s.priceText, s.currency)?.amountMinor ?: return
         _state.value = s.copy(saving = true)
         viewModelScope.launch {
             if (s.id == 0L && db.productDao().allOnce().size >= entitlementManager.getProductLimit()) {
@@ -127,6 +133,7 @@ class ProductEditViewModel @Inject constructor(
                     id = s.id, name = s.name.trim(),
                     description = s.description.trim().ifBlank { null },
                     priceMinor = price,
+                    currency = s.currency,
                     stock = newStock,
                     // Hidden until backend and public catalog share one discount contract.
                     discountType = existing?.discountType,

@@ -464,4 +464,8 @@
     <string name="plan_notice_title">Nécessite votre attention</string>
     <string name="order_stock_error_body">Réduisez la quantité ou retirez l’article, puis réessayez.</string>
     <string name="subscription_verification_error_body">Votre forfait est inchangé. Réessayez, ou contactez le support si cela persiste.</string>
+    <!-- An order is on this phone until the server accepts it. Usually a moment; offline, until the next sync. -->
+    <string name="order_local_only_chip">Pas encore envoyée</string>
+    <string name="order_local_only_title">En attente d’envoi vers votre compte</string>
+    <string name="order_local_only_message">Cette commande est enregistrée sur ce téléphone et n’a pas encore atteint votre compte. Elle sera envoyée automatiquement lors de la prochaine synchronisation. D’ici là elle n’apparaîtra pas sur un autre appareil et ne peut pas avancer dans son cycle.</string>
 </resources>

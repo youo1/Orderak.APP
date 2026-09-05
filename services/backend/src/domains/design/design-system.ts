@@ -854,7 +854,7 @@ export function designSystemCss(snapshot: GeneratedDesignSystem): string {
 	lines.push(`--orderak-font-family:"${familyName}",Cairo,Tajawal,"Noto Sans Arabic",system-ui,sans-serif;`);
 	for (const [role, token] of Object.entries(snapshot.typography.roles)) {
 		const name = role.replace(/[A-Z]/g, (char) => `-${char.toLowerCase()}`);
-		lines.push(`--orderak-type-${name}-size:${token.sizeRem}rem;--orderak-type-${name}-line-height:${token.lineHeight}rem;--orderak-type-${name}-weight:${token.weight};`);
+		lines.push(`--orderak-type-${name}-size:${token.sizeRem}rem;--orderak-type-${name}-line-height:${token.lineHeight}rem;--orderak-type-${name}-weight:${token.weight};--orderak-type-${name}-tracking:${token.letterSpacingEm}em;`);
 	}
 	for (const [name, value] of Object.entries(snapshot.spacing.tokens)) lines.push(`--orderak-${name}:${value}px;`);
 	for (const [name, value] of Object.entries(snapshot.shapes)) lines.push(`--orderak-shape-${name.replace(/[A-Z]/g, (char) => `-${char.toLowerCase()}`)}:${value}px;`);

@@ -172,6 +172,11 @@ fun OrderDetailsScreen(
             Modifier.fillMaxSize().padding(padding).padding(16.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // Above the order, not below it. A seller who opens this screen to
+            // check whether the order is safe should not have to scroll to find
+            // out that it is not.
+            if (order.livesOnlyOnThisPhone) LocalOnlyOrderBanner()
+
             Card {
                 Column(Modifier.fillMaxWidth().padding(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -283,14 +288,31 @@ fun OrderDetailsScreen(
                 }
             }
 
-            // Status actions
+            // Status actions.
+            //
+            // Disabled until the server has acknowledged the order (BR-305a). A
+            // transition applied here alone would be a pipeline that exists on
+            // one phone: the server would hold the order at NEW, a reinstall
+            // would replay work already done, and a local-only cancellation
+            // would restore stock here while the server kept it consumed.
+            // Offering a control that cannot do what it says is worse than
+            // greying it out and saying why, which the banner above does.
+            val acknowledged = !order.livesOnlyOnThisPhone
             status.next?.let { next ->
-                Button(onClick = viewModel::advance, modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = viewModel::advance,
+                    enabled = acknowledged,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
                     Text(stringResource(R.string.order_advance_to, statusLabel(next)))
                 }
             }
             if (status.canCancel) {
-                OutlinedButton(onClick = { confirmCancel = true }, modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(
+                    onClick = { confirmCancel = true },
+                    enabled = acknowledged,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
                     Text(stringResource(R.string.order_cancel), color = MaterialTheme.colorScheme.error)
                 }
             }
