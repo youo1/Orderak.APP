@@ -74,8 +74,24 @@ data class ProductDto(
     val expected_stock_version: Long? = null,
 )
 
+/**
+ * A full-mirror push. Whatever this list omits, the server deletes.
+ *
+ * `baseline_version` is the catalog_version this device last downloaded. The
+ * server requires it for any push that modifies or deletes an existing product,
+ * and refuses the write when it does not match — because absence is not evidence
+ * of deletion, and a device that has been offline sends the same payload as a
+ * seller who deleted everything. Null is only correct for a purely additive
+ * push, which cannot destroy what it has never seen.
+ */
 @Serializable
-data class ProductsSyncReq(val phone: String, val secret: String, val products: List<ProductDto>)
+data class ProductsSyncReq(
+    val phone: String,
+    val secret: String,
+    val products: List<ProductDto>,
+    val baseline_version: Long? = null,
+    val confirm_deletion: Boolean = false,
+)
 
 /** Per-product identity assigned by the backend (immutable product_code). */
 @Serializable
@@ -110,6 +126,38 @@ data class ProductsSyncRes(
     val ok: Boolean = false, val count: Int = 0,
     val products: List<ProductCodeDto> = emptyList(),
     val conflicts: List<Long> = emptyList(),
+    /** Present on catalog_baseline_required and stale_catalog: download again. */
+    val catalog_version: Long? = null,
+    @SerialName("code") val error: String? = null,
+)
+
+/** One product as the server holds it, for the download that establishes a baseline. */
+@Serializable
+data class RemoteProductDto(
+    val app_id: Long,
+    val product_code: String,
+    val name: String,
+    val description: String? = null,
+    val price: MoneyDto = MoneyDto(0),
+    val stock: Int = 0,
+    val stock_version: Long = 0,
+    val available: Boolean = true,
+    val image_url: String? = null,
+    val category_code: String? = null,
+)
+
+/**
+ * The server's catalogue plus the version that describes it.
+ *
+ * The two travel together on purpose: a version fetched separately could already
+ * cover a write this list does not contain, and the device would believe it was
+ * current while being one edit behind.
+ */
+@Serializable
+data class ProductsPullRes(
+    val ok: Boolean = false,
+    val catalog_version: Long = 0,
+    val products: List<RemoteProductDto> = emptyList(),
     @SerialName("code") val error: String? = null,
 )
 
@@ -868,6 +916,12 @@ class BackendApi @Inject constructor(
     suspend fun setOrderStatus(phone: String, secret: String, orderNo: Long, status: String): OrderStatusRes =
         apiCall({ OrderStatusRes(error = it) }) {
             patchRaw("/api/v1/orders/$orderNo/status", """{"status":"$status"}""", creds(phone, secret))
+        }
+
+    /** The server's catalogue, with the baseline version a push must send back. */
+    suspend fun fetchProducts(phone: String, secret: String): ProductsPullRes =
+        apiCall({ ProductsPullRes(error = it) }) {
+            getRaw("/api/v1/products", creds(phone, secret))
         }
 
     suspend fun syncProducts(req: ProductsSyncReq): ProductsSyncRes =
