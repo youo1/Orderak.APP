@@ -46,7 +46,7 @@
     "@types/react-dom": "^19.2.5",
     "@vitejs/plugin-react": "^6.1.0",
     "jsdom": "^28.0.0",
-    "oxlint": "^1.79.0",
+    "oxlint": "^1.80.0",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.2",
     "vite": "^8.2.2",

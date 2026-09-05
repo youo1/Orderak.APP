@@ -39,7 +39,7 @@
     "@types/node": "^24.13.3",
     "@vitest/coverage-istanbul": "^4.1.11",
     "fontkit": "2.0.4",
-    "oxlint": "^1.79.0",
+    "oxlint": "^1.80.0",
     "oxlint-tsgolint": "^7.0.2001",
     "tsx": "4.23.12",
     "typescript": "~6.0.2",
