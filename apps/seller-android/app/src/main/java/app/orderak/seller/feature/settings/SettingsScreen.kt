@@ -118,6 +118,20 @@ class SettingsViewModel @Inject constructor(
 	private val _billingPlans = MutableStateFlow<List<BillingPlanUi>>(emptyList())
 	val billingPlans = _billingPlans.asStateFlow()
 
+	/**
+	 * Whether this account may buy anything right now.
+	 *
+	 * The one authoritative answer, from EntitlementManager, shared with every
+	 * other surface that offers an upgrade (I-5). This screen used to draw a
+	 * purchase button per plan on two conditions — an Activity exists, and the
+	 * Play catalogue returned products — neither of which is a permission. It was
+	 * safe only by accident: BILLING_ENABLED is false, so the catalogue comes back
+	 * empty and no button drew. The accident ends the moment billing opens.
+	 */
+	val purchaseOpen = entitlementManager.config
+		.map { entitlementManager.isPurchaseOpen() }
+		.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
 	init {
 		viewModelScope.launch {
 			combine(billingManager.catalog, billingManager.state) { products, state -> products to state }
@@ -140,6 +154,12 @@ class SettingsViewModel @Inject constructor(
 	}
 
 	fun purchase(activity: android.app.Activity, product: BillingProductDto) {
+		// Checked here as well as at the button. The composition that drew the
+		// button can be older than the snapshot that closed purchasing, and this is
+		// the last point the app controls before Play takes over. The server stays
+		// the commercial authority either way — this gate exists so a seller is not
+		// walked into a checkout that will refuse them.
+		if (!entitlementManager.isPurchaseOpen()) return
 		billingManager.queryProductDetails(listOf(product.product_id)) { details ->
 			details.firstOrNull { it.productId == product.product_id }?.let {
 				billingManager.launchBillingFlow(activity, it, product.base_plan_id)
@@ -210,6 +230,7 @@ fun SettingsScreen(
 	val planName by viewModel.planName.collectAsStateWithLifecycle()
 	val aiAvailable by viewModel.aiAvailable.collectAsStateWithLifecycle()
 	val billingPlans by viewModel.billingPlans.collectAsStateWithLifecycle()
+	val purchaseOpen by viewModel.purchaseOpen.collectAsStateWithLifecycle()
 	val activity = LocalActivity.current
 
     var instapay by rememberSaveable(instapaySaved) { mutableStateOf(instapaySaved.orEmpty()) }
@@ -251,7 +272,10 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             )
-            if (activity != null && billingPlans.isNotEmpty()) {
+            // A plan list is not permission to sell one. `purchaseOpen` is the
+            // same decision the subscription screen and the limit notices read,
+            // so the account surface can no longer disagree with them (I-5).
+            if (purchaseOpen && activity != null && billingPlans.isNotEmpty()) {
                 billingPlans.forEach { plan ->
                     OutlinedButton(
                         onClick = { viewModel.purchase(activity, plan.product) },
