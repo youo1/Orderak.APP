@@ -744,6 +744,197 @@ describe("POST /api/v1/products/sync", () => {
 		expect(replay.status).toBe(409);
 	});
 
+	// ---- Two devices, one store -------------------------------------------
+	//
+	// `app_id` is the Android Room autoincrement row id, so two phones signed
+	// into one store both allocate 1, 2, 3… for DIFFERENT products. Matching a
+	// push on it filed the second phone's product as an edit of the first
+	// phone's and silently overwrote it. No version check can catch that: it is
+	// an identity collision, not a staleness problem. The server's own product
+	// id is the one value both phones agree on, and it is what the mirror
+	// matches on now — with app_id demoted to a local row id that the reply
+	// echoes back so a device can find its own rows again.
+
+	type PulledCatalog = {
+		catalog_version: number;
+		products: { app_id: number; remote_uuid: string; product_code: string; name: string }[];
+	};
+	type SyncReply = {
+		count: number;
+		products: { app_id: number; remote_uuid: string; product_code: string }[];
+	};
+
+	async function pullCatalog(r: Registered): Promise<PulledCatalog> {
+		const res = await SELF.fetch(`${BASE}/api/v1/products`, { headers: authHeaders(r) });
+		return (await res.json()) as PulledCatalog;
+	}
+
+	const cola = { name: "Cola", price: { amount_minor: 1500, currency: "EGP" }, stock: 10, available: true };
+	const juice = { name: "Juice", price: { amount_minor: 700, currency: "EGP" }, stock: 4, available: true };
+
+	/**
+	 * The collision, played out the way the two phones actually play it.
+	 *
+	 * Phone A invented Cola offline and Room numbered it 1. Phone B invented
+	 * Juice offline and Room numbered it 1 as well. B pushes blind first, is
+	 * refused for having no baseline, downloads, files Cola on a local row of
+	 * its own (row 2 — row 1 is Juice), and pushes both.
+	 */
+	async function twoDevicesCollide(r: Registered) {
+		const pushA = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({ products: [{ app_id: 1, ...cola }] }),
+		});
+		expect(pushA.status).toBe(200);
+
+		const blind = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({ products: [{ app_id: 1, ...juice }] }),
+		});
+		expect(blind.status).toBe(409);
+
+		const downloaded = await pullCatalog(r);
+		const serverCola = downloaded.products[0];
+		const pushB = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({
+				baseline_version: downloaded.catalog_version,
+				products: [
+					{ app_id: 2, remote_uuid: serverCola.remote_uuid, ...cola },
+					{ app_id: 1, ...juice },
+				],
+			}),
+		});
+		expect(pushB.status).toBe(200);
+		return { serverCola, reply: (await pushB.json()) as SyncReply };
+	}
+
+	it("keeps both products when two devices invent one at the same app_id", async () => {
+		const r = await registerStore();
+		const { serverCola } = await twoDevicesCollide(r);
+
+		const after = await pullCatalog(r);
+		expect(after.products.map((product) => product.name).sort()).toEqual(["Cola", "Juice"]);
+		// Cola is still the product phone A created, not a row Juice landed on.
+		expect(after.products.find((product) => product.name === "Cola")?.remote_uuid).toBe(serverCola.remote_uuid);
+		expect(new Set(after.products.map((product) => product.remote_uuid)).size).toBe(2);
+		expect(new Set(after.products.map((product) => product.product_code)).size).toBe(2);
+		// app_id keeps its per-store uniqueness even though it stopped being an
+		// identity: an app built before this change reads it back as a row id.
+		expect(new Set(after.products.map((product) => product.app_id)).size).toBe(2);
+	});
+
+	it("answers a push about the rows it was sent, under the app_ids it was sent", async () => {
+		// The client writes this reply back keyed by app_id, which is its own
+		// Room row id. The reply used to describe every product in the store,
+		// including the other phone's under the other phone's row ids — so
+		// applying it stamped a stranger's identity onto a local product.
+		const r = await registerStore();
+		const { serverCola, reply } = await twoDevicesCollide(r);
+
+		expect(reply.count).toBe(2);
+		expect(reply.products.map((product) => product.app_id).sort()).toEqual([1, 2]);
+		expect(reply.products.find((product) => product.app_id === 2)?.remote_uuid).toBe(serverCola.remote_uuid);
+		expect(reply.products.find((product) => product.app_id === 1)?.remote_uuid).not.toBe(serverCola.remote_uuid);
+	});
+
+	it("re-downloading after a collision names each product by the identity its device was given", async () => {
+		// This is what stops the device losing its own product on the way back
+		// down: it recognises Juice as the row it already holds, and Cola as
+		// something new, instead of filing both by a row id they share.
+		const r = await registerStore();
+		const { serverCola, reply } = await twoDevicesCollide(r);
+		const ownJuice = reply.products.find((product) => product.app_id === 1)!;
+
+		const after = await pullCatalog(r);
+		const downloadedJuice = after.products.find((product) => product.name === "Juice")!;
+		expect(downloadedJuice.remote_uuid).toBe(ownJuice.remote_uuid);
+		expect(downloadedJuice.product_code).toBe(ownJuice.product_code);
+		expect(downloadedJuice.remote_uuid).not.toBe(serverCola.remote_uuid);
+	});
+
+	it("treats a remote_uuid the store no longer holds as a new product, not as its app_id", async () => {
+		// A row that names an identity is not guessing. If the server no longer
+		// has it the product was deleted there, and falling back to app_id would
+		// land the resurrection on top of whichever product holds that number.
+		const r = await registerStore();
+		await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({ products: [{ app_id: 1, ...cola }, { app_id: 2, name: "Water", price: { amount_minor: 500, currency: "EGP" }, stock: 2, available: true }] }),
+		});
+		const downloaded = await pullCatalog(r);
+		const storedCola = downloaded.products.find((product) => product.name === "Cola")!;
+		const storedWater = downloaded.products.find((product) => product.name === "Water")!;
+
+		const res = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({
+				baseline_version: downloaded.catalog_version,
+				confirm_deletion: true,
+				products: [
+					{ app_id: storedCola.app_id, remote_uuid: "018f-deleted-elsewhere", ...juice },
+					{ app_id: storedWater.app_id, remote_uuid: storedWater.remote_uuid, name: "Water", price: { amount_minor: 500, currency: "EGP" }, stock: 2, available: true },
+				],
+			}),
+		});
+		expect(res.status).toBe(200);
+
+		const after = await pullCatalog(r);
+		const rebornJuice = after.products.find((product) => product.name === "Juice")!;
+		expect(rebornJuice.remote_uuid).not.toBe(storedCola.remote_uuid);
+		expect(rebornJuice.product_code).not.toBe(storedCola.product_code);
+		// Water was named by its identity and is untouched; Cola was claimed by
+		// nothing, so the mirror deleted it rather than renaming it.
+		expect(after.products.find((product) => product.name === "Water")?.remote_uuid).toBe(storedWater.remote_uuid);
+		expect(after.products.some((product) => product.name === "Cola")).toBe(false);
+	});
+
+	it("refuses two rows claiming one product instead of writing the row twice", async () => {
+		const r = await registerStore();
+		await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({ products: [{ app_id: 1, ...cola }] }),
+		});
+		const downloaded = await pullCatalog(r);
+
+		const res = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({
+				baseline_version: downloaded.catalog_version,
+				products: [
+					{ app_id: 1, remote_uuid: downloaded.products[0].remote_uuid, ...cola },
+					{ app_id: 2, remote_uuid: downloaded.products[0].remote_uuid, ...juice },
+				],
+			}),
+		});
+		expect(res.status).toBe(400);
+		expect(await res.json()).toMatchObject({ code: "duplicate_remote_uuid" });
+	});
+
+	it("still matches an app that sends no identity at all by its app_id", async () => {
+		// Every phone in the field today sends app_id alone. Refusing to match on
+		// it would file that phone's whole catalogue as new products on its next
+		// push, which is a duplicate catalogue rather than a lost one — but still
+		// wrong, and it would happen to every installed app at once.
+		const r = await registerStore();
+		const first = (await (await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({ products: [{ app_id: 1, ...cola }] }),
+		})).json()) as SyncReply;
+
+		const second = (await (await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST", headers: authHeaders(r),
+			body: JSON.stringify({ baseline_version: await baselineVersion(r), products: [{ app_id: 1, ...cola, name: "Cola 500ml" }] }),
+		})).json()) as SyncReply;
+
+		expect(second.products).toHaveLength(1);
+		expect(second.products[0].remote_uuid).toBe(first.products[0].remote_uuid);
+		expect(second.products[0].product_code).toBe(first.products[0].product_code);
+		const after = await pullCatalog(r);
+		expect(after.products).toHaveLength(1);
+		expect(after.products[0].name).toBe("Cola 500ml");
+	});
+
 	it("rejects a product sync above the free-plan limit", async () => {
 		const r = await registerStore();
 		const products = Array.from({ length: 21 }, (_, i) => ({ app_id: i + 1, name: `Product ${i}`, stock: 1 }));
