@@ -172,6 +172,11 @@ fun OrderDetailsScreen(
             Modifier.fillMaxSize().padding(padding).padding(16.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // Above the order, not below it. A seller who opens this screen to
+            // check whether the order is safe should not have to scroll to find
+            // out that it is not.
+            if (order.livesOnlyOnThisPhone) LocalOnlyOrderBanner()
+
             Card {
                 Column(Modifier.fillMaxWidth().padding(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {

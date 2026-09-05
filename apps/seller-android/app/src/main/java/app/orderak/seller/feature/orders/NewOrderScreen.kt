@@ -81,6 +81,11 @@ fun NewOrderScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            // Before the form, not after the save. A seller told afterwards that
+            // the order they just recorded is not on their account has already
+            // made the decision this affects.
+            item { ManualOrderLimitationBanner() }
+
             item { CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                 OutlinedTextField(
                     value = state.phone, onValueChange = viewModel::onPhone,

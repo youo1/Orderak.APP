@@ -464,4 +464,10 @@
     <string name="plan_notice_title">Nécessite votre attention</string>
     <string name="order_stock_error_body">Réduisez la quantité ou retirez l’article, puis réessayez.</string>
     <string name="subscription_verification_error_body">Votre forfait est inchangé. Réessayez, ou contactez le support si cela persiste.</string>
+    <!-- Manual orders live on this phone only until the server accepts them. Deleted with work item 05. -->
+    <string name="order_local_only_chip">Sur ce téléphone</string>
+    <string name="order_local_only_title">Non enregistrée dans votre compte</string>
+    <string name="order_local_only_message">Cette commande n’existe que sur ce téléphone. Elle n’apparaîtra pas si vous vous connectez depuis un autre appareil et sera perdue si vous réinstallez l’application. Les commandes reçues via le lien de votre boutique sont enregistrées dans votre compte.</string>
+    <string name="order_new_local_only_title">Enregistrée sur ce téléphone uniquement</string>
+    <string name="order_new_local_only_message">Les commandes que vous saisissez ici restent sur ce téléphone pour le moment. Elles ne sont pas ajoutées à votre compte et n’apparaîtront pas sur un autre appareil.</string>
 </resources>
