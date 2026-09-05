@@ -14,6 +14,7 @@ import app.orderak.seller.data.db.OrderWithItems
 import app.orderak.seller.data.db.PaymentEntity
 import app.orderak.seller.data.orders.OrderRepository
 import app.orderak.seller.domain.OrderStatus
+import app.orderak.seller.core.money.Money
 import app.orderak.seller.feature.payment.PaymentVerifier
 import app.orderak.seller.feature.payment.VerificationResult
 import app.orderak.seller.app.navigation.OrderDetailsRoute
@@ -117,7 +118,7 @@ class OrderDetailsViewModel @Inject constructor(
             _proof.value = ProofUiState.Running
             val text = verifier.ocr(uri)
             var duplicate = false
-            val prelim = PaymentVerifier.evaluate(text, o.totalMinor) { false }
+            val prelim = PaymentVerifier.evaluate(text, Money(o.totalMinor, o.currency)) { false }
             prelim.ref?.let { duplicate = repo.isDuplicateRef(it) }
             val result = prelim.copy(duplicateRef = duplicate)
             var statusApplied = true
