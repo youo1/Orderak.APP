@@ -104,6 +104,40 @@ data class ProductCodeDto(
     val category_code: String? = null,
 )
 
+/** One line of an order the seller is recording. */
+@Serializable
+data class NewOrderLineDto(val product_code: String, val qty: Int)
+
+/**
+ * An order the seller took outside the storefront.
+ *
+ * [idempotency_key] is required by the server rather than minted there. The app
+ * records orders offline and posts them on the next sync, so a retry after a
+ * dropped response is the normal case; a key generated per attempt would turn
+ * each retry into a new order. It is stored on the row and reused unchanged.
+ */
+@Serializable
+data class CreateOrderReq(
+    val idempotency_key: String,
+    val buyer_phone: String,
+    val buyer_name: String? = null,
+    val items: List<NewOrderLineDto>,
+    val pay_method: String,
+    val note: String? = null,
+)
+
+@Serializable
+data class CreateOrderRes(
+    val ok: Boolean = false,
+    /** Per-store order number. Stored as remoteId; the status route addresses it. */
+    val order_no: Long = 0,
+    val total_minor: Long = 0,
+    val currency: String = "EGP",
+    /** True when the key had already been used and no new order was written. */
+    val replayed: Boolean = false,
+    @SerialName("code") val error: String? = null,
+)
+
 /**
  * Result of moving one order along its pipeline.
  *
@@ -913,6 +947,12 @@ class BackendApi @Inject constructor(
      * Move one order to [status]. Addressed by the per-store order number, which
      * is what OrderEntity.remoteId holds — the app never receives the UUID.
      */
+    /** Record an order the seller took outside the storefront. */
+    suspend fun createOrder(phone: String, secret: String, req: CreateOrderReq): CreateOrderRes =
+        apiCall({ CreateOrderRes(error = it) }) {
+            postRaw("/api/v1/orders", json.encodeToString(req), creds(phone, secret))
+        }
+
     suspend fun setOrderStatus(phone: String, secret: String, orderNo: Long, status: String): OrderStatusRes =
         apiCall({ OrderStatusRes(error = it) }) {
             patchRaw("/api/v1/orders/$orderNo/status", """{"status":"$status"}""", creds(phone, secret))

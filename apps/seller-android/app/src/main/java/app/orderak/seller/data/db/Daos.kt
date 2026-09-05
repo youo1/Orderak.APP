@@ -136,6 +136,20 @@ interface OrderDao {
     @Query("UPDATE orders SET status = :status WHERE id = :id")
     suspend fun updateStatus(id: Long, status: String)
 
+    /**
+     * Orders this device created that the server has not acknowledged.
+     *
+     * `remoteId IS NULL` alone would also match nothing useful for pulled
+     * orders; pairing it with a key means "created here, not yet posted". Oldest
+     * first so the seller's order numbers come out in the order they took them.
+     */
+    @Query("SELECT * FROM orders WHERE remoteId IS NULL AND idempotencyKey IS NOT NULL ORDER BY createdAt")
+    suspend fun pendingUpload(): List<OrderEntity>
+
+    /** Record the order number the server assigned. This is what retires the marker. */
+    @Query("UPDATE orders SET remoteId = :remoteId WHERE id = :id")
+    suspend fun acceptRemoteId(id: Long, remoteId: Long)
+
     @Query("SELECT COUNT(*) FROM orders WHERE createdAt >= :since")
     fun countSince(since: Long): Flow<Int>
 

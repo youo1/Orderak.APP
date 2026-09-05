@@ -12250,6 +12250,351 @@
             }
           }
         }
+      },
+      "post": {
+        "operationId": "post_v1_orders",
+        "tags": [
+          "seller"
+        ],
+        "summary": "Record an order taken outside the storefront",
+        "description": "Creates an order the seller took in a conversation, in the shop, or over the phone. It is the same order as one placed on the storefront: same validation, same monthly plan limit, same per-store order number sequence, and the same stock movement. Only the origin differs, which is recorded on the row.\n\nThe app writes the order locally first so recording it does not depend on a signal, then posts it here. Until this call succeeds the order is not on the account: it does not reach a second device, does not survive a reinstall, is not counted against the plan, and cannot be advanced through its pipeline.",
+        "x-owner": "Seller Experience",
+        "x-data-classification": "L2",
+        "x-rate-limit": "seller-authenticated-default",
+        "x-stability": "draft",
+        "security": [
+          {
+            "sellerDevice": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "./components/common.json#/parameters/RequestId"
+          },
+          {
+            "$ref": "./components/common.json#/parameters/ClientPlatform"
+          },
+          {
+            "$ref": "./components/common.json#/parameters/AppVersion"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "idempotency_key",
+                  "buyer_phone",
+                  "items"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "idempotency_key": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._:-]{8,100}$",
+                    "description": "Required, and owned by the client. Unlike the storefront, which mints one when a browser sends none, this route refuses to invent it: the app records orders offline and retries them on the next sync, so a retry after a dropped response is the normal case and a key generated per attempt would make each retry a new order. Reuse the same key for the same order and the existing order is returned."
+                  },
+                  "buyer_phone": {
+                    "type": "string",
+                    "description": "8 to 15 digits. Non-digits are stripped before validation."
+                  },
+                  "buyer_name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 40
+                  },
+                  "items": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 50,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "product_code",
+                        "qty"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "product_code": {
+                          "type": "string",
+                          "description": "The product's immutable public code. Must belong to this store."
+                        },
+                        "qty": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 999
+                        }
+                      }
+                    },
+                    "description": "Every product must be in stock for the quantity asked; the whole order is refused otherwise."
+                  },
+                  "pay_method": {
+                    "type": "string",
+                    "enum": [
+                      "COD",
+                      "VF_CASH",
+                      "INSTAPAY"
+                    ],
+                    "default": "COD",
+                    "description": "A transfer method is only accepted when the store has published a handle for it."
+                  },
+                  "note": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 200
+                  }
+                }
+              },
+              "examples": {
+                "valid": {
+                  "value": {
+                    "idempotency_key": "018f3a2b-7c4d-4e91-b8a6",
+                    "buyer_phone": "01000000000",
+                    "buyer_name": "Walk-in",
+                    "items": [
+                      {
+                        "product_code": "p-A1B2C3",
+                        "qty": 2
+                      }
+                    ],
+                    "pay_method": "COD"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The order is on the account. Also returned for a replayed key, with replayed: true and no second order written.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "order_no",
+                    "total_minor",
+                    "currency",
+                    "replayed"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "order_no": {
+                      "type": "integer",
+                      "description": "The per-store order number. Store it as the order's remote id: it is what PATCH /api/v1/orders/{order_no}/status addresses, and the number the seller reads aloud."
+                    },
+                    "total_minor": {
+                      "type": "integer",
+                      "description": "Computed from the store's own prices, not from the request."
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "One currency per order; a mixed-currency order is refused."
+                    },
+                    "replayed": {
+                      "type": "boolean",
+                      "description": "True when this key had already been used and no new order was written."
+                    }
+                  }
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "ok": true,
+                      "order_no": 42,
+                      "total_minor": 3000,
+                      "currency": "EGP",
+                      "replayed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "idempotency_key is missing or malformed, the buyer phone or item list is invalid, a product code does not belong to this store, the same product appears twice, or the payment method is not one the store has published.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/idempotency_key_required",
+                      "title": "Idempotency Key Required",
+                      "status": 400,
+                      "code": "idempotency_key_required",
+                      "detail": "Send idempotency_key: 8-100 characters of [A-Za-z0-9._:-].",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or rejected seller credentials.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/auth",
+                      "title": "Unauthorized",
+                      "status": 401,
+                      "code": "auth",
+                      "detail": "Seller credentials are required.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The store is not accepting orders, or the buyer is restricted.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/orders_disabled",
+                      "title": "Orders Disabled",
+                      "status": 403,
+                      "code": "orders_disabled",
+                      "detail": "This store is not accepting orders.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The order could not be written as asked: stock_changed when a line exceeds what is in stock, mixed_currency_order when the lines are not all in one currency, or plan_limit_reached at the monthly order limit.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/stock_changed",
+                      "title": "Stock Changed",
+                      "status": 409,
+                      "code": "stock_changed",
+                      "detail": "One or more products no longer have the stock requested.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/rate_limited",
+                      "title": "Rate Limited",
+                      "status": 429,
+                      "code": "rate_limited",
+                      "detail": "Too many requests.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Writes for this store are fenced, during a tenant shard migration. Retryable: the response carries retry-after and the order has not been written.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Seconds to wait before retrying."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/tenant_write_fenced",
+                      "title": "Tenant Write Fenced",
+                      "status": 503,
+                      "code": "tenant_write_fenced",
+                      "detail": "Writes for this store are paused. Retry after the interval given.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/plans": {

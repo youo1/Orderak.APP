@@ -13,31 +13,28 @@ import app.orderak.seller.data.db.OrderEntity
  * Orders that exist on this phone and nowhere else.
  *
  * WHY THIS IS ON SCREEN AT ALL
- *   An order the seller records by hand is written to Room and never sent
- *   anywhere. There is no POST /api/v1/orders — the app can read orders and
- *   change their status, and it cannot create one. So a manual order is not in
- *   the account: it does not appear on a second device, it does not survive a
- *   reinstall, and it is not counted against the plan.
+ *   An order the seller records by hand is written to Room first, because the
+ *   seller is standing in front of a customer and it must not depend on a
+ *   signal, and posted to the server immediately afterwards. Until that post
+ *   lands the order is not on the account: it does not reach a second device, it
+ *   does not survive a reinstall, and it is not counted against the plan.
  *
- *   Until it is, saying nothing is the worst of the options. The seller reads a
- *   confirmation, sees the order in the list beside the ones that ARE on the
- *   account, and has no way to tell the difference. Telling them plainly turns
- *   silent data loss into a stated limitation, which is a much smaller problem
- *   and an honest one.
+ *   Usually that gap is a moment. Offline it lasts until the next sync. Either
+ *   way the seller can see the order sitting in the list beside orders that ARE
+ *   on the account, and nothing else on the row tells them apart, so the app
+ *   says which is which.
+ *
+ *   This used to describe a permanent state: there was no POST /api/v1/orders at
+ *   all, and an order typed in here stopped in Room forever. Work item 05 added
+ *   the route, so what is left is a retry window rather than a dead end — and
+ *   the copy says "not yet", not "never".
  *
  * WHY IT KEYS OFF remoteId
- *   `remoteId` is set only by the inbound pull. An order that has one came from
- *   the server and is therefore on the account; an order without one has never
- *   been anywhere else. When work item 05 posts manual orders and reconciles the
- *   server's answer, these orders start carrying a remoteId as a matter of
- *   course and every marker below disappears on its own. That is the intended
- *   end: this file is meant to be deleted, not maintained.
- *
- * WHY IT IS NOT THE EXISTING sync_pending COPY
- *   `sync_pending` says "Saved on this device. Waiting to sync." That is true of
- *   a change that will sync. Nothing here is waiting for anything, and telling a
- *   seller to wait for something that is not coming is worse than the silence it
- *   replaces.
+ *   `remoteId` is the per-store order number, written when the server accepts
+ *   the order — by the inbound pull for storefront orders, and by the create
+ *   call for these. An order that has one is on the account; an order without
+ *   one is not, whatever the reason. So the marker needs no state of its own and
+ *   clears itself the instant the post succeeds.
  */
 val OrderEntity.livesOnlyOnThisPhone: Boolean
     get() = remoteId == null
@@ -71,13 +68,3 @@ fun LocalOnlyOrderBanner(modifier: Modifier = Modifier) {
     )
 }
 
-/** Shown before the seller records an order, not after. */
-@Composable
-fun ManualOrderLimitationBanner(modifier: Modifier = Modifier) {
-    NoticeBanner(
-        role = SemanticRole.Warning,
-        title = stringResource(R.string.order_new_local_only_title),
-        message = stringResource(R.string.order_new_local_only_message),
-        modifier = modifier,
-    )
-}
