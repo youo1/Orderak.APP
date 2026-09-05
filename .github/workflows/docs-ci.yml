@@ -117,16 +117,36 @@ jobs:
       # next regeneration — which would then have failed
       # verify-doc-frontmatter.mjs with "no current document claims it", at
       # whatever unrelated moment someone next touched a migration.
+      #
+      # The same absence covered the two UX documents for longer. Both declare
+      # `generated: true` and name their generator in their own body text, but
+      # nothing wrote either file, so the tables were only ever as fresh as the
+      # last person who remembered to paste `--md` output over them. A feature
+      # demoted in orderak-plan-catalog.json left feature-surface-map.md
+      # asserting the old status, and the fix that reached for was editing the
+      # one stale cell by hand -- which does not touch the per-surface rollup
+      # counted from the same data, so the document stayed wrong in a second
+      # place while looking repaired.
       - name: Verify generated documentation is not stale
         run: |
           set -euo pipefail
           node services/backend/scripts/generate-migration-docs.mjs
-          if ! git diff --quiet -- docs/guides/database-migrations.md; then
-            echo "::error::docs/guides/database-migrations.md is out of date. Run services/backend/scripts/generate-migration-docs.mjs and commit the result."
-            git diff --stat -- docs/guides/database-migrations.md
+          node tooling/ux/generate-ux-docs.mjs
+          stale=0
+          for pair in             "docs/guides/database-migrations.md:services/backend/scripts/generate-migration-docs.mjs"             "docs/ux/feature-surface-map.md:tooling/ux/generate-ux-docs.mjs"             "docs/ux/screen-contracts.md:tooling/ux/generate-ux-docs.mjs"
+          do
+            doc="${pair%%:*}"
+            gen="${pair##*:}"
+            if ! git diff --quiet -- "$doc"; then
+              echo "::error file=${doc}::${doc} is out of date. Run ${gen} and commit the result."
+              git diff --stat -- "$doc"
+              stale=1
+            fi
+          done
+          if [ "$stale" -ne 0 ]; then
             exit 1
           fi
-          echo "Generated migration reference matches its generator."
+          echo "Generated documentation matches its generators."
 
       - name: Link check
         uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0

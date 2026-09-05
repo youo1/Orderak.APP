@@ -13,6 +13,13 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { MAP, TYPES, SURFACES, LEVELS } from "./feature-surface-map.mjs";
 
+// Bumped by hand when someone re-checks this report against the map and the
+// catalogue. Deliberately not `new Date()`: a date that moves on every run says
+// only that the generator ran, which is the one thing nobody needs to be told,
+// and it would make the CI staleness diff fail on any day the file was
+// regenerated.
+const LAST_VERIFIED = "2026-08-28";
+
 const here = dirname(fileURLToPath(import.meta.url));
 const workspace = resolve(here, "..", "..");
 const catalog = JSON.parse(
@@ -106,7 +113,7 @@ out.push("---");
 out.push("status: current");
 out.push("generated: true");
 out.push("owner: product");
-out.push(`last_verified: ${new Date().toISOString().slice(0, 10)}`);
+out.push(`last_verified: ${LAST_VERIFIED}`);
 out.push("applies_to: [internal]");
 out.push("---");
 out.push("# Feature → surface map");
