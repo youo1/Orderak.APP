@@ -77,7 +77,8 @@ jobs:
 
       - name: Audit dependencies (high+ critical)
         working-directory: services/backend
-        run: pnpm audit --audit-level high
+        # --ignore: see the faker note in pnpm-workspace.yaml (unfixable upstream).
+        run: pnpm audit --audit-level high --ignore GHSA-qxc2-j82w-r537
 
       - name: Verify design-system generator performance
         working-directory: services/backend

@@ -32,7 +32,8 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
         working-directory: contracts/openapi
-      - run: pnpm audit --audit-level high
+      # --ignore: see the faker note in pnpm-workspace.yaml (unfixable upstream).
+      - run: pnpm audit --audit-level high --ignore GHSA-qxc2-j82w-r537
         working-directory: contracts/openapi
       - run: pnpm run check
         working-directory: contracts/openapi

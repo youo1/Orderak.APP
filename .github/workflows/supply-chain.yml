@@ -55,7 +55,8 @@ jobs:
       # moderate and low are reported without blocking, so the gate stays
       # meaningful rather than becoming noise everyone learns to ignore.
       - name: Audit (high and critical fail)
-        run: pnpm audit --audit-level high
+        # --ignore: see the faker note in pnpm-workspace.yaml (unfixable upstream).
+        run: pnpm audit --audit-level high --ignore GHSA-qxc2-j82w-r537
 
       # continue-on-error already keeps a non-zero audit from failing the job,
       # so the trailing `|| true` this step also carried was a second belt on

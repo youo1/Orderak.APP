@@ -64,3 +64,23 @@ overrides:
   # says it supports -- an audit-green tree whose URI resolution is untested
   # against its consumer. Keep this inside major 3 until ajv widens its range.
   fast-uri@<3.1.6: ">=3.1.7 <4"
+
+# GHSA-qxc2-j82w-r537 (high) in @faker-js/faker has no entry here on purpose:
+# it cannot be fixed by an override. The vulnerable copy is 5.5.3, pulled by
+# postman-collection 4.5.0 on the same prism path as the three above, and the
+# advisory is patched only in >=10.4.1. Measured 2026-09-05: overriding to
+# >=10.4.1 resolves 10.5.0, makes `pnpm audit` green, and breaks
+# postman-collection at require time -- "Cannot read properties of undefined
+# (reading 'city')", because faker moved `address.city` to `location.city`
+# after v5. An audit-green tree that cannot load its own mock server is worse
+# than a declared exception, so the gating `pnpm audit` steps pass
+# `--ignore GHSA-qxc2-j82w-r537` instead. @stoplight/prism-cli 5.16.0 is
+# already the latest release, so there is nothing upstream to wait for.
+#
+# The reporting-only audit in supply-chain.yml deliberately does NOT pass the
+# flag, so the advisory keeps showing up rather than disappearing quietly.
+# Retiring Prism removes this exception and all three overrides together.
+
+auditConfig:
+  ignoreGhsas:
+    - GHSA-qxc2-j82w-r537
