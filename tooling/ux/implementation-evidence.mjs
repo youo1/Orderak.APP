@@ -110,6 +110,20 @@ export const EVIDENCE = {
     behaviour: { layer: "android", file: "PaymentVerifierTest.kt", test: "matches latin amount and extracts ref" },
   },
 
+  // The seller enters the handles on the account surface; the storefront then
+  // offers that transfer method and tells the buyer where to send the money. The
+  // row shipped marked planned for months because nothing proved either half.
+  "payments_finance.instapay_vodafone_cash_instructions": {
+    kind: "endpoint",
+    value: "/api/v1/store",
+    behaviour: {
+      layer: "backend",
+      file: "public-routes.spec.ts",
+      test: "offers a transfer method only when the seller has set a handle for it",
+    },
+    integration: "/api/v1/store",
+  },
+
   // ---- team & security ----
   "team_security.owner_account": { kind: "screen", value: "SellerProfileScreen" },
   "team_security.multiple_owner_devices": {

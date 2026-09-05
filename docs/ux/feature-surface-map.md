@@ -241,7 +241,7 @@ Until then `account` keeps its four groups and no L4 screen is built.
 | `max_concurrent_devices` | SECTION | L1 | implemented |
 | `max_warehouses` | SECTION | L4 | planned |
 | `orders_fulfilment.shipping_integrations` | SCREEN | L3 | planned |
-| `payments_finance.instapay_vodafone_cash_instructions` | SECTION | L1 | planned |
+| `payments_finance.instapay_vodafone_cash_instructions` | SECTION | L1 | implemented |
 | `payments_finance.digital_wallet_integration` | SCREEN | L4 | planned |
 | `payments_finance.payment_gateway` | SCREEN | L4 | planned |
 | `payments_finance.settlement_and_reconciliation` | SCREEN | L4 | planned |

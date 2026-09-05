@@ -60,6 +60,25 @@ registers are event logs, legal policy is reviewed by counsel on its own
 cadence, and an ADR's meaningful date is the day it was decided. Requiring a
 date there would produce fabricated dates, not accuracy.
 
+### A verification date expires
+
+Once a document carries `last_verified` and is marked `current`, that date has a
+shelf life of **120 days**. Past it, the build fails and asks for one of two
+things: re-check the content against the implementation and move the date, or
+change `status` to `draft` or `superseded` because it is no longer being kept
+true.
+
+Moving the date without re-reading the document defeats the whole mechanism, and
+no tool can detect that. The check buys a prompt, not a guarantee.
+
+It is also worth knowing what this does not cover. It catches rot — a document
+that was true and drifted. It does not catch a document that was wrong in a way
+its date looks fine for. The page that prompted this rule said
+the system was deployed nowhere while the README said production, and its date
+was fifteen days old. It was archived rather than corrected, because it was a
+point-in-time record of one workstream that had been published as though it
+described the product.
+
 [`database-migrations.md`](./database-migrations.md) is generated and is an
 index, not a copy of the SQL. To change what it says about a migration, edit the
 `descriptions` map in `services/backend/scripts/generate-migration-docs.mjs` and

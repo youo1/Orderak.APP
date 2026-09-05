@@ -18,7 +18,6 @@ exclude_docs: |
 
 nav:
   - Home: index.md
-  - Status: status.md
   - Setup: guides/setup.md
   - Glossary: reference/glossary.md
   - API Reference: reference/api.md
