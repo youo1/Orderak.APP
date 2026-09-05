@@ -17,7 +17,8 @@
     "verify:deployment-map": "node tooling/repository/verify-deployment-map.mjs",
     "verify:contract-guards": "node tooling/repository/verify-contract-guards.mjs",
     "verify:built-site": "node tooling/repository/verify-built-site.mjs site",
-    "verify:doc-links": "node tooling/repository/verify-doc-links.mjs"
+    "verify:doc-links": "node tooling/repository/verify-doc-links.mjs",
+  "verify:implementation": "node --test tooling/ux/implementation-audit.test.mjs && node tooling/ux/verify-implementation-status.mjs"
   },
   "devDependencies": {
     "turbo": "^2.10.11"

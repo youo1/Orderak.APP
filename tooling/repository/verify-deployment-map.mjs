@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { stripJsonComments } from "../lib/jsonc.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..", "..");
@@ -21,39 +22,6 @@ const requireText = (relative, expected) => {
     if (!source.includes(value)) fail(`${relative} is missing: ${value}`);
   }
 };
-
-function stripJsonComments(source) {
-  let output = "";
-  let inString = false;
-  let escaped = false;
-  let lineComment = false;
-  let blockComment = false;
-  for (let index = 0; index < source.length; index += 1) {
-    const current = source[index];
-    const next = source[index + 1];
-    if (lineComment) {
-      if (current === "\n") { lineComment = false; output += current; }
-      continue;
-    }
-    if (blockComment) {
-      if (current === "*" && next === "/") { blockComment = false; index += 1; }
-      else if (current === "\n") output += current;
-      continue;
-    }
-    if (inString) {
-      output += current;
-      if (escaped) escaped = false;
-      else if (current === "\\") escaped = true;
-      else if (current === '"') inString = false;
-      continue;
-    }
-    if (current === '"') { inString = true; output += current; continue; }
-    if (current === "/" && next === "/") { lineComment = true; index += 1; continue; }
-    if (current === "/" && next === "*") { blockComment = true; index += 1; continue; }
-    output += current;
-  }
-  return output;
-}
 
 const loadJsonc = (relative) => JSON.parse(stripJsonComments(read(relative)));
 const values = (items, key) => (items ?? []).map((item) => item[key]);
