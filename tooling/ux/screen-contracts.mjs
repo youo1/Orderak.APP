@@ -261,7 +261,7 @@ export const CONTRACTS = [
     actions: [
       { do: "add product", via: "onAdd" },
       { do: "edit product", via: "onEdit" },
-      { do: "search", status: "planned", why: "work item 12 builds it" },
+      { do: "search", via: "SearchField" },
       { do: "open categories", status: "planned", why: "the entry lives on the account surface, not here" },
     ],
     states: ["loading", "content", "empty", "error"],
@@ -360,7 +360,7 @@ export const CONTRACTS = [
     exit: ["CustomerRoute"],
     data: ["customers page", "aggregate spend"],
     actions: [
-      { do: "search", status: "planned", why: "work item 12 builds it" },
+      { do: "search", via: "SearchField" },
       { do: "open customer", via: "onOpen" },
     ],
     states: ["loading", "content", "empty", "error"],

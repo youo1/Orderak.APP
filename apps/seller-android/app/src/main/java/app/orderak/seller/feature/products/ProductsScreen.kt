@@ -49,6 +49,9 @@ import androidx.compose.foundation.clickable
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.orderak.seller.R
+import app.orderak.seller.core.text.SearchText
+import app.orderak.seller.core.ui.FullScreenEmpty
+import app.orderak.seller.core.ui.SearchField
 import app.orderak.seller.core.ui.SemanticChip
 import app.orderak.seller.core.ui.SemanticRole
 import app.orderak.seller.core.ui.UsageMeter
@@ -72,6 +75,11 @@ fun ProductsScreen(
     entitlements: EntitlementManager = hiltVm<EntitlementHolderViewModel>().entitlements,
 ) {
     val products by viewModel.products.collectAsStateWithLifecycle()
+    var query by rememberSaveable { mutableStateOf("") }
+    // Filtered in memory over what Room already holds, so search works with the
+    // network off. Name and code both, because a seller reading a code off a
+    // shelf label is the case a name-only search cannot serve.
+    val visibleProducts = products.filter { SearchText.matches(query, it.name, it.productCode) }
     val shopName by viewModel.shopName.collectAsStateWithLifecycle()
     val storeUrl by viewModel.storeUrl.collectAsStateWithLifecycle()
     val quota by viewModel.quota.collectAsStateWithLifecycle()
@@ -166,7 +174,23 @@ fun ProductsScreen(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }
+            SearchField(
+                query = query,
+                onQueryChange = { query = it },
+                placeholder = stringResource(R.string.products_search_hint),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
             Box(Modifier.fillMaxWidth().weight(1f)) {
+                // A query that matches nothing is not an empty catalogue. Same
+                // sentence for both would read as "your products are gone", so
+                // this names the query and offers the way back to the full list.
+                if (visibleProducts.isEmpty()) {
+                    FullScreenEmpty(
+                        message = stringResource(R.string.products_search_empty, query),
+                        actionLabel = stringResource(R.string.search_clear_action),
+                        onAction = { query = "" },
+                    )
+                } else {
                 LazyColumn(
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -176,6 +200,10 @@ fun ProductsScreen(
                             IconButton(onClick = {
                                 scope.launch {
                                     val url = storeUrl
+                                    // Shares the whole catalogue, never the
+                                    // filtered view — a search is how the seller
+                                    // is looking at their products, not a
+                                    // statement about what the shop sells.
                                     if (url.isNullOrBlank()) shareCatalogText(context, shopName, sellerPhone, products)
                                     else shareStoreLink(context, shopName, url)
                                 }
@@ -184,10 +212,11 @@ fun ProductsScreen(
                             }
                         }
                     }
-                    items(products, key = { it.id }) { p ->
+                    items(visibleProducts, key = { it.id }) { p ->
                         ProductCard(p, onClick = { onEdit(p.id) })
                     }
                     item { Spacer(Modifier.height(80.dp)) }
+                }
                 }
                 FloatingActionButton(
                     onClick = { if (quota.canAdd) onAdd() else showLimitDialog = true },
