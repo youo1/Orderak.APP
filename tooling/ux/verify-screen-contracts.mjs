@@ -28,7 +28,7 @@ import { SURFACES } from "./feature-surface-map.mjs";
 // only that the generator ran, which is the one thing nobody needs to be told,
 // and it would make the CI staleness diff fail on any day the file was
 // regenerated.
-const LAST_VERIFIED = "2026-08-28";
+const LAST_VERIFIED = "2026-09-05";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const workspace = resolve(here, "..", "..");
