@@ -63,9 +63,20 @@ data class RegisterRes(
 @Serializable
 data class MoneyDto(val amount_minor: Long, val currency: String = "EGP")
 
+/**
+ * One product on its way up.
+ *
+ * `remote_uuid` is the server's own id for this product, learnt on the sync
+ * that first accepted it and kept ever since. It is the identity: `app_id` is
+ * this device's Room row id, and two phones signed into one store both hand out
+ * 1, 2, 3… for different products, so a server matching on it overwrote one
+ * with the other. Null only until a product has synced for the first time, and
+ * a null tells the server exactly that.
+ */
 @Serializable
 data class ProductDto(
-    val app_id: Long, val name: String, val price: MoneyDto,
+    val app_id: Long, val remote_uuid: String? = null,
+    val name: String, val price: MoneyDto,
     val stock: Int, val available: Boolean,
     val description: String? = null,
     val image_url: String? = null,
@@ -135,6 +146,8 @@ data class ProductsSyncRes(
 @Serializable
 data class RemoteProductDto(
     val app_id: Long,
+    /** The server's id for this product — the key the local row is matched on. */
+    val remote_uuid: String? = null,
     val product_code: String,
     val name: String,
     val description: String? = null,

@@ -12525,9 +12525,9 @@
                     },
                     "products": {
                       "type": "array",
+                      "description": "The catalogue as the store holds it. Each product carries the remote_uuid a device must send back to identify it on a later push.",
                       "items": {
-                        "type": "object",
-                        "additionalProperties": true
+                        "$ref": "#/components/schemas/Product"
                       }
                     }
                   }
@@ -12540,8 +12540,10 @@
                       "products": [
                         {
                           "app_id": 1,
+                          "remote_uuid": "018f-product",
                           "product_code": "p-A1B2C3",
                           "name": "Cotton shirt",
+                          "slug": "cotton-shirt",
                           "description": null,
                           "price": {
                             "amount_minor": 15000,
@@ -12976,7 +12978,7 @@
                 "properties": {
                   "products": {
                     "type": "array",
-                    "description": "The complete catalog as the client holds it. Anything omitted here is deleted server-side. Omitting the field entirely is rejected with 400 products_required — it is never read as an empty catalog.",
+                    "description": "The complete catalog as the client holds it. Anything omitted here is deleted server-side. Omitting the field entirely is rejected with 400 products_required — it is never read as an empty catalog. Each product identifies itself with remote_uuid, the id this endpoint returned when it first accepted the product; omit it (or send null) only for a product that has never synced. app_id is the client's own row id: it is echoed back so the client can find its local row, and it is used to match an existing product only for a product that sent no remote_uuid and whose number no other row in the request has already claimed — two devices number different products alike, and matching on it overwrote one with the other.",
                     "items": {
                       "type": "object",
                       "additionalProperties": true
@@ -12997,11 +12999,13 @@
               },
               "examples": {
                 "valid": {
-                  "summary": "Full mirror of a one-product catalog",
+                  "summary": "Full mirror of a one-product catalog that has synced before",
                   "value": {
+                    "baseline_version": 7,
                     "products": [
                       {
                         "app_id": 1,
+                        "remote_uuid": "018f-product",
                         "name": "Cola",
                         "price": {
                           "amount_minor": 15000,
@@ -13017,6 +13021,36 @@
                   "summary": "Seller has deleted every product; the empty array is explicit",
                   "value": {
                     "products": []
+                  }
+                },
+                "second_device": {
+                  "summary": "A second phone pushes the product it downloaded plus one it invented offline",
+                  "value": {
+                    "baseline_version": 7,
+                    "products": [
+                      {
+                        "app_id": 2,
+                        "remote_uuid": "018f-product",
+                        "name": "Cola",
+                        "price": {
+                          "amount_minor": 15000,
+                          "currency": "EGP"
+                        },
+                        "stock": 10,
+                        "available": true
+                      },
+                      {
+                        "app_id": 1,
+                        "remote_uuid": null,
+                        "name": "Juice",
+                        "price": {
+                          "amount_minor": 7000,
+                          "currency": "EGP"
+                        },
+                        "stock": 4,
+                        "available": true
+                      }
+                    ]
                   }
                 }
               }
@@ -13044,13 +13078,18 @@
                     },
                     "products": {
                       "type": "array",
+                      "description": "One entry per product in the request, in the order it was sent.",
                       "items": {
-                        "$ref": "#/components/schemas/Product"
+                        "$ref": "#/components/schemas/SyncedProductIdentity"
                       }
                     },
                     "catalog_version": {
                       "type": "integer",
                       "description": "The store's catalog version after this write. Send it as baseline_version on the next push: an accepted push moves the version, so the baseline just used is spent."
+                    },
+                    "count": {
+                      "type": "integer",
+                      "description": "How many submitted products the store now holds."
                     }
                   },
                   "required": [
@@ -13062,24 +13101,18 @@
                   "success": {
                     "value": {
                       "ok": true,
+                      "count": 1,
                       "products": [
                         {
-                          "id": "018f-product",
-                          "product_code": "P-0001",
-                          "name": "Cola",
-                          "slug": "cola",
-                          "description": null,
-                          "price": {
-                            "amount_minor": 15000,
-                            "currency": "EGP"
-                          },
+                          "app_id": 1,
+                          "remote_uuid": "018f-product",
+                          "product_code": "p-A1B2C3",
+                          "category_code": null,
                           "stock": 10,
-                          "stock_version": 1,
-                          "available": true,
-                          "image_url": null,
-                          "category_code": null
+                          "stock_version": 1
                         }
-                      ]
+                      ],
+                      "catalog_version": 8
                     }
                   }
                 }
@@ -13170,6 +13203,33 @@
               }
             }
           },
+          "409": {
+            "description": "Refused. catalog_baseline_required: the push modifies or deletes and sent no baseline_version. stale_catalog: the baseline no longer matches the store. bulk_deletion_unconfirmed: the push deletes most of the catalog without confirm_deletion. stale_stock: one or more stock revisions were out of date; the rest of the push was applied and the conflicting product ids are listed.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/stale_catalog",
+                      "title": "Stale Catalog",
+                      "status": 409,
+                      "code": "stale_catalog",
+                      "detail": "Download the catalog again and retry.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limited",
             "headers": {
@@ -13226,33 +13286,6 @@
                       "detail": "The request could not be completed.",
                       "request_id": "018f-example",
                       "retryable": true
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Refused. catalog_baseline_required: the push modifies or deletes and sent no baseline_version. stale_catalog: the baseline no longer matches the store. bulk_deletion_unconfirmed: the push deletes most of the catalog without confirm_deletion. stale_stock: one or more stock revisions were out of date; the rest of the push was applied and the conflicting product ids are listed.",
-            "headers": {
-              "X-Request-ID": {
-                "$ref": "./components/common.json#/headers/RequestId"
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "./components/common.json#/schemas/Problem"
-                },
-                "examples": {
-                  "default": {
-                    "value": {
-                      "type": "https://developers.orderak.app/problems/stale_catalog",
-                      "title": "Stale Catalog",
-                      "status": 409,
-                      "code": "stale_catalog",
-                      "detail": "Download the catalog again and retry.",
-                      "request_id": "018f-example"
                     }
                   }
                 }
@@ -16917,9 +16950,15 @@
       },
       "Product": {
         "type": "object",
+        "description": "One product as the store holds it. Identified by remote_uuid: app_id is the row id on whichever device first pushed it and means nothing on any other device, and product_code is the public, shareable code.",
         "properties": {
-          "id": {
-            "type": "string"
+          "app_id": {
+            "type": "integer",
+            "description": "The store's internal numbering for this product, seeded from the row id of the device that created it. Not an identity: two devices number different products alike, so a client must match on remote_uuid."
+          },
+          "remote_uuid": {
+            "type": "string",
+            "description": "The server's id for this product. Store it with the local row and send it back on every push — it is the only value that means the same product on every device."
           },
           "product_code": {
             "type": "string"
@@ -16965,7 +17004,8 @@
           }
         },
         "required": [
-          "id",
+          "app_id",
+          "remote_uuid",
           "product_code",
           "name",
           "slug",
@@ -16976,6 +17016,43 @@
           "available",
           "image_url",
           "category_code"
+        ]
+      },
+      "SyncedProductIdentity": {
+        "type": "object",
+        "description": "The identity the server assigned to one submitted product. Exactly one entry per product in the request — never the rest of the store, whose app_ids belong to other devices and would collide with the caller's own row ids.",
+        "properties": {
+          "app_id": {
+            "type": "integer",
+            "description": "Echoed exactly as it was sent, so the device can find the local row this entry describes."
+          },
+          "remote_uuid": {
+            "type": "string",
+            "description": "The server's id for this product. Persist it: sending it on the next push is what stops a second device's product being filed as an edit of this one."
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "category_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "stock": {
+            "type": "integer"
+          },
+          "stock_version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "app_id",
+          "remote_uuid",
+          "product_code",
+          "category_code",
+          "stock",
+          "stock_version"
         ]
       }
     },

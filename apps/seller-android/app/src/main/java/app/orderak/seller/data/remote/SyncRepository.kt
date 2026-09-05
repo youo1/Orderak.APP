@@ -170,27 +170,25 @@ class SyncRepository @Inject constructor(
         if (baseline == null) {
             val pulled = api.fetchProducts(phone, secret)
             if (!pulled.ok) return false
+            // Built with no local id: which local row each of these belongs to
+            // is decided by adoptServerCatalog, from the server's identity. It
+            // is not remote.app_id — that is ANOTHER device's row id, and using
+            // it as ours overwrote whatever this device happened to hold there.
             db.productDao().adoptServerCatalog(
                 pulled.products.map { remote ->
-                    val local = db.productDao().byId(remote.app_id)
                     ProductEntity(
-                        id = remote.app_id,
                         name = remote.name,
                         description = remote.description,
                         priceMinor = remote.price.amount_minor,
                         currency = remote.price.currency,
                         stock = remote.stock,
-                        // The local file path is this device's, and a device
-                        // adopting the catalogue for the first time has none.
-                        imagePath = local?.imagePath,
                         imageUrl = remote.image_url,
                         available = remote.available,
                         productCode = remote.product_code,
+                        remoteUuid = remote.remote_uuid,
                         syncedStockVersion = remote.stock_version,
                         stockDirty = false,
-                        categoryId = local?.categoryId,
                         categoryCode = remote.category_code,
-                        createdAt = local?.createdAt ?: System.currentTimeMillis(),
                     )
                 },
             )
@@ -209,7 +207,12 @@ class SyncRepository @Inject constructor(
 
         val dtos = products.map {
             ProductDto(
-                app_id = it.id, name = it.name,
+                app_id = it.id,
+                // Stored since this product's first sync and, until now, read by
+                // nothing. It is what stops a second device's product from being
+                // filed as an edit of a first device's.
+                remote_uuid = it.remoteUuid,
+                name = it.name,
                 price = MoneyDto(it.priceMinor, it.currency),
                 stock = it.stock, available = it.available,
                 description = it.description,
