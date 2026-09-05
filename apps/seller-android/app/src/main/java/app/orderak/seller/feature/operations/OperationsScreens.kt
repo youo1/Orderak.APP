@@ -866,23 +866,26 @@ fun SubscriptionScreen(onBack: () -> Unit, vm: OperationsViewModel = hiltViewMod
             }
         }
 
-        // Say the true thing. Purchase is closed platform-wide, so a screen that
-        // talks only about managing a subscription in Play leaves a seller on the
-        // free plan looking for a way to buy that does not exist.
-        if (!vm.entitlements.isPurchaseOpen()) {
+        // Say the true thing, and then stop offering the thing. The banner used
+        // to sit ABOVE a Play guidance line and a recover-purchases button that
+        // both rendered unconditionally, so the screen told a seller purchasing
+        // was closed and then showed them two ways to try it — advisory, not a
+        // gate. One decision now governs the banner and the controls together,
+        // and it is the same one the account surface reads (I-5).
+        if (vm.entitlements.isPurchaseOpen()) {
+            Text(stringResource(R.string.subscription_play_guidance))
+            OutlinedButton(
+                onClick = vm.billingManager::recoverPurchases,
+                enabled = billingState == BillingState.Ready,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(stringResource(R.string.subscription_recover)) }
+        } else {
             NoticeBanner(
                 role = SemanticRole.Commerce,
                 title = stringResource(R.string.subscription_purchase_closed_title),
                 message = stringResource(R.string.subscription_purchase_closed_body),
             )
         }
-
-        Text(stringResource(R.string.subscription_play_guidance))
-        OutlinedButton(
-            onClick = vm.billingManager::recoverPurchases,
-            enabled = billingState == BillingState.Ready,
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text(stringResource(R.string.subscription_recover)) }
     }
 }
 
