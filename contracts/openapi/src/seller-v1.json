@@ -9020,7 +9020,7 @@
           "seller"
         ],
         "summary": "GET /api/v1/config",
-        "description": "Pre-release seller v1 operation. Detailed domain schemas replace the generic bootstrap schema during API-first review.",
+        "description": "Plan limits, feature flags and governance for in-app enforcement. Carries both the flat limits/features blocks that installed builds read and the keyed entitlements map that every feature gate and usage meter reads.",
         "x-owner": "Seller Experience",
         "x-data-classification": "pending-review",
         "x-rate-limit": "seller-authenticated-default",
@@ -9052,31 +9052,285 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "./components/common.json#/schemas/GenericSuccess"
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "plan_id",
+                    "limits",
+                    "entitlements"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "plan_id": {
+                      "type": "string"
+                    },
+                    "plan_name": {
+                      "type": "string"
+                    },
+                    "ads_enabled": {
+                      "type": "boolean"
+                    },
+                    "current_period_end": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    },
+                    "limits": {
+                      "type": "object",
+                      "description": "Flat limits, retained for builds that predate the entitlement map. Null means unlimited.",
+                      "properties": {
+                        "max_categories": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "max_products": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "max_orders_per_month": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "max_ai_requests_per_month": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "max_team_members": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "max_concurrent_devices": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "features": {
+                      "type": "object",
+                      "description": "Flat feature booleans, retained for the same reason as limits.",
+                      "additionalProperties": {
+                        "type": "boolean"
+                      }
+                    },
+                    "entitlements": {
+                      "$ref": "#/components/schemas/EntitlementMap"
+                    },
+                    "governance": {
+                      "type": "object",
+                      "description": "Admin-governed version policy and feature flags, evaluated for this caller.",
+                      "additionalProperties": true
+                    }
+                  }
                 },
                 "examples": {
-                  "success": {
-                    "value": {
-                      "ok": true
-                    }
-                  },
-                  "empty": {
+                  "free_plan": {
+                    "summary": "Free plan, with both the flat blocks and the entitlement map",
+                    "description": "The flat limits and features are what installed builds read; the entitlements map is what every feature gate and usage meter reads. Both are sent.",
                     "value": {
                       "ok": true,
-                      "items": [],
-                      "has_more": false
-                    }
-                  },
-                  "pagination": {
-                    "value": {
-                      "ok": true,
-                      "items": [
-                        {
-                          "id": "example"
+                      "plan_id": "free",
+                      "plan_name": "Free",
+                      "ads_enabled": true,
+                      "limits": {
+                        "max_categories": 5,
+                        "max_products": 20,
+                        "max_orders_per_month": 50,
+                        "max_ai_requests_per_month": 20,
+                        "max_team_members": 1
+                      },
+                      "features": {
+                        "custom_domain": false,
+                        "analytics": false,
+                        "priority_support": false,
+                        "ai_assistant": true,
+                        "multi_device": false
+                      },
+                      "entitlements": {
+                        "max_products": {
+                          "key": "max_products",
+                          "category": "Plan limits",
+                          "name": "max_products",
+                          "description": "Legacy compatibility entitlement",
+                          "value_type": "integer",
+                          "unit": null,
+                          "reset_period": "none",
+                          "implementation_status": "implemented",
+                          "admin_configurable": true,
+                          "mode": "value",
+                          "value": 20,
+                          "display_value": "20",
+                          "available": true,
+                          "used": 3,
+                          "remaining": 17,
+                          "reset_at": null,
+                          "custom_required": false
+                        },
+                        "max_categories": {
+                          "key": "max_categories",
+                          "category": "Plan limits",
+                          "name": "max_categories",
+                          "description": "Legacy compatibility entitlement",
+                          "value_type": "integer",
+                          "unit": null,
+                          "reset_period": "none",
+                          "implementation_status": "implemented",
+                          "admin_configurable": true,
+                          "mode": "value",
+                          "value": 5,
+                          "display_value": "5",
+                          "available": true,
+                          "used": 1,
+                          "remaining": 4,
+                          "reset_at": null,
+                          "custom_required": false
+                        },
+                        "max_orders_per_month": {
+                          "key": "max_orders_per_month",
+                          "category": "Plan limits",
+                          "name": "max_orders_per_month",
+                          "description": "Legacy compatibility entitlement",
+                          "value_type": "integer",
+                          "unit": null,
+                          "reset_period": "calendar_month_utc",
+                          "implementation_status": "implemented",
+                          "admin_configurable": true,
+                          "mode": "value",
+                          "value": 50,
+                          "display_value": "50",
+                          "available": true,
+                          "used": 12,
+                          "remaining": 38,
+                          "reset_at": "2026-10-01T00:00:00.000Z",
+                          "custom_required": false
+                        },
+                        "max_ai_requests_per_month": {
+                          "key": "max_ai_requests_per_month",
+                          "category": "Plan limits",
+                          "name": "max_ai_requests_per_month",
+                          "description": "Legacy compatibility entitlement",
+                          "value_type": "integer",
+                          "unit": null,
+                          "reset_period": "calendar_month_utc",
+                          "implementation_status": "implemented",
+                          "admin_configurable": true,
+                          "mode": "value",
+                          "value": 20,
+                          "display_value": "20",
+                          "available": true,
+                          "used": null,
+                          "remaining": null,
+                          "reset_at": "2026-10-01T00:00:00.000Z",
+                          "custom_required": false
+                        },
+                        "max_concurrent_devices": {
+                          "key": "max_concurrent_devices",
+                          "category": "Plan limits",
+                          "name": "max_concurrent_devices",
+                          "description": "Legacy compatibility entitlement",
+                          "value_type": "integer",
+                          "unit": null,
+                          "reset_period": "none",
+                          "implementation_status": "implemented",
+                          "admin_configurable": true,
+                          "mode": "value",
+                          "value": 1,
+                          "display_value": "1",
+                          "available": true,
+                          "used": 1,
+                          "remaining": 0,
+                          "reset_at": null,
+                          "custom_required": false
+                        },
+                        "max_team_members": {
+                          "key": "max_team_members",
+                          "category": "Plan limits",
+                          "name": "max_team_members",
+                          "description": "Legacy compatibility entitlement",
+                          "value_type": "integer",
+                          "unit": null,
+                          "reset_period": "none",
+                          "implementation_status": "planned",
+                          "admin_configurable": true,
+                          "mode": "value",
+                          "value": 1,
+                          "display_value": "1",
+                          "available": true,
+                          "used": null,
+                          "remaining": null,
+                          "reset_at": null,
+                          "custom_required": false
+                        },
+                        "orders_fulfilment.order_history": {
+                          "key": "orders_fulfilment.order_history",
+                          "category": "Orders & fulfilment",
+                          "name": "Order history",
+                          "description": null,
+                          "value_type": "boolean",
+                          "unit": null,
+                          "reset_period": "none",
+                          "implementation_status": "implemented",
+                          "admin_configurable": false,
+                          "mode": "value",
+                          "value": true,
+                          "display_value": "Included",
+                          "available": true,
+                          "used": null,
+                          "remaining": null,
+                          "reset_at": null,
+                          "custom_required": false
+                        },
+                        "team_security.multiple_owner_devices": {
+                          "key": "team_security.multiple_owner_devices",
+                          "category": "Team & security",
+                          "name": "Multiple owner devices",
+                          "description": null,
+                          "value_type": "boolean",
+                          "unit": null,
+                          "reset_period": "none",
+                          "implementation_status": "implemented",
+                          "admin_configurable": false,
+                          "mode": "disabled",
+                          "value": false,
+                          "display_value": "—",
+                          "available": false,
+                          "used": null,
+                          "remaining": null,
+                          "reset_at": null,
+                          "custom_required": false
                         }
-                      ],
-                      "next_cursor": "opaque-cursor",
-                      "has_more": true
+                      },
+                      "governance": {
+                        "schema_version": 1,
+                        "server_time": "2026-09-05T09:00:00.000Z",
+                        "version": {
+                          "status": "ok"
+                        },
+                        "features": {
+                          "ai_assistant": {
+                            "enabled": true,
+                            "source": "plan"
+                          }
+                        }
+                      }
                     }
                   }
                 }
@@ -10166,7 +10420,7 @@
           "seller"
         ],
         "summary": "GET /api/v1/entitlements",
-        "description": "Pre-release seller v1 operation. Detailed domain schemas replace the generic bootstrap schema during API-first review.",
+        "description": "The account's entitlement snapshot. Answers with a snapshot whether or not the versioned policy engine is enabled: with it off, the legacy plan model is projected into the same shape, so the client consumes one schema and cannot tell which side served it. Supports If-None-Match.",
         "x-owner": "Seller Experience",
         "x-data-classification": "pending-review",
         "x-rate-limit": "seller-authenticated-default",
@@ -10193,36 +10447,192 @@
             "headers": {
               "X-Request-ID": {
                 "$ref": "./components/common.json#/headers/RequestId"
+              },
+              "ETag": {
+                "description": "Validator for this snapshot. Send it back as If-None-Match.",
+                "schema": {
+                  "type": "string"
+                }
               }
             },
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "./components/common.json#/schemas/GenericSuccess"
+                  "$ref": "#/components/schemas/EntitlementSnapshot"
                 },
                 "examples": {
-                  "success": {
-                    "value": {
-                      "ok": true
-                    }
-                  },
-                  "empty": {
+                  "free_plan_legacy_engine": {
+                    "summary": "Free plan, legacy plan model answering",
+                    "description": "What every seller receives while ENTITLEMENTS_ENABLED is false. Same shape the policy engine returns; plan_revision_id names which side answered, and no client reads it to decide anything.",
                     "value": {
                       "ok": true,
-                      "items": [],
-                      "has_more": false
-                    }
-                  },
-                  "pagination": {
-                    "value": {
-                      "ok": true,
-                      "items": [
-                        {
-                          "id": "example"
+                      "schema_version": 1,
+                      "organization_id": null,
+                      "plan_id": "free",
+                      "plan_key": "free",
+                      "plan_name": "Free",
+                      "plan_revision_id": "legacy:free",
+                      "plan_version": 0,
+                      "subscription_status": "active",
+                      "current_period_end": null,
+                      "pending_revision_id": null,
+                      "pending_effective_at": null,
+                      "entitlements": {
+                        "max_products": {
+                          "key": "max_products",
+                          "category": "Plan limits",
+                          "name": "max_products",
+                          "description": "Legacy compatibility entitlement",
+                          "value_type": "integer",
+                          "unit": null,
+                          "reset_period": "none",
+                          "implementation_status": "implemented",
+                          "admin_configurable": true,
+                          "mode": "value",
+                          "value": 20,
+                          "display_value": "20",
+                          "available": true,
+                          "used": 3,
+                          "remaining": 17,
+                          "reset_at": null,
+                          "custom_required": false
+                        },
+                        "max_categories": {
+                          "key": "max_categories",
+                          "category": "Plan limits",
+                          "name": "max_categories",
+                          "description": "Legacy compatibility entitlement",
+                          "value_type": "integer",
+                          "unit": null,
+                          "reset_period": "none",
+                          "implementation_status": "implemented",
+                          "admin_configurable": true,
+                          "mode": "value",
+                          "value": 5,
+                          "display_value": "5",
+                          "available": true,
+                          "used": 1,
+                          "remaining": 4,
+                          "reset_at": null,
+                          "custom_required": false
+                        },
+                        "max_orders_per_month": {
+                          "key": "max_orders_per_month",
+                          "category": "Plan limits",
+                          "name": "max_orders_per_month",
+                          "description": "Legacy compatibility entitlement",
+                          "value_type": "integer",
+                          "unit": null,
+                          "reset_period": "calendar_month_utc",
+                          "implementation_status": "implemented",
+                          "admin_configurable": true,
+                          "mode": "value",
+                          "value": 50,
+                          "display_value": "50",
+                          "available": true,
+                          "used": 12,
+                          "remaining": 38,
+                          "reset_at": "2026-10-01T00:00:00.000Z",
+                          "custom_required": false
+                        },
+                        "max_ai_requests_per_month": {
+                          "key": "max_ai_requests_per_month",
+                          "category": "Plan limits",
+                          "name": "max_ai_requests_per_month",
+                          "description": "Legacy compatibility entitlement",
+                          "value_type": "integer",
+                          "unit": null,
+                          "reset_period": "calendar_month_utc",
+                          "implementation_status": "implemented",
+                          "admin_configurable": true,
+                          "mode": "value",
+                          "value": 20,
+                          "display_value": "20",
+                          "available": true,
+                          "used": null,
+                          "remaining": null,
+                          "reset_at": "2026-10-01T00:00:00.000Z",
+                          "custom_required": false
+                        },
+                        "max_concurrent_devices": {
+                          "key": "max_concurrent_devices",
+                          "category": "Plan limits",
+                          "name": "max_concurrent_devices",
+                          "description": "Legacy compatibility entitlement",
+                          "value_type": "integer",
+                          "unit": null,
+                          "reset_period": "none",
+                          "implementation_status": "implemented",
+                          "admin_configurable": true,
+                          "mode": "value",
+                          "value": 1,
+                          "display_value": "1",
+                          "available": true,
+                          "used": 1,
+                          "remaining": 0,
+                          "reset_at": null,
+                          "custom_required": false
+                        },
+                        "max_team_members": {
+                          "key": "max_team_members",
+                          "category": "Plan limits",
+                          "name": "max_team_members",
+                          "description": "Legacy compatibility entitlement",
+                          "value_type": "integer",
+                          "unit": null,
+                          "reset_period": "none",
+                          "implementation_status": "planned",
+                          "admin_configurable": true,
+                          "mode": "value",
+                          "value": 1,
+                          "display_value": "1",
+                          "available": true,
+                          "used": null,
+                          "remaining": null,
+                          "reset_at": null,
+                          "custom_required": false
+                        },
+                        "orders_fulfilment.order_history": {
+                          "key": "orders_fulfilment.order_history",
+                          "category": "Orders & fulfilment",
+                          "name": "Order history",
+                          "description": null,
+                          "value_type": "boolean",
+                          "unit": null,
+                          "reset_period": "none",
+                          "implementation_status": "implemented",
+                          "admin_configurable": false,
+                          "mode": "value",
+                          "value": true,
+                          "display_value": "Included",
+                          "available": true,
+                          "used": null,
+                          "remaining": null,
+                          "reset_at": null,
+                          "custom_required": false
+                        },
+                        "team_security.multiple_owner_devices": {
+                          "key": "team_security.multiple_owner_devices",
+                          "category": "Team & security",
+                          "name": "Multiple owner devices",
+                          "description": null,
+                          "value_type": "boolean",
+                          "unit": null,
+                          "reset_period": "none",
+                          "implementation_status": "implemented",
+                          "admin_configurable": false,
+                          "mode": "disabled",
+                          "value": false,
+                          "display_value": "—",
+                          "available": false,
+                          "used": null,
+                          "remaining": null,
+                          "reset_at": null,
+                          "custom_required": false
                         }
-                      ],
-                      "next_cursor": "opaque-cursor",
-                      "has_more": true
+                      },
+                      "server_time": "2026-09-05T09:00:00.000Z",
+                      "etag": "\"3f1c8a2be4d95077\""
                     }
                   }
                 }
@@ -10371,6 +10781,17 @@
                       "retryable": true
                     }
                   }
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "The snapshot has not changed since the validator was issued.",
+            "headers": {
+              "ETag": {
+                "description": "Unchanged validator.",
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -17399,6 +17820,200 @@
           "stock",
           "stock_version"
         ]
+      },
+      "Entitlement": {
+        "type": "object",
+        "description": "One catalogue entitlement as it applies to this account. The same shape is returned whether the policy engine or the legacy plan model answered, so no client needs to know which did.",
+        "required": [
+          "key",
+          "implementation_status",
+          "mode",
+          "available"
+        ],
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Catalogue key, e.g. max_products or orders_fulfilment.order_history."
+          },
+          "category": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "value_type": {
+            "type": "string",
+            "enum": [
+              "boolean",
+              "integer",
+              "text",
+              "enum"
+            ]
+          },
+          "unit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reset_period": {
+            "type": "string",
+            "enum": [
+              "none",
+              "calendar_month_utc"
+            ]
+          },
+          "implementation_status": {
+            "type": "string",
+            "enum": [
+              "implemented",
+              "partial",
+              "planned"
+            ],
+            "description": "Whether the app has actually built this. Anything other than implemented is drawn as unavailable and is never offered as an upgrade, so that a mis-seeded row cannot turn an unbuilt feature into something a seller can pay for."
+          },
+          "admin_configurable": {
+            "type": "boolean"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "value",
+              "disabled",
+              "unlimited",
+              "custom_required"
+            ]
+          },
+          "value": {
+            "description": "Number, boolean or string according to value_type. Null when the mode is unlimited or disabled."
+          },
+          "display_value": {
+            "type": "string"
+          },
+          "available": {
+            "type": "boolean",
+            "description": "Whether this account may use it right now."
+          },
+          "used": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Consumption so far, or null when nothing counts it. Null is not zero: the app draws a usage meter only when it has a numerator, so an uncounted limit is left without one rather than shown as unused."
+          },
+          "remaining": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "reset_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "custom_required": {
+            "type": "boolean"
+          }
+        }
+      },
+      "EntitlementMap": {
+        "type": "object",
+        "description": "Entitlements keyed by catalogue key.",
+        "additionalProperties": {
+          "$ref": "#/components/schemas/Entitlement"
+        }
+      },
+      "EntitlementSnapshot": {
+        "type": "object",
+        "description": "The account's plan and everything it permits. Served whichever entitlement engine is enabled; the flag selects who answers, never whether there is an answer.",
+        "required": [
+          "ok",
+          "schema_version",
+          "plan_key",
+          "entitlements"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "schema_version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "organization_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "plan_id": {
+            "type": "string"
+          },
+          "plan_key": {
+            "type": "string"
+          },
+          "plan_name": {
+            "type": "string"
+          },
+          "plan_revision_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Identifies the published plan revision, or legacy:<plan> when the legacy plan model answered."
+          },
+          "plan_version": {
+            "type": "integer"
+          },
+          "subscription_status": {
+            "type": "string"
+          },
+          "current_period_end": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "pending_revision_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pending_effective_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "entitlements": {
+            "$ref": "#/components/schemas/EntitlementMap"
+          },
+          "server_time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "etag": {
+            "type": "string",
+            "description": "Covers the snapshot and the governance decisions, and deliberately not the server clock — a validator that changed every second could never match, so the 304 path would exist and be unreachable."
+          }
+        }
       }
     },
     "securitySchemes": {
