@@ -229,6 +229,12 @@ const descriptions = {
     "The check found two defects that only existed because the screen had two ways in: the top bar drew a back arrow that did nothing on the tab, and saving payout details called the screen's dismiss callback, so a successful save on the tab reported itself by doing nothing at all. Both are fixed in the same change.",
     "It also corrects `payments_finance.ocr_receipt_assistance` to `implemented`. The feature ships - PaymentVerifier reads a transfer screenshot and matches the amount - but the stale `planned` status made the gate answer \"not built\" to a seller whose plan simply did not include it.",
   ],
+  "050_catalog_baseline_version.sql": [
+    "Adds `sellers.catalog_version`, a counter that moves on every accepted catalogue write. `GET /api/v1/products` returns it; a mirror push that would modify or delete an existing product must send it back as `baseline_version`, and is refused with 409 when it no longer matches.",
+    "`POST /api/v1/products/sync` is a full mirror: whatever the payload omits is deleted. That makes absence indistinguishable from intent, and two devices sent identical requests for opposite reasons. A phone with an empty database sent the same body as a seller who had deleted their last product, so signing in on a second phone deleted the account's catalogue and answered 200.",
+    "The second case was quieter and had no audit trail at all. Only `stock` was compare-and-set against `stock_version`; name, price, description, availability, image and category were unconditional last-write-wins. A phone that had been offline since Tuesday reverted every edit made from another device since Tuesday, and deleted every product created since - and `catalog.mirror_emptied` did not fire, because it only records a total wipe.",
+    "Per-product stock revisions cannot answer this. They establish whether one product's stock has moved; the question here is whether this device has seen the catalogue as it currently stands, which is a property of the store. A purely additive push still needs no baseline: a device that only adds products it invented cannot destroy what it has never seen.",
+  ],
 };
 
 function anchor(name) {

@@ -825,7 +825,25 @@ async function deleteCategory(env: Env, store: Row, code: string): Promise<Respo
 
 // ---- Product pull (non-destructive read) -----------------------------------
 
+/**
+ * The store's catalogue version — the baseline a device must hold before it may
+ * overwrite or delete anything. See migrations/050_catalog_baseline_version.sql.
+ */
+async function catalogVersion(env: Env, storeId: string): Promise<number> {
+	const row = await env.orderak_db
+		.prepare("SELECT catalog_version FROM sellers WHERE id = ?")
+		.bind(storeId)
+		.first<{ catalog_version: number }>();
+	return Number(row?.catalog_version ?? 0);
+}
+
 async function pullProducts(env: Env, store: Row): Promise<Response> {
+	// The catalogue and the version that describes it are read together, and the
+	// version is read FIRST. Reading it afterwards could hand back a number that
+	// already covers a write this response does not contain, which would let the
+	// device believe it is current when it is one edit behind — the exact state
+	// the baseline exists to prevent.
+	const version = await catalogVersion(env, String(store.id));
 	const { results } = (await env.orderak_db
 		.prepare(
 			`SELECT p.id, p.app_id, p.product_code, p.name, p.slug, p.description,
@@ -840,6 +858,7 @@ async function pullProducts(env: Env, store: Row): Promise<Response> {
 		.all()) as { results: Row[] };
 	return jsonResponse({
 		ok: true,
+		catalog_version: version,
 		products: (results ?? []).map((r: Row) => ({
 			app_id: Number(r.app_id),
 			product_code: String(r.product_code),
@@ -858,6 +877,19 @@ async function pullProducts(env: Env, store: Row): Promise<Response> {
 }
 
 // ---- Product sync ----------------------------------------------------------
+
+/**
+ * When a mirror deletes most of a catalogue, ask the caller to say it meant to.
+ *
+ * The threshold is a fraction rather than a count because "deleting 20 products"
+ * means nothing without knowing whether the store had 21 or 2,000. The floor
+ * exists so a seller with three products is not asked to confirm deleting two of
+ * them, which is ordinary tidying and would train them to confirm reflexively —
+ * and a prompt people click through protects nothing.
+ */
+const BULK_DELETE_MIN_CATALOG = 10;
+const BULK_DELETE_FRACTION = 0.5;
+
 
 async function syncProducts(request: Request, env: Env, store: Row): Promise<Response> {
 	// This endpoint is a MIRROR: anything the submitted list omits is deleted at
@@ -1007,6 +1039,61 @@ async function syncProducts(request: Request, env: Env, store: Row): Promise<Res
 		});
 	}
 
+	// What this push would do to what is already there. Computed before anything
+	// is written, because the baseline rule below depends on both answers.
+	const removedCodes = [...existing.entries()].filter(([appId]) => !seenAppIds.has(appId)).map(([, item]) => item.productCode);
+	const wipesEverything = records.length === 0 && existing.size > 0;
+	const deletionCount = wipesEverything ? existing.size : removedCodes.length;
+	const modifiesExisting = records.some((record) => record.existed);
+
+	// A device may only overwrite or delete what it has proved it has seen.
+	//
+	// Absence is not evidence of deletion. A device with an empty database sends
+	// the same payload as a seller who deleted their last product, and a device
+	// that has been offline since Tuesday sends the same payload as a seller who
+	// reverted every edit made since. Neither is distinguishable here, so the
+	// question is answered earlier: does this device hold the catalogue as it
+	// currently stands?
+	//
+	// A purely additive push is exempt. A device adding products it invented
+	// cannot destroy anything it has not seen, and requiring a baseline there
+	// would break the first sync of a brand-new store for no gain.
+	const currentVersion = await catalogVersion(env, storeId);
+	const claimedBaseline = body.baseline_version != null && Number.isSafeInteger(Number(body.baseline_version))
+		? Number(body.baseline_version)
+		: null;
+	if (deletionCount > 0 || modifiesExisting) {
+		if (claimedBaseline === null) {
+			return jsonResponse({
+				error: "catalog_baseline_required",
+				message: "This push would modify or delete products. Send baseline_version from GET /api/v1/products first.",
+				catalog_version: currentVersion,
+			}, 409);
+		}
+		if (claimedBaseline !== currentVersion) {
+			return jsonResponse({
+				error: "stale_catalog",
+				message: "The catalog changed since this device last downloaded it. Download again, merge, and retry.",
+				catalog_version: currentVersion,
+				baseline_version: claimedBaseline,
+			}, 409);
+		}
+	}
+
+	// A current baseline proves the device has seen what it is deleting; it does
+	// not prove the seller meant to. Deleting most of a catalogue in one push is
+	// rare enough as an intention and common enough as a defect that it is worth
+	// making the caller say so explicitly.
+	if (deletionCount > 0 && existing.size >= BULK_DELETE_MIN_CATALOG
+		&& deletionCount >= existing.size * BULK_DELETE_FRACTION && body.confirm_deletion !== true) {
+		return jsonResponse({
+			error: "bulk_deletion_unconfirmed",
+			message: "This push deletes most of the catalog. Re-send with confirm_deletion: true if that is intended.",
+			deleting: deletionCount,
+			of: existing.size,
+		}, 409);
+	}
+
 	// Keep every statement below D1's bound-parameter ceiling. Each chunk is one
 	// upsert query, so a 2,000-product catalog does not consume 2,000 queries.
 	//
@@ -1025,6 +1112,10 @@ async function syncProducts(request: Request, env: Env, store: Row): Promise<Res
 			record.slug, record.description, record.price, record.currency, record.stock, record.available, record.imageUrl,
 		]);
 		stmts.push(env.orderak_db.prepare(
+			// `stock` is bound on INSERT and deliberately absent from DO UPDATE: a
+			// new product's stock comes from the device that invented it, and an
+			// existing product's stock moves only through the compare-and-set
+			// below or a buyer's order.
 			`INSERT INTO products (id,store_id,category_id,product_code,app_id,name,slug,description,price_minor,currency,stock,available,image_url)
 			 VALUES ${values}
 			 ON CONFLICT(store_id,app_id) DO UPDATE SET
@@ -1033,7 +1124,6 @@ async function syncProducts(request: Request, env: Env, store: Row): Promise<Res
 			 image_url=excluded.image_url,updated_at=datetime('now')`,
 		).bind(...bindings));
 	}
-	const removedCodes = [...existing.entries()].filter(([appId]) => !seenAppIds.has(appId)).map(([, item]) => item.productCode);
 	for (let offset = 0; offset < removedCodes.length; offset += 90) {
 		const chunk = removedCodes.slice(offset, offset + 90);
 		stmts.push(env.orderak_db.prepare(`DELETE FROM products WHERE store_id=? AND product_code IN (${chunk.map(() => "?").join(",")})`)
@@ -1041,7 +1131,45 @@ async function syncProducts(request: Request, env: Env, store: Row): Promise<Res
 	}
 	if (!records.length) stmts.push(env.orderak_db.prepare("DELETE FROM products WHERE store_id=?").bind(storeId));
 
-	if (stmts.length) await env.orderak_db.batch(stmts);
+	// Stock joins the same batch rather than following it in a second one.
+	//
+	// It used to run afterwards, in its own batch. Two batches are two
+	// transactions, so a failure between them left the metadata writes and the
+	// deletions committed with the stock statements never attempted, and nothing
+	// recorded that half the push had landed. One batch is one transaction: all
+	// of it, or none.
+	//
+	// This does NOT make a stale stock revision reject the push, and it is not
+	// meant to. A conflicting revision changes zero rows rather than raising, so
+	// the rest still commits and the response reports the conflict — which is the
+	// contract the client is built on: applySync() takes the authoritative state
+	// for the rows that landed and keeps local intent for the ones that did not.
+	// Partial application of STOCK is deliberate. Partial application of the
+	// batch was not.
+	const stockRecords = records.filter((record) => record.existed && record.stockDirty);
+	const versionedStock = stockRecords.filter((record) => record.expectedStockVersion != null);
+	const stockOffset = stmts.length;
+	for (const record of versionedStock) {
+		stmts.push(env.orderak_db.prepare(
+			`UPDATE products SET stock=?,stock_version=stock_version+1,updated_at=datetime('now')
+			 WHERE store_id=? AND app_id=? AND stock_version=?`,
+		).bind(record.stock, storeId, record.appId, record.expectedStockVersion));
+	}
+
+	// Every accepted push moves the version, so the next device to send this
+	// baseline back is told to download again. In the same batch: a version that
+	// could be bumped without the write landing, or the reverse, is worse than
+	// no version at all.
+	stmts.push(env.orderak_db
+		.prepare("UPDATE sellers SET catalog_version = catalog_version + 1, updated_at = datetime('now') WHERE id = ?")
+		.bind(storeId));
+
+	const batchResults = await env.orderak_db.batch(stmts);
+
+	let conflicts = stockRecords.filter((record) => record.expectedStockVersion == null).map((record) => record.appId);
+	conflicts = conflicts.concat(versionedStock
+		.filter((_, index) => Number(batchResults[stockOffset + index]?.meta?.changes ?? 0) !== 1)
+		.map((record) => record.appId));
 
 	// An empty mirror against a non-empty catalog is legitimate — a seller can
 	// delete their last product — but it is also what a client-side database
@@ -1058,23 +1186,6 @@ async function syncProducts(request: Request, env: Env, store: Row): Promise<Res
 		}, request);
 	}
 
-	const stockRecords = records.filter((record) => record.existed && record.stockDirty);
-	const missingBaselines = stockRecords.filter((record) => record.expectedStockVersion == null).map((record) => record.appId);
-	let conflicts = [...missingBaselines];
-	const stockStatements = stockRecords
-		.filter((record) => record.expectedStockVersion != null)
-		.map((record) => env.orderak_db.prepare(
-			`UPDATE products SET stock=?,stock_version=stock_version+1,updated_at=datetime('now')
-			 WHERE store_id=? AND app_id=? AND stock_version=?`,
-		).bind(record.stock, storeId, record.appId, record.expectedStockVersion));
-	if (stockStatements.length) {
-		const results = await env.orderak_db.batch(stockStatements);
-		conflicts = conflicts.concat(stockRecords
-			.filter((record) => record.expectedStockVersion != null)
-			.filter((_, index) => Number(results[index]?.meta?.changes ?? 0) !== 1)
-			.map((record) => record.appId));
-	}
-
 	const { results: syncedRows } = (await env.orderak_db.prepare(
 		`SELECT p.id AS remote_uuid,p.app_id,p.product_code,p.stock,p.stock_version,c.category_code
 		 FROM products p LEFT JOIN categories c ON c.id=p.category_id
@@ -1086,8 +1197,15 @@ async function syncProducts(request: Request, env: Env, store: Row): Promise<Res
 		stock: Number(row.stock), stock_version: Number(row.stock_version ?? 0),
 	}));
 	await refreshProductTranslations(env, storeId);
-	if (conflicts.length) return jsonResponse({ ok: false, error: "stale_stock", conflicts, products: mapping }, 409);
-	return jsonResponse({ ok: true, count: mapping.length, products: mapping });
+	// The push moved the version, so the baseline the device just used is spent.
+	// Returning the new one saves a round trip and, more to the point, keeps the
+	// device current: a client that pushed successfully and then kept its old
+	// baseline would be refused on its very next edit for no reason it could see.
+	const nextVersion = currentVersion + 1;
+	if (conflicts.length) {
+		return jsonResponse({ ok: false, error: "stale_stock", conflicts, products: mapping, catalog_version: nextVersion }, 409);
+	}
+	return jsonResponse({ ok: true, count: mapping.length, products: mapping, catalog_version: nextVersion });
 }
 
 async function restoreFirebaseSession(request: Request, env: Env): Promise<Response> {

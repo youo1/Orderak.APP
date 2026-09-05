@@ -12506,31 +12506,61 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "./components/common.json#/schemas/GenericSuccess"
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "catalog_version",
+                    "products"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "catalog_version": {
+                      "type": "integer",
+                      "description": "The version describing exactly this catalog. Store it with the products and send it back as baseline_version. Read together with the catalog on purpose: a version fetched separately could already cover a write this response does not contain."
+                    },
+                    "products": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    }
+                  }
                 },
                 "examples": {
                   "success": {
                     "value": {
-                      "ok": true
+                      "ok": true,
+                      "catalog_version": 7,
+                      "products": [
+                        {
+                          "app_id": 1,
+                          "product_code": "p-A1B2C3",
+                          "name": "Cotton shirt",
+                          "description": null,
+                          "price": {
+                            "amount_minor": 15000,
+                            "currency": "EGP"
+                          },
+                          "stock": 10,
+                          "stock_version": 2,
+                          "available": true,
+                          "image_url": null,
+                          "category_code": "c-D4E5F6"
+                        }
+                      ]
                     }
                   },
                   "empty": {
                     "value": {
                       "ok": true,
-                      "items": [],
-                      "has_more": false
-                    }
-                  },
-                  "pagination": {
-                    "value": {
-                      "ok": true,
-                      "items": [
-                        {
-                          "id": "example"
-                        }
-                      ],
-                      "next_cursor": "opaque-cursor",
-                      "has_more": true
+                      "catalog_version": 0,
+                      "products": []
                     }
                   }
                 }
@@ -12951,6 +12981,16 @@
                       "type": "object",
                       "additionalProperties": true
                     }
+                  },
+                  "baseline_version": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The catalog_version this device last downloaded from GET /api/v1/products. Required for any push that modifies or deletes an existing product: the endpoint is a full mirror, so an omission is a deletion, and a device that has not downloaded cannot tell the server that the seller has no products apart from the fact that it has not looked. Omit it only for a purely additive push, which cannot destroy what it has never seen. A value that no longer matches the store is refused with 409 stale_catalog."
+                  },
+                  "confirm_deletion": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Required when the push deletes at least half of a catalog of ten or more products. A current baseline proves the device has seen what it is deleting; it does not prove the seller meant to."
                   }
                 },
                 "additionalProperties": true
@@ -13007,6 +13047,10 @@
                       "items": {
                         "$ref": "#/components/schemas/Product"
                       }
+                    },
+                    "catalog_version": {
+                      "type": "integer",
+                      "description": "The store's catalog version after this write. Send it as baseline_version on the next push: an accepted push moves the version, so the baseline just used is spent."
                     }
                   },
                   "required": [
@@ -13182,6 +13226,33 @@
                       "detail": "The request could not be completed.",
                       "request_id": "018f-example",
                       "retryable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Refused. catalog_baseline_required: the push modifies or deletes and sent no baseline_version. stale_catalog: the baseline no longer matches the store. bulk_deletion_unconfirmed: the push deletes most of the catalog without confirm_deletion. stale_stock: one or more stock revisions were out of date; the rest of the push was applied and the conflicting product ids are listed.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/stale_catalog",
+                      "title": "Stale Catalog",
+                      "status": 409,
+                      "code": "stale_catalog",
+                      "detail": "Download the catalog again and retry.",
+                      "request_id": "018f-example"
                     }
                   }
                 }

@@ -36,6 +36,20 @@ interface ProductDao {
     @Query("SELECT * FROM products")
     suspend fun allOnce(): List<ProductEntity>
 
+    /**
+     * Take the server's catalogue onto this device, establishing a baseline.
+     *
+     * Upsert rather than replace. A device can reach this point with rows of its
+     * own — cleared preferences, an app upgrade that predates baselines — and
+     * deleting those to adopt the server's view would be the same data loss this
+     * whole change exists to stop, only pointed the other way. Anything local and
+     * unknown to the server survives and is pushed as an addition.
+     */
+    @Transaction
+    suspend fun adoptServerCatalog(products: List<ProductEntity>) {
+        for (product in products) upsert(product)
+    }
+
     @Query("UPDATE products SET productCode=:code, remoteUuid=:uuid, stock=:stock, syncedStockVersion=:version, stockDirty=0 WHERE id=:id")
     suspend fun acceptSync(id: Long, code: String?, uuid: String?, stock: Int, version: Long)
 

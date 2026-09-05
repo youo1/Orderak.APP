@@ -154,6 +154,50 @@ class SyncRepository @Inject constructor(
             }
         }
 
+        // 2b) Establish a catalogue baseline before any mirror push.
+        //
+        // The push below is a full mirror: whatever it omits, the server deletes.
+        // A device that has never downloaded cannot tell the server "the seller
+        // has no products" apart from "this device has not looked yet", and for
+        // as long as it could not, signing in on a second phone deleted the
+        // account's catalogue. So the order is download, then push — never the
+        // other way, and never the push alone.
+        //
+        // A failed download aborts the sync. Pushing anyway is exactly the case
+        // this exists to prevent, and a partial download is a failure, not a
+        // baseline.
+        var baseline = sessionStore.catalogBaseline(phone)
+        if (baseline == null) {
+            val pulled = api.fetchProducts(phone, secret)
+            if (!pulled.ok) return false
+            db.productDao().adoptServerCatalog(
+                pulled.products.map { remote ->
+                    val local = db.productDao().byId(remote.app_id)
+                    ProductEntity(
+                        id = remote.app_id,
+                        name = remote.name,
+                        description = remote.description,
+                        priceMinor = remote.price.amount_minor,
+                        currency = remote.price.currency,
+                        stock = remote.stock,
+                        // The local file path is this device's, and a device
+                        // adopting the catalogue for the first time has none.
+                        imagePath = local?.imagePath,
+                        imageUrl = remote.image_url,
+                        available = remote.available,
+                        productCode = remote.product_code,
+                        syncedStockVersion = remote.stock_version,
+                        stockDirty = false,
+                        categoryId = local?.categoryId,
+                        categoryCode = remote.category_code,
+                        createdAt = local?.createdAt ?: System.currentTimeMillis(),
+                    )
+                },
+            )
+            sessionStore.saveCatalogBaseline(phone, pulled.catalog_version)
+            baseline = pulled.catalog_version
+        }
+
         // 3) Upload any local product images that don't yet have a public URL,
         //    then push products (full mirror) and persist the returned codes.
         //    image_url must be the backend R2 URL — never the local file path,
@@ -180,8 +224,20 @@ class SyncRepository @Inject constructor(
         val hash = dtos.hashCode()
         var pushOk = true
         if (hash != lastPushedProductsHash) {
-            val push = api.syncProducts(ProductsSyncReq(phone = phone, secret = secret, products = dtos))
+            val push = api.syncProducts(
+                ProductsSyncReq(phone = phone, secret = secret, products = dtos, baseline_version = baseline),
+            )
             pushOk = push.ok
+            // The server refused because this device is behind. Drop the baseline
+            // so the next sync downloads before it tries again; retrying with the
+            // same stale number would fail identically, forever.
+            if (!push.ok && push.error == "stale_catalog") {
+                sessionStore.clearCatalogBaseline()
+                lastPushedProductsHash = null
+            }
+            // An accepted push moves the server's version, so the baseline this
+            // device holds is spent. Take the new one rather than re-downloading.
+            push.catalog_version?.let { sessionStore.saveCatalogBaseline(phone, it) }
             if (push.products.isNotEmpty()) {
                 // A batch may partially apply when only some compare-and-set
                 // stock writes are stale. Accept authoritative state for the
