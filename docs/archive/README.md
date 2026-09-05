@@ -14,6 +14,7 @@ order in the [documentation home](../index.md#authority-order) applies.
 | --- | --- |
 | [Source plans](source-plans/README.md) | Original plans and roadmaps retained for traceability |
 | [Historical reviews](history/code-review-2026-07-12.md) | Point-in-time repository assessments and implementation reports |
+| [Repository and contract workstream](history/repository-workstream-2026-08-21.md) | The 2026-08-21 workstream record, formerly published as the site's "Status" page. Archived because it describes one workstream, not the product |
 | [Cloudflare platform audit](history/cloudflare-platform-audit-2026-07-27.md) | Sanitized findings retained after removing raw Cloudflare indexes and probes |
 | [Onboarding taxonomy audit](history/onboarding-taxonomy-audit-2026-07-28.md) | Reviewed taxonomy totals retained after removing the source workbook and render output |
 | [Future Stripe recovery procedure](future-runbooks/stripe-webhook-desync.md) | Dormant procedure retained until paid billing has an approved provider contract |

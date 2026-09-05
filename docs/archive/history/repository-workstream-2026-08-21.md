@@ -1,20 +1,38 @@
----
-status: current
-generated: false
-owner: governance
-last_verified: 2026-08-21
-applies_to: [internal]
----
+# Repository and Contract Workstream — 2026-08-21
 
-# Where the work stands
+> **Status:** Historical point-in-time record. This page describes ONE
+> workstream — the one that began with a review of the Git and GitHub setup and
+> ended in a currency and API-contract migration — as it stood on 2026-08-21. It
+> is not, and never was, a status page for the product. It was titled "Where the
+> work stands" and published in the navigation as "Status", which is how it came
+> to be read as one.
 
-A single page answering "what is finished, what is not, and what is safe to
-merge". Written 2026-08-21, covering the workstream that began with a review of
-the Git and GitHub setup and ended in a currency and API-contract migration.
+**Reviewed:** 2026-08-21
+**Archived:** 2026-09-05
+**Purpose:** Preserve what this workstream finished, what it did not, and the two
+decisions it took without an ADR.
 
-> **How to trust this page.** Every "done" below is backed by a gate that runs,
-> not by a claim. The gates are listed in [What makes this verifiable](#what-makes-this-verifiable).
-> If a row here disagrees with a gate, the gate is right.
+## What changed after this was written
+
+Everything below is left as it was recorded. Four things are no longer true, and
+are corrected here rather than edited into the record:
+
+1. **The branch merged.** `followup/phases-0-9-review` no longer exists. The
+   "Where the work lives" and "Read this before merging" sections describe a
+   merge that has since happened; migration 044 has been applied to staging.
+2. **The product is deployed.** "Deployed: **Nowhere**" was true of that branch,
+   not of Orderak. Production has deployed from this repository since
+   2026-08-16 — see the README, which is authoritative for deployment state.
+3. **The route-coverage figure was wrong when written.** "100%, 252 operations"
+   was measured by a scanner that could not read the dispatch expression in
+   `phone-change.ts`, so two live POST routes were invisible to it and to the
+   contract. Corrected on 2026-09-05: coverage is 100% across 255 operations,
+   and the scanner now fails closed rather than skipping what it cannot parse.
+4. **Route discovery and payload modelling moved on.** The figures in the
+   Finished table are as of the review date.
+
+The "Not finished" table is the part still worth reading; most of it remains
+accurate, and the Android production release path is unchanged.
 
 ## Where the work lives
 
@@ -39,10 +57,10 @@ commit belongs in a command, not in prose.
 | Dependency automation | Dependabot replaces a Renovate config that was never running | `.github/dependabot.yml`; manifest records the drop |
 | Node version | One source of truth in `.nvmrc`; 17 workflows read it | zero numeric `node-version` literals |
 | Worker size/startup budget | Guard added, wired into `backend-ci` | `verify-worker-budget.mjs` passes for 3 Workers |
-| Route discovery | Understands `app.openapi(createRoute(...))` and `pathname !== ...`; fails closed on any expression it cannot read | route coverage 100% across 255 operations. The previous 100% was measured over 252 and omitted two live POST routes the scanner could not see |
+| Route discovery | Understands `app.openapi(createRoute(...))` | route coverage 100%, 252 operations |
 | Test database | Built from `migrations/`, not a hand-written copy | 249 backend tests against the real schema |
 | Money representation | Minor units + explicit currency, all three platforms | [ADR-009](decisions/adr-009-minor-units-with-explicit-currency.md), migration 044 |
-| API payload modelling | Machinery built; 4 of 255 operations modelled | [ADR-010](decisions/adr-010-schema-first-api-contract.md), contract `check` passes |
+| API payload modelling | Machinery built; 2 of 244 operations modelled | [ADR-010](decisions/adr-010-schema-first-api-contract.md), contract `check` passes |
 | Historical docs | 16 archived, 15 nav entries removed | `mkdocs build --strict` passes |
 
 ## Not finished

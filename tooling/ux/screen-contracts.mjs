@@ -294,15 +294,26 @@ export const CONTRACTS = [
     id: "account",
     kotlinRoute: null,
     surface: "account",
-    purpose: "أربع مجموعات: المتجر والهوية · الاشتراك والفوترة · الفريق والأجهزة · الدعم والحساب",
+    // Rewritten from SettingsScreen.kt on 2026-09-05. The previous version
+    // described four groups, listed nine exits and named two actions; the screen
+    // has six sections, ten exits and six actions. It had drifted quietly because
+    // verify-screen-contracts.mjs checks routes, states, entitlement keys and
+    // exit targets, and has never checked `actions` at all.
+    purpose: "ست مجموعات: الخطة · المتجر والهوية · الدعم · الأجهزة والاشتراك · بيانات التحصيل · إجراءات الحساب",
     entry: ["MainRoute — تاب حسابي"],
     exit: [
-      "SellerProfileRoute", "StoreInfoRoute", "CatalogLanguagesRoute",
+      "SellerProfileRoute", "StoreInfoRoute", "CategoriesRoute", "CatalogLanguagesRoute",
       "SubscriptionRoute", "DevicesRoute", "SupportRoute",
       "AnnouncementsRoute", "AiAssistantRoute", "DeletionStatusRoute",
     ],
-    data: ["seller profile", "plan summary", "entitlement states for every entry"],
-    actions: ["open group entry", "sign out"],
+    data: [
+      "seller profile", "plan summary", "entitlement states for every entry",
+      "public slug", "payout handles (InstaPay, Vodafone Cash)",
+    ],
+    actions: [
+      "open group entry", "save payout and slug", "switch language",
+      "purchase plan", "delete account", "sign out",
+    ],
     states: ["content", "loading"],
     offline: true,
     entitlementKey: null,
