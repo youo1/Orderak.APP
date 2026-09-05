@@ -64,3 +64,31 @@ overrides:
   # says it supports -- an audit-green tree whose URI resolution is untested
   # against its consumer. Keep this inside major 3 until ajv widens its range.
   fast-uri@<3.1.6: ">=3.1.7 <4"
+
+# One advisory is not fixed here, because the fix is not one this tree can take.
+#
+# GHSA-qxc2-j82w-r537 (high) — @faker-js/faker's `helpers.fake()` evaluates the
+# template string it is handed, so a caller that passes attacker-controlled text
+# into it gets arbitrary code execution. Patched in 10.4.1.
+#
+# The vulnerable copy is 5.5.3, and the only thing asking for it is
+# postman-collection 4.5.0 — which does not declare a range that could resolve
+# to the fix. It pins `"@faker-js/faker": "5.5.3"` exactly. An override to
+# >=10.4.1 therefore does not upgrade postman-collection; it hands it a library
+# five majors from the one it was written against, which is the trade the
+# fast-uri upper bound above exists to refuse: a green audit over a dependency
+# that has never been exercised against its consumer.
+#
+# Prism's own copy is 10.5.0 and is not affected — that is the one the dynamic
+# mock generates data with. postman-collection is reached only when Prism is
+# given a Postman collection to parse, and the single place that runs Prism
+# hands it an OpenAPI document (`prism mock src/seller-v1.json --dynamic`, in
+# contracts/openapi). Nothing here reaches `helpers.fake()` at all.
+#
+# So this is ignored rather than silenced generally: one GHSA id, not a
+# severity threshold or a package. If postman-collection widens its pin, the
+# override belongs above and this entry goes. Retire Prism and this entry goes
+# with all three overrides.
+auditConfig:
+  ignoreGhsas:
+    - GHSA-qxc2-j82w-r537
