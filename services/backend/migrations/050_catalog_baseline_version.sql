@@ -1,0 +1,42 @@
+-- A store-level catalogue version, so a device must prove it is current before
+-- it may overwrite or delete anything.
+--
+-- WHY THIS EXISTS
+--   POST /api/v1/products/sync is a full mirror: whatever the payload omits is
+--   deleted. The endpoint already refuses a payload that omits `products`
+--   entirely, which closed the "truncated upload wipes the catalogue" hole. Two
+--   larger ones stayed open, and both are silent.
+--
+--   1. A device with an EMPTY local database pushes an empty mirror. That is a
+--      valid request — a seller who deleted their last product sends exactly
+--      it — so the server honours it and the catalogue is gone. Signing in on a
+--      second phone was enough to do this.
+--
+--   2. A device with a STALE local database pushes what it has. Only `stock`
+--      was compare-and-set against `stock_version`; name, price, description,
+--      availability, image and category were unconditional last-write-wins, and
+--      absence was unconditional deletion. So a phone that had been offline
+--      since Tuesday silently reverted every edit made from another device
+--      since Tuesday, and deleted every product created since — and answered
+--      `{ok: true}` with nothing written to the audit trail, because
+--      `catalog.mirror_emptied` only fires on a total wipe.
+--
+--   Per-product stock versions cannot solve either one. They answer "has this
+--   product's stock moved", and the question here is "has this device seen the
+--   catalogue as it currently stands". That is a property of the store, so the
+--   counter belongs on the store.
+--
+-- HOW IT IS USED
+--   GET /api/v1/products returns the current value; the device stores it beside
+--   the catalogue it downloaded. A push that would delete a product, or modify
+--   one that already exists, must send that value back. If it does not match,
+--   the write is refused with 409 and the device is told to download again.
+--   A purely additive push needs no baseline: a device that only adds products
+--   cannot destroy what it has not seen.
+--
+-- SAFE UNDER THE PREVIOUS RELEASE
+--   Additive with a default, and nothing reads it until the Worker that ships
+--   with this migration is deployed. Migrations apply before Workers, so the
+--   release serving traffic between those two steps ignores the column
+--   entirely and keeps behaving exactly as it does today.
+ALTER TABLE sellers ADD COLUMN catalog_version INTEGER NOT NULL DEFAULT 0;

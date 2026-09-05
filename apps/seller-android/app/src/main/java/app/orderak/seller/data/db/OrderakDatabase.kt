@@ -18,7 +18,10 @@ import javax.inject.Singleton
         OrderEntity::class, OrderItemEntity::class, PaymentEntity::class,
     ],
     // v8: money columns carry minor units plus a currency (ADR-009).
-    version = 8,
+    // v9: orders carry the idempotency key they are posted under, so a retry
+    //     after a dropped response returns the order already written rather
+    //     than creating a second one.
+    version = 9,
     exportSchema = false,
 )
 abstract class OrderakDatabase : RoomDatabase() {

@@ -7,6 +7,7 @@ import app.orderak.seller.data.db.CustomerEntity
 import app.orderak.seller.data.db.OrderakDatabase
 import app.orderak.seller.data.db.ProductEntity
 import app.orderak.seller.data.demo.DemoDataSeeder
+import app.orderak.seller.data.orders.OrderRepository
 import app.orderak.seller.data.session.SessionStore
 import app.orderak.seller.data.auth.AuthRepository
 import app.orderak.seller.data.billing.EntitlementRepository
@@ -37,6 +38,10 @@ class SyncRepository @Inject constructor(
     private val entitlementRepository: EntitlementRepository,
     private val authRepository: AuthRepository,
     private val demoDataSeeder: DemoDataSeeder,
+    // Orders the seller recorded are posted from here rather than from the
+    // screen that recorded them: the first attempt happens at creation, and
+    // every attempt after that is this sync's job.
+    private val orderRepository: OrderRepository,
 ) {
 
     /** Whether shop config changed since last sync — if not, skip register call. */
@@ -154,6 +159,58 @@ class SyncRepository @Inject constructor(
             }
         }
 
+        // 2b) Establish a catalogue baseline before any mirror push.
+        //
+        // The push below is a full mirror: whatever it omits, the server deletes.
+        // A device that has never downloaded cannot tell the server "the seller
+        // has no products" apart from "this device has not looked yet", and for
+        // as long as it could not, signing in on a second phone deleted the
+        // account's catalogue. So the order is download, then push — never the
+        // other way, and never the push alone.
+        //
+        // A failed download aborts the sync. Pushing anyway is exactly the case
+        // this exists to prevent, and a partial download is a failure, not a
+        // baseline.
+        var baseline = sessionStore.catalogBaseline(phone)
+        if (baseline == null) {
+            val pulled = api.fetchProducts(phone, secret)
+            if (!pulled.ok) return false
+            // Built with no local id: which local row each of these belongs to
+            // is decided by adoptServerCatalog, from the server's identity. It
+            // is not remote.app_id — that is ANOTHER device's row id, and using
+            // it as ours overwrote whatever this device happened to hold there.
+            db.productDao().adoptServerCatalog(
+                pulled.products.map { remote ->
+                    ProductEntity(
+                        name = remote.name,
+                        description = remote.description,
+                        priceMinor = remote.price.amount_minor,
+                        currency = remote.price.currency,
+                        stock = remote.stock,
+                        imageUrl = remote.image_url,
+                        available = remote.available,
+                        productCode = remote.product_code,
+                        remoteUuid = remote.remote_uuid,
+                        syncedStockVersion = remote.stock_version,
+                        stockDirty = false,
+                        categoryCode = remote.category_code,
+                    )
+                },
+            )
+            sessionStore.saveCatalogBaseline(phone, pulled.catalog_version)
+            baseline = pulled.catalog_version
+        }
+
+        // 2c) Post orders the seller recorded that the server has not seen.
+        //
+        // After the catalogue push below would be wrong: an order names its
+        // products by their server-assigned code, and a product created on this
+        // device has none until the mirror has run. Before it is also wrong for
+        // the first order after creating a product. So it runs here, after the
+        // baseline is established, and any order whose products are still
+        // codeless simply stays pending for one more sync.
+        val ordersPushed = orderRepository.pushPendingOrders()
+
         // 3) Upload any local product images that don't yet have a public URL,
         //    then push products (full mirror) and persist the returned codes.
         //    image_url must be the backend R2 URL — never the local file path,
@@ -165,7 +222,12 @@ class SyncRepository @Inject constructor(
 
         val dtos = products.map {
             ProductDto(
-                app_id = it.id, name = it.name,
+                app_id = it.id,
+                // Stored since this product's first sync and, until now, read by
+                // nothing. It is what stops a second device's product from being
+                // filed as an edit of a first device's.
+                remote_uuid = it.remoteUuid,
+                name = it.name,
                 price = MoneyDto(it.priceMinor, it.currency),
                 stock = it.stock, available = it.available,
                 description = it.description,
@@ -180,8 +242,20 @@ class SyncRepository @Inject constructor(
         val hash = dtos.hashCode()
         var pushOk = true
         if (hash != lastPushedProductsHash) {
-            val push = api.syncProducts(ProductsSyncReq(phone = phone, secret = secret, products = dtos))
+            val push = api.syncProducts(
+                ProductsSyncReq(phone = phone, secret = secret, products = dtos, baseline_version = baseline),
+            )
             pushOk = push.ok
+            // The server refused because this device is behind. Drop the baseline
+            // so the next sync downloads before it tries again; retrying with the
+            // same stale number would fail identically, forever.
+            if (!push.ok && push.error == "stale_catalog") {
+                sessionStore.clearCatalogBaseline()
+                lastPushedProductsHash = null
+            }
+            // An accepted push moves the server's version, so the baseline this
+            // device holds is spent. Take the new one rather than re-downloading.
+            push.catalog_version?.let { sessionStore.saveCatalogBaseline(phone, it) }
             if (push.products.isNotEmpty()) {
                 // A batch may partially apply when only some compare-and-set
                 // stock writes are stale. Accept authoritative state for the
@@ -193,7 +267,7 @@ class SyncRepository @Inject constructor(
             }
         }
 
-        return pushOk && pullOk
+        return pushOk && pullOk && ordersPushed
     }
 
     /**
