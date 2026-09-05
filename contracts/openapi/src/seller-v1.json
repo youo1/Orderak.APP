@@ -4225,6 +4225,598 @@
         }
       }
     },
+    "/api/v1/auth/phone-change/challenges": {
+      "post": {
+        "operationId": "post_v1_auth_phone_change_challenges",
+        "tags": [
+          "seller"
+        ],
+        "summary": "Open a phone-number change challenge",
+        "description": "Proves control of the CURRENT number and reserves the new one. Requires a Firebase ID token minted for the current number within the last 300 seconds. Returns a single-use challenge that expires in 600 seconds and is redeemed by POST /api/v1/auth/phone-change/complete. Gated by PHONE_CHANGE_ENABLED.",
+        "x-owner": "Seller Experience",
+        "x-data-classification": "L2",
+        "x-rate-limit": "seller-authenticated-default",
+        "x-stability": "draft",
+        "security": [
+          {
+            "sellerDevice": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "./components/common.json#/parameters/RequestId"
+          },
+          {
+            "$ref": "./components/common.json#/parameters/ClientPlatform"
+          },
+          {
+            "$ref": "./components/common.json#/parameters/AppVersion"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "new_phone",
+                  "id_token"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "new_phone": {
+                    "type": "string",
+                    "pattern": "^\\+[1-9]\\d{7,14}$",
+                    "example": "+201000000000",
+                    "description": "The number to move the account to. Must differ from the current number and must not belong to another active account."
+                  },
+                  "id_token": {
+                    "type": "string",
+                    "description": "Firebase ID token proving control of the CURRENT number, minted within the last 300 seconds."
+                  }
+                }
+              },
+              "examples": {
+                "valid": {
+                  "value": {
+                    "new_phone": "+201000000001",
+                    "id_token": "eyJhbGciOi..."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Challenge opened.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "challenge_id",
+                    "challenge_token",
+                    "expires_in_seconds"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "challenge_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "challenge_token": {
+                      "type": "string",
+                      "format": "uuid",
+                      "description": "Single-use secret. Stored only as a hash; it is not retrievable after this response."
+                    },
+                    "expires_in_seconds": {
+                      "type": "integer",
+                      "const": 600
+                    }
+                  }
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "ok": true,
+                      "challenge_id": "018f3a2b-7c4d-4e91-b8a6-2f5c9d1e0a37",
+                      "challenge_token": "7d2e5f81-3b6a-4c92-9e14-8a0d6b3f5c72",
+                      "expires_in_seconds": 600
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The new number is not a valid E.164 number, or is the current number.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/new_phone_mismatch",
+                      "title": "New Phone Mismatch",
+                      "status": 400,
+                      "code": "new_phone_mismatch",
+                      "detail": "new_phone must be a valid E.164 number different from the current one.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing credentials, or the proof of the current number is absent, stale or for a different identity.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/current_proof_mismatch",
+                      "title": "Current Proof Mismatch",
+                      "status": 401,
+                      "code": "current_proof_mismatch",
+                      "detail": "The supplied token does not prove recent control of the current number.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The account is suspended or banned.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/account_restricted",
+                      "title": "Account Restricted",
+                      "status": 403,
+                      "code": "account_restricted",
+                      "detail": "This account cannot perform the operation.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The requested number already belongs to another active account.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/phone_already_used",
+                      "title": "Phone Already Used",
+                      "status": 409,
+                      "code": "phone_already_used",
+                      "detail": "That number is already in use.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/rate_limited",
+                      "title": "Rate Limited",
+                      "status": 429,
+                      "code": "rate_limited",
+                      "detail": "Too many requests.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "PHONE_CHANGE_ENABLED is false, or the identity provider is not configured.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/phone_change_disabled",
+                      "title": "Phone Change Disabled",
+                      "status": 503,
+                      "code": "phone_change_disabled",
+                      "detail": "Phone change is closed in this environment.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/phone-change/complete": {
+      "post": {
+        "operationId": "post_v1_auth_phone_change_complete",
+        "tags": [
+          "seller"
+        ],
+        "summary": "Redeem a phone-number change challenge",
+        "description": "Redeems the challenge with a Firebase ID token proving control of the NEW number, re-points the identity and rewrites the account's phone. Every registered device is deleted and every outstanding step-up proof is revoked, so the caller must supply the device secret it wants to keep using. Single use: a redeemed challenge answers 409.",
+        "x-owner": "Seller Experience",
+        "x-data-classification": "L2",
+        "x-rate-limit": "seller-authenticated-default",
+        "x-stability": "draft",
+        "security": [
+          {
+            "sellerDevice": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "./components/common.json#/parameters/RequestId"
+          },
+          {
+            "$ref": "./components/common.json#/parameters/ClientPlatform"
+          },
+          {
+            "$ref": "./components/common.json#/parameters/AppVersion"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "challenge_id",
+                  "challenge_token",
+                  "replacement_device_secret",
+                  "id_token"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "challenge_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "challenge_token": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "The single-use token returned when the challenge was opened."
+                  },
+                  "replacement_device_secret": {
+                    "type": "string",
+                    "description": "The device secret to install for this device. Every previously registered device is revoked, so without this the caller signs itself out."
+                  },
+                  "id_token": {
+                    "type": "string",
+                    "description": "Firebase ID token proving control of the NEW number, minted within the last 300 seconds."
+                  }
+                }
+              },
+              "examples": {
+                "valid": {
+                  "value": {
+                    "challenge_id": "018f3a2b-7c4d-4e91-b8a6-2f5c9d1e0a37",
+                    "challenge_token": "7d2e5f81-3b6a-4c92-9e14-8a0d6b3f5c72",
+                    "replacement_device_secret": "…",
+                    "id_token": "eyJhbGciOi..."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The account's number was changed and all prior devices were revoked.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "phone",
+                    "prior_devices_revoked"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "phone": {
+                      "type": "string",
+                      "pattern": "^\\+[1-9]\\d{7,14}$",
+                      "example": "+201000000000",
+                      "description": "The account's new number."
+                    },
+                    "prior_devices_revoked": {
+                      "type": "boolean",
+                      "const": true,
+                      "description": "Always true. Every other device must re-authenticate."
+                    }
+                  }
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "ok": true,
+                      "phone": "+201000000001",
+                      "prior_devices_revoked": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The challenge is unknown, belongs to another seller, or a required field is missing.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/invalid_challenge",
+                      "title": "Invalid Challenge",
+                      "status": 400,
+                      "code": "invalid_challenge",
+                      "detail": "The challenge could not be redeemed.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing credentials, or the proof of the new number is absent, stale or for a different number.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/new_phone_mismatch",
+                      "title": "New Phone Mismatch",
+                      "status": 401,
+                      "code": "new_phone_mismatch",
+                      "detail": "The supplied token does not prove recent control of the new number.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The account is suspended or banned.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/account_restricted",
+                      "title": "Account Restricted",
+                      "status": 403,
+                      "code": "account_restricted",
+                      "detail": "This account cannot perform the operation.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The challenge was already redeemed, or the number was taken in the meantime.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/replayed_challenge",
+                      "title": "Replayed Challenge",
+                      "status": 409,
+                      "code": "replayed_challenge",
+                      "detail": "This challenge has already been used.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "The challenge expired. Open a new one.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/expired_challenge",
+                      "title": "Expired Challenge",
+                      "status": 410,
+                      "code": "expired_challenge",
+                      "detail": "The challenge is older than 600 seconds.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/rate_limited",
+                      "title": "Rate Limited",
+                      "status": 429,
+                      "code": "rate_limited",
+                      "detail": "Too many requests.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "PHONE_CHANGE_ENABLED is false, or the identity provider is not configured.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/phone_change_disabled",
+                      "title": "Phone Change Disabled",
+                      "status": 503,
+                      "code": "phone_change_disabled",
+                      "detail": "Phone change is closed in this environment.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/phone/complete": {
       "post": {
         "operationId": "post_v1_auth_phone_complete",

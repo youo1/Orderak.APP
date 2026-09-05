@@ -39,10 +39,10 @@ commit belongs in a command, not in prose.
 | Dependency automation | Dependabot replaces a Renovate config that was never running | `.github/dependabot.yml`; manifest records the drop |
 | Node version | One source of truth in `.nvmrc`; 17 workflows read it | zero numeric `node-version` literals |
 | Worker size/startup budget | Guard added, wired into `backend-ci` | `verify-worker-budget.mjs` passes for 3 Workers |
-| Route discovery | Understands `app.openapi(createRoute(...))` | route coverage 100%, 252 operations |
+| Route discovery | Understands `app.openapi(createRoute(...))` and `pathname !== ...`; fails closed on any expression it cannot read | route coverage 100% across 255 operations. The previous 100% was measured over 252 and omitted two live POST routes the scanner could not see |
 | Test database | Built from `migrations/`, not a hand-written copy | 249 backend tests against the real schema |
 | Money representation | Minor units + explicit currency, all three platforms | [ADR-009](decisions/adr-009-minor-units-with-explicit-currency.md), migration 044 |
-| API payload modelling | Machinery built; 2 of 244 operations modelled | [ADR-010](decisions/adr-010-schema-first-api-contract.md), contract `check` passes |
+| API payload modelling | Machinery built; 4 of 255 operations modelled | [ADR-010](decisions/adr-010-schema-first-api-contract.md), contract `check` passes |
 | Historical docs | 16 archived, 15 nav entries removed | `mkdocs build --strict` passes |
 
 ## Not finished

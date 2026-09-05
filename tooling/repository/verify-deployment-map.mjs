@@ -173,7 +173,14 @@ for (const [relative, expectedServers] of Object.entries(serverExpectations)) {
 // NEW and a reinstall replayed work the seller had already done. Cancelling was
 // worse — placing an order takes stock through a trigger, and the Room-only
 // restore meant every cancellation leaked it.
-if (operationCount !== 247) fail(`OpenAPI operation inventory changed: expected 247, found ${operationCount}.`);
+// Raised to 249 on 2026-09-05 for the two phone-change routes. Unlike the raises
+// above, no route was added: POST /api/v1/auth/phone-change/challenges and
+// .../complete have been live and enabled in both environments for months. The
+// route scanner could not read `if (url.pathname !== X)`, so it never discovered
+// them, they never appeared in `route_without_spec`, and coverage reported 100%
+// over a surface that was missing them. The scanner now fails closed instead of
+// skipping what it cannot read, which is what made these two visible.
+if (operationCount !== 249) fail(`OpenAPI operation inventory changed: expected 249, found ${operationCount}.`);
 const seller = JSON.parse(read("contracts/openapi/src/seller-v1.json"));
 for (const [route, pathItem] of Object.entries(seller.paths)) {
   for (const method of ["get", "post", "put", "patch", "delete"]) {
