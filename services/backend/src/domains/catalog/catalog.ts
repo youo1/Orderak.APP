@@ -116,6 +116,7 @@ label{font-size:13px;color:var(--mut)}
 input,select,textarea{width:100%;padding:12px;margin:4px 0 12px;border:1px solid #ddd;border-radius:10px;font-size:16px}
 .form-error{color:${t.danger};font-weight:600;margin:8px 0;min-height:1.5em}
 .total{font-size:18px;font-weight:700;margin:8px 0}
+.card div:nth-child(2),.total,.qty span{font-variant-numeric:tabular-nums lining-nums}
 .btn{width:100%;padding:14px;border:none;border-radius:12px;background:var(--g);color:#fff;font-size:17px;font-weight:700;cursor:pointer}
 .ok{background:#E8F7EF;border-radius:14px;padding:16px;text-align:center;display:none;margin-top:16px}
 .foot{text-align:center;color:#999;font-size:12px;margin:20px 0}
