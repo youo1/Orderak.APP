@@ -304,6 +304,50 @@ export function assertOpenApiRoutesResolvable(files, workspaceRoot) {
  * Discover every Hono route registration in the given files.
  * Returns [{ method, path, source }].
  */
+/**
+ * Report every plain-verb registration — app.get/post/put/patch/delete/on —
+ * whose path cannot be read statically.
+ *
+ * assertOpenApiRoutesResolvable() above does this for .openapi() registrations
+ * and explains why it matters. The same hole existed one line further down for
+ * ordinary verb calls: discoverHonoRoutes() silently returns nothing for a
+ * registration whose path does not resolve, so the route serves traffic while
+ * being absent from both the inventory and the contract, with coverage still
+ * printing 100%. Silence in the safe-looking direction is the failure mode this
+ * whole file exists to prevent.
+ *
+ * Only calls that look like route registration are considered: an app-ish
+ * receiver and at least a path plus a handler. That excludes c.get("someKey")
+ * and headers.get("x"), which share the method names and take no route.
+ */
+export function assertHonoPathsResolvable(files, workspaceRoot) {
+	const offenders = [];
+	for (const file of files) {
+		const source = fs.readFileSync(file, "utf8");
+		const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+		const constants = collectStringConstants(sourceFile);
+		const relative = path.relative(workspaceRoot, file).replaceAll("\\", "/");
+		const visit = (node) => {
+			if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+				const called = node.expression.name.text;
+				if (ROUTE_METHODS.has(called) && node.arguments.length >= 2) {
+					const receiver = node.expression.expression.getText();
+					if (/^(app|router|[A-Za-z]*[Aa]pp|[A-Za-z]*[Rr]outer)$/.test(receiver)) {
+						const pathNode = called === "on" ? node.arguments[1] : node.arguments[0];
+						if (pathNode && !resolvePath(pathNode, constants)) {
+							const line = sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1;
+							offenders.push(`${relative}:${line}: ${receiver}.${called}(${pathNode.getText().slice(0, 60)}…) — path is not statically resolvable`);
+						}
+					}
+				}
+			}
+			ts.forEachChild(node, visit);
+		};
+		visit(sourceFile);
+	}
+	return offenders;
+}
+
 export function discoverHonoRoutes(files, workspaceRoot) {
 	const routes = [];
 
