@@ -484,4 +484,8 @@
     <string name="plan_notice_title">محتاج انتباهك</string>
     <string name="order_stock_error_body">قلّل الكمية أو شيل المنتج وجرّب تاني.</string>
     <string name="subscription_verification_error_body">خطتك زي ما هي. جرّب تاني، ولو فضل يفشل كلّم الدعم.</string>
+    <!-- An order is on this phone until the server accepts it. Usually a moment; offline, until the next sync. -->
+    <string name="order_local_only_chip">لسه ما اتبعتش</string>
+    <string name="order_local_only_title">مستني يوصل حسابك</string>
+    <string name="order_local_only_message">الأوردر ده اتحفظ على الجهاز ده ولسه ما وصلش حسابك. هيتبعت لوحده في المزامنة الجاية. لحد ساعتها مش هيظهر على موبايل تاني، ومش هتقدر تحرّكه في مراحله.</string>
 </resources>

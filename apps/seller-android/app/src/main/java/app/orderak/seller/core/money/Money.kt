@@ -56,6 +56,63 @@ fun exponentOf(currency: String): Int =
     JavaCurrency.getInstance(currency).defaultFractionDigits
 
 /**
+ * How many minor units make one major unit: 100 for EGP, 1000 for KWD.
+ *
+ * The integer counterpart of the private pow10 below. Anything comparing two
+ * amounts rather than rendering one should use this and stay in minor units —
+ * floating point introduces a tolerance, and a tolerance is a place for a
+ * factor-of-ten error to hide.
+ */
+fun minorUnitsPerMajor(currency: String): Long = when (exponentOf(currency)) {
+    0 -> 1L
+    2 -> 100L
+    3 -> 1000L
+    else -> throw IllegalArgumentException("Unsupported ISO 4217 exponent for $currency")
+}
+
+/**
+ * Read a decimal string as minor units of [currency], or null if it is not a
+ * valid amount in it.
+ *
+ * Null rather than a best guess. "12.345" is not an amount in a two-decimal
+ * currency, and rounding it to 12.34 would invent a number nobody wrote — which
+ * matters here because the caller is deciding whether a receipt matches an
+ * order, and a fabricated near-miss is worse than no match at all.
+ */
+fun parseMinorUnits(text: String, currency: String): Long? {
+    val exponent = exponentOf(currency)
+    val dot = text.indexOf('.')
+    val whole = if (dot < 0) text else text.substring(0, dot)
+    val fraction = if (dot < 0) "" else text.substring(dot + 1)
+    if (fraction.length > exponent) return null
+    val major = whole.toLongOrNull() ?: return null
+    val minor = if (exponent == 0) 0L else fraction.padEnd(exponent, '0').toLongOrNull() ?: return null
+    return try {
+        Math.addExact(Math.multiplyExact(major, minorUnitsPerMajor(currency)), minor)
+    } catch (_: ArithmeticException) {
+        // A digit run long enough to overflow is not an amount anyone transferred.
+        null
+    }
+}
+
+/**
+ * A plain decimal for an editable field: no grouping separators, no symbol, and
+ * trailing zeros trimmed so a whole amount reads "150" rather than "150.00".
+ *
+ * Separate from [formatMoney] on purpose. That one formats for reading and
+ * groups thousands; this one produces something a seller can keep typing into
+ * and [parseMoney] can read back without the round trip changing the number.
+ */
+fun majorUnitsText(money: Money): String {
+    val per = minorUnitsPerMajor(money.currency)
+    val major = money.amountMinor / per
+    val minor = money.amountMinor % per
+    if (minor == 0L) return major.toString()
+    val digits = exponentOf(money.currency)
+    return "$major." + minor.toString().padStart(digits, '0').trimEnd('0')
+}
+
+/**
  * Format for display, without the currency symbol.
  *
  * The screens wrap this in `R.string.currency_*`, so the symbol comes from the

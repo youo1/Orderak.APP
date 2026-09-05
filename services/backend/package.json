@@ -27,6 +27,7 @@
     "cf-typegen": "wrangler types src/generated/public-worker-env.d.ts --config wrangler.jsonc --env-file wrangler-types.env --env-interface PublicWorkerBindings --strict-vars=false && wrangler types src/generated/admin-worker-env.d.ts --config wrangler.admin.jsonc --env-file wrangler-types.env --env-interface AdminWorkerBindings --strict-vars=false --include-runtime=false",
     "cf-types:check": "wrangler types src/generated/public-worker-env.d.ts --config wrangler.jsonc --env-file wrangler-types.env --env-interface PublicWorkerBindings --strict-vars=false --check && wrangler types src/generated/admin-worker-env.d.ts --config wrangler.admin.jsonc --env-file wrangler-types.env --env-interface AdminWorkerBindings --strict-vars=false --include-runtime=false --check",
     "lint": "oxlint --type-aware src",
+    "reconcile:stock": "node scripts/reconcile-stock.mjs",
     "verify:migrations": "node scripts/verify-migrations.mjs",
     "verify:drift": "node scripts/verify-cloudflare-drift.mjs"
   },

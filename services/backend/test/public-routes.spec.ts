@@ -74,6 +74,27 @@ describe("public store page", () => {
 		expect(html).not.toContain("قميص قطن");
 	});
 
+	// The catalogue sells "InstaPay / Vodafone Cash instructions" on every plan.
+	// What that means in practice is this: the storefront offers a transfer method
+	// only when the seller has given a handle for it, and then tells the buyer
+	// where to send the money. Nothing tested that, so the row sat marked planned
+	// while shipping, and could equally have broken while marked implemented.
+	it("offers a transfer method only when the seller has set a handle for it", async () => {
+		const withHandles = await registerStore({ instapay: "seller@instapay", vfcash: "01000000000" });
+		await seedProduct(withHandles);
+		const offered = await (await SELF.fetch(`${SITE}/${withHandles.public_identifier}`)).text();
+		expect(offered).toContain('value="INSTAPAY"');
+		expect(offered).toContain('value="VF_CASH"');
+
+		const withoutHandles = await registerStore({ store_name: "No Transfers" });
+		await seedProduct(withoutHandles);
+		const bare = await (await SELF.fetch(`${SITE}/${withoutHandles.public_identifier}`)).text();
+		expect(bare).not.toContain('value="INSTAPAY"');
+		expect(bare).not.toContain('value="VF_CASH"');
+		// Cash on delivery is unconditional, so the page is not simply empty.
+		expect(bare).toContain('value="COD"');
+	});
+
 	it("never injects store payment values into executable HTML", async () => {
 		const payload = `</b><img src=x onerror=alert(1)>`;
 		const r = await registerStore({ instapay: payload, vfcash: payload });
