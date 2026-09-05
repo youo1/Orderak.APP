@@ -82,6 +82,13 @@ class SessionStore @Inject constructor(
         val CITY_GEONAME_ID = longPreferencesKey("city_geoname_id")
         val CITY_CATALOG_ID = longPreferencesKey("city_catalog_id")
         val COUNTRY_ISO = stringPreferencesKey("country_iso")
+
+        // The catalogue baseline: the store version this device last downloaded,
+        // and the account it downloaded it for. Both, because a version alone
+        // would survive a sign-out and let the next seller push against a number
+        // that describes someone else's catalogue.
+        val CATALOG_BASELINE = longPreferencesKey("catalog_baseline_version")
+        val CATALOG_BASELINE_ACCOUNT = stringPreferencesKey("catalog_baseline_account")
         val LOGO_URI = stringPreferencesKey("logo_uri")
         val FULL_NAME = stringPreferencesKey("full_name")
         val EMAIL = stringPreferencesKey("email")
@@ -133,6 +140,36 @@ class SessionStore @Inject constructor(
     val instapay: Flow<String?> = context.dataStore.data.map { it[Keys.INSTAPAY] }
     val vfcash: Flow<String?> = context.dataStore.data.map { it[Keys.VFCASH] }
     val slug: Flow<String?> = context.dataStore.data.map { it[Keys.SLUG] }
+
+    /**
+     * The catalogue version this device downloaded, if it belongs to [account].
+     *
+     * Null means the device has no baseline: it has never downloaded, the
+     * download failed, or the stored one belongs to a different seller. In every
+     * one of those cases the device must not send a destructive mirror, because
+     * it cannot vouch for what it is about to overwrite.
+     */
+    suspend fun catalogBaseline(account: String): Long? {
+        val prefs = context.dataStore.data.first()
+        if (prefs[Keys.CATALOG_BASELINE_ACCOUNT] != account) return null
+        return prefs[Keys.CATALOG_BASELINE]
+    }
+
+    /** Record a completed download. Only ever called after the whole catalogue landed. */
+    suspend fun saveCatalogBaseline(account: String, version: Long) {
+        context.dataStore.edit {
+            it[Keys.CATALOG_BASELINE_ACCOUNT] = account
+            it[Keys.CATALOG_BASELINE] = version
+        }
+    }
+
+    /** Drop the baseline, forcing a fresh download before the next mirror push. */
+    suspend fun clearCatalogBaseline() {
+        context.dataStore.edit {
+            it.remove(Keys.CATALOG_BASELINE_ACCOUNT)
+            it.remove(Keys.CATALOG_BASELINE)
+        }
+    }
     val publicIdentifier: Flow<String?> = context.dataStore.data.map { it[Keys.PUBLIC_ID] }
     val storeCode: Flow<String?> = context.dataStore.data.map { it[Keys.STORE_CODE] }
     val storeUrl: Flow<String?> = context.dataStore.data.map { it[Keys.STORE_URL] }

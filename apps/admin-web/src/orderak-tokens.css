@@ -1,0 +1,528 @@
+/* Orderak generated design system — flattened token bundle.
+ * DO NOT EDIT BY HAND. Generated from the Orderak Design System project
+ * (tokens/*.css) on 2026-09-04. Regenerate rather than patching.
+ *
+ * Contains: @font-face (Cairo, Tajawal, Noto Sans Arabic), the full Material 3
+ * colour scheme light + .orderak-dark, the semantic role layer, 15 type roles,
+ * spacing, shape, motion, interactive states and layout tokens — 296 tokens.
+ *
+ * Install:
+ *   1. Copy this file and the fonts/ directory next to it.
+ *   2. Import it BEFORE any app stylesheet so the app's own :root fallbacks
+ *      never win:  @import "./orderak-tokens.css";
+ *   3. Delete the retired :root block from apps/admin-web/src/index.css
+ *      (see PATCH.md).
+ *
+ * Font URLs below are relative: they expect ./fonts/*.woff2 beside this file.
+ */
+
+
+/* ===== fonts.css ===== */
+/* Orderak webfonts — copied verbatim from services/backend/assets/static/fonts/.
+   Rules mirror fontFaceCss() in services/backend/src/domains/design/design-system.ts:
+   same families, weights, unicode-ranges and metric overrides. */
+
+@font-face{font-family:"Orderak Cairo";src:url("./fonts/cairo-arabic-variable.woff2") format("woff2");font-weight:200 1000;font-style:normal;font-display:swap;unicode-range:U+0600-06FF,U+0750-077F,U+0870-089F,U+08A0-08FF,U+200C-200E,U+FB50-FDFF,U+FE70-FEFC;size-adjust:104%;ascent-override:130.3%;descent-override:57.1%;line-gap-override:0%}
+@font-face{font-family:"Orderak Cairo";src:url("./fonts/cairo-latin-core-variable.woff2") format("woff2");font-weight:200 1000;font-style:normal;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+2000-206F,U+20AC,U+2122,U+FEFF,U+FFFD;size-adjust:104%;ascent-override:130.3%;descent-override:57.1%;line-gap-override:0%}
+@font-face{font-family:"Orderak Cairo";src:url("./fonts/cairo-latin-variable.woff2") format("woff2");font-weight:200 1000;font-style:normal;font-display:swap;unicode-range:U+0100-02FF,U+1E00-1EFF,U+20A0-20CF;size-adjust:104%;ascent-override:130.3%;descent-override:57.1%;line-gap-override:0%}
+
+@font-face{font-family:"Orderak Tajawal";src:url("./fonts/tajawal-arabic-400.woff2") format("woff2");font-weight:400;font-style:normal;font-display:swap;unicode-range:U+0600-06FF,U+0750-077F,U+0870-089F,U+08A0-08FF,U+200C-200E,U+FB50-FDFF,U+FE70-FEFC;size-adjust:114.54%;ascent-override:64.3%;descent-override:35.7%;line-gap-override:20%}
+@font-face{font-family:"Orderak Tajawal";src:url("./fonts/tajawal-latin-400.woff2") format("woff2");font-weight:400;font-style:normal;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+2000-206F,U+20AC,U+2122,U+FEFF,U+FFFD;size-adjust:114.54%;ascent-override:64.3%;descent-override:35.7%;line-gap-override:20%}
+@font-face{font-family:"Orderak Tajawal";src:url("./fonts/tajawal-arabic-500.woff2") format("woff2");font-weight:500;font-style:normal;font-display:swap;unicode-range:U+0600-06FF,U+0750-077F,U+0870-089F,U+08A0-08FF,U+200C-200E,U+FB50-FDFF,U+FE70-FEFC;size-adjust:114.54%;ascent-override:64.3%;descent-override:35.7%;line-gap-override:20%}
+@font-face{font-family:"Orderak Tajawal";src:url("./fonts/tajawal-latin-500.woff2") format("woff2");font-weight:500;font-style:normal;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+2000-206F,U+20AC,U+2122,U+FEFF,U+FFFD;size-adjust:114.54%;ascent-override:64.3%;descent-override:35.7%;line-gap-override:20%}
+@font-face{font-family:"Orderak Tajawal";src:url("./fonts/tajawal-arabic-700.woff2") format("woff2");font-weight:700;font-style:normal;font-display:swap;unicode-range:U+0600-06FF,U+0750-077F,U+0870-089F,U+08A0-08FF,U+200C-200E,U+FB50-FDFF,U+FE70-FEFC;size-adjust:114.54%;ascent-override:64.3%;descent-override:35.7%;line-gap-override:20%}
+@font-face{font-family:"Orderak Tajawal";src:url("./fonts/tajawal-latin-700.woff2") format("woff2");font-weight:700;font-style:normal;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+2000-206F,U+20AC,U+2122,U+FEFF,U+FFFD;size-adjust:114.54%;ascent-override:64.3%;descent-override:35.7%;line-gap-override:20%}
+
+@font-face{font-family:"Orderak Noto Arabic";src:url("./fonts/noto-sans-arabic-variable.woff2") format("woff2");font-weight:100 900;font-style:normal;font-display:swap;unicode-range:U+0600-06FF,U+0750-077F,U+0870-089F,U+08A0-08FF,U+200C-200E,U+FB50-FDFF,U+FE70-FEFC;size-adjust:97.01%;ascent-override:137.4%;descent-override:73.8%;line-gap-override:0%}
+@font-face{font-family:"Orderak Noto Arabic";src:url("./fonts/noto-sans-arabic-latin-core-variable.woff2") format("woff2");font-weight:100 900;font-style:normal;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+2000-206F,U+20AC,U+2122,U+FEFF,U+FFFD;size-adjust:97.01%;ascent-override:137.4%;descent-override:73.8%;line-gap-override:0%}
+@font-face{font-family:"Orderak Noto Arabic";src:url("./fonts/noto-sans-arabic-latin-variable.woff2") format("woff2");font-weight:100 900;font-style:normal;font-display:swap;unicode-range:U+0100-02FF,U+1E00-1EFF,U+20A0-20CF;size-adjust:97.01%;ascent-override:137.4%;descent-override:73.8%;line-gap-override:0%}
+
+
+/* ===== colors.css ===== */
+/* Orderak colour roles — light "standard" contrast.
+   Source: apps/seller-android/.../theme/GeneratedDesignSystem.kt (LightStandard +
+   LightStandardExtended) and design/tokens.json. Generated from brand seed
+   #014D4E (HCT hue 198.1, chroma 28.7); every pair was contrast-validated at
+   generation. Do not hand-tune a value here — it stops being a validated colour. */
+
+:root{
+  /* -- brand seed + legacy 14-token projection (design/tokens.json) -- */
+  --orderak-primary:#014D4E;
+  --orderak-primary-strong:#002929;
+  --orderak-primary-soft:#B0EEEE;
+  --orderak-primary-tint:#95D1D2;
+  --orderak-canvas:#F3FBFC;
+  --orderak-surface:#F3FBFC;
+  --orderak-ink:#151D1E;
+  --orderak-muted:#3B494B;
+  --orderak-line:#BAC9CB;
+  --orderak-danger:#BA1A1A;
+  --orderak-danger-soft:#FFDAD5;
+  --orderak-warning:#755B00;
+  --orderak-warning-soft:#FFDF91;
+  --orderak-accent:#9B4500;
+
+  /* -- Material 3 system roles (the full generated scheme) -- */
+  --md-sys-color-primary:#014D4E;
+  --md-sys-color-on-primary:#FFFFFF;
+  --md-sys-color-primary-container:#B0EEEE;
+  --md-sys-color-on-primary-container:#054F50;
+  --md-sys-color-inverse-primary:#95D1D2;
+  --md-sys-color-secondary:#9B4500;
+  --md-sys-color-on-secondary:#FFFFFF;
+  --md-sys-color-secondary-container:#FFDBC9;
+  --md-sys-color-on-secondary-container:#763300;
+  --md-sys-color-tertiary:#005AC2;
+  --md-sys-color-on-tertiary:#FFFFFF;
+  --md-sys-color-tertiary-container:#D8E2FF;
+  --md-sys-color-on-tertiary-container:#004395;
+  --md-sys-color-background:#F3FBFC;
+  --md-sys-color-on-background:#151D1E;
+  --md-sys-color-surface:#F3FBFC;
+  --md-sys-color-on-surface:#151D1E;
+  --md-sys-color-surface-variant:#D6E5E7;
+  --md-sys-color-on-surface-variant:#3B494B;
+  --md-sys-color-surface-tint:#296768;
+  --md-sys-color-inverse-surface:#2A3233;
+  --md-sys-color-inverse-on-surface:#EAF2F3;
+  --md-sys-color-error:#BA1A1A;
+  --md-sys-color-on-error:#FFFFFF;
+  --md-sys-color-error-container:#FFDAD5;
+  --md-sys-color-on-error-container:#930009;
+  --md-sys-color-outline:#6B7A7C;
+  --md-sys-color-outline-variant:#BAC9CB;
+  --md-sys-color-scrim:#000000;
+  --md-sys-color-surface-bright:#F3FBFC;
+  --md-sys-color-surface-dim:#D4DBDC;
+  --md-sys-color-surface-container:#E7EFF0;
+  --md-sys-color-surface-container-high:#E2EAEA;
+  --md-sys-color-surface-container-highest:#DCE4E5;
+  --md-sys-color-surface-container-low:#EDF5F6;
+  --md-sys-color-surface-container-lowest:#FFFFFF;
+
+  /* -- extended semantic roles (no M3 slot exists for these) -- */
+  --orderak-success:#1B6D24;
+  --orderak-success-soft:#A3F69C;
+  --orderak-on-success:#FFFFFF;
+  --orderak-on-success-container:#002204;
+  --orderak-success-container-outline:#38873A;
+  --orderak-on-warning:#FFFFFF;
+  --orderak-on-warning-container:#241A00;
+  --orderak-warning-container-outline:#937309;
+  --orderak-information:#0061A4;
+  --orderak-information-soft:#D1E4FF;
+  --orderak-on-information:#FFFFFF;
+  --orderak-on-information-container:#001D36;
+  --orderak-information-container-outline:#327ABF;
+  --orderak-commerce:#6D509A;
+  --orderak-commerce-soft:#ECDCFF;
+  --orderak-on-commerce:#FFFFFF;
+  --orderak-on-commerce-container:#270452;
+  --orderak-commerce-container-outline:#8669B5;
+  --orderak-on-accent:#FFFFFF;
+
+  /* -- aliases used by the admin web app (apps/admin-web/src/index.css) --
+     SUPERSEDED, not preserved. index.css hardcodes an earlier seed on :root
+     (--primary #006A62, --canvas #F3FBFA, --line #B9CAC9) and
+     font-family: Inter. Those are legacy visual decisions from before the
+     generator existed; this design system replaces them. The generated
+     Dark Teal scheme and Cairo are the single source of truth on every
+     surface, admin included. Do not reintroduce #006A62 or Inter — if you are
+     rebuilding an admin screen, rebuild it on these tokens rather than
+     matching the old stylesheet. */
+  --primary:var(--orderak-primary);
+  --primary-strong:var(--orderak-primary-strong);
+  --primary-soft:var(--orderak-primary-soft);
+  --primary-tint:var(--orderak-primary-tint);
+  --canvas:var(--orderak-canvas);
+  --surface:#FFFFFF;
+  --ink:var(--orderak-ink);
+  --muted:var(--orderak-muted);
+  --line:var(--orderak-line);
+  --shadow:var(--orderak-shadow-modal);
+  --danger:var(--orderak-danger);
+  --danger-soft:var(--orderak-danger-soft);
+  --warning:var(--orderak-warning);
+  --warning-soft:var(--orderak-warning-soft);
+  --accent:var(--orderak-accent);
+
+  /* -- the @theme inline contract in apps/admin-web/src/index.css --
+     That block reads var(--orderak-<name>, var(--<legacy>)), so supplying these
+     seven names is what flips the admin app onto the generated scheme. The
+     backend generator emits them; they are declared here under the same names
+     so this design system is drop-in compatible with the app's Tailwind theme.
+     Do not rename them — index.css looks them up literally. */
+  --orderak-on-primary:var(--md-sys-color-on-primary);
+  --orderak-secondary:var(--md-sys-color-secondary);
+  --orderak-background:var(--md-sys-color-background);
+  --orderak-on-surface:var(--md-sys-color-on-surface);
+  --orderak-outline-variant:var(--md-sys-color-outline-variant);
+  --orderak-error:var(--md-sys-color-error);
+
+  /* -- storefront aliases (baseStyle() in domains/catalog/catalog.ts) -- */
+  --g:var(--orderak-primary);
+  --bg:var(--orderak-canvas);
+  --tx:var(--orderak-ink);
+  --mut:var(--orderak-muted);
+}
+
+/* Dark "standard" contrast. Source: DarkStandard + DarkStandardExtended. */
+.orderak-dark{
+  --orderak-primary:#95D1D2;
+  --orderak-primary-strong:#B0EEEE;
+  --orderak-primary-soft:#054F50;
+  --orderak-primary-tint:#296768;
+  --orderak-canvas:#0D1516;
+  --orderak-surface:#0D1516;
+  --orderak-ink:#DCE4E5;
+  --orderak-muted:#BAC9CB;
+  --orderak-line:#3B494B;
+  --orderak-danger:#FFB4AB;
+  --orderak-danger-soft:#930009;
+  --orderak-warning:#E9C259;
+  --orderak-warning-soft:#594400;
+  --orderak-accent:#FFB68E;
+  --md-sys-color-primary:#95D1D2;
+  --md-sys-color-on-primary:#003738;
+  --md-sys-color-primary-container:#054F50;
+  --md-sys-color-on-primary-container:#B0EEEE;
+  --md-sys-color-secondary:#FFB68E;
+  --md-sys-color-on-secondary:#532200;
+  --md-sys-color-secondary-container:#763300;
+  --md-sys-color-on-secondary-container:#FFDBC9;
+  --md-sys-color-tertiary:#ADC6FF;
+  --md-sys-color-on-tertiary:#002E6A;
+  --md-sys-color-tertiary-container:#004395;
+  --md-sys-color-on-tertiary-container:#D8E2FF;
+  --md-sys-color-background:#0D1516;
+  --md-sys-color-on-background:#DCE4E5;
+  --md-sys-color-surface:#0D1516;
+  --md-sys-color-on-surface:#DCE4E5;
+  --md-sys-color-surface-variant:#3B494B;
+  --md-sys-color-on-surface-variant:#BAC9CB;
+  --md-sys-color-inverse-surface:#DCE4E5;
+  --md-sys-color-inverse-on-surface:#2A3233;
+  --md-sys-color-error:#FFB4AB;
+  --md-sys-color-on-error:#690004;
+  --md-sys-color-error-container:#930009;
+  --md-sys-color-on-error-container:#FFDAD5;
+  --md-sys-color-outline:#849495;
+  --md-sys-color-outline-variant:#3B494B;
+  --md-sys-color-surface-bright:#333B3B;
+  --md-sys-color-surface-dim:#0D1516;
+  --md-sys-color-surface-container:#192122;
+  --md-sys-color-surface-container-high:#242B2C;
+  --md-sys-color-surface-container-highest:#2E3637;
+  --md-sys-color-surface-container-low:#151D1E;
+  --md-sys-color-surface-container-lowest:#080F10;
+  --orderak-success:#88D982;
+  --orderak-success-soft:#005312;
+  --orderak-on-success-container:#A3F69C;
+  --orderak-success-container-outline:#6DBD6A;
+  --orderak-on-warning-container:#FFDF91;
+  --orderak-warning-container-outline:#CBA740;
+  --orderak-information:#9FCAFF;
+  --orderak-information-soft:#00497D;
+  --orderak-on-information-container:#D1E4FF;
+  --orderak-information-container-outline:#6EAFF7;
+  --orderak-commerce:#D6BAFF;
+  --orderak-commerce-soft:#543880;
+  --orderak-on-commerce-container:#ECDCFF;
+  --orderak-commerce-container-outline:#BC9CED;
+  --surface:#192122;
+}
+
+/* Brand mark colours. These live only in the logo files; no UI surface uses
+   them. Recorded so nobody re-derives them from the SVG by eye. */
+:root{
+  --orderak-mark-green:#1DAB61;
+  --orderak-mark-badge:#ED8936;
+  --orderak-mark-wordmark:#14342A;
+  --orderak-mark-tagline:#157F49;
+}
+
+
+/* ===== typography.css ===== */
+/* Orderak type scale — the 15 generated Material 3 roles.
+   Source: GeneratedDesignSystem.typography (sizeSp, lineHeight in rem units of
+   16px, weight, letterSpacingEm). Emitted by the backend as
+   --orderak-type-<role>-size / -line-height / -weight. */
+
+:root{
+  --orderak-font-family:"Orderak Cairo",Cairo,Tajawal,"Noto Sans Arabic",system-ui,sans-serif;
+  --orderak-font-family-tajawal:"Orderak Tajawal",Tajawal,system-ui,sans-serif;
+  --orderak-font-family-noto:"Orderak Noto Arabic","Noto Sans Arabic",system-ui,sans-serif;
+
+  --orderak-type-display-large-size:3.5625rem;--orderak-type-display-large-line-height:4rem;--orderak-type-display-large-weight:400;--orderak-type-display-large-tracking:-0.0044em;
+  --orderak-type-display-medium-size:2.8125rem;--orderak-type-display-medium-line-height:3.25rem;--orderak-type-display-medium-weight:400;--orderak-type-display-medium-tracking:0em;
+  --orderak-type-display-small-size:2.25rem;--orderak-type-display-small-line-height:2.75rem;--orderak-type-display-small-weight:400;--orderak-type-display-small-tracking:0em;
+  --orderak-type-headline-large-size:2rem;--orderak-type-headline-large-line-height:2.5rem;--orderak-type-headline-large-weight:400;--orderak-type-headline-large-tracking:0em;
+  --orderak-type-headline-medium-size:1.75rem;--orderak-type-headline-medium-line-height:2.25rem;--orderak-type-headline-medium-weight:400;--orderak-type-headline-medium-tracking:0em;
+  --orderak-type-headline-small-size:1.5rem;--orderak-type-headline-small-line-height:2rem;--orderak-type-headline-small-weight:400;--orderak-type-headline-small-tracking:0em;
+  --orderak-type-title-large-size:1.375rem;--orderak-type-title-large-line-height:1.75rem;--orderak-type-title-large-weight:400;--orderak-type-title-large-tracking:0em;
+  --orderak-type-title-medium-size:1rem;--orderak-type-title-medium-line-height:1.5rem;--orderak-type-title-medium-weight:500;--orderak-type-title-medium-tracking:0.0094em;
+  --orderak-type-title-small-size:0.875rem;--orderak-type-title-small-line-height:1.25rem;--orderak-type-title-small-weight:500;--orderak-type-title-small-tracking:0.0071em;
+  --orderak-type-body-large-size:1rem;--orderak-type-body-large-line-height:1.5rem;--orderak-type-body-large-weight:400;--orderak-type-body-large-tracking:0.0313em;
+  --orderak-type-body-medium-size:0.875rem;--orderak-type-body-medium-line-height:1.25rem;--orderak-type-body-medium-weight:400;--orderak-type-body-medium-tracking:0.0179em;
+  --orderak-type-body-small-size:0.75rem;--orderak-type-body-small-line-height:1rem;--orderak-type-body-small-weight:400;--orderak-type-body-small-tracking:0.0333em;
+  --orderak-type-label-large-size:0.875rem;--orderak-type-label-large-line-height:1.25rem;--orderak-type-label-large-weight:500;--orderak-type-label-large-tracking:0.0071em;
+  --orderak-type-label-medium-size:0.75rem;--orderak-type-label-medium-line-height:1rem;--orderak-type-label-medium-weight:500;--orderak-type-label-medium-tracking:0.0417em;
+  --orderak-type-label-small-size:0.6875rem;--orderak-type-label-small-line-height:1rem;--orderak-type-label-small-weight:500;--orderak-type-label-small-tracking:0.0455em;
+}
+
+/* Numerals.
+   Cairo's lining figures are narrow and proportional. In a dense table, a
+   money column or a counted pair they shift column to column and get muddy at
+   label sizes. Every number that sits in a column, a total, or a "used / limit"
+   pair takes tabular figures. This is a system rule, not a per-screen fix. */
+:root{--orderak-numeric-tabular:tabular-nums lining-nums; /* @kind other */}
+.ork-numeric{font-variant-numeric:var(--orderak-numeric-tabular);font-feature-settings:"tnum" 1,"lnum" 1}
+/* Counted pairs and money stay LTR inside Arabic — "14 / 20" reorders otherwise. */
+.ork-numeric-pair{font-variant-numeric:var(--orderak-numeric-tabular);direction:ltr;unicode-bidi:isolate}
+
+/* Minimum Latin size.
+   Cairo's Latin has a lower x-height and tighter apertures than a UI-first
+   face. labelSmall (11px) is legible in Arabic but marginal in Latin, so 12px
+   is the floor for any Latin text a user must read rather than glance at.
+   Use labelSmall for glanceable chips only. */
+:root{--orderak-type-latin-floor:12px}
+
+/* Ready-made role classes. Apply one per text element; never mix a role's size
+   with another role's weight. */
+.ork-display-large{font:var(--orderak-type-display-large-weight) var(--orderak-type-display-large-size)/var(--orderak-type-display-large-line-height) var(--orderak-font-family);letter-spacing:var(--orderak-type-display-large-tracking)}
+.ork-display-medium{font:var(--orderak-type-display-medium-weight) var(--orderak-type-display-medium-size)/var(--orderak-type-display-medium-line-height) var(--orderak-font-family)}
+.ork-display-small{font:var(--orderak-type-display-small-weight) var(--orderak-type-display-small-size)/var(--orderak-type-display-small-line-height) var(--orderak-font-family)}
+.ork-headline-large{font:var(--orderak-type-headline-large-weight) var(--orderak-type-headline-large-size)/var(--orderak-type-headline-large-line-height) var(--orderak-font-family)}
+.ork-headline-medium{font:var(--orderak-type-headline-medium-weight) var(--orderak-type-headline-medium-size)/var(--orderak-type-headline-medium-line-height) var(--orderak-font-family)}
+.ork-headline-small{font:var(--orderak-type-headline-small-weight) var(--orderak-type-headline-small-size)/var(--orderak-type-headline-small-line-height) var(--orderak-font-family)}
+.ork-title-large{font:var(--orderak-type-title-large-weight) var(--orderak-type-title-large-size)/var(--orderak-type-title-large-line-height) var(--orderak-font-family)}
+.ork-title-medium{font:var(--orderak-type-title-medium-weight) var(--orderak-type-title-medium-size)/var(--orderak-type-title-medium-line-height) var(--orderak-font-family);letter-spacing:var(--orderak-type-title-medium-tracking)}
+.ork-title-small{font:var(--orderak-type-title-small-weight) var(--orderak-type-title-small-size)/var(--orderak-type-title-small-line-height) var(--orderak-font-family);letter-spacing:var(--orderak-type-title-small-tracking)}
+.ork-body-large{font:var(--orderak-type-body-large-weight) var(--orderak-type-body-large-size)/var(--orderak-type-body-large-line-height) var(--orderak-font-family);letter-spacing:var(--orderak-type-body-large-tracking)}
+.ork-body-medium{font:var(--orderak-type-body-medium-weight) var(--orderak-type-body-medium-size)/var(--orderak-type-body-medium-line-height) var(--orderak-font-family);letter-spacing:var(--orderak-type-body-medium-tracking)}
+.ork-body-small{font:var(--orderak-type-body-small-weight) var(--orderak-type-body-small-size)/var(--orderak-type-body-small-line-height) var(--orderak-font-family);letter-spacing:var(--orderak-type-body-small-tracking)}
+.ork-label-large{font:var(--orderak-type-label-large-weight) var(--orderak-type-label-large-size)/var(--orderak-type-label-large-line-height) var(--orderak-font-family);letter-spacing:var(--orderak-type-label-large-tracking)}
+.ork-label-medium{font:var(--orderak-type-label-medium-weight) var(--orderak-type-label-medium-size)/var(--orderak-type-label-medium-line-height) var(--orderak-font-family);letter-spacing:var(--orderak-type-label-medium-tracking)}
+.ork-label-small{font:var(--orderak-type-label-small-weight) var(--orderak-type-label-small-size)/var(--orderak-type-label-small-line-height) var(--orderak-font-family);letter-spacing:var(--orderak-type-label-small-tracking)}
+
+
+/* ===== spacing.css ===== */
+/* Orderak spacing scale. Source: GeneratedDesignSystem.spacing, emitted as
+   --orderak-space<n>. The scale is deliberately gappy: there is no space5,
+   space7, space9 or space11 — a value that is not on the scale is a mistake. */
+
+:root{
+  --orderak-space0:0px;
+  --orderak-space1:4px;
+  --orderak-space2:8px;
+  --orderak-space3:12px;
+  --orderak-space4:16px;
+  --orderak-space6:24px;
+  --orderak-space8:32px;
+  --orderak-space10:40px;
+  --orderak-space12:48px;
+  --orderak-space16:64px;
+  /* Every tappable target on the phone is at least this tall. Non-negotiable. */
+  --orderak-minimum-touch-target:48px;
+}
+
+
+/* ===== shape.css ===== */
+/* Orderak shape + elevation. Radii come from GeneratedDesignSystem.shapes,
+   emitted as --orderak-shape-<name>. Shadows are the admin web's, which is the
+   only surface in the system that uses them; the phone app separates surfaces
+   with tone (surfaceContainer*) and a 1px outline, not shadow. */
+
+:root{
+  --orderak-shape-extra-small:4px;
+  --orderak-shape-small:8px;
+  --orderak-shape-medium:12px;
+  --orderak-shape-large:16px;
+  --orderak-shape-extra-large:24px;
+  --orderak-shape-full:999px;
+
+  --orderak-shadow-card:0 5px 18px rgba(20,20,31,.04);
+  --orderak-shadow-raised:0 5px 14px rgba(20,20,31,.08);
+  --orderak-shadow-storefront:0 1px 4px rgba(0,0,0,.067);
+  --orderak-shadow-modal:0 16px 40px rgba(13,21,20,.08);
+  --orderak-shadow-overlay:0 30px 80px rgba(20,20,31,.14);
+  --orderak-scrim:rgba(8,12,30,.48);
+
+  /* Motion tokens moved to tokens/motion.css. */
+}
+
+
+/* ===== motion.css ===== */
+/* Motion.
+   Orderak's motion is short and unremarkable by design: a seller is working,
+   not being entertained. Nothing bounces, nothing springs, nothing has an
+   entrance animation. The only keyframe animation in the product is the admin
+   spinner. Durations below are the ones actually used in
+   apps/admin-web/src/index.css; the easing set is the M3 standard curves the
+   Compose app inherits. */
+
+:root{
+  --orderak-duration-instant:0ms; /* @kind other */
+  --orderak-duration-short:150ms; /* @kind other */   /* hover, colour, opacity */
+  --orderak-duration-medium:180ms; /* @kind other */  /* sidebar + workspace slide */
+  --orderak-duration-long:200ms; /* @kind other */    /* switch thumb, drawer, sheet */
+  --orderak-duration-extra-long:300ms; /* @kind other */ /* full-screen transition — rare */
+
+  --orderak-easing-standard:cubic-bezier(.2,0,0,1); /* @kind other */
+  --orderak-easing-decelerate:cubic-bezier(0,0,0,1); /* @kind other */  /* entering */
+  --orderak-easing-accelerate:cubic-bezier(.3,0,1,1); /* @kind other */ /* exiting */
+  --orderak-easing-linear:linear; /* @kind other */                     /* spinners only */
+
+  /* Ready-made transitions. Prefer these over writing a duration inline. */
+  --orderak-motion-fast:var(--orderak-duration-short) ease; /* @kind other */
+  --orderak-motion-nav:var(--orderak-duration-medium) ease; /* @kind other */
+  --orderak-motion-drawer:var(--orderak-duration-long) ease; /* @kind other */
+  --orderak-motion-state:opacity var(--orderak-duration-short) var(--orderak-easing-standard); /* @kind other */
+}
+
+@keyframes ork-spin{to{transform:rotate(360deg)}}
+.ork-spinner{width:26px;height:26px;border:3px solid var(--md-sys-color-surface-variant);border-top-color:var(--md-sys-color-primary);border-radius:50%;animation:ork-spin .9s var(--orderak-easing-linear) infinite}
+
+/* Reduced motion is honoured, not approximated. The product already turns the
+   sidebar transitions off entirely; extend that to everything. */
+@media (prefers-reduced-motion: reduce){
+  :root{
+    --orderak-duration-short:0ms; /* @kind other */
+    --orderak-duration-medium:0ms; /* @kind other */
+    --orderak-duration-long:0ms; /* @kind other */
+    --orderak-duration-extra-long:0ms; /* @kind other */
+    --orderak-motion-fast:0ms linear; /* @kind other */
+    --orderak-motion-nav:0ms linear; /* @kind other */
+    --orderak-motion-drawer:0ms linear; /* @kind other */
+  }
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important}
+  .ork-spinner{animation-duration:1.6s !important;animation-iteration-count:infinite !important}
+}
+
+
+/* ===== states.css ===== */
+/* Interactive states.
+   Material 3 state layers: a translucent overlay of the *content* colour laid
+   over the container. The opacity carries the state, so one set of numbers
+   covers every component and no component invents its own hover colour.
+   Source: M3 state-layer spec as used by Compose (the Android app gets these
+   from the ripple/indication theme), plus the resolved web values in
+   apps/admin-web/src/index.css. */
+
+:root{
+  /* state layer opacities — the whole interaction system in five numbers */
+  --orderak-state-hover:0.08; /* @kind other */
+  --orderak-state-focus:0.10; /* @kind other */
+  --orderak-state-pressed:0.10; /* @kind other */
+  --orderak-state-dragged:0.16; /* @kind other */
+  --orderak-state-selected:0.12; /* @kind other */
+
+  /* disabled: opacity, never a different colour */
+  --orderak-disabled-content-opacity:0.38; /* @kind other */
+  --orderak-disabled-container-opacity:0.12; /* @kind other */
+  /* the web surfaces use a flat 0.5 on the whole control instead */
+  --orderak-disabled-opacity-web:0.5; /* @kind other */
+
+  /* focus ring. Always visible, never removed — outline, not a colour change,
+     so it reads on any container. */
+  --orderak-focus-ring-width:3px;
+  --orderak-focus-ring-offset:2px;
+  --orderak-focus-ring-color:rgba(30,58,138,.22);
+  --orderak-focus-ring:var(--orderak-focus-ring-width) solid var(--orderak-focus-ring-color); /* @kind other */
+  /* inner ring on a focused text field, paired with a --primary border */
+  --orderak-focus-field-ring:0 0 0 3px rgba(30,58,138,.12); /* @kind other */
+
+  /* resolved web hover values (admin surfaces) */
+  --orderak-hover-surface:#F0F3FA;        /* table row, list row */
+  --orderak-hover-border:#B8C0D4;         /* outlined control */
+  --orderak-hover-lift:translateY(-1px); /* @kind other */  /* paired with --orderak-shadow-raised */
+  --orderak-hover-tint:var(--orderak-primary-soft);
+
+  /* press. There is no press-shrink anywhere in Orderak: Compose ripple owns
+     press on the phone, and the web simply drops the hover lift. */
+  --orderak-pressed-lift:none; /* @kind other */
+}
+
+.orderak-dark{
+  --orderak-focus-ring-color:rgba(149,209,210,.34);
+  --orderak-focus-field-ring:0 0 0 3px rgba(149,209,210,.18); /* @kind other */
+  --orderak-hover-surface:#242B2C;
+  --orderak-hover-border:#6B7A7C;
+}
+
+/* Utility: a state layer you can drop on any container.
+   .ork-interactive gives hover/focus/press to a custom element without
+   hardcoding a second colour for each state. */
+.ork-interactive{position:relative;isolation:isolate}
+.ork-interactive::after{content:"";position:absolute;inset:0;border-radius:inherit;background:currentColor;opacity:0;pointer-events:none;transition:opacity var(--orderak-duration-short) var(--orderak-easing-standard)}
+.ork-interactive:hover::after{opacity:var(--orderak-state-hover)}
+.ork-interactive:focus-visible::after{opacity:var(--orderak-state-focus)}
+.ork-interactive:active::after{opacity:var(--orderak-state-pressed)}
+.ork-interactive[aria-selected="true"]::after,.ork-interactive[aria-pressed="true"]::after{opacity:var(--orderak-state-selected)}
+.ork-interactive:disabled,.ork-interactive[aria-disabled="true"]{opacity:var(--orderak-disabled-opacity-web);cursor:not-allowed}
+.ork-interactive:disabled::after,.ork-interactive[aria-disabled="true"]::after{opacity:0}
+
+/* Focus is never removed. This is the one rule with no exceptions. */
+:where(a,button,input,select,textarea,[tabindex]):focus-visible{outline:var(--orderak-focus-ring);outline-offset:var(--orderak-focus-ring-offset)}
+
+
+/* ===== layout.css ===== */
+/* Grid, breakpoints and responsive rules.
+   Orderak has three layout regimes and they do not share a grid, because they
+   do not share a device. Do not apply the admin grid to a phone surface.
+
+   1. Phone (seller app)   — one column, 16dp gutters, no grid.
+   2. Storefront (buyer)   — one 520px column, centred, 16px padding. Fixed.
+   3. Admin (staff)        — 268px rail + fluid content capped at 1560px.
+*/
+
+:root{
+  /* Breakpoints. Only three, and only the admin surface uses them —
+     the phone app has no breakpoints (it is one column at every size) and the
+     storefront's column is narrower than the smallest phone. */
+  --orderak-breakpoint-compact:600px; /* @kind other */   /* below: single column, drawer nav */
+  --orderak-breakpoint-medium:860px; /* @kind other */    /* below: sidebar collapses to overlay */
+  --orderak-breakpoint-expanded:1240px; /* @kind other */ /* above: full metric + two-panel grid */
+
+  /* Containers */
+  --orderak-container-storefront:520px; /* the buyer page. Never widen it. */
+  --orderak-container-admin:1560px;     /* admin content column cap */
+  --orderak-container-prose:760px;      /* description/guidance line length */
+  --orderak-container-phone:412px;      /* Compose reference frame width */
+
+  /* Structural fixed dimensions */
+  --orderak-sidebar-width:268px;
+  --orderak-topbar-height:64px;
+  --orderak-appbar-height:64px;
+  --orderak-navbar-height:80px;   /* phone bottom navigation */
+  --orderak-fab-inset:16px;
+
+  /* Gutters */
+  --orderak-gutter-phone:var(--orderak-space4);   /* 16 */
+  --orderak-gutter-storefront:var(--orderak-space4);
+  --orderak-gutter-admin:34px;                     /* index.css .page padding */
+  --orderak-page-padding-block:var(--orderak-space8); /* 32 */
+
+  /* Grid columns */
+  --orderak-grid-metric:repeat(4, minmax(0, 1fr)); /* @kind other */
+  --orderak-grid-panel:repeat(2, minmax(0, 1fr)); /* @kind other */
+  --orderak-grid-gap:14px;
+}
+
+/* Responsive rules, written once so no screen re-derives them. */
+.ork-page{width:min(var(--orderak-container-admin),100%);margin-inline:auto;padding:var(--orderak-page-padding-block) var(--orderak-gutter-admin) 70px}
+.ork-grid-metric{display:grid;grid-template-columns:var(--orderak-grid-metric);gap:var(--orderak-grid-gap)}
+.ork-grid-panel{display:grid;grid-template-columns:var(--orderak-grid-panel);gap:18px}
+
+@media (max-width:1240px){
+  .ork-grid-metric{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:860px){
+  /* The sidebar becomes an overlay drawer; the content column takes the width. */
+  .ork-grid-panel{grid-template-columns:1fr}
+  .ork-page{padding-inline:var(--orderak-space4)}
+}
+@media (max-width:600px){
+  .ork-grid-metric{grid-template-columns:1fr}
+}
+

@@ -22,6 +22,7 @@ import { handleConfigRoute, loadClientConfig } from "../platform/config/config";
 import { landingPageHtml } from "../landing";
 import { publicDesignSystemCss, publicDesignSystemResponse } from "../domains/admin/admin-theme";
 import { designSystemCss, designSystemFontPreload, loadActiveDesignSystem } from "../domains/design/design-system";
+import { createOrder } from "../domains/catalog/catalog";
 import { PUBLIC_SITE_URL } from "../domains/identity/identity";
 import { authSeller, logError, jsonResponse, methodNotAllowed, corsHeaders, allowedCorsOrigin, readCreds, checkRateLimit, recordDeviceMetadata, enforceRequestBodyLimit, type AuthenticatedSeller } from "../platform/http/shared";
 import { getPlanLimit } from "../domains/commerce/plan-limits";
@@ -613,6 +614,72 @@ async function handleApi(
 				console.error(JSON.stringify({ signal: "ai_request_failed", provider: "deepseek" }));
 				return jsonResponse({ error: "ai_temporarily_unavailable" }, 503, { "retry-after": String(retryAfter) });
 			}
+		}
+
+		// ---- Record an order the seller took outside the storefront ----
+		//
+		// Until this existed the app could read orders and change their status and
+		// could not create one, so an order the seller typed in was written to Room
+		// and stopped there: absent from the account, from a second device, from a
+		// reinstall, and from the monthly plan count. The seller read a
+		// confirmation and had a note on one phone.
+		//
+		// It shares createOrder() with the storefront rather than reimplementing
+		// it. Validation, the monthly limit and its concurrency race, the per-store
+		// order number and its retry, the mixed-currency refusal and the stock
+		// trigger are the same rules whoever is asking, and a second copy would be
+		// correct only until the first fix landed in one of them.
+		if (request.method === "POST" && url.pathname === "/api/v1/orders") {
+			const { phone, secret } = readCreds(request, url);
+			const store = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret);
+			if (!store) return jsonResponse({ error: "auth" }, 401);
+			let body: Record<string, unknown>;
+			try {
+				body = (await request.json()) as Record<string, unknown>;
+			} catch {
+				return jsonResponse({ error: "invalid" }, 400);
+			}
+
+			// Required here, unlike the storefront, which mints one when the browser
+			// sends none. The app records orders offline and posts them on the next
+			// sync, so a retry after a dropped response is the normal case rather
+			// than the exception — and a key generated per attempt would make every
+			// retry a new order. The client owns the key because only the client
+			// knows which attempts are the same order.
+			const idempotencyKey = String(body.idempotency_key ?? "").trim();
+			if (!/^[A-Za-z0-9._:-]{8,100}$/.test(idempotencyKey)) {
+				return jsonResponse({
+					error: "idempotency_key_required",
+					message: "Send idempotency_key: 8-100 characters of [A-Za-z0-9._:-]. Reuse it when retrying the same order.",
+				}, 400);
+			}
+
+			const result = await createOrder(env, store, {
+				idempotencyKey,
+				buyerPhone: String(body.buyer_phone ?? ""),
+				buyerName: String(body.buyer_name ?? "") || null,
+				items: ((body.items ?? []) as Record<string, unknown>[])
+					.map((item) => ({ product_code: String(item.product_code), qty: Number(item.qty) })),
+				payMethod: String(body.pay_method ?? "COD"),
+				note: String(body.note ?? "") || null,
+				origin: "manual",
+				// No per-IP limit: this is the account owner writing their own
+				// orders, where the monthly plan limit is the meaningful ceiling.
+				// Five a minute would only punish a seller catching up after a busy
+				// afternoon, which is the case this route exists to serve.
+				clientIp: null,
+				logContext: "seller_order_create",
+			});
+			if (!result.ok) return result.response;
+			// order_no, not the UUID: the app stores it as remoteId and addresses
+			// the status route by it, and it is the number the seller reads aloud.
+			return jsonResponse({
+				ok: true,
+				order_no: result.order.orderNo,
+				total_minor: result.order.totalMinor,
+				currency: result.order.currency,
+				replayed: result.order.replayed,
+			});
 		}
 
 		// ---- Pull new orders (from Android app) ----

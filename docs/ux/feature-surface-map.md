@@ -2,7 +2,7 @@
 status: current
 generated: true
 owner: product
-last_verified: 2026-08-28
+last_verified: 2026-09-05
 applies_to: [internal]
 ---
 # Feature → surface map
@@ -195,7 +195,7 @@ Until then `account` keeps its four groups and no L4 screen is built.
 | --- | --- | --- | --- |
 | `customers_crm.customer_list_and_order_history` | SCREEN | L1 | implemented |
 | `customers_crm.customer_search` | SECTION | L1 | planned |
-| `customers_crm.editable_customer_profiles` | SCREEN | L1 | implemented |
+| `customers_crm.editable_customer_profiles` | SCREEN | L1 | planned |
 | `customers_crm.customer_notes_and_tags` | SECTION | L2 | planned |
 | `customers_crm.customer_segments` | SCREEN | L3 | planned |
 | `customers_crm.customer_status` | FIELD | L2 | planned |
@@ -241,7 +241,7 @@ Until then `account` keeps its four groups and no L4 screen is built.
 | `max_concurrent_devices` | SECTION | L1 | implemented |
 | `max_warehouses` | SECTION | L4 | planned |
 | `orders_fulfilment.shipping_integrations` | SCREEN | L3 | planned |
-| `payments_finance.instapay_vodafone_cash_instructions` | SECTION | L1 | planned |
+| `payments_finance.instapay_vodafone_cash_instructions` | SECTION | L1 | implemented |
 | `payments_finance.digital_wallet_integration` | SCREEN | L4 | planned |
 | `payments_finance.payment_gateway` | SCREEN | L4 | planned |
 | `payments_finance.settlement_and_reconciliation` | SCREEN | L4 | planned |
