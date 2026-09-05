@@ -98,6 +98,13 @@ jobs:
       - name: Verify screen contracts
         run: node tooling/ux/verify-screen-contracts.mjs
 
+      # The verifier decides whether the product's claims about itself are
+      # true, and for a year nothing decided whether the verifier was. It
+      # passed a feature whose screen has no edit control. Its own tests run
+      # first so a broken guard fails as a broken guard, not as a green tick.
+      - name: Test the implementation audit
+        run: node --test tooling/ux/implementation-audit.test.mjs
+
       - name: Verify implementation status against the code
         run: node tooling/ux/verify-implementation-status.mjs
 

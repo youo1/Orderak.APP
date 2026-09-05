@@ -146,6 +146,12 @@ fun OrderCard(o: OrderEntity, onClick: () -> Unit) {
                 )
                 Spacer(Modifier.height(4.dp))
                 StatusChip(status)
+                // An order the server has never seen sits in this list beside
+                // ones it has, and nothing else on the row tells them apart.
+                if (o.livesOnlyOnThisPhone) {
+                    Spacer(Modifier.height(4.dp))
+                    LocalOnlyOrderChip()
+                }
             }
         },
     )

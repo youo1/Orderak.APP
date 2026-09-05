@@ -414,12 +414,31 @@ Request:
 {
   "phone": "01012345678",
   "secret": "device-uuid-secret",
+  "baseline_version": 7,
   "products": [
-    { "app_id": 1, "name": "Pizza", "price": { "amount_minor": 15000, "currency": "EGP" }, "stock": 10, "available": true, "stock_dirty": true, "expected_stock_version": 4 },
-    { "app_id": 2, "name": "Burger", "price": { "amount_minor": 8000, "currency": "EGP" }, "stock": 5, "available": true, "stock_dirty": false, "expected_stock_version": 9 }
+    { "app_id": 1, "remote_uuid": "018f-pizza", "name": "Pizza", "price": { "amount_minor": 15000, "currency": "EGP" }, "stock": 10, "available": true, "stock_dirty": true, "expected_stock_version": 4 },
+    { "app_id": 2, "remote_uuid": null, "name": "Burger", "price": { "amount_minor": 8000, "currency": "EGP" }, "stock": 5, "available": true, "stock_dirty": false, "expected_stock_version": 9 }
   ]
 }
 ```
+
+A product is identified by `remote_uuid`, the id this endpoint returned when it
+first accepted the product. Send it on every later push; send `null` (or omit
+it) only for a product that has never synced, as Burger does above.
+
+`app_id` is the client's own row id, and it is not an identity: two phones
+signed into one store both number their products 1, 2, 3…, so matching a push on
+it filed the second phone's product as an edit of the first phone's and
+overwrote it. It survives for two things — the reply echoes it back so a device
+can find the local row each entry describes, and a product carrying no
+`remote_uuid` is matched by it when no other row in the request has already
+claimed that product, which is what keeps an app built before this change
+working.
+
+`baseline_version` is the `catalog_version` this device last downloaded from
+`GET /api/v1/products`. Any push that modifies or deletes an existing product
+must send it, and a value that no longer matches the store is refused with
+`409 stale_catalog`.
 
 `image_url` must be a public URL returned by `POST /api/v1/media/upload`, not a
 local device path. The app uploads each product image once, caches the returned
@@ -444,11 +463,17 @@ Response:
   "ok": true,
   "count": 2,
   "products": [
-    { "app_id": 1, "product_code": "p-H72LP9", "remote_uuid": "…", "stock": 10, "stock_version": 5, "category_code": null },
-    { "app_id": 2, "product_code": "p-K91QD2", "remote_uuid": "…", "stock": 5, "stock_version": 9, "category_code": "c-A82KD9" }
+    { "app_id": 1, "product_code": "p-H72LP9", "remote_uuid": "018f-pizza", "stock": 10, "stock_version": 5, "category_code": null },
+    { "app_id": 2, "product_code": "p-K91QD2", "remote_uuid": "018f-burger", "stock": 5, "stock_version": 9, "category_code": "c-A82KD9" }
   ]
 }
 ```
+
+The reply holds one entry per **submitted** product, keyed by the `app_id` it
+was sent with — never the rest of the store, whose `app_id` values belong to
+other devices and collide with the caller's own row ids. Persist each
+`remote_uuid`: sending it next time is what stops another device's product from
+being filed as an edit of this one.
 
 Products not included in the list are **deleted** from the server (mirror sync).
 

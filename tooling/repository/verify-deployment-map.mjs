@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { stripJsonComments } from "../lib/jsonc.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..", "..");
@@ -21,39 +22,6 @@ const requireText = (relative, expected) => {
     if (!source.includes(value)) fail(`${relative} is missing: ${value}`);
   }
 };
-
-function stripJsonComments(source) {
-  let output = "";
-  let inString = false;
-  let escaped = false;
-  let lineComment = false;
-  let blockComment = false;
-  for (let index = 0; index < source.length; index += 1) {
-    const current = source[index];
-    const next = source[index + 1];
-    if (lineComment) {
-      if (current === "\n") { lineComment = false; output += current; }
-      continue;
-    }
-    if (blockComment) {
-      if (current === "*" && next === "/") { blockComment = false; index += 1; }
-      else if (current === "\n") output += current;
-      continue;
-    }
-    if (inString) {
-      output += current;
-      if (escaped) escaped = false;
-      else if (current === "\\") escaped = true;
-      else if (current === '"') inString = false;
-      continue;
-    }
-    if (current === '"') { inString = true; output += current; continue; }
-    if (current === "/" && next === "/") { lineComment = true; index += 1; continue; }
-    if (current === "/" && next === "*") { blockComment = true; index += 1; continue; }
-    output += current;
-  }
-  return output;
-}
 
 const loadJsonc = (relative) => JSON.parse(stripJsonComments(read(relative)));
 const values = (items, key) => (items ?? []).map((item) => item[key]);
@@ -205,7 +173,20 @@ for (const [relative, expectedServers] of Object.entries(serverExpectations)) {
 // NEW and a reinstall replayed work the seller had already done. Cancelling was
 // worse — placing an order takes stock through a trigger, and the Room-only
 // restore meant every cancellation leaked it.
-if (operationCount !== 247) fail(`OpenAPI operation inventory changed: expected 247, found ${operationCount}.`);
+// Raised to 249 on 2026-09-05 for the two phone-change routes. Unlike the raises
+// above, no route was added: POST /api/v1/auth/phone-change/challenges and
+// .../complete have been live and enabled in both environments for months. The
+// route scanner could not read `if (url.pathname !== X)`, so it never discovered
+// them, they never appeared in `route_without_spec`, and coverage reported 100%
+// over a surface that was missing them. The scanner now fails closed instead of
+// skipping what it cannot read, which is what made these two visible.
+// Raised to 250 on 2026-09-05 for POST /api/v1/orders. The app could read
+// orders and change their status and could not create one, so an order the
+// seller took in a conversation was written to Room and stopped there: absent
+// from the account, from a second device, from a reinstall, and from the
+// monthly plan count. The seller read a confirmation and had a note on one
+// phone. Unlike the phone-change raise above, this route is genuinely new.
+if (operationCount !== 250) fail(`OpenAPI operation inventory changed: expected 250, found ${operationCount}.`);
 const seller = JSON.parse(read("contracts/openapi/src/seller-v1.json"));
 for (const [route, pathItem] of Object.entries(seller.paths)) {
   for (const method of ["get", "post", "put", "patch", "delete"]) {

@@ -17,6 +17,9 @@
 //      `status: current` claiming it. Two claimants is a contradiction; zero
 //      claimants is an unowned subject someone will assume is covered.
 //   3. Frontmatter, where present, uses only known fields and values.
+//   4. A `status: current` document carrying a `last_verified` date must have
+//      checked it within MAX_VERIFIED_AGE_DAYS. See that constant for what this
+//      catches and, more importantly, what it does not.
 //
 // WHAT THIS DELIBERATELY DOES NOT DO
 //   It does not require frontmatter on every document. A mechanically
@@ -38,11 +41,52 @@ const docsRoot = path.join(repositoryRoot, "docs");
 const registryPath = path.join(docsRoot, "governance", "subject-registry.json");
 
 const STATUS_VALUES = ["current", "draft", "superseded", "archived"];
+
+/**
+ * How long a `last_verified` date may stand before the claim goes back to being
+ * unverified.
+ *
+ * WHY 120 DAYS
+ *   The oldest dated document in the corpus is 48 days old and the median is 15,
+ *   so this fails nothing today and is not a deadline anyone is racing. That is
+ *   deliberate. A short threshold does not buy accuracy — it buys a bulk commit
+ *   that bumps every date to today, which is the same failure with fresher
+ *   numbers on it. A third of a year is long enough that re-verifying is real
+ *   work someone actually does, and short enough that a document cannot be
+ *   quietly wrong for a year while wearing "current".
+ *
+ * WHAT THIS CATCHES, AND WHAT IT DOES NOT
+ *   It catches rot: a document that was true, was verified, and drifted while
+ *   nobody looked.
+ *
+ *   It would NOT have caught docs/status.md, which is the document that prompted
+ *   it. That page said the system was "Deployed: **Nowhere**" while the README
+ *   said production since 2026-08-16, and its date was fifteen days old. It was
+ *   not stale. It was a point-in-time record of one workstream, published in the
+ *   navigation as "Status", and read as a statement about the product. No date
+ *   check finds that; archiving it did. Recorded here so the next person does
+ *   not assume this guard covers more than it does.
+ */
+const MAX_VERIFIED_AGE_DAYS = 120;
 const OWNER_VALUES = ["backend", "android", "admin", "security", "product", "legal", "governance"];
 const APPLIES_TO_VALUES = ["production", "staging", "internal"];
 const KNOWN_FIELDS = ["status", "generated", "owner", "last_verified", "applies_to", "authoritative_for"];
 
 const problems = [];
+
+/**
+ * Whole days between a YYYY-MM-DD date and today, or null when the string is
+ * well-formed but not a real date — 2026-02-30 passes the format check and is
+ * not a day that exists.
+ */
+function ageInDays(iso) {
+	const [year, month, day] = iso.split("-").map(Number);
+	const then = new Date(Date.UTC(year, month - 1, day));
+	if (then.getUTCFullYear() !== year || then.getUTCMonth() !== month - 1 || then.getUTCDate() !== day) return null;
+	const today = new Date();
+	const now = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+	return Math.floor((now - then.getTime()) / 86_400_000);
+}
 
 /**
  * Minimal YAML frontmatter reader. Deliberately not a YAML dependency: the
@@ -161,6 +205,17 @@ for (const file of markdownFiles(docsRoot)) {
 	}
 	if (fields.last_verified !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(fields.last_verified)) {
 		problems.push(`${relative(file)}: last_verified must be YYYY-MM-DD, found "${fields.last_verified}"`);
+	} else if (fields.last_verified !== undefined && fields.status === "current") {
+		const age = ageInDays(fields.last_verified);
+		if (age === null) {
+			problems.push(`${relative(file)}: last_verified "${fields.last_verified}" is not a real date`);
+		} else if (age > MAX_VERIFIED_AGE_DAYS) {
+			problems.push(
+				`${relative(file)}: marked current but last verified ${age} days ago (limit ${MAX_VERIFIED_AGE_DAYS}) — ` +
+					"check it against the implementation and move the date, or change status to draft or superseded. " +
+					"Moving the date without re-reading it is the one thing this cannot detect and the only thing that breaks it",
+			);
+		}
 	}
 	for (const environment of fields.applies_to ?? []) {
 		if (!APPLIES_TO_VALUES.includes(environment)) {

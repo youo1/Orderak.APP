@@ -86,6 +86,19 @@ data class OrderEntity(
     val totalMinor: Long,
     val currency: String = "EGP",
     val note: String? = null,
+    /**
+     * The key this order is posted under, stable across every retry.
+     *
+     * Set when the seller records the order and never changed, so a retry after
+     * a dropped response returns the order already written instead of creating a
+     * second one. Null for orders pulled from the server: those were created
+     * elsewhere and are already on the account.
+     *
+     * There is no separate sync-state column. `remoteId` already answers the
+     * only question anyone asks — is this order on the account — and a second
+     * field meaning the same thing is a second field to keep in step.
+     */
+    val idempotencyKey: String? = null,
     val createdAt: Long = System.currentTimeMillis()
 )
 
