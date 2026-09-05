@@ -255,3 +255,203 @@ describe("order status transitions", () => {
 		expect(response.status).toBe(401);
 	});
 });
+
+/**
+ * Orders the seller records by hand.
+ *
+ * Until POST /api/v1/orders existed, these were written to Room and posted
+ * nowhere: absent from the account, from a second device, from a reinstall and
+ * from the monthly plan count. The route shares createOrder() with the
+ * storefront, so what is worth testing here is that sharing it did not lose
+ * anything — the limit, the idempotency, the stock movement and the isolation
+ * all have to hold for this caller too.
+ */
+describe("POST /api/v1/orders", () => {
+	beforeEach(createSchema);
+
+	const key = (suffix: string) => `manual-order-${suffix}`;
+
+	async function seed(r: Registered, appId = 1, stock = 10): Promise<string> {
+		const res = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST",
+			headers: authHeaders(r),
+			body: JSON.stringify({
+				products: [{
+					app_id: appId, name: "Cola", price: { amount_minor: 1500, currency: "EGP" },
+					stock, available: true,
+				}],
+			}),
+		});
+		return ((await res.json()) as { products: { product_code: string }[] }).products[0].product_code;
+	}
+
+	async function create(r: Registered, body: Record<string, unknown>): Promise<Response> {
+		return SELF.fetch(`${BASE}/api/v1/orders`, {
+			method: "POST", headers: authHeaders(r), body: JSON.stringify(body),
+		});
+	}
+
+	it("writes the order to the account and allocates the next order number", async () => {
+		const r = await registerStore();
+		const code = await seed(r);
+		const res = await create(r, {
+			idempotency_key: key("first"),
+			buyer_phone: "01000000000",
+			buyer_name: "Walk-in",
+			items: [{ product_code: code, qty: 2 }],
+			pay_method: "COD",
+		});
+		expect(res.status).toBe(200);
+		expect(await res.json()).toMatchObject({ ok: true, order_no: 1, total_minor: 3000, currency: "EGP" });
+
+		// The proof that matters: it is readable from the account, which is what
+		// a second device does on its next sync.
+		const pulled = (await (await SELF.fetch(`${BASE}/api/v1/orders?since=0`, { headers: authHeaders(r) })).json()) as {
+			orders: { order_no: number; buyer_name: string }[];
+		};
+		expect(pulled.orders).toHaveLength(1);
+		expect(pulled.orders[0]).toMatchObject({ order_no: 1, buyer_name: "Walk-in" });
+	});
+
+	it("records where the order came from", async () => {
+		const r = await registerStore();
+		const code = await seed(r);
+		await create(r, {
+			idempotency_key: key("origin"), buyer_phone: "01000000000",
+			items: [{ product_code: code, qty: 1 }],
+		});
+		const seller = await env.orderak_db.prepare("SELECT id FROM sellers WHERE phone=?").bind(r.phone).first<{ id: string }>();
+		const row = await env.orderak_db.prepare("SELECT origin FROM orders WHERE store_id=?").bind(seller!.id).first<{ origin: string }>();
+		expect(row?.origin).toBe("manual");
+	});
+
+	it("moves stock exactly once", async () => {
+		const r = await registerStore();
+		const code = await seed(r, 1, 10);
+		await create(r, {
+			idempotency_key: key("stock"), buyer_phone: "01000000000",
+			items: [{ product_code: code, qty: 3 }],
+		});
+		const seller = await env.orderak_db.prepare("SELECT id FROM sellers WHERE phone=?").bind(r.phone).first<{ id: string }>();
+		const product = await env.orderak_db.prepare("SELECT stock FROM products WHERE store_id=? AND product_code=?")
+			.bind(seller!.id, code).first<{ stock: number }>();
+		expect(product?.stock).toBe(7);
+	});
+
+	it("returns the existing order when the same key is sent twice", async () => {
+		const r = await registerStore();
+		const code = await seed(r);
+		const body = {
+			idempotency_key: key("replay"), buyer_phone: "01000000000",
+			items: [{ product_code: code, qty: 1 }],
+		};
+		const first = (await (await create(r, body)).json()) as { order_no: number };
+		const second = await create(r, body);
+		expect(second.status).toBe(200);
+		expect(await second.json()).toMatchObject({ order_no: first.order_no, replayed: true });
+
+		const seller = await env.orderak_db.prepare("SELECT id FROM sellers WHERE phone=?").bind(r.phone).first<{ id: string }>();
+		const count = await env.orderak_db.prepare("SELECT COUNT(*) AS c FROM orders WHERE store_id=?")
+			.bind(seller!.id).first<{ c: number }>();
+		expect(count?.c).toBe(1);
+
+		// A replay must not take stock a second time. This is the assertion that
+		// makes the retry safe, and the reason the client owns the key.
+		const product = await env.orderak_db.prepare("SELECT stock FROM products WHERE store_id=? AND product_code=?")
+			.bind(seller!.id, code).first<{ stock: number }>();
+		expect(product?.stock).toBe(9);
+	});
+
+	it("requires an idempotency key rather than inventing one", async () => {
+		// The storefront mints a key when a browser sends none. Doing that here
+		// would turn every retry of a queued offline order into a new order.
+		const r = await registerStore();
+		const code = await seed(r);
+		const res = await create(r, { buyer_phone: "01000000000", items: [{ product_code: code, qty: 1 }] });
+		expect(res.status).toBe(400);
+		expect(await res.json()).toMatchObject({ code: "idempotency_key_required" });
+	});
+
+	it("counts against the monthly limit and refuses at it", async () => {
+		const r = await registerStore();
+		const code = await seed(r, 1, 50);
+		const seller = await env.orderak_db.prepare("SELECT id FROM sellers WHERE phone=?").bind(r.phone).first<{ id: string }>();
+		await env.orderak_db.batch([
+			env.orderak_db.prepare("INSERT INTO plans(id,name,active,max_orders_per_month) VALUES('two','Two',1,2)"),
+			env.orderak_db.prepare("INSERT INTO subscriptions(seller_id,plan_id,status) VALUES(?,'two','active')").bind(seller!.id),
+		]);
+		for (const n of [1, 2]) {
+			const res = await create(r, {
+				idempotency_key: key(`limit-${n}`), buyer_phone: "01000000000",
+				items: [{ product_code: code, qty: 1 }],
+			});
+			expect(res.status).toBe(200);
+		}
+		const refused = await create(r, {
+			idempotency_key: key("limit-3"), buyer_phone: "01000000000",
+			items: [{ product_code: code, qty: 1 }],
+		});
+		expect(refused.status).toBe(409);
+		expect(await refused.json()).toMatchObject({ code: "plan_limit_reached", limit: 2 });
+	});
+
+	it("refuses a product belonging to another store", async () => {
+		const mine = await registerStore();
+		const theirs = await registerStore({ store_name: "Other Shop" });
+		const theirCode = await seed(theirs);
+		const res = await create(mine, {
+			idempotency_key: key("cross-store"), buyer_phone: "01000000000",
+			items: [{ product_code: theirCode, qty: 1 }],
+		});
+		expect(res.status).toBe(400);
+		expect(await res.json()).toMatchObject({ code: "products" });
+	});
+
+	it("leaves no order behind when the stock claim fails", async () => {
+		// The order header and every line are one D1 batch, and the stock trigger
+		// aborts the insert when a line asks for more than exists. If the batch
+		// were not atomic this would leave a header with no items, or items that
+		// took stock for an order nobody can see.
+		const r = await registerStore();
+		const code = await seed(r, 1, 2);
+		const res = await create(r, {
+			idempotency_key: key("oversell"), buyer_phone: "01000000000",
+			items: [{ product_code: code, qty: 5 }],
+		});
+		expect(res.status).toBe(409);
+
+		const seller = await env.orderak_db.prepare("SELECT id FROM sellers WHERE phone=?").bind(r.phone).first<{ id: string }>();
+		const orders = await env.orderak_db.prepare("SELECT COUNT(*) AS c FROM orders WHERE store_id=?")
+			.bind(seller!.id).first<{ c: number }>();
+		expect(orders?.c).toBe(0);
+		const product = await env.orderak_db.prepare("SELECT stock FROM products WHERE store_id=? AND product_code=?")
+			.bind(seller!.id, code).first<{ stock: number }>();
+		expect(product?.stock).toBe(2);
+	});
+
+	it("requires authentication", async () => {
+		const res = await SELF.fetch(`${BASE}/api/v1/orders`, {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ idempotency_key: key("noauth"), buyer_phone: "01000000000", items: [] }),
+		});
+		expect(res.status).toBe(401);
+	});
+
+	it("can be advanced through its pipeline like any other order", async () => {
+		// The point of writing it to the server: the status route addresses orders
+		// by order_no, and a manual order now has one.
+		const r = await registerStore();
+		const code = await seed(r);
+		const created = (await (await create(r, {
+			idempotency_key: key("status"), buyer_phone: "01000000000",
+			items: [{ product_code: code, qty: 1 }],
+		})).json()) as { order_no: number };
+
+		const advanced = await SELF.fetch(`${BASE}/api/v1/orders/${created.order_no}/status`, {
+			method: "PATCH", headers: authHeaders(r), body: JSON.stringify({ status: "CONFIRMED" }),
+		});
+		expect(advanced.status).toBe(200);
+		expect(await advanced.json()).toMatchObject({ status: "CONFIRMED" });
+	});
+});

@@ -462,10 +462,8 @@
     <string name="plan_notice_title">Needs your attention</string>
     <string name="order_stock_error_body">Reduce the quantity or remove the item, then try again.</string>
     <string name="subscription_verification_error_body">Your plan is unchanged. Try again, or reach support if it keeps failing.</string>
-    <!-- Manual orders live on this phone only until the server accepts them. Deleted with work item 05. -->
-    <string name="order_local_only_chip">On this phone</string>
-    <string name="order_local_only_title">Not saved to your account</string>
-    <string name="order_local_only_message">This order is on this phone only. It will not appear if you sign in on another device, and it will not survive reinstalling the app. Orders that come from your store link are saved to your account.</string>
-    <string name="order_new_local_only_title">Saved on this phone only</string>
-    <string name="order_new_local_only_message">Orders you record here stay on this phone for now. They are not added to your account and will not appear on another device.</string>
+    <!-- An order is on this phone until the server accepts it. Usually a moment; offline, until the next sync. -->
+    <string name="order_local_only_chip">Not sent yet</string>
+    <string name="order_local_only_title">Waiting to reach your account</string>
+    <string name="order_local_only_message">This order is saved on this phone and has not reached your account yet. It is sent automatically on the next sync. Until then it will not appear on another device, and it cannot be moved along its pipeline.</string>
 </resources>

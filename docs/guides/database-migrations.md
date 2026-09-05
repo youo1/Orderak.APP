@@ -95,6 +95,7 @@ trigger's final semicolon when replaying a fresh remote D1 database.
 - [048_app_screen_surface_and_transitions.sql](#048_app_screen_surface_and_transitionssql)
 - [049_delete_settings_route.sql](#049_delete_settings_routesql)
 - [050_catalog_baseline_version.sql](#050_catalog_baseline_versionsql)
+- [051_manual_order_origin.sql](#051_manual_order_originsql)
 
 ## 001_init.sql
 
@@ -575,3 +576,14 @@ trigger's final semicolon when replaying a fresh remote D1 database.
 - `POST /api/v1/products/sync` is a full mirror: whatever the payload omits is deleted. That makes absence indistinguishable from intent, and two devices sent identical requests for opposite reasons. A phone with an empty database sent the same body as a seller who had deleted their last product, so signing in on a second phone deleted the account's catalogue and answered 200.
 - The second case was quieter and had no audit trail at all. Only `stock` was compare-and-set against `stock_version`; name, price, description, availability, image and category were unconditional last-write-wins. A phone that had been offline since Tuesday reverted every edit made from another device since Tuesday, and deleted every product created since - and `catalog.mirror_emptied` did not fire, because it only records a total wipe.
 - Per-product stock revisions cannot answer this. They establish whether one product's stock has moved; the question here is whether this device has seen the catalogue as it currently stands, which is a property of the store. A purely additive push still needs no baseline: a device that only adds products it invented cannot destroy what it has never seen.
+
+## 051_manual_order_origin.sql
+
+**Source:** `services/backend/migrations/051_manual_order_origin.sql`
+
+### What it does
+
+- Adds `orders.origin` - `storefront` or `manual` - and an index on (store_id, origin, created_at). Ships with `POST /api/v1/orders`, the route that lets the app record an order the seller took outside the storefront.
+- Until that route existed the app could read orders and change their status, and could not create one. So an order the seller typed in went into Room and stopped there: absent from the account, from a second device, from a reinstall, and from the monthly plan count. The seller read a confirmation and had a note on one phone.
+- The default is `storefront` because every row that exists when this runs came from the storefront - nothing else could have written one. That is a statement about the existing data rather than a guess, and it is why no backfill is needed.
+- Once both paths write here, `how did this order get in` stops being answerable by inference. Two things need the answer: stock movement has to be attributable to a cause, and any reporting has to separate a channel the buyer drove from one the seller did.

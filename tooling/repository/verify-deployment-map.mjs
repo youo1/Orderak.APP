@@ -180,7 +180,13 @@ for (const [relative, expectedServers] of Object.entries(serverExpectations)) {
 // them, they never appeared in `route_without_spec`, and coverage reported 100%
 // over a surface that was missing them. The scanner now fails closed instead of
 // skipping what it cannot read, which is what made these two visible.
-if (operationCount !== 249) fail(`OpenAPI operation inventory changed: expected 249, found ${operationCount}.`);
+// Raised to 250 on 2026-09-05 for POST /api/v1/orders. The app could read
+// orders and change their status and could not create one, so an order the
+// seller took in a conversation was written to Room and stopped there: absent
+// from the account, from a second device, from a reinstall, and from the
+// monthly plan count. The seller read a confirmation and had a note on one
+// phone. Unlike the phone-change raise above, this route is genuinely new.
+if (operationCount !== 250) fail(`OpenAPI operation inventory changed: expected 250, found ${operationCount}.`);
 const seller = JSON.parse(read("contracts/openapi/src/seller-v1.json"));
 for (const [route, pathItem] of Object.entries(seller.paths)) {
   for (const method of ["get", "post", "put", "patch", "delete"]) {

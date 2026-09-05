@@ -1,0 +1,34 @@
+-- Where an order came from: the storefront, or the seller typing it in.
+--
+-- WHY THIS EXISTS
+--   Until now every order in this table arrived the same way — a buyer submitted
+--   the public storefront form — because that is the only path that could write
+--   one. The app could read orders and change their status, and it could not
+--   create one: there was no POST /api/v1/orders at all.
+--
+--   So an order the seller recorded by hand went into Room and stopped there. It
+--   was absent from the account, from a second device, from a reinstall, and
+--   from the monthly plan count. The seller read a confirmation and had a note
+--   on one phone.
+--
+--   This migration ships with the route that fixes it. Once both paths write
+--   here, "how did this order get in" stops being answerable by inference, and
+--   two things need the answer: stock movement has to be attributable to a cause
+--   (work item 06), and any future reporting has to separate a channel the buyer
+--   drove from one the seller did.
+--
+-- WHY THE DEFAULT IS storefront
+--   Every row that exists when this runs came from the storefront, because
+--   nothing else could have written it. The default is a statement of fact about
+--   the existing data, not a guess — and it is the reason no backfill is needed.
+--
+-- SAFE UNDER THE PREVIOUS RELEASE
+--   Additive with a default, and nothing reads it until the Worker shipping with
+--   this migration is deployed. Migrations apply before Workers, so the release
+--   serving traffic in between inserts orders without naming the column and gets
+--   'storefront', which is exactly what those orders are.
+ALTER TABLE orders ADD COLUMN origin TEXT NOT NULL DEFAULT 'storefront';
+
+-- Reporting and the stock reconciliation both ask "which orders came from where,
+-- in this period". Without this they scan the store's whole history.
+CREATE INDEX IF NOT EXISTS idx_orders_store_origin ON orders(store_id, origin, created_at);

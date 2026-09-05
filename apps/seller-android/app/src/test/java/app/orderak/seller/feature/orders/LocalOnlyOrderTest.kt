@@ -39,14 +39,24 @@ class LocalOnlyOrderTest {
     }
 
     @Test
-    fun `the marker clears itself once orders are posted, without touching this code`() {
-        // Work item 05 posts manual orders and reconciles the server's answer,
-        // which sets remoteId. Nothing in the UI needs changing for the marker to
-        // disappear — this file is meant to be deleted, not maintained, and this
-        // test is what says so.
-        val beforeItem05 = order(remoteId = null)
-        val afterItem05 = beforeItem05.copy(remoteId = 1001)
-        assertTrue(beforeItem05.livesOnlyOnThisPhone)
-        assertFalse(afterItem05.livesOnlyOnThisPhone)
+    fun `the marker clears itself the moment the server accepts the order`() {
+        // OrderRepository.pushOrder writes the returned order number into
+        // remoteId, and nothing else has to happen for the chip, the banner and
+        // the disabled status controls to resolve. The marker owns no state of
+        // its own, which is why it cannot get stuck showing the wrong thing.
+        val beforePost = order(remoteId = null)
+        val afterPost = beforePost.copy(remoteId = 1001)
+        assertTrue(beforePost.livesOnlyOnThisPhone)
+        assertFalse(afterPost.livesOnlyOnThisPhone)
+    }
+
+    @Test
+    fun `an order that failed to post is still marked, and still has its key`() {
+        // The retry path: SyncRepository.pushPendingOrders finds it by
+        // remoteId IS NULL AND idempotencyKey IS NOT NULL, and the key is what
+        // makes the retry return the same order rather than a second one.
+        val queued = order(remoteId = null).copy(idempotencyKey = "b8f1-0000")
+        assertTrue(queued.livesOnlyOnThisPhone)
+        assertTrue(queued.idempotencyKey != null)
     }
 }

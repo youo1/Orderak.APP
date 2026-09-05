@@ -421,39 +421,94 @@ ${inStock ? orderForm(store, lang, productCurrency) : ""}
 // POST /{public_identifier} — buyers submit an order. Items are referenced by
 // public product_code; the server resolves them within this store only.
 
-export async function handleCatalogOrder(request: Request, env: Env, store: Store): Promise<Response> {
+/**
+ * Everything it takes to write an order, with no HTTP in it.
+ *
+ * WHY THIS IS A FUNCTION AND NOT A HANDLER
+ *   Two callers create orders now: the public storefront form, and the seller
+ *   recording one they took in a conversation. They validate the same way, count
+ *   against the same monthly limit, allocate from the same per-store order
+ *   number sequence, and move stock through the same trigger — and one of them
+ *   is unauthenticated while the other is the account owner.
+ *
+ *   Duplicating that would mean two implementations of the quota race, the
+ *   order-number retry and the mixed-currency refusal, and the copy would be
+ *   correct exactly until the first fix landed in one of them. So the rules live
+ *   here once and the HTTP shells stay thin.
+ *
+ * WHY FAILURES CARRY A RESPONSE AND SUCCESS DOES NOT
+ *   The failure contract is genuinely shared: a seller hitting the monthly limit
+ *   should read the same payload a buyer does, because it is the same limit and
+ *   the client already knows how to render it. Rebuilding those bodies per
+ *   caller would be the drift this extraction exists to prevent.
+ *
+ *   Success is not shared. The storefront answers with the payment details a
+ *   buyer needs; the app needs the order it must reconcile its local copy to. So
+ *   the success branch returns data and each caller shapes its own reply.
+ */
+export interface CreateOrderInput {
+	idempotencyKey: string;
+	/** Raw as supplied; non-digits are stripped here so both callers agree. */
+	buyerPhone: string;
+	buyerName: string | null;
+	items: { product_code: string; qty: number }[];
+	payMethod: string;
+	note: string | null;
+	origin: "storefront" | "manual";
+	/**
+	 * null skips the per-IP rate limit.
+	 *
+	 * The storefront is public and unauthenticated: without a limit one client
+	 * can zero a store's inventory and flood the seller's app. The seller path is
+	 * the account owner writing their own orders, where the monthly plan limit is
+	 * the meaningful ceiling and a five-per-minute cap would only punish someone
+	 * catching up on a busy afternoon.
+	 */
+	clientIp: string | null;
+	logContext: string;
+}
+
+export interface CreatedOrder {
+	orderId: string;
+	orderNo: number;
+	totalMinor: number;
+	currency: string;
+	/** True when this key had already been used and no new order was written. */
+	replayed: boolean;
+}
+
+export type CreateOrderResult =
+	| { ok: true; order: CreatedOrder }
+	| { ok: false; response: Response };
+
+export async function createOrder(env: Env, store: Store, input: CreateOrderInput): Promise<CreateOrderResult> {
+	const fail = (response: Response): CreateOrderResult => ({ ok: false, response });
 	let quotaReservationId: string | null = null;
 	try {
 		const tenant = await resolveTenantContextForStore(env, String(store.id));
 		requireTenantWrite(tenant);
 		const db = tenant.db;
 		if (!(await storeCapabilityEnabled(env, String(store.id), "orders.accepting", true))) {
-			return jsonResponse({ error: "orders_disabled" }, 403);
+			return fail(jsonResponse({ error: "orders_disabled" }, 403));
 		}
-		const rawIdempotencyKey = request.headers.get("idempotency-key")?.trim() ?? "";
-		const idempotencyKey = /^[A-Za-z0-9._:-]{8,100}$/.test(rawIdempotencyKey)
-			? rawIdempotencyKey : crypto.randomUUID();
-		const successResponse = (order: { order_no: number; total_minor: number }): Response => jsonResponse({
-			ok: true,
-			order_no: order.order_no,
-			total_minor: order.total_minor,
-			contact_phone: store.whatsapp || store.phone,
-			instapay: store.instapay,
-			vfcash: store.vfcash,
-		});
-		const existingOrder = async (): Promise<{ order_no: number; total_minor: number } | null> =>
-			db.prepare(
-				"SELECT order_no,total_minor FROM orders WHERE store_id=? AND idempotency_key=?",
-			).bind(store.id, idempotencyKey).first<{ order_no: number; total_minor: number }>();
+		const idempotencyKey = input.idempotencyKey;
+		const existingOrder = async (): Promise<CreatedOrder | null> => {
+			const row = await db.prepare(
+				"SELECT id,order_no,total_minor,currency FROM orders WHERE store_id=? AND idempotency_key=?",
+			).bind(store.id, idempotencyKey).first<{ id: string; order_no: number; total_minor: number; currency: string }>();
+			return row
+				? {
+					orderId: String(row.id), orderNo: Number(row.order_no), totalMinor: Number(row.total_minor),
+					currency: String(row.currency || DEFAULT_CURRENCY), replayed: true,
+				}
+				: null;
+		};
 		const replay = await existingOrder();
-		if (replay) return successResponse(replay);
+		if (replay) return { ok: true, order: replay };
 
-		// Public, unauthenticated endpoint that writes orders and decrements
-		// stock — without a rate limit one client can zero a store's inventory
-		// and flood the seller's app. 5 orders / minute per IP per store.
-		const ip = request.headers.get("cf-connecting-ip") ?? "noip";
-		if (!(await checkRateLimit(env, `order:${store.id}:${ip}`, 5, 60))) {
-			return jsonResponse({ error: "rate_limited" }, 429);
+		if (input.clientIp !== null
+			&& !(await checkRateLimit(env, `order:${store.id}:${input.clientIp}`, 5, 60))) {
+			return fail(jsonResponse({ error: "rate_limited" }, 429));
 		}
 
 		// The month boundary is UTC. Stores are in Africa/Cairo, so an order placed
@@ -469,13 +524,13 @@ export async function handleCatalogOrder(request: Request, env: Env, store: Stor
 			const usage = await db.prepare(
 				"SELECT COUNT(*) AS count FROM orders WHERE store_id=? AND created_at>=datetime('now','start of month')",
 			).bind(store.id).first<{count:number}>();
-			if (Number(usage?.count ?? 0) >= monthlyLimit) return limitReached("max_orders_per_month", monthlyLimit);
+			if (Number(usage?.count ?? 0) >= monthlyLimit) return fail(limitReached("max_orders_per_month", monthlyLimit));
 		}
-		const body = (await request.json()) as Record<string, unknown>;
-		const rawItems = ((body.items ?? []) as Record<string, unknown>[]).filter((i) => Number(i.qty) > 0);
-		const buyerPhone = String(body.buyer_phone ?? "").replace(/\D/g, "");
+
+		const rawItems = input.items.filter((i) => Number(i.qty) > 0);
+		const buyerPhone = input.buyerPhone.replace(/\D/g, "");
 		if (buyerPhone.length < 8 || buyerPhone.length > 15 || rawItems.length === 0 || rawItems.length > 50) {
-			return jsonResponse({ error: "invalid" }, 400);
+			return fail(jsonResponse({ error: "invalid" }, 400));
 		}
 		if (env.BUYER_PRIVACY_PEPPER) {
 			const buyerHash = await keyedHash(buyerPhone, env.BUYER_PRIVACY_PEPPER);
@@ -483,11 +538,11 @@ export async function handleCatalogOrder(request: Request, env: Env, store: Stor
 				`SELECT id FROM buyer_restrictions WHERE buyer_phone_hash=? AND status='blocked' AND revoked_at IS NULL
 				 AND (store_id IS NULL OR store_id=?) AND (expires_at IS NULL OR expires_at>datetime('now')) LIMIT 1`,
 			).bind(buyerHash, store.id).first();
-			if (restricted) return jsonResponse({ error: "buyer_restricted" }, 403);
+			if (restricted) return fail(jsonResponse({ error: "buyer_restricted" }, 403));
 		}
 
 		const codes = rawItems.map((i) => String(i.product_code));
-		if (new Set(codes).size !== codes.length) return jsonResponse({ error: "duplicate_products" }, 400);
+		if (new Set(codes).size !== codes.length) return fail(jsonResponse({ error: "duplicate_products" }, 400));
 		const marks = codes.map(() => "?").join(",");
 		const { results: products } = (await db
 			.prepare(
@@ -498,7 +553,7 @@ export async function handleCatalogOrder(request: Request, env: Env, store: Stor
 			.all()) as { results: Record<string, unknown>[] };
 
 		if (!products || products.length !== codes.length) {
-			return jsonResponse({ error: "products" }, 400);
+			return fail(jsonResponse({ error: "products" }, 400));
 		}
 
 		let total = 0;
@@ -517,7 +572,7 @@ export async function handleCatalogOrder(request: Request, env: Env, store: Stor
 			})
 			.filter(Boolean) as { product_id: string; product_name: string; qty: number; price_minor: number; currency: string }[];
 
-		if (lines.length !== rawItems.length) return jsonResponse({ error: "stock_changed" }, 409);
+		if (lines.length !== rawItems.length) return fail(jsonResponse({ error: "stock_changed" }, 409));
 
 		// `total` is a sum of price_minor across the ordered products, which is
 		// only a number if every one of them is denominated the same way. Adding
@@ -531,25 +586,19 @@ export async function handleCatalogOrder(request: Request, env: Env, store: Stor
 		// it here rather than record a total that cannot be interpreted.
 		const orderCurrencies = new Set(lines.map((line) => line.currency));
 		if (orderCurrencies.size > 1) {
-			return jsonResponse({ error: "mixed_currency_order", currencies: [...orderCurrencies].sort() }, 409);
+			return fail(jsonResponse({ error: "mixed_currency_order", currencies: [...orderCurrencies].sort() }, 409));
 		}
 		const orderCurrency = [...orderCurrencies][0] ?? DEFAULT_CURRENCY;
 
 		const payMethods = ["COD"];
 		if (String(store.vfcash ?? "").trim()) payMethods.push("VF_CASH");
 		if (String(store.instapay ?? "").trim()) payMethods.push("INSTAPAY");
-		const payMethod = String(body.pay_method ?? "COD");
-		if (!payMethods.includes(payMethod)) return jsonResponse({ error: "payment_unavailable" }, 400);
+		const payMethod = input.payMethod;
+		if (!payMethods.includes(payMethod)) return fail(jsonResponse({ error: "payment_unavailable" }, 400));
 		const quota = env.ENTITLEMENTS_ENABLED === "true"
-			? await reserveUsage(
-				env,
-				String(store.id),
-				"max_orders_per_month",
-				1,
-					idempotencyKey,
-			)
+			? await reserveUsage(env, String(store.id), "max_orders_per_month", 1, idempotencyKey)
 			: null;
-		if (quota && !quota.allowed) return entitlementLimitReached(quota.snapshot, "max_orders_per_month", 429);
+		if (quota && !quota.allowed) return fail(entitlementLimitReached(quota.snapshot, "max_orders_per_month", 429));
 		quotaReservationId = quota?.reservation_id ?? null;
 
 		// Per-store human-friendly order number. MAX+1 races under concurrency,
@@ -565,7 +614,9 @@ export async function handleCatalogOrder(request: Request, env: Env, store: Stor
 						// `currency` is written rather than left to the column default:
 						// the default is only correct while one market exists, and a
 						// default that is right by coincidence stops being right without
-						// anything changing here.
+						// anything changing here. `origin` for the same reason: the
+						// default is only correct while the storefront is the sole
+						// writer, and this function is what stops that being true.
 						//
 						// INSERT ... SELECT ... WHERE, not a plain VALUES, so the quota
 						// is re-checked inside the same statement that consumes it. The
@@ -581,8 +632,8 @@ export async function handleCatalogOrder(request: Request, env: Env, store: Stor
 						// so D1 rolls the whole batch back — including the trigger's
 						// stock claims. The catch below re-reads the quota to turn that
 						// into a plan-limit response rather than a generic failure.
-						`INSERT INTO orders (id, order_no, store_id, buyer_phone, buyer_name, pay_method, total_minor, currency, note, idempotency_key, status)
-						 SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NEW'
+						`INSERT INTO orders (id, order_no, store_id, buyer_phone, buyer_name, pay_method, total_minor, currency, note, idempotency_key, origin, status)
+						 SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NEW'
 						 WHERE ? IS NULL OR (
 						   SELECT COUNT(*) FROM orders o
 						   WHERE o.store_id = ? AND o.created_at >= datetime('now','start of month')
@@ -593,12 +644,13 @@ export async function handleCatalogOrder(request: Request, env: Env, store: Stor
 						orderNo,
 						store.id,
 						buyerPhone,
-						String(body.buyer_name ?? "").slice(0, 40) || null,
+						input.buyerName ? input.buyerName.slice(0, 40) : null,
 						payMethod,
 						total,
 						orderCurrency,
-						String(body.note ?? "").slice(0, 200) || null,
+						input.note ? input.note.slice(0, 200) : null,
 						idempotencyKey,
+						input.origin,
 						// NULL disables the quota clause entirely, for an unlimited plan
 						// or when entitlements own the counting instead.
 						enforceMonthlyLimit ? monthlyLimit : null,
@@ -632,7 +684,7 @@ export async function handleCatalogOrder(request: Request, env: Env, store: Stor
 			await db.batch(buildStmts(orderNo));
 		} catch (error) {
 			const duplicate = await existingOrder();
-			if (duplicate) return successResponse(duplicate);
+			if (duplicate) return { ok: true, order: duplicate };
 			const message = error instanceof Error ? error.message : String(error);
 			// The quota clause on the order insert is the only thing that can make
 			// the header row silently absent while its items still reference it, so
@@ -645,7 +697,7 @@ export async function handleCatalogOrder(request: Request, env: Env, store: Stor
 				).bind(store.id).first<{ count: number }>();
 				if (Number(usage?.count ?? 0) >= Number(monthlyLimit)) {
 					if (quotaReservationId) await voidUsageReservation(env, quotaReservationId);
-					return limitReached("max_orders_per_month", Number(monthlyLimit), Number(usage?.count ?? 0));
+					return fail(limitReached("max_orders_per_month", Number(monthlyLimit), Number(usage?.count ?? 0)));
 				}
 			}
 			const stillAvailable = await Promise.all(lines.map((line) => db.prepare(
@@ -653,7 +705,7 @@ export async function handleCatalogOrder(request: Request, env: Env, store: Stor
 			).bind(line.product_id, line.qty).first<{ ok: number }>()));
 			if (stillAvailable.some((row) => !row)) {
 				if (quotaReservationId) await voidUsageReservation(env, quotaReservationId);
-				return jsonResponse({ error: "stock_changed" }, 409);
+				return fail(jsonResponse({ error: "stock_changed" }, 409));
 			}
 			const orderNumberConflict = message.includes("orders.store_id, orders.order_no")
 				|| message.includes("idx_orders_store_orderno");
@@ -668,13 +720,51 @@ export async function handleCatalogOrder(request: Request, env: Env, store: Stor
 			await db.batch(buildStmts(orderNo));
 		}
 
-		return successResponse({ order_no: orderNo, total_minor: total });
+		return { ok: true, order: { orderId, orderNo, totalMinor: total, currency: orderCurrency, replayed: false } };
 	} catch (e) {
 		if (quotaReservationId) await voidUsageReservation(env, quotaReservationId);
 		if (e instanceof TenantWriteFencedError) {
-			return jsonResponse({ error: "tenant_write_fenced", retryable: true }, 503, { "retry-after": String(e.retryAfterSeconds) });
+			return fail(jsonResponse({ error: "tenant_write_fenced", retryable: true }, 503, { "retry-after": String(e.retryAfterSeconds) }));
 		}
-		await logError(env, "catalog_order", e, request);
-		return jsonResponse({ error: "server" }, 500);
+		await logError(env, input.logContext, e);
+		return fail(jsonResponse({ error: "server" }, 500));
 	}
+}
+
+/**
+ * The public storefront's order form.
+ *
+ * Everything that decides whether the order is legal lives in createOrder above.
+ * What is left here is HTTP: read the body, name the caller, and answer with the
+ * payment details a buyer needs in order to pay.
+ */
+export async function handleCatalogOrder(request: Request, env: Env, store: Store): Promise<Response> {
+	let body: Record<string, unknown>;
+	try {
+		body = (await request.json()) as Record<string, unknown>;
+	} catch {
+		return jsonResponse({ error: "invalid" }, 400);
+	}
+	const rawIdempotencyKey = request.headers.get("idempotency-key")?.trim() ?? "";
+	const result = await createOrder(env, store, {
+		idempotencyKey: /^[A-Za-z0-9._:-]{8,100}$/.test(rawIdempotencyKey) ? rawIdempotencyKey : crypto.randomUUID(),
+		buyerPhone: String(body.buyer_phone ?? ""),
+		buyerName: String(body.buyer_name ?? "") || null,
+		items: ((body.items ?? []) as Record<string, unknown>[])
+			.map((i) => ({ product_code: String(i.product_code), qty: Number(i.qty) })),
+		payMethod: String(body.pay_method ?? "COD"),
+		note: String(body.note ?? "") || null,
+		origin: "storefront",
+		clientIp: request.headers.get("cf-connecting-ip") ?? "noip",
+		logContext: "catalog_order",
+	});
+	if (!result.ok) return result.response;
+	return jsonResponse({
+		ok: true,
+		order_no: result.order.orderNo,
+		total_minor: result.order.totalMinor,
+		contact_phone: store.whatsapp || store.phone,
+		instapay: store.instapay,
+		vfcash: store.vfcash,
+	});
 }

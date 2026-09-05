@@ -7,6 +7,7 @@ import app.orderak.seller.data.db.CustomerEntity
 import app.orderak.seller.data.db.OrderakDatabase
 import app.orderak.seller.data.db.ProductEntity
 import app.orderak.seller.data.demo.DemoDataSeeder
+import app.orderak.seller.data.orders.OrderRepository
 import app.orderak.seller.data.session.SessionStore
 import app.orderak.seller.data.auth.AuthRepository
 import app.orderak.seller.data.billing.EntitlementRepository
@@ -37,6 +38,10 @@ class SyncRepository @Inject constructor(
     private val entitlementRepository: EntitlementRepository,
     private val authRepository: AuthRepository,
     private val demoDataSeeder: DemoDataSeeder,
+    // Orders the seller recorded are posted from here rather than from the
+    // screen that recorded them: the first attempt happens at creation, and
+    // every attempt after that is this sync's job.
+    private val orderRepository: OrderRepository,
 ) {
 
     /** Whether shop config changed since last sync — if not, skip register call. */
@@ -198,6 +203,16 @@ class SyncRepository @Inject constructor(
             baseline = pulled.catalog_version
         }
 
+        // 2c) Post orders the seller recorded that the server has not seen.
+        //
+        // After the catalogue push below would be wrong: an order names its
+        // products by their server-assigned code, and a product created on this
+        // device has none until the mirror has run. Before it is also wrong for
+        // the first order after creating a product. So it runs here, after the
+        // baseline is established, and any order whose products are still
+        // codeless simply stays pending for one more sync.
+        val ordersPushed = orderRepository.pushPendingOrders()
+
         // 3) Upload any local product images that don't yet have a public URL,
         //    then push products (full mirror) and persist the returned codes.
         //    image_url must be the backend R2 URL — never the local file path,
@@ -249,7 +264,7 @@ class SyncRepository @Inject constructor(
             }
         }
 
-        return pushOk && pullOk
+        return pushOk && pullOk && ordersPushed
     }
 
     /**
