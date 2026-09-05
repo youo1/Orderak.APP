@@ -96,6 +96,7 @@ trigger's final semicolon when replaying a fresh remote D1 database.
 - [049_delete_settings_route.sql](#049_delete_settings_routesql)
 - [050_catalog_baseline_version.sql](#050_catalog_baseline_versionsql)
 - [051_manual_order_origin.sql](#051_manual_order_originsql)
+- [052_stock_movements.sql](#052_stock_movementssql)
 
 ## 001_init.sql
 
@@ -587,3 +588,14 @@ trigger's final semicolon when replaying a fresh remote D1 database.
 - Until that route existed the app could read orders and change their status, and could not create one. So an order the seller typed in went into Room and stopped there: absent from the account, from a second device, from a reinstall, and from the monthly plan count. The seller read a confirmation and had a note on one phone.
 - The default is `storefront` because every row that exists when this runs came from the storefront - nothing else could have written one. That is a statement about the existing data rather than a guess, and it is why no backfill is needed.
 - Once both paths write here, `how did this order get in` stops being answerable by inference. Two things need the answer: stock movement has to be attributable to a cause, and any reporting has to separate a channel the buyer drove from one the seller did.
+
+## 052_stock_movements.sql
+
+**Source:** `services/backend/migrations/052_stock_movements.sql`
+
+### What it does
+
+- Adds `stock_movements`, an append-only record of every change to a product's stock and why, and rewrites the two stock triggers to write it. `admin_audit` could not do this job: it is indexed on action and created_at only, the entity lives in an unindexed JSON blob, and retention deletes rows after two years. Inventory is financial state.
+- Order-driven movement was already attributable by inference - an order_items row says which product and how many. What had no trace of any kind was the seller's own adjustment: editing a product's stock travels through the catalogue mirror as a compare-and-set that bumps stock_version and writes nothing else, so afterwards a seller correcting a count and an order that went missing were the same event.
+- The triggers write the ledger row in the same statement that moves the stock, so there is no ordering to get wrong and no code path that can move stock while forgetting to say so. The seller's adjustment is the one movement made in application code, and it writes its row in the same D1 batch - conditional on both the new revision AND the new figure, because the revision alone is also bumped by an order's trigger and would record a movement that was refused.
+- The backfill reconstructs what it can and says so: every row it writes carries `reconstructed = 1`. Sales are recoverable for order lines whose product still exists. Cancellations are a fact but not a time, because `status_changed_at` arrived with migration 046 and cancellations before it never reached the server at all. Manual adjustments are not recoverable in any case. What is left becomes one opening balance per product, which is the honest remainder rather than an invented history.

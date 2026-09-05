@@ -1124,6 +1124,24 @@ async function syncProducts(request: Request, env: Env, store: Row): Promise<Res
 			 image_url=excluded.image_url,updated_at=datetime('now')`,
 		).bind(...bindings));
 	}
+	// A product arrives holding stock, and those units have to come from
+	// somewhere or the ledger can never reconcile for it. The mirror's INSERT
+	// takes the figure straight from the device that invented the product, which
+	// makes this its opening balance in the literal sense: the count it started
+	// with, before anything moved it.
+	//
+	// Only for products this push creates. An existing product's stock is not
+	// touched by the upsert — it moves through an order or the adjustment below.
+	for (const record of records) {
+		if (record.existed || record.stock === 0) continue;
+		stmts.push(env.orderak_db.prepare(
+			`INSERT INTO stock_movements (
+			   id, store_id, product_id, product_code, delta, balance_after,
+			   cause, cause_id, actor, reconstructed
+			 ) VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, 'OPENING_BALANCE', NULL, 'seller', 0)`,
+		).bind(storeId, record.id, record.productCode, record.stock, record.stock));
+	}
+
 	for (let offset = 0; offset < removedCodes.length; offset += 90) {
 		const chunk = removedCodes.slice(offset, offset + 90);
 		stmts.push(env.orderak_db.prepare(`DELETE FROM products WHERE store_id=? AND product_code IN (${chunk.map(() => "?").join(",")})`)
@@ -1154,6 +1172,39 @@ async function syncProducts(request: Request, env: Env, store: Row): Promise<Res
 			`UPDATE products SET stock=?,stock_version=stock_version+1,updated_at=datetime('now')
 			 WHERE store_id=? AND app_id=? AND stock_version=?`,
 		).bind(record.stock, storeId, record.appId, record.expectedStockVersion));
+	}
+
+	// The seller setting a figure themselves is the one stock movement made in
+	// application code rather than by a trigger, and until now the only one that
+	// left no trace at all: the compare-and-set above bumps stock_version and
+	// writes nothing else, so afterwards a seller correcting a count and an order
+	// that went missing are the same event.
+	//
+	// Conditional on the update having applied, not on having been attempted. A
+	// stale revision matches no rows, and a ledger row written anyway would
+	// record a movement that did not happen — which is worse than the silence it
+	// replaces, because reconciliation would then believe it.
+	for (const record of versionedStock) {
+		const previous = existing.get(record.appId);
+		if (!previous) continue;
+		const delta = record.stock - previous.stock;
+		if (delta === 0) continue;
+		stmts.push(env.orderak_db.prepare(
+			`INSERT INTO stock_movements (
+			   id, store_id, product_id, product_code, delta, balance_after,
+			   cause, cause_id, actor, reconstructed
+			 )
+			 SELECT lower(hex(randomblob(16))), p.store_id, p.id, p.product_code, ?, p.stock,
+			        'MANUAL_ADJUSTMENT', NULL, 'seller', 0
+			 FROM products p
+			 WHERE p.store_id=? AND p.app_id=? AND p.stock_version=? AND p.stock=?`,
+		// Both halves are needed. The version alone is not proof the update
+		// applied: an order's trigger bumps it too, so a push whose stale
+		// revision was refused can still find the row sitting at expected+1 and
+		// record a movement that never happened. Requiring the new stock as well
+		// distinguishes "this statement wrote it" from "it happens to look like
+		// this", and within one batch nothing else can move it in between.
+		).bind(delta, storeId, record.appId, Number(record.expectedStockVersion) + 1, record.stock));
 	}
 
 	// Every accepted push moves the version, so the next device to send this
