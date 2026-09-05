@@ -75,12 +75,49 @@ function ktFiles(dir, acc = []) {
 }
 const androidSources = ktFiles(ANDROID_SRC);
 
-/** Escape a symbol so it can sit inside a RegExp unchanged. */
-const escapeRegex = (value) => value.replace(/[^A-Za-z0-9_]/g, (ch) => `\\${ch}`);
+/**
+ * Where a word character meets a non-word one — the rule `\b` applies, with
+ * the ends of the string counting as non-word.
+ */
+const WORD = /[A-Za-z0-9_]/;
+const isWord = (ch) => ch !== undefined && WORD.test(ch);
+const isBoundary = (left, right) => isWord(left) !== isWord(right);
 
-/** Body of `fun Name(...) { ... }`, brace-matched so nested braces are kept. */
+/**
+ * Does `symbol` appear in `body` as a whole token rather than inside a longer
+ * one? `onSave` names `onSave()` and not `onSaveDraft()`.
+ *
+ * Spelled out rather than assembled into a RegExp from the symbol. Both this
+ * and the signature match below used to build their pattern out of data — one
+ * of them escaped it, the other did not — which is a thing a reader has to
+ * re-prove safe every time they meet it, and a scanner cannot prove at all.
+ * Verified identical to the `\b`-anchored form it replaces over every symbol
+ * in the contracts against every Kotlin source in the app.
+ */
+function namesSymbol(body, symbol) {
+  if (!symbol) return false;
+  for (let at = body.indexOf(symbol); at >= 0; at = body.indexOf(symbol, at + 1)) {
+    if (isBoundary(body[at - 1], symbol[0])
+      && isBoundary(symbol[symbol.length - 1], body[at + symbol.length])) return true;
+  }
+  return false;
+}
+
+/** Every `fun Name(` in a Kotlin source, with the name captured to compare. */
+const FUN_SIGNATURE = /\bfun\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/g;
+
+/**
+ * Body of `fun Name(...) { ... }`, brace-matched so nested braces are kept.
+ *
+ * The identifier is captured and compared rather than embedded in the pattern,
+ * so a name carrying regex syntax cannot change what is searched for.
+ */
 function composableBody(source, name) {
-  const signature = new RegExp(String.raw`\bfun\s+` + name + String.raw`\s*\(`).exec(source);
+  FUN_SIGNATURE.lastIndex = 0;
+  let signature = null;
+  for (let match = FUN_SIGNATURE.exec(source); match; match = FUN_SIGNATURE.exec(source)) {
+    if (match[1] === name) { signature = match; break; }
+  }
   if (!signature) return null;
   let index = signature.index + signature[0].length - 1;
   let depth = 0;
@@ -128,7 +165,7 @@ function checkActions(contract) {
       actionCounts.via += 1;
       if (body === null) {
         push(contract, `action "${action.do}" names via "${action.via}" but no composable ${name}() was found`);
-      } else if (!new RegExp(String.raw`\b` + escapeRegex(action.via) + String.raw`\b`).test(body)) {
+      } else if (!namesSymbol(body, action.via)) {
         push(contract, `action "${action.do}" names via "${action.via}", which does not appear in ${name}()`);
       }
       if (UNVERIFIED_ACTIONS.has(key)) {
