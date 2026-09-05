@@ -62,8 +62,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.orderak.seller.R
 import app.orderak.seller.app.navigation.SellerSurface
 import app.orderak.seller.core.ui.NoticeBanner
+import app.orderak.seller.core.ui.PlanUsageRowItem
+import app.orderak.seller.core.ui.planUsageRows
 import app.orderak.seller.core.ui.SemanticRole
-import app.orderak.seller.core.ui.UsageMeter
 import app.orderak.seller.feature.settings.SettingsScreen
 import app.orderak.seller.core.ads.LocalAdManager
 import app.orderak.seller.core.ui.SyncStatusBanner
@@ -81,8 +82,6 @@ import app.orderak.seller.feature.products.shareCatalogText
 import app.orderak.seller.feature.operations.AnnouncementsDashboardIndicator
 import app.orderak.seller.core.ui.theme.LocalOrderakExtendedColors
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.intOrNull
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 
 /**
@@ -414,42 +413,17 @@ private fun PlanNotice(text: String, dismissible: Boolean, onDismiss: () -> Unit
 
 @Composable
 private fun PlanUsageCard(config: BackendConfig) {
-    val definitions = listOf(
-        "max_products" to R.string.usage_products,
-        "max_orders_per_month" to R.string.usage_orders_month,
-        "max_ai_requests_per_month" to R.string.usage_ai_requests,
-        "max_categories" to R.string.usage_categories,
-        "max_concurrent_devices" to R.string.usage_devices,
-    )
-    val rows = definitions.mapNotNull { (key, label) ->
-        val entitlement = config.entitlements[key] ?: return@mapNotNull null
-        val used = entitlement.used ?: return@mapNotNull null
-        val limit = if (entitlement.mode == "unlimited") null
-        else (entitlement.value as? JsonPrimitive)?.intOrNull
-        Triple(label, used, limit)
-    }
+    // Rows, order and unlimited handling all come from core/ui/PlanUsage.kt, so
+    // this card and the subscription screen cannot drift apart again. It used to
+    // keep its own list and its own filter, and the two screens disagreed about
+    // what an unlimited plan looks like.
+    val rows = planUsageRows(config)
     if (rows.isEmpty()) return
 
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(R.string.plan_usage_title), style = MaterialTheme.typography.titleMedium)
-            rows.forEach { (label, used, limit) ->
-                // This card used to draw its own bar and pick its own thresholds,
-                // so the dashboard and the products screen disagreed about how
-                // close to a limit counts as close. UsageMeter owns that now, and
-                // carries the icon that keeps the warning readable without colour.
-                if (limit != null) {
-                    UsageMeter(label = stringResource(label), used = used, limit = limit)
-                } else {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(stringResource(label), style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            stringResource(R.string.usage_value_unlimited, used),
-                            style = MaterialTheme.typography.labelMedium,
-                        )
-                    }
-                }
-            }
+            rows.forEach { row -> PlanUsageRowItem(row) }
         }
     }
 }
