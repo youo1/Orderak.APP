@@ -197,7 +197,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Entry | MainRoute — تاب المتجر |
 | Exit | ProductEditRoute · CategoriesRoute · StoreInfoRoute · PaywallRoute — عند الحد |
 | Data | products page · product limit usage · category count |
-| Actions | add product `onAdd` · edit product `onEdit` · search *(planned)* · open categories *(planned)* |
+| Actions | add product `onAdd` · edit product `onEdit` · search `SearchField` · open categories *(planned)* |
 
 ### `product-edit`
 
@@ -279,7 +279,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Entry | MainRoute — تاب العملاء |
 | Exit | CustomerRoute |
 | Data | customers page · aggregate spend |
-| Actions | search *(planned)* · open customer `onOpen` |
+| Actions | search `SearchField` · open customer `onOpen` |
 
 ### `customer-details`
 
