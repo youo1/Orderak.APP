@@ -65,22 +65,47 @@ checks the stored bytes rather than whether the word appears.
 None of these can be done from this repository, and all of them must be done
 first:
 
-1. **Play Console products** — `orderak_paid1`, `orderak_paid2`,
-   `orderak_paid3`, each with `monthly` and `annual` base plans, priced, and
-   active. The product ids must match `play_product_mappings.product_id`
-   exactly; the mappings are already seeded and inactive.
-2. **Service account** with Android Publisher access, granted permissions on
-   those specific products.
-3. **Pub/Sub topic and push subscription** for RTDN, with the OIDC audience and
-   service-account email that `GOOGLE_PLAY_PUBSUB_*` expect.
-4. **Package name match** — the mappings say `app.orderak.seller`, and the
-   signed build's `applicationId` must equal it. Note the staging flavour
+1. **A separate Play Console entry for staging.** The staging Android flavour
    applies `applicationIdSuffix = ".staging"`, so a staging build is
-   `app.orderak.seller.staging` and needs its own Play entry or a production
-   package build pointed at staging.
+   `app.orderak.seller.staging` — a different app to Google, with its own
+   products. This was a choice between that and pointing a production-package
+   build at the staging backend; a separate entry was taken, because the
+   alternative means the only build that can be purchase-tested is one signed as
+   production, which is the build you least want floating around a test track.
+
+   The cost is that products must be created twice. Product ids are scoped per
+   app, so both entries carry an `orderak_paid1` and they are different products.
+
+2. **Play Console products in each entry** — `orderak_paid1`, `orderak_paid2`,
+   `orderak_paid3`, each with `monthly` and `annual` base plans, priced, and
+   active. The ids must match `play_product_mappings.product_id` exactly.
+   Migration 054 seeds twelve mappings, six per package, all inactive.
+
+3. **Service account** with Android Publisher access, granted permissions on
+   those specific products. A separate app entry means the grant has to be made
+   on both, or staging verification fails while production works.
+
+4. **Pub/Sub topic and push subscription** for RTDN, with the OIDC audience and
+   service-account email that `GOOGLE_PLAY_PUBSUB_*` expect.
+
 5. **A signed build** in a Play testing track. See
    [android-release.md](../guides/android-release.md) — a purchase cannot be
    tested from a locally-installed APK.
+
+### Which mappings an environment can see
+
+`mappingForItem` binds `GOOGLE_PLAY_PACKAGE_NAME`, so that variable is what
+selects between the two mapping sets:
+
+| Environment | `GOOGLE_PLAY_PACKAGE_NAME` | Mappings it can resolve |
+|---|---|---|
+| staging | `app.orderak.seller.staging` | the six staging rows |
+| production | `app.orderak.seller` | the six production rows |
+
+A mapping set that does not match the variable is invisible to the lookup. The
+symptom is `play_product_not_enabled` on every purchase, while the mappings look
+perfectly fine in a table — which is why the preflight checks the match rather
+than only listing the rows.
 
 ## Order of operations
 
@@ -96,9 +121,10 @@ first:
    depends on it.
 5. Watch for one full day. `error_logs`, `operational_job_runs`, and the queue
    health panel under **Commerce → Purchase verification**.
-6. Activate the mappings for one product only — start with `orderak_paid1`,
-   monthly. One product proves the path; six multiply the ways a first attempt
-   can fail.
+6. Activate the mappings for one product only, **and only in the staging
+   package's set** — start with `orderak_paid1`, monthly. One product proves the
+   path; six multiply the ways a first attempt can fail. The production six stay
+   inactive until production's own rollout.
 7. `BILLING_ENABLED=true` and `settings.billing_enabled` to the boolean `true`.
 8. Work the matrix.
 9. Activate the remaining mappings once the matrix passes for the first.
