@@ -237,6 +237,32 @@ describe("payment webhook", () => {
 		expect(response.status).not.toBe(403);
 		expect(await response.json()).not.toMatchObject({ code: "feature_disabled" });
 	});
+
+	// The second carve-out, added 2026-09-06, and the same rule taken further.
+	//
+	// /api/v1/plans is a read-only comparison of what each plan includes. It
+	// takes no payment, grants nothing and names no seller. While it sat in the
+	// acquisition set, the plans screen and the paywall — the two surfaces built
+	// for a seller who has just hit a limit and cannot buy — got a 403 in exactly
+	// the state they exist to serve: told a limit had stopped them, then refused
+	// the explanation of what would lift it.
+	it("still lets a seller see what the plans include", async () => {
+		const testEnv = deployedEnv();
+		testEnv.BILLING_ENABLED = "false";
+		const response = await call("/api/v1/plans", { method: "GET" }, testEnv);
+		expect(response.status).toBe(200);
+		expect(await response.json()).toMatchObject({ ok: true });
+	});
+
+	// Acquisition itself stays shut. The carve-out above is the whole of the
+	// change; if this ever passes, the gate has been opened rather than narrowed.
+	it("still refuses to start a subscription", async () => {
+		const testEnv = deployedEnv();
+		testEnv.BILLING_ENABLED = "false";
+		const response = await call("/api/v1/subscribe", { method: "POST", body }, testEnv);
+		expect(response.status).toBe(403);
+		expect(await response.json()).toMatchObject({ code: "feature_disabled" });
+	});
 });
 
 describe("paid checkout without a real gateway", () => {

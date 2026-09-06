@@ -102,6 +102,7 @@ nav:
     - D1 Restore From Backup: runbooks/d1-restore.md
     - Design System Recovery: runbooks/design-system-recovery.md
     - Firebase Auth Outage: runbooks/firebase-auth-outage.md
+    - Google Play Billing Rollout: runbooks/play-billing-rollout.md
     - Google Play Billing DLQ: runbooks/play-billing-dlq.md
     - Worker Secret Rotation: runbooks/secret-rotation.md
     - Tenant Shard Migration: runbooks/tenant-shard-migration.md

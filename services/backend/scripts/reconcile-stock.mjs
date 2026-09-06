@@ -49,17 +49,36 @@ if (environment !== null && !SAFE.test(environment)) {
 
 const database = environment === "staging" ? "orderak-db-staging" : "orderak-db";
 
+/**
+ * Quote one argument for the shell wrangler is invoked through.
+ *
+ * Windows needs `shell: true`, because npx is a .cmd and Node 20+ refuses to
+ * execFile one directly (it returns EINVAL — the fix for CVE-2024-27980). With a
+ * shell in the way, every argument is re-parsed by cmd.exe, and SQL is full of
+ * characters it treats as syntax: `<` and `>` are redirection, `(` and `)` are
+ * grouping, `&` is a separator. An unquoted `HAVING unexplained <> 0` becomes a
+ * redirect to a file called `0`, and wrangler is left with no --command at all.
+ *
+ * cmd.exe unescapes a doubled quote inside a quoted string, so that is the whole
+ * escape. On POSIX no shell is used and the argument passes through untouched.
+ */
+function shellArgument(value) {
+	if (process.platform !== "win32") return value;
+	return `"${String(value).replace(/"/g, '""')}"`;
+}
+
 function query(sql) {
 	const command = ["d1", "execute", database, "--json", remote ? "--remote" : "--local"];
 	if (environment) command.push("--env", environment);
-	command.push("--command", sql);
-	const output = execFileSync("npx", ["wrangler", ...command], {
+	// Collapsed to one line. The queries below are written multi-line for
+	// readability, and cmd.exe cannot carry a newline inside a quoted argument —
+	// it ends the command there, so wrangler saw no --command at all. SQL does
+	// not care about the whitespace; the shell does.
+	command.push("--command", sql.replace(/\s+/g, " ").trim());
+	const output = execFileSync("npx", ["wrangler", ...command].map(shellArgument), {
 		cwd: backendRoot,
 		encoding: "utf8",
 		stdio: ["ignore", "pipe", "inherit"],
-		// Windows needs shell:true — npx is a .cmd and Node will not execFile
-		// one. Every interpolated value above is checked against SAFE first; the
-		// SQL below is a literal in this file and takes no input.
 		shell: process.platform === "win32",
 		maxBuffer: 32 * 1024 * 1024,
 	});
