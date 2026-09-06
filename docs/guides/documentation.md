@@ -85,6 +85,21 @@ index, not a copy of the SQL. To change what it says about a migration, edit the
 regenerate. Editing the Markdown directly is destroyed on the next run, and CI
 fails when the committed file and the generator disagree.
 
+[`../ux/feature-surface-map.md`](../ux/feature-surface-map.md) and
+[`../ux/screen-contracts.md`](../ux/screen-contracts.md) are generated the same
+way, by `tooling/ux/generate-ux-docs.mjs`, which writes what
+`verify-feature-surface-map.mjs --md` and `verify-screen-contracts.mjs --md`
+print. To change what either says, edit the `MAP` in
+`tooling/ux/feature-surface-map.mjs`, the `CONTRACTS` in
+`tooling/ux/screen-contracts.mjs`, or the feature's entry in
+`../product/orderak-plan-catalog.json`, then regenerate. Both documents declared
+`generated: true` for some time before anything wrote them, so the tables were
+only as current as the last person who remembered to paste the output over them;
+correcting a stale cell by hand is a trap, because the surface totals are
+counted from the same source and a hand-edit leaves them disagreeing with the
+row it just fixed. The generators validate before they print, so a regeneration
+cannot launder a map that no longer matches the catalogue.
+
 The root and component README files should remain concise entry points. Link to
 the authoritative guide for details that would otherwise be duplicated.
 

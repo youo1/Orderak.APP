@@ -113,6 +113,12 @@ linking, source-of-truth, and validation conventions.
 | Architecture, hostnames, data flows | [`docs/architecture/overview.md`](./docs/architecture/overview.md) |
 | Auth model, secret handling | [`docs/architecture/security-model.md`](./docs/architecture/security-model.md) |
 | UI strings, locales, translations | Run `verifyLocalizationContract` |
+| Feature surfaces, screen contracts, feature implementation status | Edit the map, the contracts, or the plan catalogue, then run `node tooling/ux/generate-ux-docs.mjs` |
+
+Do **not** hand-edit [`docs/ux/feature-surface-map.md`](./docs/ux/feature-surface-map.md)
+or [`docs/ux/screen-contracts.md`](./docs/ux/screen-contracts.md); like
+`database-migrations.md` they are generated, and CI fails when a committed file and
+its generator disagree.
 
 ## Secret handling
 
