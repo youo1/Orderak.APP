@@ -82,5 +82,13 @@
   {
     "method": "DELETE",
     "path": "/api/admin/v1/announcements/{id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/customers/{customer_key}"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/customers/{customer_key}"
   }
 ]

@@ -60,7 +60,10 @@ export function AppShell() {
 
   return <div className={`app-shell ${desktopHidden ? 'navigation-hidden' : ''}`}>
     {mobileOpen && <button className="mobile-overlay" aria-label="Close navigation" onClick={() => setMobileOpen(false)} />}
-    <aside id="admin-navigation" className={`sidebar ${mobileOpen ? 'open' : ''}`} aria-hidden={isMobile ? !mobileOpen : desktopHidden} inert={(isMobile ? !mobileOpen : desktopHidden) || undefined}>
+    {/* orderak-dark pins the generated dark scheme to the rail, so it stays a
+        dark surface in both page schemes and its children can use ordinary
+        tokens instead of hand-written colour. */}
+    <aside id="admin-navigation" className={`sidebar orderak-dark ${mobileOpen ? 'open' : ''}`} aria-hidden={isMobile ? !mobileOpen : desktopHidden} inert={(isMobile ? !mobileOpen : desktopHidden) || undefined}>
       <div className="brand"><div className="brand-mark">O</div><div><strong>Orderak</strong><span>Control Center</span></div><button className="mobile-close" aria-label="Close navigation" onClick={() => setMobileOpen(false)}><X size={18} /></button></div>
       <button className="command-trigger" onClick={() => setPaletteOpen(true)}><Search size={15} /><span>Find a section</span><kbd>Ctrl K</kbd></button>
       <nav>{groups.map(group => <div className="nav-group" key={group}><p>{group}</p>{visible.filter(section => section.group === group).map(section => { const Icon = section.icon; return <NavLink key={section.id} to={section.path} end={section.path === '/'} onClick={() => setMobileOpen(false)}><Icon size={17} /><span>{section.label}</span></NavLink>; })}</div>)}</nav>

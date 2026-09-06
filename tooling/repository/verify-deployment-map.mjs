@@ -195,7 +195,13 @@ for (const [relative, expectedServers] of Object.entries(serverExpectations)) {
 // over-reported, so each phantom silently satisfied the spec entry it had
 // created. Coverage now checks the spec against the Allow header the server
 // actually sends — see contracts/openapi/scripts/method-allow-inventory.mjs.
-if (operationCount !== 245) fail(`OpenAPI operation inventory changed: expected 245, found ${operationCount}.`);
+// Raised to 248 on 2026-09-06 for the three customer routes. A buyer was two
+// denormalised columns on `orders` and the customer list was aggregated on the
+// device, so there was no row to edit — the catalogue sold editable customer
+// profiles at paid1 while CustomerDetailsScreen had nowhere to put an edit.
+// GET /api/v1/customers, GET and PATCH /api/v1/customers/{customer_key} are the
+// resource that edit goes into.
+if (operationCount !== 248) fail(`OpenAPI operation inventory changed: expected 248, found ${operationCount}.`);
 const seller = JSON.parse(read("contracts/openapi/src/seller-v1.json"));
 for (const [route, pathItem] of Object.entries(seller.paths)) {
   for (const method of ["get", "post", "put", "patch", "delete"]) {

@@ -2,8 +2,9 @@ import { authSeller, jsonResponse, methodNotAllowed, readCreds, type Authenticat
 import { pickLocale } from "../../platform/localization/i18n";
 import { auditDb } from "../admin/admin-auth";
 
+import { handleCustomerRoutes } from "../customers/customers";
 type Row = Record<string, unknown>;
-type SellerOperationMethod = "GET" | "POST" | "PUT" | "DELETE";
+type SellerOperationMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 type SellerOperationMethods = [SellerOperationMethod, ...SellerOperationMethod[]];
 
 function allowedMethodsFor(path: string): SellerOperationMethods | null {
@@ -16,6 +17,11 @@ function allowedMethodsFor(path: string): SellerOperationMethods | null {
 	if (/^\/api\/v1\/catalog\/translations\/[^/]+\/(?:ar|en)$/.test(path)) return ["PUT", "DELETE"];
 	if (path === "/api/v1/devices") return ["GET"];
 	if (/^\/api\/v1\/devices\/\d+$/.test(path)) return ["DELETE"];
+	if (path === "/api/v1/customers") return ["GET"];
+	// The key is a normalised phone, so it carries a leading "+" and nothing
+	// else path-shaped. Matching [^/]+ rather than a digit run keeps the
+	// unresolved keys — raw values that never became E.164 — addressable too.
+	if (/^\/api\/v1\/customers\/[^/]+$/.test(path)) return ["GET", "PATCH"];
 	return null;
 }
 
@@ -65,6 +71,15 @@ export async function handleSellerOperationRoutes(
 
 	const seller = await sellerFor(request, env, url, authenticatedSeller);
 	if (!seller) return jsonResponse({ error: "auth" }, 401);
+
+	// Customers the seller can edit.
+	//
+	// Delegated rather than written here: the store is resolved from the
+	// credential above and passed in, which is the rule the cross-store isolation
+	// suite exists to keep, and the customer module has no other way to learn a
+	// store id.
+	const customers = await handleCustomerRoutes(request, env, url, seller);
+	if (customers) return customers;
 
 	if (path === "/api/v1/account/status" && method === "GET") {
 		return jsonResponse({ ok: true, status: seller.status ?? "active" });

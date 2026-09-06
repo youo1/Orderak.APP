@@ -153,5 +153,32 @@ class FeatureAvailabilityResolver @Inject constructor(
  * carries the feature and still calls it built.
  */
 object FeatureKeys {
+    // ---- Features gated by plan --------------------------------------------
     const val OCR_RECEIPT_ASSISTANCE = "payments_finance.ocr_receipt_assistance"
+
+    // ---- Limits the app measures usage against -----------------------------
+    //
+    // These were inline literals at every call site, which is how the dashboard
+    // and the subscription screen came to hold two lists of the same keys in two
+    // orders. A misspelling in either was indistinguishable from a key the
+    // server had not sent: both produce a row that quietly does not render.
+    const val MAX_PRODUCTS = "max_products"
+    const val MAX_CATEGORIES = "max_categories"
+    const val MAX_ORDERS_PER_MONTH = "max_orders_per_month"
+    const val MAX_AI_REQUESTS_PER_MONTH = "max_ai_requests_per_month"
+    const val MAX_CONCURRENT_DEVICES = "max_concurrent_devices"
+
+    /** Whether the free-plan advert slot is shown. */
+    const val SHOW_ADS = "show_ads"
+
+    /** Every key above, for tests and tooling that check the set as a whole. */
+    val ALL: List<String> = listOf(
+        OCR_RECEIPT_ASSISTANCE,
+        MAX_PRODUCTS,
+        MAX_CATEGORIES,
+        MAX_ORDERS_PER_MONTH,
+        MAX_AI_REQUESTS_PER_MONTH,
+        MAX_CONCURRENT_DEVICES,
+        SHOW_ADS,
+    )
 }

@@ -24,6 +24,7 @@ import { storeCapabilityEnabled } from "../operations/capabilities";
 import { keyedHash } from "../identity/auth";
 import { DEFAULT_CURRENCY, type Currency, exponentOf } from "../../platform/money/money";
 
+import { recordCustomerFromOrder } from "../customers/customers";
 type Store = Record<string, unknown>;
 
 /**
@@ -718,6 +719,26 @@ export async function createOrder(env: Env, store: Store, input: CreateOrderInpu
 			// including trigger-driven stock claims, so recomputing once is safe.
 			orderNo = await nextOrderNo();
 			await db.batch(buildStmts(orderNo));
+		}
+
+		// The customer behind the order.
+		//
+		// Written after the batch, not inside it. The batch is the order and its
+		// stock movement and must stay exactly that (I-2): adding a fourth
+		// statement would mean a customer row could roll back an order, and a
+		// failed customer write is not a reason to refuse a sale. The seller has
+		// the order either way, and a customer missing from the list is repaired
+		// by the backfill or by their next order.
+		try {
+			await recordCustomerFromOrder(
+				env,
+				String(store.id),
+				input.buyerPhone,
+				input.buyerName,
+				store.country_code == null ? null : String(store.country_code),
+			);
+		} catch (customerError) {
+			await logError(env, "record_customer", customerError);
 		}
 
 		return { ok: true, order: { orderId, orderNo, totalMinor: total, currency: orderCurrency, replayed: false } };
