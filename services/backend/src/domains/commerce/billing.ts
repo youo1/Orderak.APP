@@ -5,6 +5,7 @@
 // Never floats, and never a bare /100.
 // ============================================================
 
+import { planComparison } from "./plans";
 import {
 	jsonResponse,
 	authSeller,
@@ -237,35 +238,31 @@ export async function handleBillingRoutes(
 
 // ===================== Handlers =====================
 
+/**
+ * The plan comparison, built from the entitlement catalogue.
+ *
+ * WHAT THIS REPLACED, AND WHY
+ *   It used to read `plans` joined to `plan_features` — the legacy billing
+ *   tables — and return whatever rows were there. `plan_features` has an
+ *   `enabled` flag and no notion of whether the app has built the thing, so the
+ *   endpoint could advertise a feature that does not exist. That is exactly what
+ *   BR-506 forbids, and it was not hypothetical: the catalogue sold "editable
+ *   customer profiles" at paid1 for months while the screen had no edit control.
+ *
+ *   `entitlement_definitions.implementation_status` is where that fact lives,
+ *   and it is corrected forward by migration rather than shipped in a build.
+ *   planComparison() filters on it, so an unbuilt feature cannot reach a seller
+ *   even if the plan tables drift.
+ *
+ * STILL PUBLIC, STILL CACHED
+ *   It was public before and there is no reason to close it: this is the same
+ *   comparison the pricing page shows, carries nothing store-specific, and the
+ *   five-minute edge cache is worth keeping for a table that changes on the
+ *   scale of months.
+ */
 async function listPublicPlans(env: Env): Promise<Response> {
-	const { results: plans } = await env.orderak_db
-		.prepare("SELECT * FROM plans WHERE active = 1 ORDER BY sort_order")
-		.all();
-	const planRows = plans as Record<string, unknown>[];
-
-	// Was N+1 (one plan_features query per plan). Fetch all features in one
-	// query and group in JS.
-	const featuresByPlan = new Map<unknown, Record<string, unknown>[]>();
-	if (planRows.length) {
-		const marks = planRows.map(() => "?").join(",");
-		const { results: features } = await env.orderak_db
-			.prepare(
-				`SELECT plan_id, feature_key, name, description, enabled
-				 FROM plan_features WHERE plan_id IN (${marks})`,
-			)
-			.bind(...planRows.map((p) => p.id))
-			.all();
-		for (const f of features as Record<string, unknown>[]) {
-			const { plan_id, ...rest } = f;
-			const list = featuresByPlan.get(plan_id) ?? [];
-			list.push(rest);
-			featuresByPlan.set(plan_id, list);
-		}
-	}
-	const out = planRows.map((plan) => ({ ...plan, features: featuresByPlan.get(plan.id) ?? [] }));
-
-	// Public, rarely-changing data — let the edge cache it for 5 min.
-	const res = jsonResponse({ ok: true, plans: out });
+	const { plans, rows } = await planComparison(env);
+	const res = jsonResponse({ ok: true, plans, comparison: rows });
 	res.headers.set("cache-control", "public, max-age=300");
 	return res;
 }

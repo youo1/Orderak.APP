@@ -39,8 +39,6 @@ const catalog = JSON.parse(
 );
 const catalogKeys = new Set(catalog.features.map(f => f.key));
 
-/** Routes the migration adds; not expected in Routes.kt yet. */
-const NEW_ROUTES = new Set(["PlansRoute", "PaywallRoute"]);
 /**
  * Deleted, and must stay deleted.
  *
@@ -203,7 +201,7 @@ const head = s => s.split("—")[0].trim();
 const isKnownTarget = (t) => {
   const h = head(t);
   if (ids.has(h)) return true;
-  if (declaredRoutes.has(h) || NEW_ROUTES.has(h)) return true;
+  if (declaredRoutes.has(h)) return true;
   return EXTERNAL.some(e => t.startsWith(e));
 };
 
@@ -213,7 +211,7 @@ for (const c of CONTRACTS) {
   if (c.kotlinRoute !== null) {
     if (DELETED_ROUTES.has(c.kotlinRoute)) {
       push(c, `${c.kotlinRoute} was deleted — the account surface hosts it, so no contract may name it`);
-    } else if (!declaredRoutes.has(c.kotlinRoute) && !NEW_ROUTES.has(c.kotlinRoute)) {
+    } else if (!declaredRoutes.has(c.kotlinRoute)) {
       push(c, `kotlinRoute "${c.kotlinRoute}" is not declared in Routes.kt`);
     }
   }

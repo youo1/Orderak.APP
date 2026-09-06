@@ -22,6 +22,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import app.orderak.seller.feature.auth.AuthScreen
+import app.orderak.seller.feature.billing.PaywallScreen
+import app.orderak.seller.feature.billing.PlansScreen
 import app.orderak.seller.feature.customers.CustomerDetailsScreen
 import app.orderak.seller.feature.main.MainScreen
 import app.orderak.seller.feature.orders.NewOrderScreen
@@ -130,6 +132,7 @@ fun OrderakNavHost() {
                 onAddProduct = { navController.navigate(ProductEditRoute()) },
                 onEditProduct = { id: Long -> navController.navigate(ProductEditRoute(id)) },
                 onOpenCustomer = { key: String -> navController.navigate(CustomerRoute(key)) },
+                onLimitReached = { key: String -> navController.navigate(PaywallRoute(key)) },
                 onOpenAnnouncements = { navController.navigate(AnnouncementsRoute) },
                 // The account surface owns the settings destinations now, so
                 // the shell passes them straight through.
@@ -146,7 +149,12 @@ fun OrderakNavHost() {
             )
         }
 
-        composable<ProductEditRoute> { ProductEditScreen(onBack = { navController.popBackStack() }) }
+        composable<ProductEditRoute> {
+            ProductEditScreen(
+                onBack = { navController.popBackStack() },
+                onLimitReached = { key: String -> navController.navigate(PaywallRoute(key)) },
+            )
+        }
 
         composable<NewOrderRoute> {
             NewOrderScreen(
@@ -166,9 +174,25 @@ fun OrderakNavHost() {
             )
         }
 
+        composable<PlansRoute> { PlansScreen(onBack = { navController.popBackStack() }) }
+
+        // popBackStack, not a navigate: the seller came here from a screen with
+        // half-entered input, and returning by any other route would discard it.
+        composable<PaywallRoute> {
+            PaywallScreen(
+                onBack = { navController.popBackStack() },
+                onViewPlans = { navController.navigate(PlansRoute) },
+            )
+        }
+
         composable<StoreInfoRoute> { StoreInfoScreen(onBack = { navController.popBackStack() }) }
 
-        composable<CategoriesRoute> { CategoriesScreen(onBack = { navController.popBackStack() }) }
+        composable<CategoriesRoute> {
+            CategoriesScreen(
+                onBack = { navController.popBackStack() },
+                onLimitReached = { key: String -> navController.navigate(PaywallRoute(key)) },
+            )
+        }
 
         composable<SellerProfileRoute> {
             SellerProfileScreen(

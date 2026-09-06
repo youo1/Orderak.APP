@@ -487,4 +487,23 @@
     <string name="products_search_empty">Aucun produit ne correspond à « %1$s »</string>
     <string name="customers_search_empty">Aucun client ne correspond à « %1$s »</string>
     <string name="search_clear_action">Effacer la recherche</string>
+    <string name="plans_title">Offres</string>
+    <string name="plans_feature_column">Fonctionnalité</string>
+    <string name="plans_unavailable">Les détails des offres ne sont pas disponibles pour le moment</string>
+    <string name="plans_purchase_closed">La mise à niveau n\'est pas encore ouverte. Cette page vous montre ce que contient chaque offre.</string>
+    <string name="plans_price_note">Les prix seront affichés par Google Play dans votre devise à l\'ouverture des mises à niveau.</string>
+    <string name="paywall_title">Limite de l\'offre atteinte</string>
+    <string name="paywall_limit_products">Vous avez atteint votre limite de produits</string>
+    <string name="paywall_limit_categories">Vous avez atteint votre limite de catégories</string>
+    <string name="paywall_limit_orders">Vous avez atteint la limite de commandes de ce mois</string>
+    <string name="paywall_limit_devices">Vous avez atteint votre limite d\'appareils</string>
+    <string name="paywall_limit_ai">Vous avez atteint la limite de requêtes IA de ce mois</string>
+    <string name="paywall_limit_generic">Vous avez atteint une limite de votre offre</string>
+    <string name="paywall_usage_of_limit">Vous utilisez %1$d sur %2$d.</string>
+    <string name="paywall_limit_only">Votre offre en autorise %1$d.</string>
+    <string name="paywall_limit_unknown">Votre offre n\'en autorise pas davantage pour le moment.</string>
+    <string name="paywall_next_plan">%1$s vous en donne %2$s.</string>
+    <string name="paywall_dismiss">Retour</string>
+    <string name="paywall_view_plans">Voir les offres</string>
+    <string name="paywall_purchase_closed">La mise à niveau n\'est pas encore ouverte : il n\'y a rien à acheter ici.</string>
 </resources>

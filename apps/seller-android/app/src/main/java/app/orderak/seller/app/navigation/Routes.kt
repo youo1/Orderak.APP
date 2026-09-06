@@ -27,5 +27,18 @@ import kotlinx.serialization.Serializable
 @Serializable data object DevicesRoute
 @Serializable data object DeletionStatusRoute
 @Serializable data object SubscriptionRoute
+
+/** The four-plan comparison. Read-only while purchase is closed. */
+@Serializable data object PlansRoute
+
+/**
+ * The moment a seller hits a plan limit.
+ *
+ * Carries the entitlement key the server refused on, not the numbers. The
+ * snapshot the app already holds has the limit, the usage and what remains for
+ * that key; passing them through navigation would mean two sources for one fact
+ * and a back-stack entry that goes stale the moment a sync lands.
+ */
+@Serializable data class PaywallRoute(val limitKey: String)
 @Serializable data object AiAssistantRoute
 @Serializable data object SellerProfileRoute

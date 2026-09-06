@@ -38,12 +38,6 @@ const catalog = JSON.parse(readFileSync(catalogPath, "utf8"));
 const SURFACES = ["today", "orders", "store", "customers", "account"];
 const STATES = ["loading", "content", "empty", "error"];
 
-/**
- * Routes the migration will add in phase 9. Listed so transitions may point at
- * them before they exist; remove an entry the moment its route lands, or this
- * list becomes a way to hide drift rather than declare intent.
- */
-const PLANNED_ROUTES = new Set(["PlansRoute", "PaywallRoute"]);
 
 /** Synthetic manifest keys: surfaces and overlays hosted inside MainRoute. */
 const isSynthetic = (route) => route.includes("#");
@@ -107,7 +101,7 @@ const catalogKeys = new Map(catalog.features.map((f) => [f.key, f.implementation
 for (const s of screens) {
   const at = `${rel(manifestPath)}: ${s.route}`;
 
-  if (!isSynthetic(s.route) && !declaredRoutes.has(s.route) && !PLANNED_ROUTES.has(s.route)) {
+  if (!isSynthetic(s.route) && !declaredRoutes.has(s.route)) {
     problems.push(`${at}: names a route that is not declared in Routes.kt`);
   }
   if (s.parent !== "null" && s.parent !== undefined && !known.has(s.parent)) {
@@ -119,7 +113,7 @@ for (const s of screens) {
   if (!["implemented", "planned"].includes(s.status)) problems.push(`${at}: feature_status "${s.status}" is invalid`);
 
   for (const to of s.transitions) {
-    if (!known.has(to) && !declaredRoutes.has(to) && !PLANNED_ROUTES.has(to)) {
+    if (!known.has(to) && !declaredRoutes.has(to)) {
       problems.push(`${at}: transition to "${to}" resolves to nothing`);
     }
   }
@@ -139,14 +133,6 @@ for (const s of screens) {
 for (const route of declaredRoutes) {
   if (!known.has(route)) {
     problems.push(`${rel(routesPath)}: ${route} is declared but the manifest does not register it`);
-  }
-}
-
-for (const route of PLANNED_ROUTES) {
-  if (declaredRoutes.has(route)) {
-    problems.push(
-      `tooling/repository/verify-screen-manifest.mjs: ${route} now exists in Routes.kt — remove it from PLANNED_ROUTES`,
-    );
   }
 }
 
