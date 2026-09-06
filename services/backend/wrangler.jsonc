@@ -126,7 +126,8 @@
 			"DEEPSEEK_API_KEY",
 			"FIREBASE_WEB_API_KEY",
 			"FORWARD_TO",
-			"PAYMENT_WEBHOOK_SECRET"
+			"PAYMENT_WEBHOOK_SECRET",
+			"SENTRY_DSN"
 		]
 	},
 	"env": {
@@ -134,14 +135,22 @@
 			"name": "orderak-worker-staging",
 			"workers_dev": true,
 			"preview_urls": false,
-			// Staging runs with billing, AI and email forwarding off, and
-			// carries only these two. Requiring Production's provider
-			// credentials here would fail every staging deploy for services
-			// this environment does not call.
+			// Staging runs with billing, AI and email forwarding off, so it
+			// carries only what it actually calls. Requiring Production's
+			// provider credentials here would fail every staging deploy for
+			// services this environment does not use.
+			//
+			// SENTRY_DSN is required in both environments as of 2026-09-06.
+			// Sentry is wired in both Workers and no-ops silently when the DSN is
+			// unset, so nothing proved errors were aggregating anywhere — the
+			// failure mode of an observability tool that is not there is that
+			// everything looks quiet. Requiring it turns "was it ever set?" from
+			// a question nobody can answer into a deploy that stops.
 			"secrets": {
 				"required": [
 					"BUYER_PRIVACY_PEPPER",
-					"FIREBASE_WEB_API_KEY"
+					"FIREBASE_WEB_API_KEY",
+					"SENTRY_DSN"
 				]
 			},
 			"vars": {

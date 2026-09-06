@@ -9,15 +9,23 @@ applies_to: [production, staging]
 This document defines the production-ready authentication architecture target,
 Firebase console configuration, environment separation, and release gates.
 
-> **Implementation state (2026-08-01):** the versioned safety contract is v7;
+> **Implementation state (2026-09-06):** the versioned safety contract is v7;
 > the provider and runtime behavior remain the approved V6 Android profile. Hybrid
 > Passkeys, inline manual-verify OTP, post-OTP onboarding consent, private
 > profile/birth-year/email, and international phone/store onboarding are
 > implemented in the repository behind
-> `ONBOARDING_ENABLED=false` and `PASSKEY_ENABLED=false`. External
-> release/Play signing, Digital Asset Links, static city-catalogue import, all-country
-> Firebase policy/billing, migration publication, and physical-device evidence
-> remain production release gates.
+> `ONBOARDING_ENABLED=false` and `PASSKEY_ENABLED=false`.
+>
+> **Release signing now exists.** `signingConfigs` reads from the environment,
+> CI owns the version code, and `android-release.yml` produces a signed
+> production bundle — see [the release pipeline](../guides/android-release.md).
+> What remains outstanding is the key material itself and its registration:
+> a production Firebase project, the upload **and** Play App Signing
+> fingerprints on it, Digital Asset Links, all-country Firebase policy and
+> billing, migration publication, and physical-device evidence. Those remain
+> production release gates.
+>
+> The cutover itself is [production-auth-cutover.md](../runbooks/production-auth-cutover.md).
 
 ## Historical live production audit — 13 July 2026
 
@@ -32,8 +40,12 @@ Firebase console configuration, environment separation, and release gates.
   has its debug SHA-1/SHA-256 fingerprints; and App Check is registered with
   Play Integrity.
 - Release-upload and Google Play App Signing SHA-1/SHA-256 fingerprints remain
-  a release gate because this workspace has no release signing configuration or
-  Play signing certificate yet.
+  a release gate. As of 2026-09-06 the workspace *does* have release signing
+  configuration — what it does not have is a key, a Play signing certificate, or
+  the registration of either on a production Firebase project. Both pairs are
+  needed: Play re-signs the bundle, so a device presents Play's certificate, and
+  registering only the upload key gives sign-in that works on a sideloaded build
+  and fails from the Play install.
 - The production Worker version `35aaa76b-d8bb-4c3d-b9bc-d897a889b2d8` serves
   the deletion resource and runs technical-log cleanup daily at 02:17 UTC.
 
