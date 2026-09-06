@@ -38,6 +38,13 @@ type Body = Record<string, unknown>;
  * they already have. A seller who cannot buy must still be able to see the plan
  * they are on. See docs/domains/billing.md.
  *
+ * `/api/v1/plans` left the set for the same reason, and the case is stronger.
+ * It is a read-only comparison of what each plan includes; it takes no payment,
+ * grants nothing, and names no seller. Gating it meant the plans screen and the
+ * paywall — the two surfaces built specifically for a seller who has hit a limit
+ * and cannot buy — returned 403 in exactly the state they exist to serve. The
+ * seller was told a limit had stopped them and then refused the explanation.
+ *
  * The Android client calls none of this surface — its paid path is Google Play
  * (`/api/v1/billing/catalog`, `/api/v1/billing/google/verify`), a different
  * module with authoritative server-side verification.
@@ -49,7 +56,6 @@ const BILLING_ACQUISITION_ROUTES = new Set([
 	"/api/v1/coupons/apply",
 	"/api/v1/referral/apply",
 	"/api/v1/referral/stats",
-	"/api/v1/plans",
 	"/api/integrations/v1/payment",
 ]);
 
