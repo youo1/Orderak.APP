@@ -30,6 +30,7 @@ import {
 	uniqueSlug,
 	uniqueStoreCode,
 } from "./identity";
+import { validE164 } from "./phone";
 import { pickLocale } from "../../platform/localization/i18n";
 import { provisionDeviceSecret } from "./seller-session";
 import {
@@ -1223,10 +1224,6 @@ function isObject(value: unknown): value is Row {
 
 function string(value: unknown, max: number): string {
 	return typeof value === "string" ? value.trim().slice(0, max) : "";
-}
-
-function validE164(value: string): boolean {
-	return /^\+[1-9]\d{6,14}$/.test(value);
 }
 
 function validatedPhoneCountryIso(phone: string, requestedValue: unknown): string | null {

@@ -97,6 +97,7 @@ trigger's final semicolon when replaying a fresh remote D1 database.
 - [050_catalog_baseline_version.sql](#050_catalog_baseline_versionsql)
 - [051_manual_order_origin.sql](#051_manual_order_originsql)
 - [052_stock_movements.sql](#052_stock_movementssql)
+- [053_customers.sql](#053_customerssql)
 
 ## 001_init.sql
 
@@ -599,3 +600,14 @@ trigger's final semicolon when replaying a fresh remote D1 database.
 - Order-driven movement was already attributable by inference - an order_items row says which product and how many. What had no trace of any kind was the seller's own adjustment: editing a product's stock travels through the catalogue mirror as a compare-and-set that bumps stock_version and writes nothing else, so afterwards a seller correcting a count and an order that went missing were the same event.
 - The triggers write the ledger row in the same statement that moves the stock, so there is no ordering to get wrong and no code path that can move stock while forgetting to say so. The seller's adjustment is the one movement made in application code, and it writes its row in the same D1 batch - conditional on both the new revision AND the new figure, because the revision alone is also bumped by an order's trigger and would record a movement that was refused.
 - The backfill reconstructs what it can and says so: every row it writes carries `reconstructed = 1`. Sales are recoverable for order lines whose product still exists. Cancellations are a fact but not a time, because `status_changed_at` arrived with migration 046 and cancellations before it never reached the server at all. Manual adjustments are not recoverable in any case. What is left becomes one opening balance per product, which is the honest remainder rather than an invented history.
+
+## 053_customers.sql
+
+**Source:** `services/backend/migrations/053_customers.sql`
+
+### What it does
+
+- Adds `customers`, a row the seller owns and can edit. Before it a buyer was two denormalised columns on `orders` — `buyer_phone` and `buyer_name` — and the customer list was an aggregation computed on the device. There was no row to edit, which is why CustomerDetailsScreen had no edit control and no save: the catalogue sold editable customer profiles at paid1 while the app had nowhere to put an edit.
+- The key is not `buyer_phone`. The storefront's phone input is a bare `type="tel"` with no pattern, and the value is stripped to digits before it is stored, so the column holds any 8-to-15-digit string on earth with no prefix, no country and no plausibility check. `01012345678` and `+201012345678` are one person and two strings, and a table keyed on the raw value would inherit that split permanently. Identity here is the canonically normalised number, the same normalisation the identity and order systems use.
+- There is both a key and a raw value because normalisation has three outcomes, not two. A value that resolves to exactly one E.164 number is safe to merge two spellings of; one that is ambiguous — a bare national number the store's own country does not explain — or plainly invalid is not. Those are preserved verbatim and keyed to themselves, so an unresolvable value can never collide with another customer. Merging on a guess is how two people's order histories become one, and afterwards nothing can tell that apart from a correct merge.
+- The migration deliberately does not backfill. Classifying a value needs libphonenumber and the store's country, which SQL cannot do, and a crude SQL rule would produce exactly the wrong thing: confident merges indistinguishable from correct ones. The backfill is `scripts/backfill-customers.mjs`, run deliberately and reporting what it could not resolve. The table is otherwise purely additive, so the previous release serves live traffic against this schema without knowing it exists.

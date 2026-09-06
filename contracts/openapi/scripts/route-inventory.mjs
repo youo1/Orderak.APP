@@ -24,9 +24,27 @@ function normalize(raw, tail = "") {
   if (value.endsWith("/")) value += "{id}";
   const suffix = /\.endsWith\(["'`]([^"'`]+)["'`]\)/.exec(tail)?.[1];
   if (suffix && !value.endsWith(suffix)) value += suffix;
-  value = value.replace("/api/v1/categories/{id}", "/api/v1/categories/{category_code}");
-  return value;
+  return PARAMETER_NAMES.get(value) ?? value;
 }
+
+/**
+ * Paths whose dynamic segment the contract names something more specific.
+ *
+ * `normalize` collapses every interpolated segment to `{id}`, because that is
+ * all it can know from a string literal. Where the OpenAPI spec gives the
+ * parameter a real name, the two forms have to be reconciled or the route reads
+ * as undocumented — and the whole point of this scanner is that "undocumented"
+ * is a failure rather than a silent skip.
+ *
+ * A table rather than a chain of `.replace` calls: this began as one hard-coded
+ * line for categories, and one hard-coded line is how a list of them starts.
+ */
+const PARAMETER_NAMES = new Map([
+  ["/api/v1/categories/{id}", "/api/v1/categories/{category_code}"],
+  // The customer key is a normalised phone number, not an id, and the contract
+  // says so. See services/backend/src/domains/identity/phone.ts.
+  ["/api/v1/customers/{id}", "/api/v1/customers/{customer_key}"],
+]);
 
 /**
  * Path literals the regex pass could not turn into a route.
