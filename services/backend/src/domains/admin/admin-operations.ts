@@ -89,9 +89,15 @@ op.get(`${B}/subscriptions`, async (c) => {
 op.get(`${B}/billing/health`, async (c) => {
 		const env = c.env, gate = c.get("gate");
 		const denied = gate("subscriptions:view"); if (denied) return denied;
-		const mappings = await env.orderak_db.prepare(
-			"SELECT COUNT(*) total,SUM(CASE WHEN active=1 THEN 1 ELSE 0 END) active,MAX(last_synced_at) last_synced_at FROM play_product_mappings",
-		).first();
+		// Grouped by package, not totalled. Staging has its own Play Console entry
+		// so the table holds a mapping set per package, and a bare "6 of 12 active"
+		// tells an operator nothing about which environment can actually sell.
+		const { results: mappings } = await env.orderak_db.prepare(
+			`SELECT package_name,COUNT(*) total,
+			        SUM(CASE WHEN active=1 THEN 1 ELSE 0 END) active,
+			        MAX(last_synced_at) last_synced_at
+			   FROM play_product_mappings GROUP BY package_name ORDER BY package_name`,
+		).all();
 		const { results: purchases } = await env.orderak_db.prepare(
 			"SELECT state,COUNT(*) count,MAX(last_verified_at) last_verified_at FROM play_purchases GROUP BY state ORDER BY state",
 		).all();
@@ -133,7 +139,7 @@ op.get(`${B}/billing/health`, async (c) => {
 				acquisition: env.BILLING_ENABLED === "true",
 				lifecycle: env.GOOGLE_PLAY_LIFECYCLE_ENABLED === "true",
 			},
-			mappings: mappings ?? {},
+			mappings: mappings ?? [],
 			purchases: purchases ?? [],
 			rtdn: events ?? {},
 			verification_jobs: jobs ?? {},

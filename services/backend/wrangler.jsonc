@@ -157,7 +157,15 @@
 				"STATIC_CITY_CATALOG_ENABLED": "true",
 				"BUSINESS_TAXONOMY_ENABLED": "true",
 				"AI_MONTHLY_BUDGET_MICRO_USD": "0",
-				"GOOGLE_PLAY_PACKAGE_NAME": "app.orderak.seller",
+				// Staging has its own Play Console entry. The staging Android
+				// flavour applies applicationIdSuffix = ".staging", so a staging
+				// build is a different app to Google, with its own products —
+				// product ids are scoped per app. The mapping lookup binds this
+				// value, and migration 054 carries a set of mappings for each
+				// package, so this string is what selects between them. Pointing
+				// it at the production package would make staging purchases
+				// resolve against production's products.
+				"GOOGLE_PLAY_PACKAGE_NAME": "app.orderak.seller.staging",
 				"LOCAL_JWT_VERIFICATION": "true",
 				"FIREBASE_PROJECT_ID": "orderak-staging"
 			},

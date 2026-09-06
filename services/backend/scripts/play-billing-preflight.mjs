@@ -39,6 +39,7 @@
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadJsonc } from "../../../tooling/lib/jsonc.mjs";
 
 const backendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
@@ -107,6 +108,27 @@ function secretNames() {
 	}
 }
 
+/**
+ * This environment's Play package, read from the same file the Worker deploys
+ * with.
+ *
+ * Parsed rather than assumed, because it is the value that decides which of the
+ * two mapping sets the lookup can see. Reading it from wrangler.jsonc means the
+ * preflight is checking the configuration that ships, not a copy of it.
+ *
+ * loadJsonc is the repository's one JSONC reader — verify-deployment-map grew a
+ * stripper, and a second copy here would agree with it only until one was fixed.
+ */
+function expectedPackage() {
+	try {
+		const config = loadJsonc(path.join(backendRoot, "wrangler.jsonc"));
+		const scope = environment ? config.env?.[environment] : config;
+		return scope?.vars?.GOOGLE_PLAY_PACKAGE_NAME ?? config.vars?.GOOGLE_PLAY_PACKAGE_NAME ?? null;
+	} catch {
+		return null;
+	}
+}
+
 const blockers = [];
 const warnings = [];
 const notes = [];
@@ -151,20 +173,33 @@ if (mappings === null) {
 			orphaned.map((row) => `${row.product_id}/${row.base_plan_id}`).join(", "),
 		);
 	}
-	const active = mappings.filter((row) => Number(row.active) === 1);
-	if (active.length === 0) {
-		// Not a blocker on its own: mappings are activated as part of the rollout,
-		// after the Play Console products are confirmed to exist. Saying so is the
-		// point — an inactive mapping means a purchase of that product is refused.
-		notes.push(`all ${mappings.length} mappings are inactive — activate them only after confirming each product exists in the Play Console`);
-	} else {
-		notes.push(`${active.length} of ${mappings.length} mappings active: ${active.map((r) => `${r.product_id}/${r.base_plan_id}`).join(", ")}`);
+	// Two packages is the expected shape, not a problem: staging has its own
+	// Play Console entry, so migration 054 carries a mapping set for each.
+	// GOOGLE_PLAY_PACKAGE_NAME is what selects between them, and a mapping set
+	// that does not match it is invisible to the lookup — a purchase would fail
+	// with play_product_not_enabled and the mappings would look fine in a table.
+	const expected = expectedPackage();
+	const byPackage = new Map();
+	for (const row of mappings) {
+		const name = String(row.package_name);
+		byPackage.set(name, (byPackage.get(name) ?? 0) + 1);
 	}
-	const packages = new Set(mappings.map((row) => String(row.package_name)));
-	if (packages.size > 1) {
-		blockers.push(`mappings name more than one package: ${[...packages].join(", ")}`);
+	notes.push(`mapping sets: ${[...byPackage].map(([name, n]) => `${name} (${n})`).join(", ")}`);
+
+	if (expected === null) {
+		warnings.push("could not read GOOGLE_PLAY_PACKAGE_NAME from wrangler.jsonc — confirm by hand that a mapping set matches this environment's package");
+	} else if (!byPackage.has(expected)) {
+		blockers.push(
+			`no mapping carries package ${expected}, which is this environment's GOOGLE_PLAY_PACKAGE_NAME — ` +
+			"every purchase would fail with play_product_not_enabled",
+		);
 	} else {
-		notes.push(`package name on every mapping: ${[...packages][0]} (must equal GOOGLE_PLAY_PACKAGE_NAME and the signed build's applicationId)`);
+		const matching = mappings.filter((row) => String(row.package_name) === expected);
+		const matchingActive = matching.filter((row) => Number(row.active) === 1).length;
+		notes.push(`this environment resolves against ${expected}: ${matching.length} mappings, ${matchingActive} active`);
+		if (matchingActive === 0) {
+			notes.push("none of them active yet — activate one product first, after confirming it exists in that Play Console entry");
+		}
 	}
 }
 
