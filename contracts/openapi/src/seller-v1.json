@@ -8547,7 +8547,7 @@
           "seller"
         ],
         "summary": "GET /api/v1/config",
-        "description": "Pre-release seller v1 operation. Detailed domain schemas replace the generic bootstrap schema during API-first review.",
+        "description": "Plan limits, feature flags and governance for in-app enforcement. Carries both the flat limits/features blocks that installed builds read and the keyed entitlements map that every feature gate and usage meter reads.",
         "x-owner": "Seller Experience",
         "x-data-classification": "pending-review",
         "x-rate-limit": "seller-authenticated-default",
@@ -8579,31 +8579,285 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "./components/common.json#/schemas/GenericSuccess"
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "plan_id",
+                    "limits",
+                    "entitlements"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "plan_id": {
+                      "type": "string"
+                    },
+                    "plan_name": {
+                      "type": "string"
+                    },
+                    "ads_enabled": {
+                      "type": "boolean"
+                    },
+                    "current_period_end": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    },
+                    "limits": {
+                      "type": "object",
+                      "description": "Flat limits, retained for builds that predate the entitlement map. Null means unlimited.",
+                      "properties": {
+                        "max_categories": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "max_products": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "max_orders_per_month": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "max_ai_requests_per_month": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "max_team_members": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "max_concurrent_devices": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "features": {
+                      "type": "object",
+                      "description": "Flat feature booleans, retained for the same reason as limits.",
+                      "additionalProperties": {
+                        "type": "boolean"
+                      }
+                    },
+                    "entitlements": {
+                      "$ref": "#/components/schemas/EntitlementMap"
+                    },
+                    "governance": {
+                      "type": "object",
+                      "description": "Admin-governed version policy and feature flags, evaluated for this caller.",
+                      "additionalProperties": true
+                    }
+                  }
                 },
                 "examples": {
-                  "success": {
-                    "value": {
-                      "ok": true
-                    }
-                  },
-                  "empty": {
+                  "free_plan": {
+                    "summary": "Free plan, with both the flat blocks and the entitlement map",
+                    "description": "The flat limits and features are what installed builds read; the entitlements map is what every feature gate and usage meter reads. Both are sent.",
                     "value": {
                       "ok": true,
-                      "items": [],
-                      "has_more": false
-                    }
-                  },
-                  "pagination": {
-                    "value": {
-                      "ok": true,
-                      "items": [
-                        {
-                          "id": "example"
+                      "plan_id": "free",
+                      "plan_name": "Free",
+                      "ads_enabled": true,
+                      "limits": {
+                        "max_categories": 5,
+                        "max_products": 20,
+                        "max_orders_per_month": 50,
+                        "max_ai_requests_per_month": 20,
+                        "max_team_members": 1
+                      },
+                      "features": {
+                        "custom_domain": false,
+                        "analytics": false,
+                        "priority_support": false,
+                        "ai_assistant": true,
+                        "multi_device": false
+                      },
+                      "entitlements": {
+                        "max_products": {
+                          "key": "max_products",
+                          "category": "Plan limits",
+                          "name": "max_products",
+                          "description": "Legacy compatibility entitlement",
+                          "value_type": "integer",
+                          "unit": null,
+                          "reset_period": "none",
+                          "implementation_status": "implemented",
+                          "admin_configurable": true,
+                          "mode": "value",
+                          "value": 20,
+                          "display_value": "20",
+                          "available": true,
+                          "used": 3,
+                          "remaining": 17,
+                          "reset_at": null,
+                          "custom_required": false
+                        },
+                        "max_categories": {
+                          "key": "max_categories",
+                          "category": "Plan limits",
+                          "name": "max_categories",
+                          "description": "Legacy compatibility entitlement",
+                          "value_type": "integer",
+                          "unit": null,
+                          "reset_period": "none",
+                          "implementation_status": "implemented",
+                          "admin_configurable": true,
+                          "mode": "value",
+                          "value": 5,
+                          "display_value": "5",
+                          "available": true,
+                          "used": 1,
+                          "remaining": 4,
+                          "reset_at": null,
+                          "custom_required": false
+                        },
+                        "max_orders_per_month": {
+                          "key": "max_orders_per_month",
+                          "category": "Plan limits",
+                          "name": "max_orders_per_month",
+                          "description": "Legacy compatibility entitlement",
+                          "value_type": "integer",
+                          "unit": null,
+                          "reset_period": "calendar_month_utc",
+                          "implementation_status": "implemented",
+                          "admin_configurable": true,
+                          "mode": "value",
+                          "value": 50,
+                          "display_value": "50",
+                          "available": true,
+                          "used": 12,
+                          "remaining": 38,
+                          "reset_at": "2026-10-01T00:00:00.000Z",
+                          "custom_required": false
+                        },
+                        "max_ai_requests_per_month": {
+                          "key": "max_ai_requests_per_month",
+                          "category": "Plan limits",
+                          "name": "max_ai_requests_per_month",
+                          "description": "Legacy compatibility entitlement",
+                          "value_type": "integer",
+                          "unit": null,
+                          "reset_period": "calendar_month_utc",
+                          "implementation_status": "implemented",
+                          "admin_configurable": true,
+                          "mode": "value",
+                          "value": 20,
+                          "display_value": "20",
+                          "available": true,
+                          "used": null,
+                          "remaining": null,
+                          "reset_at": "2026-10-01T00:00:00.000Z",
+                          "custom_required": false
+                        },
+                        "max_concurrent_devices": {
+                          "key": "max_concurrent_devices",
+                          "category": "Plan limits",
+                          "name": "max_concurrent_devices",
+                          "description": "Legacy compatibility entitlement",
+                          "value_type": "integer",
+                          "unit": null,
+                          "reset_period": "none",
+                          "implementation_status": "implemented",
+                          "admin_configurable": true,
+                          "mode": "value",
+                          "value": 1,
+                          "display_value": "1",
+                          "available": true,
+                          "used": 1,
+                          "remaining": 0,
+                          "reset_at": null,
+                          "custom_required": false
+                        },
+                        "max_team_members": {
+                          "key": "max_team_members",
+                          "category": "Plan limits",
+                          "name": "max_team_members",
+                          "description": "Legacy compatibility entitlement",
+                          "value_type": "integer",
+                          "unit": null,
+                          "reset_period": "none",
+                          "implementation_status": "planned",
+                          "admin_configurable": true,
+                          "mode": "value",
+                          "value": 1,
+                          "display_value": "1",
+                          "available": true,
+                          "used": null,
+                          "remaining": null,
+                          "reset_at": null,
+                          "custom_required": false
+                        },
+                        "orders_fulfilment.order_history": {
+                          "key": "orders_fulfilment.order_history",
+                          "category": "Orders & fulfilment",
+                          "name": "Order history",
+                          "description": null,
+                          "value_type": "boolean",
+                          "unit": null,
+                          "reset_period": "none",
+                          "implementation_status": "implemented",
+                          "admin_configurable": false,
+                          "mode": "value",
+                          "value": true,
+                          "display_value": "Included",
+                          "available": true,
+                          "used": null,
+                          "remaining": null,
+                          "reset_at": null,
+                          "custom_required": false
+                        },
+                        "team_security.multiple_owner_devices": {
+                          "key": "team_security.multiple_owner_devices",
+                          "category": "Team & security",
+                          "name": "Multiple owner devices",
+                          "description": null,
+                          "value_type": "boolean",
+                          "unit": null,
+                          "reset_period": "none",
+                          "implementation_status": "implemented",
+                          "admin_configurable": false,
+                          "mode": "disabled",
+                          "value": false,
+                          "display_value": "—",
+                          "available": false,
+                          "used": null,
+                          "remaining": null,
+                          "reset_at": null,
+                          "custom_required": false
                         }
-                      ],
-                      "next_cursor": "opaque-cursor",
-                      "has_more": true
+                      },
+                      "governance": {
+                        "schema_version": 1,
+                        "server_time": "2026-09-05T09:00:00.000Z",
+                        "version": {
+                          "status": "ok"
+                        },
+                        "features": {
+                          "ai_assistant": {
+                            "enabled": true,
+                            "source": "plan"
+                          }
+                        }
+                      }
                     }
                   }
                 }
@@ -9693,7 +9947,7 @@
           "seller"
         ],
         "summary": "GET /api/v1/entitlements",
-        "description": "Pre-release seller v1 operation. Detailed domain schemas replace the generic bootstrap schema during API-first review.",
+        "description": "The account's entitlement snapshot. Answers with a snapshot whether or not the versioned policy engine is enabled: with it off, the legacy plan model is projected into the same shape, so the client consumes one schema and cannot tell which side served it. Supports If-None-Match.",
         "x-owner": "Seller Experience",
         "x-data-classification": "pending-review",
         "x-rate-limit": "seller-authenticated-default",
@@ -9720,36 +9974,192 @@
             "headers": {
               "X-Request-ID": {
                 "$ref": "./components/common.json#/headers/RequestId"
+              },
+              "ETag": {
+                "description": "Validator for this snapshot. Send it back as If-None-Match.",
+                "schema": {
+                  "type": "string"
+                }
               }
             },
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "./components/common.json#/schemas/GenericSuccess"
+                  "$ref": "#/components/schemas/EntitlementSnapshot"
                 },
                 "examples": {
-                  "success": {
-                    "value": {
-                      "ok": true
-                    }
-                  },
-                  "empty": {
+                  "free_plan_legacy_engine": {
+                    "summary": "Free plan, legacy plan model answering",
+                    "description": "What every seller receives while ENTITLEMENTS_ENABLED is false. Same shape the policy engine returns; plan_revision_id names which side answered, and no client reads it to decide anything.",
                     "value": {
                       "ok": true,
-                      "items": [],
-                      "has_more": false
-                    }
-                  },
-                  "pagination": {
-                    "value": {
-                      "ok": true,
-                      "items": [
-                        {
-                          "id": "example"
+                      "schema_version": 1,
+                      "organization_id": null,
+                      "plan_id": "free",
+                      "plan_key": "free",
+                      "plan_name": "Free",
+                      "plan_revision_id": "legacy:free",
+                      "plan_version": 0,
+                      "subscription_status": "active",
+                      "current_period_end": null,
+                      "pending_revision_id": null,
+                      "pending_effective_at": null,
+                      "entitlements": {
+                        "max_products": {
+                          "key": "max_products",
+                          "category": "Plan limits",
+                          "name": "max_products",
+                          "description": "Legacy compatibility entitlement",
+                          "value_type": "integer",
+                          "unit": null,
+                          "reset_period": "none",
+                          "implementation_status": "implemented",
+                          "admin_configurable": true,
+                          "mode": "value",
+                          "value": 20,
+                          "display_value": "20",
+                          "available": true,
+                          "used": 3,
+                          "remaining": 17,
+                          "reset_at": null,
+                          "custom_required": false
+                        },
+                        "max_categories": {
+                          "key": "max_categories",
+                          "category": "Plan limits",
+                          "name": "max_categories",
+                          "description": "Legacy compatibility entitlement",
+                          "value_type": "integer",
+                          "unit": null,
+                          "reset_period": "none",
+                          "implementation_status": "implemented",
+                          "admin_configurable": true,
+                          "mode": "value",
+                          "value": 5,
+                          "display_value": "5",
+                          "available": true,
+                          "used": 1,
+                          "remaining": 4,
+                          "reset_at": null,
+                          "custom_required": false
+                        },
+                        "max_orders_per_month": {
+                          "key": "max_orders_per_month",
+                          "category": "Plan limits",
+                          "name": "max_orders_per_month",
+                          "description": "Legacy compatibility entitlement",
+                          "value_type": "integer",
+                          "unit": null,
+                          "reset_period": "calendar_month_utc",
+                          "implementation_status": "implemented",
+                          "admin_configurable": true,
+                          "mode": "value",
+                          "value": 50,
+                          "display_value": "50",
+                          "available": true,
+                          "used": 12,
+                          "remaining": 38,
+                          "reset_at": "2026-10-01T00:00:00.000Z",
+                          "custom_required": false
+                        },
+                        "max_ai_requests_per_month": {
+                          "key": "max_ai_requests_per_month",
+                          "category": "Plan limits",
+                          "name": "max_ai_requests_per_month",
+                          "description": "Legacy compatibility entitlement",
+                          "value_type": "integer",
+                          "unit": null,
+                          "reset_period": "calendar_month_utc",
+                          "implementation_status": "implemented",
+                          "admin_configurable": true,
+                          "mode": "value",
+                          "value": 20,
+                          "display_value": "20",
+                          "available": true,
+                          "used": null,
+                          "remaining": null,
+                          "reset_at": "2026-10-01T00:00:00.000Z",
+                          "custom_required": false
+                        },
+                        "max_concurrent_devices": {
+                          "key": "max_concurrent_devices",
+                          "category": "Plan limits",
+                          "name": "max_concurrent_devices",
+                          "description": "Legacy compatibility entitlement",
+                          "value_type": "integer",
+                          "unit": null,
+                          "reset_period": "none",
+                          "implementation_status": "implemented",
+                          "admin_configurable": true,
+                          "mode": "value",
+                          "value": 1,
+                          "display_value": "1",
+                          "available": true,
+                          "used": 1,
+                          "remaining": 0,
+                          "reset_at": null,
+                          "custom_required": false
+                        },
+                        "max_team_members": {
+                          "key": "max_team_members",
+                          "category": "Plan limits",
+                          "name": "max_team_members",
+                          "description": "Legacy compatibility entitlement",
+                          "value_type": "integer",
+                          "unit": null,
+                          "reset_period": "none",
+                          "implementation_status": "planned",
+                          "admin_configurable": true,
+                          "mode": "value",
+                          "value": 1,
+                          "display_value": "1",
+                          "available": true,
+                          "used": null,
+                          "remaining": null,
+                          "reset_at": null,
+                          "custom_required": false
+                        },
+                        "orders_fulfilment.order_history": {
+                          "key": "orders_fulfilment.order_history",
+                          "category": "Orders & fulfilment",
+                          "name": "Order history",
+                          "description": null,
+                          "value_type": "boolean",
+                          "unit": null,
+                          "reset_period": "none",
+                          "implementation_status": "implemented",
+                          "admin_configurable": false,
+                          "mode": "value",
+                          "value": true,
+                          "display_value": "Included",
+                          "available": true,
+                          "used": null,
+                          "remaining": null,
+                          "reset_at": null,
+                          "custom_required": false
+                        },
+                        "team_security.multiple_owner_devices": {
+                          "key": "team_security.multiple_owner_devices",
+                          "category": "Team & security",
+                          "name": "Multiple owner devices",
+                          "description": null,
+                          "value_type": "boolean",
+                          "unit": null,
+                          "reset_period": "none",
+                          "implementation_status": "implemented",
+                          "admin_configurable": false,
+                          "mode": "disabled",
+                          "value": false,
+                          "display_value": "—",
+                          "available": false,
+                          "used": null,
+                          "remaining": null,
+                          "reset_at": null,
+                          "custom_required": false
                         }
-                      ],
-                      "next_cursor": "opaque-cursor",
-                      "has_more": true
+                      },
+                      "server_time": "2026-09-05T09:00:00.000Z",
+                      "etag": "\"3f1c8a2be4d95077\""
                     }
                   }
                 }
@@ -9898,6 +10308,17 @@
                       "retryable": true
                     }
                   }
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "The snapshot has not changed since the validator was issued.",
+            "headers": {
+              "ETag": {
+                "description": "Unchanged validator.",
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -16022,6 +16443,812 @@
           }
         }
       }
+    },
+    "/api/v1/customers": {
+      "get": {
+        "operationId": "get_v1_customers",
+        "tags": [
+          "seller"
+        ],
+        "summary": "The store's customers, with order counts and lifetime spend. Store is resolved from the credential; there is no store parameter.",
+        "description": "The store's customers, with order counts and lifetime spend. Store is resolved from the credential; there is no store parameter.",
+        "x-owner": "Seller Experience",
+        "x-data-classification": "L2",
+        "x-rate-limit": "seller-authenticated-default",
+        "x-stability": "draft",
+        "security": [
+          {
+            "sellerDevice": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "./components/common.json#/parameters/RequestId"
+          },
+          {
+            "$ref": "./components/common.json#/parameters/ClientPlatform"
+          },
+          {
+            "$ref": "./components/common.json#/parameters/AppVersion"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The store's customers.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "customers"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "customers": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Customer"
+                      }
+                    }
+                  }
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "ok": true,
+                      "customers": [
+                        {
+                          "customer_key": "+201012345678",
+                          "phone_e164": "+201012345678",
+                          "phone_raw": "01012345678",
+                          "phone_status": "valid",
+                          "name": "Mariam Hassan",
+                          "alt_contact": "01199999999",
+                          "note": "Prefers evening delivery",
+                          "orders_count": 4,
+                          "total_minor": 62000,
+                          "last_order_at": "2026-09-01T17:20:00Z",
+                          "created_at": "2026-05-02T09:00:00Z",
+                          "updated_at": "2026-09-01T17:20:00Z"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failure",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/validation_failed",
+                      "title": "Validation Failed",
+                      "status": 400,
+                      "code": "validation_failed",
+                      "detail": "One or more fields are invalid.",
+                      "request_id": "018f-example",
+                      "field_errors": {
+                        "field": "invalid"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/auth",
+                      "title": "Auth",
+                      "status": 401,
+                      "code": "auth",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/forbidden",
+                      "title": "Forbidden",
+                      "status": 403,
+                      "code": "forbidden",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              },
+              "Retry-After": {
+                "$ref": "./components/common.json#/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/rate_limited",
+                      "title": "Rate Limited",
+                      "status": 429,
+                      "code": "rate_limited",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example",
+                      "retryable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Retryable dependency failure",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              },
+              "Retry-After": {
+                "$ref": "./components/common.json#/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/temporarily_unavailable",
+                      "title": "Temporarily Unavailable",
+                      "status": 503,
+                      "code": "temporarily_unavailable",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example",
+                      "retryable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/customers/{customer_key}": {
+      "get": {
+        "operationId": "get_v1_customers_by_key",
+        "tags": [
+          "seller"
+        ],
+        "summary": "One customer of this store.",
+        "description": "One customer of this store.",
+        "x-owner": "Seller Experience",
+        "x-data-classification": "L2",
+        "x-rate-limit": "seller-authenticated-default",
+        "x-stability": "draft",
+        "security": [
+          {
+            "sellerDevice": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "customer_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The customer_key from the list. URL-encoded: a resolved key begins with '+'."
+          },
+          {
+            "$ref": "./components/common.json#/parameters/RequestId"
+          },
+          {
+            "$ref": "./components/common.json#/parameters/ClientPlatform"
+          },
+          {
+            "$ref": "./components/common.json#/parameters/AppVersion"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The customer.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "customer"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "customer": {
+                      "$ref": "#/components/schemas/Customer"
+                    }
+                  }
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "ok": true,
+                      "customer": {
+                        "customer_key": "+201012345678",
+                        "phone_e164": "+201012345678",
+                        "phone_raw": "01012345678",
+                        "phone_status": "valid",
+                        "name": "Mariam Hassan",
+                        "alt_contact": "01199999999",
+                        "note": "Prefers evening delivery",
+                        "orders_count": 4,
+                        "total_minor": 62000,
+                        "last_order_at": "2026-09-01T17:20:00Z",
+                        "created_at": "2026-05-02T09:00:00Z",
+                        "updated_at": "2026-09-01T17:20:00Z"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failure",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/validation_failed",
+                      "title": "Validation Failed",
+                      "status": 400,
+                      "code": "validation_failed",
+                      "detail": "One or more fields are invalid.",
+                      "request_id": "018f-example",
+                      "field_errors": {
+                        "field": "invalid"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/auth",
+                      "title": "Auth",
+                      "status": 401,
+                      "code": "auth",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/forbidden",
+                      "title": "Forbidden",
+                      "status": 403,
+                      "code": "forbidden",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              },
+              "Retry-After": {
+                "$ref": "./components/common.json#/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/rate_limited",
+                      "title": "Rate Limited",
+                      "status": 429,
+                      "code": "rate_limited",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example",
+                      "retryable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Retryable dependency failure",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              },
+              "Retry-After": {
+                "$ref": "./components/common.json#/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/temporarily_unavailable",
+                      "title": "Temporarily Unavailable",
+                      "status": 503,
+                      "code": "temporarily_unavailable",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example",
+                      "retryable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such customer for this store",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/not-found",
+                      "title": "Not found",
+                      "status": 404,
+                      "code": "auth",
+                      "request_id": "018f-example",
+                      "detail": "This store has no customer with that key."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "patch_v1_customers_by_key",
+        "tags": [
+          "seller"
+        ],
+        "summary": "Edit a customer's name, alternate contact or note. The phone is the identity and is not editable: changing it would silently be a different customer, taking the order history with it.",
+        "description": "Edit a customer's name, alternate contact or note. The phone is the identity and is not editable: changing it would silently be a different customer, taking the order history with it.",
+        "x-owner": "Seller Experience",
+        "x-data-classification": "L2",
+        "x-rate-limit": "seller-authenticated-default",
+        "x-stability": "draft",
+        "security": [
+          {
+            "sellerDevice": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "customer_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The customer_key from the list. URL-encoded: a resolved key begins with '+'."
+          },
+          {
+            "$ref": "./components/common.json#/parameters/RequestId"
+          },
+          {
+            "$ref": "./components/common.json#/parameters/ClientPlatform"
+          },
+          {
+            "$ref": "./components/common.json#/parameters/AppVersion"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "minProperties": 1,
+                "description": "Send only the fields being changed. Null clears a field; an omitted field is left as it is. A phone field of any name is refused with phone_not_editable.",
+                "properties": {
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 120
+                  },
+                  "alt_contact": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 120
+                  },
+                  "note": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 2000
+                  }
+                }
+              },
+              "examples": {
+                "rename": {
+                  "value": {
+                    "name": "Mariam Hassan",
+                    "note": "Prefers evening delivery"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The customer as it now stands.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "customer"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "customer": {
+                      "$ref": "#/components/schemas/Customer"
+                    }
+                  }
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "ok": true,
+                      "customer": {
+                        "customer_key": "+201012345678",
+                        "phone_e164": "+201012345678",
+                        "phone_raw": "01012345678",
+                        "phone_status": "valid",
+                        "name": "Mariam Hassan",
+                        "alt_contact": "01199999999",
+                        "note": "Prefers evening delivery",
+                        "orders_count": 4,
+                        "total_minor": 62000,
+                        "last_order_at": "2026-09-01T17:20:00Z",
+                        "created_at": "2026-05-02T09:00:00Z",
+                        "updated_at": "2026-09-01T17:20:00Z"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failure",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/validation_failed",
+                      "title": "Validation Failed",
+                      "status": 400,
+                      "code": "validation_failed",
+                      "detail": "One or more fields are invalid.",
+                      "request_id": "018f-example",
+                      "field_errors": {
+                        "field": "invalid"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/auth",
+                      "title": "Auth",
+                      "status": 401,
+                      "code": "auth",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/forbidden",
+                      "title": "Forbidden",
+                      "status": 403,
+                      "code": "forbidden",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              },
+              "Retry-After": {
+                "$ref": "./components/common.json#/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/rate_limited",
+                      "title": "Rate Limited",
+                      "status": 429,
+                      "code": "rate_limited",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example",
+                      "retryable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Retryable dependency failure",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              },
+              "Retry-After": {
+                "$ref": "./components/common.json#/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/temporarily_unavailable",
+                      "title": "Temporarily Unavailable",
+                      "status": 503,
+                      "code": "temporarily_unavailable",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example",
+                      "retryable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such customer for this store",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/not-found",
+                      "title": "Not found",
+                      "status": 404,
+                      "code": "auth",
+                      "request_id": "018f-example",
+                      "detail": "This store has no customer with that key."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -16254,6 +17481,280 @@
           "stock",
           "stock_version"
         ]
+      },
+      "Entitlement": {
+        "type": "object",
+        "description": "One catalogue entitlement as it applies to this account. The same shape is returned whether the policy engine or the legacy plan model answered, so no client needs to know which did.",
+        "required": [
+          "key",
+          "implementation_status",
+          "mode",
+          "available"
+        ],
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Catalogue key, e.g. max_products or orders_fulfilment.order_history."
+          },
+          "category": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "value_type": {
+            "type": "string",
+            "enum": [
+              "boolean",
+              "integer",
+              "text",
+              "enum"
+            ]
+          },
+          "unit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reset_period": {
+            "type": "string",
+            "enum": [
+              "none",
+              "calendar_month_utc"
+            ]
+          },
+          "implementation_status": {
+            "type": "string",
+            "enum": [
+              "implemented",
+              "partial",
+              "planned"
+            ],
+            "description": "Whether the app has actually built this. Anything other than implemented is drawn as unavailable and is never offered as an upgrade, so that a mis-seeded row cannot turn an unbuilt feature into something a seller can pay for."
+          },
+          "admin_configurable": {
+            "type": "boolean"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "value",
+              "disabled",
+              "unlimited",
+              "custom_required"
+            ]
+          },
+          "value": {
+            "description": "Number, boolean or string according to value_type. Null when the mode is unlimited or disabled."
+          },
+          "display_value": {
+            "type": "string"
+          },
+          "available": {
+            "type": "boolean",
+            "description": "Whether this account may use it right now."
+          },
+          "used": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Consumption so far, or null when nothing counts it. Null is not zero: the app draws a usage meter only when it has a numerator, so an uncounted limit is left without one rather than shown as unused."
+          },
+          "remaining": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "reset_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "custom_required": {
+            "type": "boolean"
+          }
+        }
+      },
+      "EntitlementMap": {
+        "type": "object",
+        "description": "Entitlements keyed by catalogue key.",
+        "additionalProperties": {
+          "$ref": "#/components/schemas/Entitlement"
+        }
+      },
+      "EntitlementSnapshot": {
+        "type": "object",
+        "description": "The account's plan and everything it permits. Served whichever entitlement engine is enabled; the flag selects who answers, never whether there is an answer.",
+        "required": [
+          "ok",
+          "schema_version",
+          "plan_key",
+          "entitlements"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "schema_version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "organization_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "plan_id": {
+            "type": "string"
+          },
+          "plan_key": {
+            "type": "string"
+          },
+          "plan_name": {
+            "type": "string"
+          },
+          "plan_revision_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Identifies the published plan revision, or legacy:<plan> when the legacy plan model answered."
+          },
+          "plan_version": {
+            "type": "integer"
+          },
+          "subscription_status": {
+            "type": "string"
+          },
+          "current_period_end": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "pending_revision_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pending_effective_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "entitlements": {
+            "$ref": "#/components/schemas/EntitlementMap"
+          },
+          "server_time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "etag": {
+            "type": "string",
+            "description": "Covers the snapshot and the governance decisions, and deliberately not the server clock — a validator that changed every second could never match, so the 304 path would exist and be unreachable."
+          }
+        }
+      },
+      "Customer": {
+        "type": "object",
+        "description": "One customer of this store. Identified by the canonically normalised phone number, so two spellings of the same number are one customer.",
+        "required": [
+          "customer_key",
+          "phone_raw",
+          "phone_status",
+          "orders_count",
+          "total_minor"
+        ],
+        "properties": {
+          "customer_key": {
+            "type": "string",
+            "description": "The identity, and the path segment for reads and edits. The E.164 form when the number resolved, the raw stored value when it did not — so an unresolvable value keys only to itself and can never collide with another customer."
+          },
+          "phone_e164": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Present only when the number resolved. Null is not missing data: it records that this value could not be resolved to one number."
+          },
+          "phone_raw": {
+            "type": "string",
+            "description": "Exactly what the order carried. Never rewritten."
+          },
+          "phone_status": {
+            "type": "string",
+            "enum": [
+              "valid",
+              "ambiguous",
+              "invalid"
+            ],
+            "description": "Anything but 'valid' is flagged for review and was never merged with another customer. Guessing which customer an unresolvable value belongs to is how two people's order histories become one."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Seller-editable."
+          },
+          "alt_contact": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Seller-editable."
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Seller-editable."
+          },
+          "orders_count": {
+            "type": "integer"
+          },
+          "total_minor": {
+            "type": "integer",
+            "description": "Lifetime spend in minor units."
+          },
+          "last_order_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
       }
     },
     "securitySchemes": {

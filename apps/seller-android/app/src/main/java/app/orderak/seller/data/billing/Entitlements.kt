@@ -65,11 +65,11 @@ class EntitlementManager @Inject constructor(
         if (isAuthoritativePeriodExpired(current)) return feature == Feature.SHOW_ADS
         return when (feature) {
             Feature.AI_ASSISTANT -> current.governance?.features?.get("ai_assistant")?.enabled
-                ?: (integerLimit("max_ai_requests_per_month")?.let { it > 0 }
+                ?: (integerLimit(FeatureKeys.MAX_AI_REQUESTS_PER_MONTH)?.let { it > 0 }
                     ?: current.limits?.max_ai_requests_per_month?.let { it > 0 }
                     ?: false)
             Feature.SHOW_ADS -> current.governance?.features?.get("first_party_ads")?.enabled
-                ?: (current.entitlements["show_ads"]?.let { (it.value as? JsonPrimitive)?.booleanOrNull } ?: current.ads_enabled)
+                ?: (current.entitlements[FeatureKeys.SHOW_ADS]?.let { (it.value as? JsonPrimitive)?.booleanOrNull } ?: current.ads_enabled)
         }
     }
 
@@ -82,7 +82,7 @@ class EntitlementManager @Inject constructor(
         // Backend sends max_products = null to mean "unlimited". Only fall back to
         // the free default (20) when no config has loaded yet — never treat
         // "unlimited" as 20, which would wrongly cap paying sellers.
-        integerLimit("max_products")?.let { return it }
+        integerLimit(FeatureKeys.MAX_PRODUCTS)?.let { return it }
         val limits = _config.value?.limits ?: return 20
         return limits.max_products ?: Int.MAX_VALUE
     }

@@ -468,4 +468,12 @@
     <string name="order_local_only_chip">Pas encore envoyée</string>
     <string name="order_local_only_title">En attente d’envoi vers votre compte</string>
     <string name="order_local_only_message">Cette commande est enregistrée sur ce téléphone et n’a pas encore atteint votre compte. Elle sera envoyée automatiquement lors de la prochaine synchronisation. D’ici là elle n’apparaîtra pas sur un autre appareil et ne peut pas avancer dans son cycle.</string>
+
+    <!-- Search: filtering a list the seller already has, offline. -->
+    <string name="search_clear">Effacer la recherche</string>
+    <string name="products_search_hint">Rechercher par nom ou code</string>
+    <string name="customers_search_hint">Rechercher par nom ou numéro</string>
+    <string name="products_search_empty">Aucun produit ne correspond à « %1$s »</string>
+    <string name="customers_search_empty">Aucun client ne correspond à « %1$s »</string>
+    <string name="search_clear_action">Effacer la recherche</string>
 </resources>

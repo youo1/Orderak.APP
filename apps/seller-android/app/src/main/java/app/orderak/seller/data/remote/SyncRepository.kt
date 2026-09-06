@@ -143,17 +143,30 @@ class SyncRepository @Inject constructor(
                     ads_enabled = c.ads_enabled,
                     limits = c.limits,
                     features = c.features,
+                    // Carried through, not dropped. This conversion used to omit
+                    // it, so even once the server started sending the map the
+                    // fallback would have handed the resolver an empty one.
+                    entitlements = c.entitlements,
                     governance = c.governance,
                 )
             }
             val entitlementResult = entitlementRepository.refresh(force = true)
+            // Fall back only when the app has NO snapshot to work from.
+            //
+            // The "or the error was http_503" arm that used to sit here was the
+            // one place the client read the server's engine state: 503 meant
+            // ENTITLEMENTS_ENABLED was false, and the app changed what it did
+            // because of it. /api/v1/entitlements answers with a snapshot in
+            // either configuration now, so that arm described a response that no
+            // longer exists — and while it did exist it was the reason a working
+            // cached snapshot could be overwritten by the thinner legacy config
+            // on any sync. What is left is not engine branching: it is "the
+            // request failed and there is nothing cached", which is a network
+            // condition and true of both engines alike (I-4).
             if (
                 legacyConfig != null &&
                 entitlementResult == EntitlementRefreshResult.FAILED &&
-                (
-                    entitlementRepository.state.value.config == null ||
-                    entitlementRepository.state.value.error == "http_503"
-                )
+                entitlementRepository.state.value.config == null
             ) {
                 entitlementRepository.acceptConfig(legacyConfig)
             }

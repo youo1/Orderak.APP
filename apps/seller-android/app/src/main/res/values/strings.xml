@@ -464,4 +464,12 @@
     <string name="order_local_only_chip">Not sent yet</string>
     <string name="order_local_only_title">Waiting to reach your account</string>
     <string name="order_local_only_message">This order is saved on this phone and has not reached your account yet. It is sent automatically on the next sync. Until then it will not appear on another device, and it cannot be moved along its pipeline.</string>
+
+    <!-- Search: filtering a list the seller already has, offline. -->
+    <string name="search_clear">Clear search</string>
+    <string name="products_search_hint">Search by name or code</string>
+    <string name="customers_search_hint">Search by name or number</string>
+    <string name="products_search_empty">No product matches “%1$s”</string>
+    <string name="customers_search_empty">No customer matches “%1$s”</string>
+    <string name="search_clear_action">Clear search</string>
 </resources>

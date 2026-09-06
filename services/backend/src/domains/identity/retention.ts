@@ -63,6 +63,38 @@ const CLEANUP_RULES: CleanupRule[] = [
 	{ label: "admin_audit:2y", statement: "DELETE FROM admin_audit WHERE rowid IN (SELECT rowid FROM admin_audit WHERE created_at < datetime('now','-2 years') LIMIT ?)" },
 ];
 
+/**
+ * Tables this job must never touch, and why.
+ *
+ * Every rule above is age-based deletion, so a table is safe here only for as
+ * long as nobody adds a rule for it. That is exemption by omission, and it is
+ * not the same thing as a decision — the next person adding a rule has no way
+ * to tell "we chose not to" from "we did not think of it".
+ *
+ * `stock_movements` is the ledger behind work item 06. It is financial state:
+ * the balance it carries is what makes today's `products.stock` explainable,
+ * and reconciliation subtracts from an opening balance that only exists as a
+ * row in it. Deleting old rows would not trim history, it would make every
+ * later balance unverifiable — which is precisely why the ledger was built
+ * instead of reusing `admin_audit`, whose own rows this job deletes after two
+ * years (see the rule directly above).
+ *
+ * Named rather than merely absent so the accompanying test can assert it, and
+ * so a future rule that reaches this table fails a test instead of a seller.
+ */
+export const RETENTION_EXEMPT_TABLES = ["stock_movements"] as const;
+
+/** Every table any cleanup rule names. Exported so the exemption is testable. */
+export function retentionRuleTables(): string[] {
+	const named = new Set<string>();
+	for (const rule of CLEANUP_RULES) {
+		for (const match of rule.statement.matchAll(/(?:DELETE\s+FROM|UPDATE)\s+([A-Za-z_][A-Za-z0-9_]*)/gi)) {
+			named.add(match[1].toLowerCase());
+		}
+	}
+	return [...named].sort();
+}
+
 export async function runRetentionCleanup(env: Env): Promise<number> {
 	let total = 0;
 	const counts: Record<string, number> = {};

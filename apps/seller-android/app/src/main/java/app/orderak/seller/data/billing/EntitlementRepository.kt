@@ -1,6 +1,7 @@
 package app.orderak.seller.data.billing
 
 import android.content.Context
+import android.util.Log
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -120,7 +121,13 @@ class EntitlementRepository @Inject constructor(
         }
     }
 
-    /** Compatibility input while ENTITLEMENTS_ENABLED remains false. */
+    /**
+     * A snapshot assembled from the piggybacked plan config rather than fetched.
+     *
+     * Used when /api/v1/entitlements could not be reached at all and nothing is
+     * cached. It is not a different engine — the server sends the same keyed map
+     * on both paths — it is the same answer arriving by the other request.
+     */
     suspend fun acceptConfig(config: BackendConfig) {
         val phone = sessionStore.phone.first().orEmpty()
         if (phone.isNotBlank()) acceptConfig(phone, config, null, System.currentTimeMillis())
@@ -167,6 +174,23 @@ class EntitlementRepository @Inject constructor(
             if (etag == null) values.remove(Keys.ETAG) else values[Keys.ETAG] = etag
             values[Keys.UPDATED_AT] = now
             values[Keys.CHECKED_AT] = now
+        }
+        // BR-516. A snapshot that arrives with no entitlements is accepted — it
+        // is a real answer from the server and the resolver fails closed on it
+        // correctly — but it is never NORMAL, and it is silent from the seller's
+        // side: every gate reads NotBuilt and every meter draws nothing, which
+        // looks exactly like a plan with no features rather than like a fault.
+        //
+        // This was the live state of the app until work item 03a: the server sent
+        // no map at all. Saying so out loud is what distinguishes "the server has
+        // nothing to say about this account" from "the app is not asking".
+        if (config.entitlements.isEmpty()) {
+            Log.w(
+                "EntitlementRepository",
+                "Accepted an entitlement snapshot with no entitlements " +
+                    "(plan=${config.plan_id ?: "unknown"}, revision=${config.plan_revision_id ?: "none"}). " +
+                    "Every gate will resolve NotBuilt and no usage meter will render.",
+            )
         }
         entitlementManager.updateFromBackend(config)
         _state.value = EntitlementSyncState(

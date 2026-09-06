@@ -1,5 +1,10 @@
 import { jsonResponse } from "../../platform/http/shared";
 import { ensureOrganizationRoute, playAccountHash } from "../identity/identity";
+import {
+	LEGACY_FEATURE_ENTITLEMENTS,
+	LEGACY_LIMIT_ENTITLEMENTS,
+	LEGACY_MULTI_DEVICE_KEY,
+} from "./legacy-entitlements";
 
 export type EntitlementValueMode = "value" | "disabled" | "unlimited" | "custom_required";
 export type EntitlementValue = boolean | number | string | null;
@@ -79,6 +84,11 @@ const LEGACY_FREE_LIMITS: Record<string, number> = {
 	max_orders_per_month: 50,
 	max_ai_requests_per_month: 20,
 	max_concurrent_devices: 1,
+	// No plans column enforces this and no server code reads it, but the app
+	// draws a row for it, and a key the snapshot omits is drawn as unbuilt rather
+	// than as "1". Reporting the true value is not the same claim as reporting
+	// nothing at all.
+	max_team_members: 1,
 };
 
 function uuid(): string {
@@ -305,7 +315,69 @@ export async function projectEntitlementsForAndroid(
 	return projected;
 }
 
-async function legacySnapshot(env: Env, storeId: string): Promise<EntitlementSnapshot> {
+/**
+ * Usage for the legacy path, counted per store rather than per organization.
+ *
+ * The engine's usageFor() joins through `organization_stores`, which the legacy
+ * model has no row in — so reusing it would return zero for every seller and the
+ * meters would read "0 of 20" forever. These are the same counts, scoped the way
+ * the legacy world is scoped.
+ *
+ * A null `used` is not the same as zero. The app draws a meter only when it
+ * knows the numerator, so a key nothing counts is left without one rather than
+ * being drawn as unused.
+ */
+async function legacyUsage(
+	env: Env,
+	storeId: string,
+	key: string,
+): Promise<{ used: number | null; resetAt: string | null }> {
+	if (key === "max_products") {
+		const row = await env.orderak_db.prepare("SELECT COUNT(*) AS c FROM products WHERE store_id=?")
+			.bind(storeId).first<{ c: number }>();
+		return { used: Number(row?.c ?? 0), resetAt: null };
+	}
+	if (key === "max_categories") {
+		const row = await env.orderak_db.prepare("SELECT COUNT(*) AS c FROM categories WHERE store_id=?")
+			.bind(storeId).first<{ c: number }>();
+		return { used: Number(row?.c ?? 0), resetAt: null };
+	}
+	if (key === "max_orders_per_month") {
+		const window = monthWindow();
+		const row = await env.orderak_db.prepare(
+			`SELECT COUNT(*) AS c FROM orders
+			 WHERE store_id=?
+			   AND created_at>=datetime('now','start of month')
+			   AND created_at<datetime('now','start of month','+1 month')`,
+		).bind(storeId).first<{ c: number }>();
+		return { used: Number(row?.c ?? 0), resetAt: window.end };
+	}
+	if (key === "max_concurrent_devices") {
+		// The account itself is one device; seller_devices holds the additional
+		// ones. Counting only the table would report 0 for a seller signed in on
+		// the phone in their hand.
+		const row = await env.orderak_db.prepare("SELECT COUNT(*) AS c FROM seller_devices WHERE seller_id=?")
+			.bind(storeId).first<{ c: number }>();
+		return { used: 1 + Number(row?.c ?? 0), resetAt: null };
+	}
+	if (key === "max_ai_requests_per_month") {
+		// Nothing counts AI requests per store in the legacy model. Reporting a
+		// zero nobody measured would draw a meter saying the seller has used none,
+		// which is a claim; reporting null draws no meter, which is not.
+		return { used: null, resetAt: monthWindow().end };
+	}
+	return { used: null, resetAt: null };
+}
+
+/**
+ * The entitlement snapshot as the legacy plan model can state it.
+ *
+ * Exported because it is no longer only a fallback: while `ENTITLEMENTS_ENABLED`
+ * is false this is what every seller receives, so it is the shape the client is
+ * actually built against. legacy-entitlements.ts carries what it can and cannot
+ * honestly say.
+ */
+export async function legacySnapshot(env: Env, storeId: string): Promise<EntitlementSnapshot> {
 	let plan: Record<string, unknown> | null = null;
 	try {
 		plan = await env.orderak_db.prepare(
@@ -321,37 +393,103 @@ async function legacySnapshot(env: Env, storeId: string): Promise<EntitlementSna
 		const value = plan[key];
 		return value == null ? null : Number(value);
 	};
-	const values: Record<string, number | boolean | null> = {
+	const multiDevice = plan ? Number(plan.multi_device_enabled) === 1 : false;
+	const entitlements: Record<string, EffectiveEntitlement> = {};
+
+	// ---- Integer limits, from the plan row ---------------------------------
+	const limitValues: Record<string, number | null> = {
 		max_categories: legacyLimit("max_categories"),
 		max_products: legacyLimit("max_products"),
 		max_orders_per_month: legacyLimit("max_orders_per_month"),
 		max_ai_requests_per_month: legacyLimit("max_ai_requests_per_month"),
-		max_concurrent_devices: plan?.multi_device_enabled ? 2 : 1,
-		show_ads: plan ? Number(plan.ads_enabled) === 1 : true,
+		max_team_members: legacyLimit("max_team_members"),
+		// The legacy table has no device count, only a boolean. Two is what the
+		// plan comparison gives the first paid tier; one is what a plan without
+		// the flag permits.
+		max_concurrent_devices: plan ? (multiDevice ? 2 : 1) : LEGACY_FREE_LIMITS.max_concurrent_devices,
 	};
-	const entitlements: Record<string, EffectiveEntitlement> = {};
-	for (const [key, value] of Object.entries(values)) {
-		const integer = key.startsWith("max_");
+	for (const limit of LEGACY_LIMIT_ENTITLEMENTS) {
+		const key = limit.key;
+		const value = limitValues[key];
+		const { used, resetAt } = await legacyUsage(env, storeId, key);
 		entitlements[key] = {
 			key,
 			category: "Plan limits",
 			name: key,
 			description: "Legacy compatibility entitlement",
-			value_type: integer ? "integer" : "boolean",
+			value_type: "integer",
 			unit: null,
 			reset_period: key.endsWith("_per_month") ? "calendar_month_utc" : "none",
-			implementation_status: "implemented",
+			// The catalogue's own status, not a blanket "implemented". max_team_members
+			// is sent because the engine sends it and the key sets must match, and is
+			// sent as planned because no server code enforces it — which the resolver
+			// reads as unbuilt rather than as a limit the seller has run into.
+			implementation_status: limit.implementation_status,
 			admin_configurable: true,
-			mode: value == null && integer ? "unlimited" : "value",
+			mode: value == null ? "unlimited" : "value",
 			value,
 			display_value: value == null ? "Unlimited" : String(value),
-			available: integer || value === true,
+			available: true,
+			used,
+			// Unlimited has no remainder, and neither does a limit whose usage was
+			// never counted. Both are null rather than a number that would be wrong.
+			remaining: value == null || used == null ? null : Math.max(0, value - used),
+			reset_at: resetAt,
+			custom_required: false,
+		};
+	}
+
+	// ---- Ads, the one boolean the plan row carries directly -----------------
+	const adsOn = plan ? Number(plan.ads_enabled) === 1 : true;
+	entitlements.show_ads = {
+		key: "show_ads",
+		category: "Plan limits",
+		name: "show_ads",
+		description: "Legacy compatibility entitlement",
+		value_type: "boolean",
+		unit: null,
+		reset_period: "none",
+		implementation_status: "implemented",
+		admin_configurable: true,
+		mode: "value",
+		value: adsOn,
+		display_value: adsOn ? "Shown" : "Hidden",
+		available: adsOn,
+		used: null,
+		remaining: null,
+		reset_at: null,
+		custom_required: false,
+	};
+
+	// ---- Implemented features ------------------------------------------------
+	//
+	// Everything the app has actually built. One of them is gated by the legacy
+	// plan row; the rest are open on every plan, which is what the app permits
+	// today. Emitting them matters because the resolver reads an absent key as
+	// NotBuilt — so before this, every built feature looked unbuilt.
+	for (const feature of LEGACY_FEATURE_ENTITLEMENTS) {
+		const available = feature.key === LEGACY_MULTI_DEVICE_KEY ? multiDevice : true;
+		entitlements[feature.key] = {
+			key: feature.key,
+			category: feature.category,
+			name: feature.name,
+			description: null,
+			value_type: feature.value_type,
+			unit: null,
+			reset_period: "none",
+			implementation_status: "implemented",
+			admin_configurable: false,
+			mode: available ? "value" : "disabled",
+			value: feature.value_type === "boolean" ? available : (available ? feature.display_value : null),
+			display_value: available ? feature.display_value : "\u2014",
+			available,
 			used: null,
 			remaining: null,
 			reset_at: null,
 			custom_required: false,
 		};
 	}
+
 	const snapshot = {
 		ok: true as const,
 		schema_version: 1 as const,
@@ -371,6 +509,19 @@ async function legacySnapshot(env: Env, storeId: string): Promise<EntitlementSna
 	};
 	snapshot.etag = await hashSnapshot(snapshotVersionMaterial(snapshot));
 	return snapshot;
+}
+
+/**
+ * The snapshot a client receives, whichever engine is switched on.
+ *
+ * The flag decides which side answers; it does not decide whether the client
+ * gets an answer at all. That distinction is the whole of I-4, and it used to be
+ * the other way round — `ENTITLEMENTS_ENABLED=false` meant a 503 and an empty
+ * map, so the client's behaviour depended on a server flag it could not see.
+ */
+export async function resolveEntitlementsForClient(env: Env, storeId: string): Promise<EntitlementSnapshot> {
+	if (env.ENTITLEMENTS_ENABLED === "true") return resolveEntitlements(env, storeId);
+	return legacySnapshot(env, storeId);
 }
 
 /** Resolve the backend-authoritative, typed entitlement set for one store. */
