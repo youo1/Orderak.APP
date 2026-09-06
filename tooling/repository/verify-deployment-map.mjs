@@ -186,7 +186,16 @@ for (const [relative, expectedServers] of Object.entries(serverExpectations)) {
 // from the account, from a second device, from a reinstall, and from the
 // monthly plan count. The seller read a confirmation and had a note on one
 // phone. Unlike the phone-change raise above, this route is genuinely new.
-if (operationCount !== 250) fail(`OpenAPI operation inventory changed: expected 250, found ${operationCount}.`);
+// Lowered to 245 on 2026-09-06 for five operations that were never served. The
+// seller contract declared GET and POST on /api/v1/categories/{category_code},
+// POST /api/v1/store, GET /api/v1/media/upload and GET /api/v1/products/sync;
+// every one is answered with 405. The first lowering, and the mirror image of
+// the phone-change raise above: there the scanner could not read a dispatch and
+// under-reported, here it guessed a method out of a neighbouring block and
+// over-reported, so each phantom silently satisfied the spec entry it had
+// created. Coverage now checks the spec against the Allow header the server
+// actually sends — see contracts/openapi/scripts/method-allow-inventory.mjs.
+if (operationCount !== 245) fail(`OpenAPI operation inventory changed: expected 245, found ${operationCount}.`);
 const seller = JSON.parse(read("contracts/openapi/src/seller-v1.json"));
 for (const [route, pathItem] of Object.entries(seller.paths)) {
   for (const method of ["get", "post", "put", "patch", "delete"]) {
