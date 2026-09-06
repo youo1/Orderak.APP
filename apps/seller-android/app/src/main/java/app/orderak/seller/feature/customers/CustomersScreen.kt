@@ -23,6 +23,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
@@ -37,7 +40,9 @@ import androidx.lifecycle.viewModelScope
 import app.orderak.seller.R
 import app.orderak.seller.core.money.DEFAULT_CURRENCY
 import app.orderak.seller.core.money.formatAmount
+import app.orderak.seller.core.text.SearchText
 import app.orderak.seller.core.ui.FullScreenEmpty
+import app.orderak.seller.core.ui.SearchField
 import app.orderak.seller.core.ui.PriorityListRow
 import androidx.compose.ui.platform.LocalConfiguration
 import app.orderak.seller.data.db.CustomerSummary
@@ -61,14 +66,56 @@ fun CustomersScreen(
     viewModel: CustomersViewModel = hiltViewModel()
 ) {
     val customers by viewModel.customers.collectAsStateWithLifecycle()
+    var query by rememberSaveable { mutableStateOf("") }
+
     // No action offered: a customer record is created by an order arriving, so
     // there is nothing a seller can press here. An empty state with a button
     // that does not help is worse than one without.
+    //
+    // Checked before the search box is drawn, so a seller with no customers is
+    // not handed something to search through nothing with.
     if (customers.isEmpty()) {
         FullScreenEmpty(message = stringResource(R.string.customers_empty))
         return
     }
+
+    // Filtered here rather than in a query: the list is already in memory, so
+    // this works with the network off, which is the state a seller at a stall is
+    // most often in. Phone as well as name — the phone IS the customer's
+    // identity, and Arabic-Indic digits fold to Latin so ٠١٠ finds 010.
+    val visible = customers.filter { SearchText.matches(query, it.name, it.phone) }
     val locale = LocalConfiguration.current.locales[0]
+
+    Column(Modifier.fillMaxSize()) {
+        SearchField(
+            query = query,
+            onQueryChange = { query = it },
+            placeholder = stringResource(R.string.customers_search_hint),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+
+        // A search that matches nothing is not an empty customer list, and
+        // saying so with the same sentence would read as "your customers are
+        // gone". It names the query and offers the way back.
+        if (visible.isEmpty()) {
+            FullScreenEmpty(
+                message = stringResource(R.string.customers_search_empty, query),
+                actionLabel = stringResource(R.string.search_clear_action),
+                onAction = { query = "" },
+            )
+            return@Column
+        }
+
+        CustomerList(visible, locale, onOpen)
+    }
+}
+
+@Composable
+private fun CustomerList(
+    customers: List<CustomerSummary>,
+    locale: java.util.Locale,
+    onOpen: (String) -> Unit,
+) {
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         items(customers, key = { it.phone }) { c ->
             // The shared row, with no priority rail: a customer is never

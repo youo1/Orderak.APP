@@ -488,4 +488,12 @@
     <string name="order_local_only_chip">لسه ما اتبعتش</string>
     <string name="order_local_only_title">مستني يوصل حسابك</string>
     <string name="order_local_only_message">الأوردر ده اتحفظ على الجهاز ده ولسه ما وصلش حسابك. هيتبعت لوحده في المزامنة الجاية. لحد ساعتها مش هيظهر على موبايل تاني، ومش هتقدر تحرّكه في مراحله.</string>
+
+    <!-- Search: filtering a list the seller already has, offline. -->
+    <string name="search_clear">مسح البحث</string>
+    <string name="products_search_hint">ابحث بالاسم أو الكود</string>
+    <string name="customers_search_hint">ابحث بالاسم أو الرقم</string>
+    <string name="products_search_empty">مفيش منتج مطابق لـ ‏«%1$s»</string>
+    <string name="customers_search_empty">مفيش عميل مطابق لـ ‏«%1$s»</string>
+    <string name="search_clear_action">امسح البحث</string>
 </resources>

@@ -11,8 +11,10 @@ import { jsonResponse, authSeller, type AuthenticatedSeller } from "../http/shar
 import { keyedHash, sha256Hex } from "../../domains/identity/auth";
 import { FREE_LIMITS } from "../../domains/commerce/plan-limits";
 import {
+	legacySnapshot,
 	projectEntitlementsForAndroid,
 	resolveEntitlements,
+	resolveEntitlementsForClient,
 	type EntitlementSnapshot,
 } from "../../domains/commerce/entitlements";
 
@@ -52,8 +54,19 @@ const FREE_CONFIG = {
  */
 export async function loadPlanConfig(env: Env, sellerId: string): Promise<Record<string, unknown>> {
 	if (env.ENTITLEMENTS_ENABLED === "true") {
-		return legacyProjection(await resolveEntitlements(env, sellerId));
+		const snapshot = await resolveEntitlements(env, sellerId);
+		return { ...legacyProjection(snapshot), entitlements: snapshot.entitlements };
 	}
+
+	// The same map, from the legacy plan model.
+	//
+	// This response is piggybacked onto the orders pull, and it is the only place
+	// the app reliably receives plan state — /api/v1/entitlements is a separate
+	// request that can fail. Both flat `limits`/`features` and the keyed map are
+	// sent: the flat blocks are what older installed builds read, and the map is
+	// what every gate and usage meter reads. Dropping either would break one of
+	// the two.
+	const entitlements = (await legacySnapshot(env, sellerId)).entitlements;
 	const sub = (await env.orderak_db
 		.prepare(
 			`SELECT s.plan_id, s.status, s.current_period_end,
@@ -70,7 +83,7 @@ export async function loadPlanConfig(env: Env, sellerId: string): Promise<Record
 		.bind(sellerId)
 		.first()) as Record<string, unknown> | null;
 
-	if (!sub) return FREE_CONFIG;
+	if (!sub) return { ...FREE_CONFIG, entitlements };
 
 	// Helper: NULL means unlimited, return as null in JSON so the app knows.
 	const n = (v: unknown): number | null =>
@@ -96,6 +109,7 @@ export async function loadPlanConfig(env: Env, sellerId: string): Promise<Record
 			ai_assistant: true, // available on all plans
 			multi_device: sub.multi_device_enabled === 1,
 		},
+		entitlements,
 	};
 }
 
@@ -165,14 +179,28 @@ export async function handleConfigRoute(
 	const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret);
 	if (!seller) return jsonResponse({ error: "auth" }, 401);
 	if (url.pathname === "/api/v1/entitlements") {
-		if (env.ENTITLEMENTS_ENABLED !== "true") return jsonResponse({ error: "entitlements_v2_disabled" }, 503);
-		const resolved = await resolveEntitlements(env, String(seller.id));
+		// This used to answer 503 whenever ENTITLEMENTS_ENABLED was false, which is
+		// both environments — so the route the app depends on for every gate and
+		// every usage meter has never returned a snapshot to anyone. The client
+		// failed closed on the empty map, correctly, and the seller saw a plan
+		// screen that could not say what their plan allowed.
+		//
+		// The flag chooses which engine answers. It does not choose whether the
+		// client is answered at all (I-4): the shape is identical either way, so
+		// nothing downstream can tell, or has to.
+		const resolved = await resolveEntitlementsForClient(env, String(seller.id));
 		const baseSnapshot = url.searchParams.get("projection") === "android-v1"
 			? await projectEntitlementsForAndroid(resolved)
 			: resolved;
 		const clientConfig = await loadClientConfig(env, seller as unknown as Record<string, unknown>, request);
-		const governance = clientConfig.governance;
-		const etag = `"${await sha256Hex(`${baseSnapshot.etag}:${JSON.stringify(governance)}`)}"`;
+		const governance = clientConfig.governance as Record<string, unknown>;
+		// The validator covers the snapshot and the governance DECISIONS, never the
+		// clock. `governance.server_time` is stamped fresh on every call, so hashing
+		// the block whole produced a different ETag each time and no request could
+		// ever match one: the 304 path existed and was unreachable, and every poll
+		// re-sent the entire snapshot.
+		const { server_time: _governanceClock, ...governanceMaterial } = governance;
+		const etag = `"${await sha256Hex(`${baseSnapshot.etag}:${JSON.stringify(governanceMaterial)}`)}"`;
 		const snapshot = { ...baseSnapshot, etag, governance };
 		const headers = {
 			etag,

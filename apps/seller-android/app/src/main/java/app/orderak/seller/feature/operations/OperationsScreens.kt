@@ -60,9 +60,9 @@ import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import app.orderak.seller.R
 import app.orderak.seller.core.ui.NoticeBanner
+import app.orderak.seller.core.ui.PlanUsageRowItem
+import app.orderak.seller.core.ui.planUsageRows
 import app.orderak.seller.core.ui.SemanticRole
-import app.orderak.seller.core.ui.UsageMeter
-import kotlinx.serialization.json.JsonPrimitive
 import app.orderak.seller.core.locale.AppLocales
 import app.orderak.seller.core.ui.FullScreenEmpty
 import app.orderak.seller.core.ui.FullScreenError
@@ -846,59 +846,44 @@ fun SubscriptionScreen(onBack: () -> Unit, vm: OperationsViewModel = hiltViewMod
         // name, a status string and a recovery button, and never once said how
         // much of the plan was used — so "am I close to a limit?" could only be
         // answered by hitting one.
-        val usage = config?.let { current ->
-            SUBSCRIPTION_USAGE_ROWS.mapNotNull { (key, label) ->
-                val entitlement = current.entitlements[key] ?: return@mapNotNull null
-                val used = entitlement.used ?: return@mapNotNull null
-                val limit = if (entitlement.mode == "unlimited") null
-                else (entitlement.value as? JsonPrimitive)?.intOrNull
-                if (limit == null) null else Triple(label, used, limit)
-            }
-        }.orEmpty()
+        //
+        // The rows come from core/ui/PlanUsage.kt, shared with the dashboard
+        // card. This screen used to build its own and drop every unlimited
+        // entitlement — `if (limit == null) null` — while the dashboard drew it
+        // as a count, so a seller on a plan with an unlimited allowance saw it in
+        // one place and not the other.
+        val usage = config?.let(::planUsageRows).orEmpty()
 
         if (usage.isNotEmpty()) {
             Text(
                 stringResource(R.string.plan_usage_title),
                 style = MaterialTheme.typography.titleMedium,
             )
-            usage.forEach { (label, used, limit) ->
-                UsageMeter(label = stringResource(label), used = used, limit = limit)
-            }
+            usage.forEach { row -> PlanUsageRowItem(row) }
         }
 
-        // Say the true thing. Purchase is closed platform-wide, so a screen that
-        // talks only about managing a subscription in Play leaves a seller on the
-        // free plan looking for a way to buy that does not exist.
-        if (!vm.entitlements.isPurchaseOpen()) {
+        // Say the true thing, and then stop offering the thing. The banner used
+        // to sit ABOVE a Play guidance line and a recover-purchases button that
+        // both rendered unconditionally, so the screen told a seller purchasing
+        // was closed and then showed them two ways to try it — advisory, not a
+        // gate. One decision now governs the banner and the controls together,
+        // and it is the same one the account surface reads (I-5).
+        if (vm.entitlements.isPurchaseOpen()) {
+            Text(stringResource(R.string.subscription_play_guidance))
+            OutlinedButton(
+                onClick = vm.billingManager::recoverPurchases,
+                enabled = billingState == BillingState.Ready,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(stringResource(R.string.subscription_recover)) }
+        } else {
             NoticeBanner(
                 role = SemanticRole.Commerce,
                 title = stringResource(R.string.subscription_purchase_closed_title),
                 message = stringResource(R.string.subscription_purchase_closed_body),
             )
         }
-
-        Text(stringResource(R.string.subscription_play_guidance))
-        OutlinedButton(
-            onClick = vm.billingManager::recoverPurchases,
-            enabled = billingState == BillingState.Ready,
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text(stringResource(R.string.subscription_recover)) }
     }
 }
-
-/**
- * The limits worth showing on the subscription screen.
- *
- * Same keys and order as the dashboard card, so a seller who checks usage in two
- * places is not told two different stories.
- */
-private val SUBSCRIPTION_USAGE_ROWS = listOf(
-    "max_products" to R.string.usage_products,
-    "max_orders_per_month" to R.string.usage_orders_month,
-    "max_categories" to R.string.usage_categories,
-    "max_concurrent_devices" to R.string.usage_devices,
-    "max_ai_requests_per_month" to R.string.usage_ai_requests,
-)
 
 @Composable
 fun AiAssistantScreen(onBack: () -> Unit, vm: OperationsViewModel = hiltViewModel()) {
