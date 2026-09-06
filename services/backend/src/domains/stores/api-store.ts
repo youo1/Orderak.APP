@@ -362,7 +362,11 @@ export async function handleStoreRoutes(
 
 	if (p === "/api/v1/products") return methodNotAllowed("GET");
 	if (p === "/api/v1/products/sync") return methodNotAllowed("POST");
-	return methodNotAllowed("POST"); // /api/v1/media/upload
+	if (p === "/api/v1/media/upload") return methodNotAllowed("POST");
+	// Unreachable: isStoreRoute admits no other path and each is answered above.
+	// The contract guard reads these Allow lists as the method set a path serves,
+	// so the last one had to be a guard rather than a trailing comment.
+	return methodNotAllowed("POST");
 }
 
 // ---- Register --------------------------------------------------------------
