@@ -208,6 +208,41 @@ data class ProductsPullRes(
     @SerialName("code") val error: String? = null,
 )
 
+// ---- Plans ----
+
+/**
+ * One row of the plan comparison: an entitlement and what each plan gives for it.
+ *
+ * The server sends only features whose `implementation_status` is `implemented`
+ * (BR-506), so a row reaching the app is a feature the app has. `values` is
+ * keyed by plan key — "free", "paid1", "paid2", "paid3" — and holds the display
+ * string the catalogue carries, not a number this app should format.
+ */
+@Serializable
+data class PlanComparisonRowDto(
+    val entitlement_key: String,
+    val category: String,
+    val name: String,
+    val value_type: String = "boolean",
+    val values: Map<String, String> = emptyMap(),
+)
+
+@Serializable
+data class PlanSummaryDto(
+    val plan_key: String,
+    val name: String,
+    val description: String? = null,
+    val sort_order: Int = 0,
+)
+
+@Serializable
+data class PlansRes(
+    val ok: Boolean = false,
+    val plans: List<PlanSummaryDto> = emptyList(),
+    val comparison: List<PlanComparisonRowDto> = emptyList(),
+    @SerialName("code") val error: String? = null,
+)
+
 // ---- Customers ----
 
 /**
@@ -1047,6 +1082,18 @@ class BackendApi @Inject constructor(
         apiCall({ ProductsSyncRes(error = it) }) {
             postRaw("/api/v1/products/sync", json.encodeToString(req), creds(req.phone, req.secret))
         }
+
+    // ---- Plans ----
+
+    /**
+     * The plan comparison, built by the server from the entitlement catalogue.
+     *
+     * Deliberately carries no prices: Play owns what a seller pays, in their own
+     * currency, and a second number from here would disagree the moment Google
+     * applied a regional price or a promotion.
+     */
+    suspend fun listPlans(): PlansRes =
+        apiCall({ PlansRes(error = it) }) { getRaw("/api/v1/plans") }
 
     // ---- Customers ----
 

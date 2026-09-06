@@ -582,12 +582,12 @@ export const CONTRACTS = [
     exit: ["رجوع"],
     data: ["plan catalogue", "current plan", "billing flag state"],
     actions: [
-      { do: "compare plans", status: "planned", why: "the screen does not exist yet — work item 08" },
+      { do: "compare plans", via: "PlanComparison" },
     ],
     states: ["loading", "content", "error"],
     offline: false,
     entitlementKey: null,
-    featureStatus: "planned",
+    featureStatus: "implemented",
     phase: 9,
   },
   {
@@ -599,14 +599,13 @@ export const CONTRACTS = [
     exit: ["PlansRoute", "رجوع للشاشة اللي جت منها"],
     data: ["which limit", "current usage", "next plan limits", "billing flag state"],
     actions: [
-      { do: "upgrade", status: "planned", why: "the screen does not exist yet — work item 08" },
-      { do: "register interest", status: "planned", why: "the screen does not exist yet — work item 08" },
-      { do: "dismiss", status: "planned", why: "the screen does not exist yet — work item 08" },
+      { do: "view plans", via: "onViewPlans" },
+      { do: "dismiss", via: "onBack" },
     ],
     states: ["content"],
     offline: false,
     entitlementKey: null,
-    featureStatus: "planned",
+    featureStatus: "implemented",
     phase: 9,
   },
 ];

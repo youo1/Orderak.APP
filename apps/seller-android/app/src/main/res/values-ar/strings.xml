@@ -507,4 +507,23 @@
     <string name="products_search_empty">مفيش منتج مطابق لـ ‏«%1$s»</string>
     <string name="customers_search_empty">مفيش عميل مطابق لـ ‏«%1$s»</string>
     <string name="search_clear_action">امسح البحث</string>
+    <string name="plans_title">الباقات</string>
+    <string name="plans_feature_column">الميزة</string>
+    <string name="plans_unavailable">تفاصيل الباقات مش متاحة دلوقتي</string>
+    <string name="plans_purchase_closed">الترقية لسه مش مفتوحة. الصفحة دي عشان تشوف كل باقة فيها إيه.</string>
+    <string name="plans_price_note">الأسعار هتظهر من Google Play بعملتك لما الترقية تفتح.</string>
+    <string name="paywall_title">وصلت لحد الباقة</string>
+    <string name="paywall_limit_products">وصلت لأقصى عدد منتجات في باقتك</string>
+    <string name="paywall_limit_categories">وصلت لأقصى عدد أقسام في باقتك</string>
+    <string name="paywall_limit_orders">وصلت لأقصى عدد أوردرات الشهر ده</string>
+    <string name="paywall_limit_devices">وصلت لأقصى عدد أجهزة في باقتك</string>
+    <string name="paywall_limit_ai">وصلت لأقصى عدد طلبات الذكاء الاصطناعي الشهر ده</string>
+    <string name="paywall_limit_generic">وصلت لحد من حدود باقتك</string>
+    <string name="paywall_usage_of_limit">مستخدم %1$d من %2$d.</string>
+    <string name="paywall_limit_only">باقتك بتسمح بـ %1$d.</string>
+    <string name="paywall_limit_unknown">باقتك مش بتسمح بأكتر من كده دلوقتي.</string>
+    <string name="paywall_next_plan">%1$s بتديك %2$s.</string>
+    <string name="paywall_dismiss">رجوع</string>
+    <string name="paywall_view_plans">شوف الباقات</string>
+    <string name="paywall_purchase_closed">الترقية لسه مش مفتوحة، فمفيش حاجة تتشتري من هنا.</string>
 </resources>

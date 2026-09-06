@@ -1,5 +1,6 @@
 package app.orderak.seller.feature.products
 
+import app.orderak.seller.data.billing.FeatureKeys
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -63,6 +64,7 @@ import java.io.File
 @Composable
 fun ProductEditScreen(
     onBack: () -> Unit,
+    onLimitReached: (String) -> Unit = {},
     viewModel: ProductEditViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -180,11 +182,20 @@ fun ProductEditScreen(
             }
 
             if (state.quotaExceeded) {
-                Text(
-                    stringResource(R.string.error_plan_limit),
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
-                )
+                // A one-line error told the seller a save had failed and nothing
+                // about why or what to do. The paywall names the limit, the
+                // usage and what the next plan gives; the input on this screen
+                // survives because the paywall's exit pops rather than resets.
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        stringResource(R.string.error_plan_limit),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    TextButton(onClick = { onLimitReached(FeatureKeys.MAX_PRODUCTS) }) {
+                        Text(stringResource(R.string.paywall_view_plans))
+                    }
+                }
             }
 
             Button(

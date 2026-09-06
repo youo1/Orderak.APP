@@ -485,4 +485,23 @@
     <string name="products_search_empty">No product matches “%1$s”</string>
     <string name="customers_search_empty">No customer matches “%1$s”</string>
     <string name="search_clear_action">Clear search</string>
+    <string name="plans_title">Plans</string>
+    <string name="plans_feature_column">Feature</string>
+    <string name="plans_unavailable">Plan details aren\'t available right now</string>
+    <string name="plans_purchase_closed">Upgrading isn\'t open yet. This is here so you can see what each plan includes.</string>
+    <string name="plans_price_note">Prices are shown by Google Play in your own currency when upgrading opens.</string>
+    <string name="paywall_title">Plan limit reached</string>
+    <string name="paywall_limit_products">You\'ve reached your product limit</string>
+    <string name="paywall_limit_categories">You\'ve reached your category limit</string>
+    <string name="paywall_limit_orders">You\'ve reached this month\'s order limit</string>
+    <string name="paywall_limit_devices">You\'ve reached your device limit</string>
+    <string name="paywall_limit_ai">You\'ve reached this month\'s AI request limit</string>
+    <string name="paywall_limit_generic">You\'ve reached a limit on your plan</string>
+    <string name="paywall_usage_of_limit">You\'re using %1$d of %2$d.</string>
+    <string name="paywall_limit_only">Your plan allows %1$d.</string>
+    <string name="paywall_limit_unknown">Your plan doesn\'t allow any more right now.</string>
+    <string name="paywall_next_plan">%1$s gives you %2$s.</string>
+    <string name="paywall_dismiss">Go back</string>
+    <string name="paywall_view_plans">See plans</string>
+    <string name="paywall_purchase_closed">Upgrading isn\'t open yet, so there\'s nothing to buy from here.</string>
 </resources>
