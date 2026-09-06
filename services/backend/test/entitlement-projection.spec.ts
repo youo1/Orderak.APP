@@ -101,11 +101,14 @@ describe("legacy entitlement projection", () => {
 	it("never names a feature the app has not built", async () => {
 		// The resolver refuses to upsell anything whose status is not
 		// "implemented", so a key that leaked in here with that status would be
-		// sold rather than hidden. editable_customer_profiles is the live example:
-		// migration 047 marks it implemented in D1 while the screen has no editor.
+		// sold rather than hidden.
+		//
+		// editable_customer_profiles used to be asserted absent here: migration
+		// 047 marked it implemented in D1 while the screen had no editor. Work
+		// item 11 shipped the editor, so it is now present — and gated, which the
+		// paid-only test below covers. The general rule is what remains.
 		const r = await registerStore({ phone: "+201500003005" });
 		const snapshot = await legacySnapshot(engineOff(), await storeIdOf(r));
-		expect(snapshot.entitlements["customers_crm.editable_customer_profiles"]).toBeUndefined();
 
 		// The rule is not that a planned key may never appear — the engine sends
 		// planned keys too, and the key sets have to match. The rule is that
@@ -119,6 +122,29 @@ describe("legacy entitlement projection", () => {
 				expect(catalogued, `${key} is ${catalogued} in the catalogue`).toBe("implemented");
 			}
 		}
+	});
+
+	it("keeps the customer editor closed on free and open on a paid plan", async () => {
+		// The catalogue's plan revisions put this at `disabled` on free and
+		// `Included` on all three paid tiers, and the legacy plans table has no
+		// column that says so — the gate is the plan row existing at all. A free
+		// seller who saw it available would be offered an editor the plan
+		// comparison sells at paid1.
+		const r = await registerStore({ phone: "+201500003105" });
+		const storeId = await storeIdOf(r);
+
+		const free = await legacySnapshot(engineOff(), storeId);
+		const freeItem = free.entitlements["customers_crm.editable_customer_profiles"];
+		expect(freeItem, "the key must be present, or the resolver reads it as NotBuilt").toBeTruthy();
+		expect(freeItem.available).toBe(false);
+		expect(freeItem.implementation_status).toBe("implemented");
+
+		await env.orderak_db.batch([
+			env.orderak_db.prepare("INSERT INTO plans(id,name,active,multi_device_enabled,max_products) VALUES('crm','CRM',1,0,200)"),
+			env.orderak_db.prepare("INSERT INTO subscriptions(seller_id,plan_id,status) VALUES(?,'crm','active')").bind(storeId),
+		]);
+		const paid = await legacySnapshot(engineOff(), storeId);
+		expect(paid.entitlements["customers_crm.editable_customer_profiles"].available).toBe(true);
 	});
 
 	it("honours the one feature the legacy plan row actually gates", async () => {

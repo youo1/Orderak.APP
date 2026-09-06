@@ -129,7 +129,7 @@ fun OrderakNavHost() {
                 onOpenOrder = { id: Long -> navController.navigate(OrderDetailsRoute(id)) },
                 onAddProduct = { navController.navigate(ProductEditRoute()) },
                 onEditProduct = { id: Long -> navController.navigate(ProductEditRoute(id)) },
-                onOpenCustomer = { phone: String -> navController.navigate(CustomerRoute(phone)) },
+                onOpenCustomer = { key: String -> navController.navigate(CustomerRoute(key)) },
                 onOpenAnnouncements = { navController.navigate(AnnouncementsRoute) },
                 // The account surface owns the settings destinations now, so
                 // the shell passes them straight through.

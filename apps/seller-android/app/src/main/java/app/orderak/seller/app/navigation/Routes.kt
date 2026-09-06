@@ -9,7 +9,14 @@ import kotlinx.serialization.Serializable
 @Serializable data class ProductEditRoute(val id: Long = -1)
 @Serializable data object NewOrderRoute
 @Serializable data class OrderDetailsRoute(val id: Long)
-@Serializable data class CustomerRoute(val phone: String)
+/**
+ * One customer, addressed by the key rather than the raw phone.
+ *
+ * The raw value is not an identity: two spellings of one number are one
+ * customer and two strings, so navigating by it could open a row that does not
+ * exist or the wrong one of a pair. See CustomerEntity.
+ */
+@Serializable data class CustomerRoute(val customerKey: String)
 @Serializable data object StoreInfoRoute
 @Serializable data object CategoriesRoute
 @Serializable data object RestrictedAccountRoute

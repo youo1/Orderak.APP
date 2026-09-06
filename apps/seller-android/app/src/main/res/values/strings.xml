@@ -196,6 +196,17 @@
     <string name="payment_disclaimer">This check helps detect tampering — it doesn\'t replace checking your wallet</string>
 
     <string name="customers_empty">Every customer who orders will appear here automatically</string>
+    <string name="customer_phone">Phone</string>
+    <string name="customer_phone_is_identity">This is how orders find this customer, so it can\'t be changed here</string>
+    <string name="customer_phone_unresolved">This number couldn\'t be matched to a country, so it is kept exactly as it was typed</string>
+    <string name="customer_name">Name</string>
+    <string name="customer_alt_contact">Other contact</string>
+    <string name="customer_note">Note</string>
+    <string name="customer_contact">Message</string>
+    <string name="customer_save">Save</string>
+    <string name="customer_saved">Customer saved</string>
+    <string name="customer_edit_locked">Editing customer details is part of a paid plan</string>
+    <string name="customer_orders_heading">Orders</string>
     <plurals name="customer_orders_count">
         <item quantity="one">1 order</item>
         <item quantity="other">%d orders</item>

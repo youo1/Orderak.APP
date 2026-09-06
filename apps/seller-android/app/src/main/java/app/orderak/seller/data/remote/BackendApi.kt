@@ -208,6 +208,65 @@ data class ProductsPullRes(
     @SerialName("code") val error: String? = null,
 )
 
+// ---- Customers ----
+
+/**
+ * A customer as the server holds them.
+ *
+ * `customer_key` is the identity and `phone_raw` is what the order carries; they
+ * differ whenever the buyer typed a national number that resolved. Both are
+ * stored on the device for the same reason the server keeps both — the order
+ * rows join on the raw value, and the editor addresses the key.
+ *
+ * `phone_status` other than "valid" means the number could not be resolved to
+ * exactly one E.164 number. Such a customer is real and editable; it simply may
+ * never be merged with another spelling, because nothing can prove they are the
+ * same person.
+ */
+@Serializable
+data class CustomerDto(
+    val customer_key: String,
+    val phone_raw: String,
+    val phone_e164: String? = null,
+    val phone_status: String = "valid",
+    val name: String? = null,
+    val alt_contact: String? = null,
+    val note: String? = null,
+    val orders_count: Int = 0,
+    val total_minor: Long = 0,
+    val last_order_at: String? = null,
+    val created_at: String? = null,
+    val updated_at: String? = null,
+)
+
+@Serializable
+data class CustomersRes(
+    val ok: Boolean = false,
+    val customers: List<CustomerDto> = emptyList(),
+    @SerialName("code") val error: String? = null,
+)
+
+@Serializable
+data class CustomerRes(
+    val ok: Boolean = false,
+    val customer: CustomerDto? = null,
+    @SerialName("code") val error: String? = null,
+)
+
+/**
+ * A seller's edit.
+ *
+ * Only the three editable fields, and no phone in any form: the server refuses a
+ * body carrying one with `phone_not_editable`, and the app must not be the thing
+ * that discovers that at runtime.
+ */
+@Serializable
+data class CustomerUpdateReq(
+    val name: String? = null,
+    val alt_contact: String? = null,
+    val note: String? = null,
+)
+
 // ---- Store Information ----
 
 @Serializable
@@ -987,6 +1046,34 @@ class BackendApi @Inject constructor(
     suspend fun syncProducts(req: ProductsSyncReq): ProductsSyncRes =
         apiCall({ ProductsSyncRes(error = it) }) {
             postRaw("/api/v1/products/sync", json.encodeToString(req), creds(req.phone, req.secret))
+        }
+
+    // ---- Customers ----
+
+    suspend fun listCustomers(phone: String, secret: String): CustomersRes =
+        apiCall({ CustomersRes(error = it) }) { getRaw("/api/v1/customers", creds(phone, secret)) }
+
+    /**
+     * Post one seller edit.
+     *
+     * The key is percent-encoded because it is a phone number: a resolved one
+     * begins with "+", and an unresolved one is whatever the buyer typed.
+     *
+     * URLEncoder is form encoding, not path encoding — it emits "+" for a space,
+     * and the server reads the segment with decodeURIComponent, which returns a
+     * literal plus for that. A raw value containing a space would come back as a
+     * different key and address a customer that does not exist, so the one
+     * character the two encodings disagree about is rewritten here.
+     */
+    suspend fun updateCustomer(
+        phone: String,
+        secret: String,
+        customerKey: String,
+        req: CustomerUpdateReq,
+    ): CustomerRes =
+        apiCall({ CustomerRes(error = it) }) {
+            val encoded = java.net.URLEncoder.encode(customerKey, "UTF-8").replace("+", "%20")
+            patchRaw("/api/v1/customers/$encoded", json.encodeToString(req), creds(phone, secret))
         }
 
     // ---- Store Information ----

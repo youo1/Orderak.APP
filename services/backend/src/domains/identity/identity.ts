@@ -1,3 +1,5 @@
+import { validE164 } from "./phone";
+
 type SellerIdentityRow = {
 	id: string;
 	seller_id: string;
@@ -170,9 +172,11 @@ export function authIdentityV2Enabled(env: Env): boolean {
 	return env.AUTH_IDENTITY_ENABLED === "true";
 }
 
-export function validE164(phone: string): boolean {
-	return /^\+[1-9]\d{7,14}$/.test(phone);
-}
+// Re-exported so the existing import sites keep working. The definition moved
+// to phone.ts, where it sits beside the buyer-phone normaliser that has to agree
+// with it — two copies of this rule in two files is how they came to differ by a
+// digit in the first place (I-6).
+export { validE164 } from "./phone";
 
 async function digest(value: string): Promise<string> {
 	const bytes = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)));

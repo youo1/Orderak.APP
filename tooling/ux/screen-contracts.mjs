@@ -376,15 +376,17 @@ export const CONTRACTS = [
     purpose: "ملف العميل وسجل طلباته",
     entry: ["customers", "order-details"],
     exit: ["OrderDetailsRoute", "رجوع"],
-    data: ["customer", "order history", "contact"],
+    data: ["customer", "order history", "contact", "edit availability"],
     actions: [
       { do: "open order", via: "onOpenOrder" },
-      { do: "contact", status: "planned", why: "work item 11 builds the editor" },
-      { do: "edit", status: "planned", why: "work item 11 builds the editor" },
+      { do: "contact", via: "contactCustomer" },
+      { do: "edit", via: "save" },
     ],
     states: ["loading", "content", "error"],
     offline: true,
-    entitlementKey: null,
+    // The editor is a paid feature. The gate resolves fail-closed, so a seller
+    // with no snapshot sees the fields read-only rather than editable.
+    entitlementKey: "customers_crm.editable_customer_profiles",
     featureStatus: "implemented",
     phase: 8,
   },

@@ -1,6 +1,7 @@
 package app.orderak.seller.data.orders
 
 import androidx.room.withTransaction
+import app.orderak.seller.core.phone.CustomerPhone
 import app.orderak.seller.data.db.CustomerEntity
 import app.orderak.seller.data.db.OrderDao
 import app.orderak.seller.data.db.OrderEntity
@@ -34,7 +35,7 @@ class OrderRepository @Inject constructor(
     val orders: Flow<List<OrderEntity>> = orderDao.all()
     fun order(id: Long): Flow<OrderWithItems?> = orderDao.withItems(id)
     fun ordersOf(phone: String): Flow<List<OrderEntity>> = orderDao.byPhone(phone)
-    fun customer(phone: String) = db.customerDao().byPhone(phone)
+    fun customer(key: String) = db.customerDao().byKey(key)
     val customers = db.customerDao().summaries()
     fun payments(orderId: Long): Flow<List<PaymentEntity>> = paymentDao.byOrder(orderId)
 
@@ -61,9 +62,24 @@ class OrderRepository @Inject constructor(
         buyerPhone: String, buyerName: String?, payMethod: PayMethod,
         note: String?, lines: List<NewOrderLine>
     ): Long {
+        // The customer's identity, decided the same way the server decides it.
+        // The seller's own country is the only country context a buyer phone
+        // has; without it a bare national number is ambiguous and keys to
+        // itself rather than being guessed at (I-6).
+        val region = sessionStore.countryIso.first()
+        val normalized = CustomerPhone.normalize(buyerPhone, region)
+
         val orderId = db.withTransaction {
-            db.customerDao().insertIgnore(CustomerEntity(phone = buyerPhone, name = buyerName))
-            if (!buyerName.isNullOrBlank()) db.customerDao().fillName(buyerPhone, buyerName)
+            db.customerDao().insertIgnore(
+                CustomerEntity(
+                    customerKey = normalized.key,
+                    phone = buyerPhone,
+                    phoneE164 = normalized.e164,
+                    phoneStatus = normalized.status.name.lowercase(),
+                    name = buyerName,
+                )
+            )
+            if (!buyerName.isNullOrBlank()) db.customerDao().fillName(normalized.key, buyerName)
             val total = lines.sumOf { it.qty * it.priceMinor }
             val id = orderDao.insert(
                 OrderEntity(
@@ -126,6 +142,27 @@ class OrderRepository @Inject constructor(
         if (!response.ok) return false
         orderDao.acceptRemoteId(orderId, response.order_no)
         return true
+    }
+
+    /**
+     * Apply a seller's edit to a customer.
+     *
+     * Written locally and marked dirty, not posted here. The seller is often
+     * offline, and an edit that failed because of that would either be lost or
+     * would have to block the screen on a network call. [SyncRepository] posts
+     * every dirty row on the next sync and clears the flag on acknowledgement;
+     * until then the local value is the one shown.
+     *
+     * The phone is not a parameter. It is the identity — see CustomerDao.
+     */
+    suspend fun editCustomer(customerKey: String, name: String, altContact: String, note: String) {
+        db.customerDao().applyEdit(
+            key = customerKey,
+            name = name.trim().ifBlank { null },
+            altContact = altContact.trim().ifBlank { null },
+            note = note.trim().ifBlank { null },
+            updatedAt = System.currentTimeMillis(),
+        )
     }
 
     /** Post everything this device recorded and the server has not acknowledged. */

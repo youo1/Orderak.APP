@@ -21,7 +21,9 @@ import javax.inject.Singleton
     // v9: orders carry the idempotency key they are posted under, so a retry
     //     after a dropped response returns the order already written rather
     //     than creating a second one.
-    version = 9,
+    // v10: customers are a row the seller edits, keyed by the normalised phone
+    //     rather than the raw one, and carrying the fields the editor writes.
+    version = 10,
     exportSchema = false,
 )
 abstract class OrderakDatabase : RoomDatabase() {

@@ -68,9 +68,10 @@ fun CustomersScreen(
     val customers by viewModel.customers.collectAsStateWithLifecycle()
     var query by rememberSaveable { mutableStateOf("") }
 
-    // No action offered: a customer record is created by an order arriving, so
-    // there is nothing a seller can press here. An empty state with a button
-    // that does not help is worse than one without.
+    // No action offered on the empty state: a customer record is created by an
+    // order arriving, so there is nothing here for a seller to press until one
+    // does. A button that does not help is worse than no button. Rows
+    // themselves are pressable — they open the editor.
     //
     // Checked before the search box is drawn, so a seller with no customers is
     // not handed something to search through nothing with.
@@ -117,7 +118,7 @@ private fun CustomerList(
     onOpen: (String) -> Unit,
 ) {
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(customers, key = { it.phone }) { c ->
+        items(customers, key = { it.customerKey }) { c ->
             // The shared row, with no priority rail: a customer is never
             // "waiting on the seller" the way an order is, so claiming a rail
             // here would put a signal on a list that has nothing to triage.
@@ -128,7 +129,7 @@ private fun CustomerList(
                     c.ordersCount,
                     c.ordersCount,
                 ),
-                modifier = Modifier.clickable { onOpen(c.phone) },
+                modifier = Modifier.clickable { onOpen(c.customerKey) },
                 trailing = {
                     Text(
                         stringResource(
