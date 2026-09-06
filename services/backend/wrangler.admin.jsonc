@@ -127,7 +127,8 @@
 			"ADMIN_SESSION_PEPPER",
 			"ADMIN_TOTP_KEY_V1",
 			"ADMIN_TOTP_KEY_V2",
-			"BUYER_PRIVACY_PEPPER"
+			"BUYER_PRIVACY_PEPPER",
+			"SENTRY_DSN"
 		]
 	},
 	"env": {
@@ -144,14 +145,15 @@
 			"secrets": {
 				"required": [
 					"ADMIN_API_KEY",
-					"ADMIN_AUDIT_SIGNING_KEY",
 					"ADMIN_AUDIT_KEY_V2",
+					"ADMIN_AUDIT_SIGNING_KEY",
 					"ADMIN_EXPORT_SIGNING_KEY",
 					"ADMIN_RECOVERY_PEPPER",
 					"ADMIN_SESSION_PEPPER",
 					"ADMIN_TOTP_KEY_V1",
 					"ADMIN_TOTP_KEY_V2",
-					"BUYER_PRIVACY_PEPPER"
+					"BUYER_PRIVACY_PEPPER",
+					"SENTRY_DSN"
 				]
 			},
 			"vars": {

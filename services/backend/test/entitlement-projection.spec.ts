@@ -147,6 +147,45 @@ describe("legacy entitlement projection", () => {
 		expect(paid.entitlements["customers_crm.editable_customer_profiles"].available).toBe(true);
 	});
 
+	it("carries the same key set on every one of the four plans", async () => {
+		// The readiness gate asks for a non-empty snapshot on all four plans with
+		// an identical shape, and the rest of this file checks free plus "a paid
+		// plan" — which is the case that was already working. A plan whose row is
+		// missing a column, or whose limits are all null, produces a snapshot that
+		// is technically present and draws nothing, and that is the failure this
+		// catches: a seller on paid3 seeing an emptier account screen than a
+		// seller on free.
+		const r = await registerStore({ phone: "+201500003201" });
+		const storeId = await storeIdOf(r);
+
+		const free = await legacySnapshot(engineOff(), storeId);
+		const expectedKeys = Object.keys(free.entitlements).sort();
+		expect(expectedKeys.length).toBeGreaterThan(0);
+
+		for (const [planId, name, multiDevice] of [
+			["paid1", "Launch", 0],
+			["paid2", "Momentum", 1],
+			["paid3", "Command", 1],
+		] as const) {
+			await env.orderak_db.batch([
+				env.orderak_db.prepare(
+					"INSERT INTO plans(id,name,active,multi_device_enabled,max_products,max_categories,max_orders_per_month) VALUES(?,?,1,?,200,50,1000)",
+				).bind(planId, name, multiDevice),
+				env.orderak_db.prepare("DELETE FROM subscriptions WHERE seller_id=?").bind(storeId),
+				env.orderak_db.prepare("INSERT INTO subscriptions(seller_id,plan_id,status) VALUES(?,?,'active')").bind(storeId, planId),
+			]);
+
+			const snapshot = await legacySnapshot(engineOff(), storeId);
+			expect(snapshot.plan_key, `${planId} plan_key`).toBe(planId);
+			// Identical key set, not identical values: a paid plan is allowed to
+			// decide differently, and is not allowed to answer a different question.
+			expect(Object.keys(snapshot.entitlements).sort(), `${planId} key set`).toEqual(expectedKeys);
+			// Non-empty in the sense that matters — the limits the app draws
+			// meters for are present and carry a ceiling.
+			expect(snapshot.entitlements.max_products.value, `${planId} max_products`).toBe(200);
+		}
+	});
+
 	it("honours the one feature the legacy plan row actually gates", async () => {
 		const r = await registerStore({ phone: "+201500003006" });
 		const storeId = await storeIdOf(r);
