@@ -1,7 +1,7 @@
 import {
   BadgeDollarSign, BookOpenText, Boxes, BriefcaseBusiness, Bug, CircleGauge, ClipboardCheck,
   CreditCard, FileClock, FileText, Flag, GalleryVerticalEnd, Globe2, HardDrive, Headphones,
-  Image, Inbox, Languages, LayoutDashboard, Mail, Megaphone, MessageSquareText, MonitorSmartphone, PackageCheck, Paintbrush,
+  Image, Inbox, Languages, LayoutDashboard, ListChecks, Mail, Megaphone, MessageSquareText, MonitorSmartphone, PackageCheck, Paintbrush,
   ReceiptText, ScrollText, Settings2, Shield, ShieldAlert, ShoppingBag, Store, Tags, Ticket,
   Trash2, WandSparkles,
 } from 'lucide-react';
@@ -27,6 +27,7 @@ export const sections: Section[] = [
   { id: 'deletions', path: '/deletions', label: 'Deletion & Trust', description: 'Identity verification, deadlines and safe retries', group: 'Accounts', permission: 'deletions:view', endpoint: '/api/admin/v1/deletion-requests', resultKeys: ['requests'], icon: Trash2 },
 
   { id: 'subscriptions', path: '/commerce/subscriptions', label: 'Subscriptions', description: 'Lifecycle, usage, grace and Play reconciliation', group: 'Commerce', permission: 'subscriptions:view', endpoint: '/api/admin/v1/subscriptions', resultKeys: ['subscriptions'], icon: CreditCard },
+  { id: 'billing-verifications', path: '/commerce/billing-verifications', label: 'Purchase verification', description: 'Play verification queue, lease state and audited requeues', group: 'Commerce', permission: 'subscriptions:view', endpoint: '/api/admin/v1/billing/verifications', resultKeys: ['verifications'], icon: ListChecks },
   { id: 'plans', path: '/commerce/plans', label: 'Plans & limits', description: 'Immutable revisions, entitlements and governed limits', group: 'Commerce', permission: 'plans:view', endpoint: '/api/admin/v1/plan-catalog', resultKeys: ['plans', 'revisions', 'definitions', 'values'], icon: Boxes },
   { id: 'coupons', path: '/commerce/coupons', label: 'Coupons', description: 'Coupon lifecycle and redemption constraints', group: 'Commerce', permission: 'coupons:view', endpoint: '/api/admin/v1/coupons', resultKeys: ['coupons'], icon: Ticket },
   { id: 'affiliate', path: '/commerce/affiliate', label: 'Referrals & payouts', description: 'Affiliate configuration, referrals and payout state', group: 'Commerce', permission: 'affiliate:view', endpoint: '/api/admin/v1/referrals', resultKeys: ['referrals'], icon: BadgeDollarSign },

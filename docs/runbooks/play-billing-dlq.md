@@ -2,7 +2,7 @@
 status: current
 generated: false
 owner: backend
-last_verified: 2026-08-12
+last_verified: 2026-09-06
 applies_to: [production, staging]
 ---
 # Google Play billing DLQ runbook
@@ -12,13 +12,22 @@ Use this runbook for any `play_verification_dlq` or
 access not revoked, or an acknowledgement requiring intervention. Treat every
 event as urgent; never copy token ciphertext into tickets, chat, or logs.
 
+Every step below is available in the admin console under
+**Commerce → Purchase verification**, which lists the queue, shows health, and
+performs the audited requeue. The API calls are named so the runbook stays
+readable when the console is unavailable, not because they are the intended
+route. A purchase is money already taken; the recovery path for a paying seller
+should not require a terminal.
+
 ## Triage
 
-1. Open `GET /api/admin/v1/billing/verifications/{id}` with
+1. Open the job. In the console, filter by status `dead_lettered` and select the
+   row; by API, `GET /api/admin/v1/billing/verifications/{id}` with
    `subscriptions:view`. Record job ID, organization, source, attempt count,
-   sanitized error, generation, and timestamps. The API does not expose the raw
+   sanitized error, generation, and timestamps. Neither surface exposes the raw
    token or ciphertext.
-2. Check `/api/admin/v1/billing/health`: lifecycle/acquisition flags, oldest queued
+2. Check queue health — shown on the same console page, or
+   `/api/admin/v1/billing/health`: lifecycle/acquisition flags, oldest queued
    message, backlog, undispatched count, DLQ count, provider circuit state,
    claim-duration p50/p95/max versus 120 seconds, and reclaim frequency.
 3. Check Cloudflare Queue metrics for `orderak-play-billing` and D1 query
@@ -37,9 +46,13 @@ event as urgent; never copy token ciphertext into tickets, chat, or logs.
 1. An administrator with `subscriptions:manage` requests a fresh action
    authorization for action `billing.verification_retry` and entity ID equal to
    the dead-lettered job ID. Fresh password and TOTP are required; the approval
-   expires in five minutes and is single-use.
-2. Call `POST /api/admin/v1/billing/verifications/{id}/retry` with header
-   `x-admin-action-authorization` and JSON `{ "reason": "..." }`.
+   expires in five minutes and is single-use. The console requests this for you
+   when you submit the requeue form.
+2. Submit the requeue with a written reason. The console does this; by API it is
+   `POST /api/admin/v1/billing/verifications/{id}/retry` with header
+   `x-admin-action-authorization` and JSON `{ "reason": "..." }`. A job that is
+   not `dead_lettered` is refused with 409 `verification_not_dead_lettered` —
+   the queue has not given up on it yet, and requeuing is not a way to hurry it.
 3. Record the returned verification ID. Repeating the same authorized request
    returns the existing child; the dead-lettered parent can create only one.
    The action reuses encrypted D1 material and writes an audit event.
