@@ -196,6 +196,17 @@
     <string name="payment_disclaimer">Cette vérification aide à détecter les fraudes — elle ne remplace pas la vérification de votre portefeuille</string>
 
     <string name="customers_empty">Chaque client qui commande apparaîtra ici automatiquement</string>
+    <string name="customer_phone">Téléphone</string>
+    <string name="customer_phone_is_identity">C\'est ce qui relie les commandes à ce client, il ne peut donc pas être modifié ici</string>
+    <string name="customer_phone_unresolved">Ce numéro n\'a pas pu être rattaché à un pays : il est conservé tel qu\'il a été saisi</string>
+    <string name="customer_name">Nom</string>
+    <string name="customer_alt_contact">Autre contact</string>
+    <string name="customer_note">Note</string>
+    <string name="customer_contact">Message</string>
+    <string name="customer_save">Enregistrer</string>
+    <string name="customer_saved">Client enregistré</string>
+    <string name="customer_edit_locked">La modification des fiches clients fait partie d\'une offre payante</string>
+    <string name="customer_orders_heading">Commandes</string>
     <plurals name="customer_orders_count">
         <item quantity="one">%d commande</item>
         <item quantity="many">%d commandes</item>

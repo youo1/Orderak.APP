@@ -201,21 +201,72 @@ interface CustomerDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertIgnore(customer: CustomerEntity)
 
-    @Query("UPDATE customers SET name = :name WHERE phone = :phone AND (name IS NULL OR name = '')")
-    suspend fun fillName(phone: String, name: String)
-
     @Query(
-        """SELECT c.phone AS phone, c.name AS name,
+        "UPDATE customers SET name = :name WHERE customerKey = :key AND (name IS NULL OR name = '')"
+    )
+    suspend fun fillName(key: String, name: String)
+
+    /**
+     * The list, joined on the raw phone rather than the key.
+     *
+     * `orders.buyerPhone` holds what the buyer typed, and nothing rewrites it —
+     * so the join has to be on the value the order actually carries. The key is
+     * selected beside it because it is what navigation and editing address.
+     */
+    @Query(
+        """SELECT c.customerKey AS customerKey, c.phone AS phone, c.name AS name,
                   COUNT(o.id) AS ordersCount,
                   COALESCE(SUM(o.totalMinor), 0) AS totalMinor
            FROM customers c
            LEFT JOIN orders o ON o.buyerPhone = c.phone AND o.status != 'CANCELLED'
-           GROUP BY c.phone ORDER BY totalMinor DESC"""
+           GROUP BY c.customerKey ORDER BY totalMinor DESC"""
     )
     fun summaries(): Flow<List<CustomerSummary>>
 
-    @Query("SELECT * FROM customers WHERE phone = :phone")
-    fun byPhone(phone: String): Flow<CustomerEntity?>
+    @Query("SELECT * FROM customers WHERE customerKey = :key")
+    fun byKey(key: String): Flow<CustomerEntity?>
+
+    @Query("SELECT * FROM customers WHERE customerKey = :key")
+    suspend fun findByKey(key: String): CustomerEntity?
+
+    /**
+     * A seller's edit, applied locally and marked for the next sync.
+     *
+     * The phone is not in the SET list. It is the identity: changing it would
+     * not be an edit but a claim that this is a different customer, and the
+     * order rows that join on it would silently stop matching.
+     */
+    @Query(
+        """UPDATE customers
+              SET name = :name, altContact = :altContact, note = :note,
+                  updatedAt = :updatedAt, dirty = 1
+            WHERE customerKey = :key"""
+    )
+    suspend fun applyEdit(
+        key: String,
+        name: String?,
+        altContact: String?,
+        note: String?,
+        updatedAt: Long,
+    )
+
+    /** Rows carrying an edit the server has not acknowledged. */
+    @Query("SELECT * FROM customers WHERE dirty = 1")
+    suspend fun dirty(): List<CustomerEntity>
+
+    @Query("UPDATE customers SET dirty = 0 WHERE customerKey = :key")
+    suspend fun clearDirty(key: String)
+
+    /**
+     * A customer as the server holds them.
+     *
+     * REPLACE rather than a field-by-field update because the server row is
+     * authoritative for every column here. It is called only for rows that are
+     * not dirty — see `SyncRepository`, which posts local edits before pulling,
+     * so an unacknowledged edit is never overwritten by the value it replaced.
+     */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(customer: CustomerEntity)
 }
 
 @Dao

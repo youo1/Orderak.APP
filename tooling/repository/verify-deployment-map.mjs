@@ -186,7 +186,14 @@ for (const [relative, expectedServers] of Object.entries(serverExpectations)) {
 // from the account, from a second device, from a reinstall, and from the
 // monthly plan count. The seller read a confirmation and had a note on one
 // phone. Unlike the phone-change raise above, this route is genuinely new.
-if (operationCount !== 250) fail(`OpenAPI operation inventory changed: expected 250, found ${operationCount}.`);
+// Raised to 253 on 2026-09-06 for the customers resource: GET /api/v1/customers,
+// GET and PATCH /api/v1/customers/{customer_key}. Genuinely new, all three. A
+// buyer was two denormalised columns on `orders` and the app's customer list was
+// an aggregation computed on the device, so there was no row for a seller to
+// edit — while the plan comparison sold "editable customer profiles" at paid1
+// and migration 047 marked it implemented in D1 on the strength of the screen
+// merely existing.
+if (operationCount !== 253) fail(`OpenAPI operation inventory changed: expected 253, found ${operationCount}.`);
 const seller = JSON.parse(read("contracts/openapi/src/seller-v1.json"));
 for (const [route, pathItem] of Object.entries(seller.paths)) {
   for (const method of ["get", "post", "put", "patch", "delete"]) {

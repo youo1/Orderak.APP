@@ -209,6 +209,17 @@
 
     <!-- S11/S12 Customers -->
     <string name="customers_empty">هيظهر هنا كل عميل طلب منك — تلقائيًا مع أول أوردر</string>
+    <string name="customer_phone">رقم التليفون</string>
+    <string name="customer_phone_is_identity">ده اللي الأوردرات بتلاقي بيه العميل، عشان كده مش بيتغير من هنا</string>
+    <string name="customer_phone_unresolved">الرقم ده مش قادرين نحدد دولته، فمتسجل زي ما اتكتب بالظبط</string>
+    <string name="customer_name">الاسم</string>
+    <string name="customer_alt_contact">وسيلة تواصل تانية</string>
+    <string name="customer_note">ملاحظة</string>
+    <string name="customer_contact">راسل</string>
+    <string name="customer_save">حفظ</string>
+    <string name="customer_saved">اتحفظ</string>
+    <string name="customer_edit_locked">تعديل بيانات العملاء متاح في الباقات المدفوعة</string>
+    <string name="customer_orders_heading">الأوردرات</string>
     <plurals name="customer_orders_count">
         <item quantity="zero">مفيش أوردرات</item>
         <item quantity="one">أوردر واحد</item>

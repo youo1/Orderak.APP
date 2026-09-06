@@ -147,7 +147,13 @@ export const EVIDENCE = {
   "customers_crm.editable_customer_profiles": {
     kind: "screen",
     value: "CustomerDetailsScreen",
-    note: "DO NOT PROMOTE on this evidence. The screen resolves, and it renders an order list with no edit control, no save and no write path in its ViewModel — this row is why the behaviour axis exists. The catalogue sold it at paid1 while the app could not do it. Promote it when work item 11 ships the editor, together with a behaviour test that asserts an edit persists.",
+    behaviour: {
+      layer: "android",
+      file: "CustomerMergeTest.kt",
+      test: "an edit the server has not acknowledged survives the next pull",
+    },
+    integration: "/api/v1/customers",
+    note: "Promoted with the editor, not with the screen. This row is why the behaviour axis exists: the screen resolved for months while rendering an order list with no edit control, no save and no write path, and the catalogue sold it at paid1 the whole time. The named test asserts the property that makes the editor worth having — an edit the server has not acknowledged is never overwritten by the value it replaced.",
   },
   "analytics_reporting.operational_dashboard":       { kind: "screen", value: "MainScreen" },
   "support_service.in_app_support_tickets":          { kind: "endpoint", value: "/api/v1/support/tickets", integration: "/api/v1/support/tickets" },

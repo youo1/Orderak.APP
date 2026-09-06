@@ -31,13 +31,14 @@
  *   projection specs compare this list against the source catalogue and fail
  *   naming any key that was added, removed or reclassified.
  *
- * WHY `customers_crm.editable_customer_profiles` IS ABSENT
- *   Migration 047 marks it `implemented` in D1. It is not: CustomerDetailsScreen
- *   renders an order list with no edit control and no write path, which is the
- *   finding that put the behaviour axis into the evidence verifier in the first
- *   place. The source catalogue still calls it planned, this list follows the
- *   source catalogue, and work item 11 is what makes it true. Until then, a
- *   snapshot that named it would sell a screen that cannot save.
+ * WHY `customers_crm.editable_customer_profiles` IS PRESENT AGAIN
+ *   It was held out of this list while migration 047 called it `implemented` in
+ *   D1 and the screen rendered an order list with no edit control and no write
+ *   path — the finding that put the behaviour axis into the evidence verifier.
+ *   Work item 11 shipped the editor, the customers resource and a behaviour test
+ *   that asserts an edit survives the sync after it, so the claim is now true and
+ *   the key belongs in the snapshot. It is a paid feature: the free plan's row
+ *   below is `disabled`, matching the plan revisions seeded by migration 025.
  */
 
 export interface LegacyFeatureEntitlement {
@@ -65,6 +66,7 @@ export const LEGACY_FEATURE_ENTITLEMENTS: readonly LegacyFeatureEntitlement[] = 
 	{ key: "orders_fulfilment.order_status_updates", category: "Orders & fulfilment", name: "Order status updates", value_type: "boolean", display_value: "Included" },
 	{ key: "orders_fulfilment.paid_unpaid_tracking", category: "Orders & fulfilment", name: "Paid / unpaid tracking", value_type: "boolean", display_value: "Included" },
 	{ key: "customers_crm.customer_list_and_order_history", category: "Customers & CRM", name: "Customer list and order history", value_type: "boolean", display_value: "Included" },
+	{ key: "customers_crm.editable_customer_profiles", category: "Customers & CRM", name: "Editable customer profiles", value_type: "boolean", display_value: "Included" },
 	{ key: "payments_finance.instapay_vodafone_cash_instructions", category: "Payments & finance", name: "InstaPay / Vodafone Cash instructions", value_type: "boolean", display_value: "Included" },
 	{ key: "payments_finance.ocr_receipt_assistance", category: "Payments & finance", name: "OCR receipt assistance", value_type: "text", display_value: "Included" },
 	{ key: "analytics_reporting.operational_dashboard", category: "Analytics & reporting", name: "Operational dashboard", value_type: "text", display_value: "Essential counts" },
@@ -90,6 +92,20 @@ export const LEGACY_FEATURE_ENTITLEMENTS: readonly LegacyFeatureEntitlement[] = 
  * something the server then refuses.
  */
 export const LEGACY_MULTI_DEVICE_KEY = "team_security.multiple_owner_devices";
+
+/**
+ * Implemented features the legacy plans table gates by the plan's existence
+ * rather than by a column of its own.
+ *
+ * A seller with no row in `plans` is on free. The catalogue's plan revisions put
+ * this key at `disabled` on free and `Included` on all three paid tiers, and
+ * there is no legacy column that says so — so the gate is the plan row itself.
+ * Reporting it as universally available would offer every free seller an editor
+ * the plan comparison sells at paid1.
+ */
+export const LEGACY_PAID_ONLY_KEYS: readonly string[] = [
+	"customers_crm.editable_customer_profiles",
+];
 
 /**
  * Integer limits the snapshot reports, each with the catalogue's own status.
