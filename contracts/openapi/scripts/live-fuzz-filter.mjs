@@ -7,7 +7,7 @@
  * -----------------------------
  * The nightly job runs schemathesis against https://api.staging.orderak.app with
  * `--phases examples,coverage,fuzzing,stateful --checks all`. The seller contract has
- * 68 operations, 37 of them mutating, including:
+ * 67 operations, 39 of them mutating, including:
  *
  *   POST   /api/v1/account/deletion-request          - deletes the account
  *   POST   /api/v1/account/email/verification/resend - sends real email
