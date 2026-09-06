@@ -37,9 +37,20 @@ misc.xml
 deploymentTargetDropDown.xml
 render.experimental.xml
 
-# Keystore files
+# Keystore files.
+#
+# Release signing material reaches the build through the environment
+# (ORDERAK_KEYSTORE_PATH and friends), never a path inside the tree, so nothing
+# here should ever want to be committed. These patterns exist to make an
+# accident impossible rather than to support a workflow: a leaked upload key
+# cannot be rotated without Google's involvement, and the app-signing key Play
+# holds cannot be rotated at all.
 *.jks
 *.keystore
+*.p12
+*.pepk
+keystore.properties
+signing.properties
 
 # SSH keys
 .ssh/

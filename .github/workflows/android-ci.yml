@@ -113,6 +113,52 @@ jobs:
           if [ "$SIZE" -gt 52428800 ]; then echo "ERROR: Bundle exceeds 50 MB threshold"; exit 1; fi
         shell: bash
 
+  # The release variant, built on every pull request.
+  #
+  # It was configured and never assembled: minify, resource shrinking and
+  # ProGuard were all declared while every build anyone ran was `debug`. A
+  # release-only R8 failure would therefore have been discovered by whoever
+  # first tried to publish, which is the worst possible moment to learn that
+  # Room, Hilt or kotlinx.serialization needed a keep rule.
+  #
+  # Staging, not production: the production Firebase config in CI is a
+  # deliberate placeholder and `verifyFirebaseConfiguration` fails on it. Both
+  # share the `release` build type, so this exercises the same R8 configuration
+  # the published bundle uses.
+  release-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-provider: basic
+      - name: Create CI Firebase configuration
+        run: bash .github/scripts/write-ci-google-services.sh
+      - name: Assemble minified release bundle
+        working-directory: apps/seller-android
+        run: bash ./gradlew :app:bundleStagingRelease -PorderakVersionCode=${{ github.run_number }} --stacktrace
+      - name: Check release bundle size
+        run: |
+          AAB=apps/seller-android/app/build/outputs/bundle/stagingRelease/app-staging-release.aab
+          SIZE=$(stat -c%s "$AAB" 2>/dev/null || echo 0)
+          echo "Release bundle size: $SIZE bytes"
+          if [ "$SIZE" -eq 0 ]; then echo "ERROR: no release bundle produced"; exit 1; fi
+          if [ "$SIZE" -gt 52428800 ]; then echo "ERROR: bundle exceeds 50 MB threshold"; exit 1; fi
+        shell: bash
+      - name: Upload R8 mapping
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: r8-mapping-staging-release
+          path: apps/seller-android/app/build/outputs/mapping/stagingRelease/**
+          if-no-files-found: warn
+          retention-days: 7
+
   localization-drift:
     runs-on: ubuntu-latest
     timeout-minutes: 10

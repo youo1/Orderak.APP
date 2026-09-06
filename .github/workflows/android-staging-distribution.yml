@@ -20,6 +20,10 @@ jobs:
       FIREBASE_APP_DISTRIBUTION_CREDENTIALS: ${{ secrets.FIREBASE_APP_DISTRIBUTION_CREDENTIALS }}
       FIREBASE_APP_DISTRIBUTION_GROUPS: ${{ vars.FIREBASE_APP_DISTRIBUTION_GROUPS }}
       GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/.firebase-app-distribution.json
+      ORDERAK_KEYSTORE_BASE64: ${{ secrets.ORDERAK_KEYSTORE_BASE64 }}
+      ORDERAK_KEYSTORE_PASSWORD: ${{ secrets.ORDERAK_KEYSTORE_PASSWORD }}
+      ORDERAK_KEY_ALIAS: ${{ secrets.ORDERAK_KEY_ALIAS }}
+      ORDERAK_KEY_PASSWORD: ${{ secrets.ORDERAK_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -35,16 +39,42 @@ jobs:
           test -n "$FIREBASE_STAGING_GOOGLE_SERVICES_JSON"
           test -n "$FIREBASE_APP_DISTRIBUTION_CREDENTIALS"
           test -n "$FIREBASE_APP_DISTRIBUTION_GROUPS"
+          test -n "$ORDERAK_KEYSTORE_BASE64"
+          test -n "$ORDERAK_KEYSTORE_PASSWORD"
+          test -n "$ORDERAK_KEY_ALIAS"
+          test -n "$ORDERAK_KEY_PASSWORD"
 
-      - name: Materialize ephemeral Firebase configuration
-        working-directory: apps/seller-android
+      - name: Materialize ephemeral Firebase and signing configuration
         run: |
-          printf '%s' "$FIREBASE_STAGING_GOOGLE_SERVICES_JSON" > app/src/staging/google-services.json
+          umask 077
+          printf '%s' "$FIREBASE_STAGING_GOOGLE_SERVICES_JSON" > apps/seller-android/app/src/staging/google-services.json
           printf '%s' "$FIREBASE_APP_DISTRIBUTION_CREDENTIALS" > "$GOOGLE_APPLICATION_CREDENTIALS"
+          printf '%s' "$ORDERAK_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/orderak-upload.jks"
+        shell: bash
 
-      - name: Build, verify, and distribute Staging APK
+      # stagingRelease, not stagingDebug.
+      #
+      # `debug` forces crashlyticsCollectionEnabled and performanceCollectionEnabled
+      # to "false", and stagingDebug was the only build anyone had ever been given
+      # — so every tester the app has ever had ran it with crash reporting off,
+      # and the reporting path had never once been exercised. It also means
+      # testers were running an unminified build, so an R8 problem would have
+      # been found by the first production release rather than by a tester.
+      #
+      # Signed with the same upload key as production. A release variant is not
+      # installable unsigned, and signing it with a throwaway key would mean
+      # testers could not take an update from the Play track later.
+      - name: Build, verify, and distribute the staging release APK
         working-directory: apps/seller-android
+        env:
+          ORDERAK_KEYSTORE_PATH: ${{ runner.temp }}/orderak-upload.jks
         run: |
           ./gradlew verifyAuthPhase1Contract verifyLocalizationContract
-          ./gradlew :app:assembleStagingDebug :app:testStagingDebugUnitTest
-          ./gradlew :app:appDistributionUploadStagingDebug --groups="$FIREBASE_APP_DISTRIBUTION_GROUPS"
+          ./gradlew :app:testStagingDebugUnitTest
+          ./gradlew :app:assembleStagingRelease -PorderakVersionCode=${{ github.run_number }}
+          ./gradlew :app:appDistributionUploadStagingRelease --groups="$FIREBASE_APP_DISTRIBUTION_GROUPS"
+
+      - name: Remove signing material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/orderak-upload.jks"
+        shell: bash

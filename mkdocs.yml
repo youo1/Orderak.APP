@@ -111,6 +111,7 @@ nav:
     - Local Development Agents: guides/development-agents.md
     - Testing: guides/testing.md
     - Staging and Production Workflow: guides/staging-production-workflow.md
+    - Android Release Pipeline: guides/android-release.md
     - Troubleshooting: guides/troubleshooting.md
     - Generated Migration Reference: guides/database-migrations.md
   - User Guide:
