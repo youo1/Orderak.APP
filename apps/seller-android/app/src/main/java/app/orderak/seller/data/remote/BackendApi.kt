@@ -3,7 +3,11 @@ import app.orderak.seller.core.network.Backend
 import app.orderak.seller.core.locale.AppLocales
 import app.orderak.seller.core.network.ApiRoutes
 import app.orderak.seller.core.network.NetworkJson
+import app.orderak.seller.core.platform.ApiFailure
 import app.orderak.seller.core.platform.ClientContextProvider
+import app.orderak.seller.core.platform.CrashReporter
+import app.orderak.seller.core.platform.isReportableFailure
+import app.orderak.seller.core.platform.redactRoute
 import app.orderak.seller.data.session.SessionRouteMonitor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -738,6 +742,7 @@ class BackendApi @Inject constructor(
     private val client: OkHttpClient,
     private val sessionRouteMonitor: SessionRouteMonitor,
     private val clientContextProvider: ClientContextProvider,
+    private val crashReporter: CrashReporter,
 ) {
     // Not constructor-injected to avoid a Hilt qualifier for one binding;
     // swap to injection if a test ever needs a TestDispatcher here.
@@ -822,17 +827,44 @@ class BackendApi @Inject constructor(
 
     /** Executes on [io]: OkHttp enqueue is async, but body.string() blocks. */
     private suspend fun execute(request: Request): String = withContext(io) {
-        client.newCall(request).await().use { it.bodyOrThrow() }
+        try {
+            client.newCall(request).await().use { it.bodyOrThrow() }
+        } catch (e: IOException) {
+            // Report here rather than in apiCall, which knows the error code but
+            // not which endpoint produced it — the path lives on the request and
+            // nowhere else. Doing it here also keeps the ~80 call sites unchanged.
+            //
+            // Only server-side failures, never the offline case: see
+            // isReportableFailure.
+            val code = e.message.orEmpty()
+            if (isReportableFailure(code)) {
+                crashReporter.recordApiFailure(
+                    ApiFailure(
+                        route = redactRoute(request.url.encodedPath),
+                        requestId = request.header("x-request-id"),
+                        code = code,
+                    ),
+                )
+            }
+            throw e
+        }
     }
 
-    private fun builder(path: String, headers: Map<String, String>) = Request.Builder()
-        .url(Backend.BASE_URL + ApiRoutes.versioned(path))
-        // The app UI locale is independent from seller-authored product text.
-        // The Worker may use this only for optional messages and communication;
-        // API decisions always use stable machine-readable codes.
-        .header("Accept-Language", AppLocales.currentTag())
-        .header("x-request-id", clientContextProvider.newRequestId())
-        .apply { headers.forEach { (k, v) -> header(k, v) } }
+    private fun builder(path: String, headers: Map<String, String>): Request.Builder {
+        val requestId = clientContextProvider.newRequestId()
+        // The id the Worker will log and echo. Recorded before the call goes out
+        // so that if the app dies mid-request, the crash still names it and the
+        // matching Sentry event can be found from the Crashlytics report.
+        crashReporter.noteRequest(requestId, redactRoute(ApiRoutes.versioned(path)))
+        return Request.Builder()
+            .url(Backend.BASE_URL + ApiRoutes.versioned(path))
+            // The app UI locale is independent from seller-authored product text.
+            // The Worker may use this only for optional messages and communication;
+            // API decisions always use stable machine-readable codes.
+            .header("Accept-Language", AppLocales.currentTag())
+            .header("x-request-id", requestId)
+            .apply { headers.forEach { (k, v) -> header(k, v) } }
+    }
 
     private suspend fun postRaw(path: String, body: String, headers: Map<String, String> = emptyMap()): String =
         execute(builder(path, headers).post(body.toRequestBody(mediaJson)).build())

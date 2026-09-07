@@ -649,9 +649,29 @@ val verifySellerApiContract by tasks.registering {
                 ".url(Backend.BASE_URL + ApiRoutes.versioned(path))" in backendApi,
             "Seller calls must cross the central v1-only routing boundary."
         )
+        // Correlation is the property, not the expression.
+        //
+        // This used to pin one exact inlined call:
+        //     .header("x-request-id", clientContextProvider.newRequestId())
+        // which held the right behaviour in place right up until the id had to
+        // be used twice — once on the header and once handed to the crash
+        // reporter, so a Crashlytics report names the request a Sentry event can
+        // be found by. Binding it to a local is the same behaviour and did not
+        // match the literal.
+        //
+        // So the check now accepts either shape, and in the local-variable form
+        // requires the value sent as the header to be the one that came from the
+        // provider — the two stay welded together, which is the thing actually
+        // worth protecting. It is not looser about that; it is looser only about
+        // whether the call is written on one line or two.
+        val correlationInline =
+            ".header(\"x-request-id\", clientContextProvider.newRequestId())" in backendApi
+        val correlationViaLocal = Regex(
+            """val requestId = clientContextProvider\.newRequestId\(\)[\s\S]{0,800}?\.header\("x-request-id", requestId\)"""
+        ).containsMatchIn(backendApi)
         requireContract(
             "interface ClientContextProvider" in clientContext &&
-                ".header(\"x-request-id\", clientContextProvider.newRequestId())" in backendApi &&
+                (correlationInline || correlationViaLocal) &&
                 "x-orderak-platform" in backendApi,
             "Request correlation or the platform-neutral client context is missing."
         )
