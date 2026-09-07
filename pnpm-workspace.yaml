@@ -64,6 +64,21 @@ overrides:
   # says it supports -- an audit-green tree whose URI resolution is untested
   # against its consumer. Keep this inside major 3 until ajv widens its range.
   fast-uri@<3.1.6: ">=3.1.7 <4"
+  # GHSA-x5fp-wj9c-mxmx (moderate) — the array limit can be bypassed by comma
+  # parsing inside a bracket key, so a crafted query string allocates past the
+  # cap the limit exists to impose. Plus GHSA-4mjr-xmp4-gh2g (moderate), denial
+  # of service through an attacker-controlled `isBuffer`. Fixed in 6.15.4 and
+  # 6.16.0 respectively, so one pin past both closes both.
+  #
+  # Reaches the tree only as @stoplight/prism-cli > @stoplight/json-schema-ref-parser
+  # > url > qs, so it parses nothing but the OpenAPI mock's own arguments during
+  # CI and never runs in a Worker.
+  #
+  # No upper bound is needed, unlike fast-uri above: `url@0.11.4` declares
+  # `qs: ^6.12.3`, and 6.16.0 is inside that range rather than past it. This is
+  # the case that entry refuses — a consumer handed a version it never declared
+  # support for — and it does not arise here.
+  qs@<6.16.0: ">=6.16.0"
 
 # One advisory is not fixed here, because the fix is not one this tree can take.
 #

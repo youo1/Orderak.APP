@@ -158,7 +158,20 @@
 				"BILLING_ENABLED": "false",
 				"GOOGLE_PLAY_LIFECYCLE_ENABLED": "false",
 				"AI_ASSISTANT_ENABLED": "false",
-				"ENTITLEMENTS_ENABLED": "false",
+				// Work item 03b, staging only, 2026-09-06. Production stays
+				// "false" until a staging snapshot has been watched — the plan
+				// calls this a release rather than a config change because it
+				// swaps the source of every gate and meter in the app at once,
+				// and it is the first real exercise of a subsystem that has
+				// never served a request.
+				//
+				// Safe to flip because the shape is held by test rather than by
+				// hope: entitlements.spec asserts the engine and the legacy path
+				// answer with the same key set and the same per-key fields, so
+				// the client cannot tell which one replied (I-4). Item 11 has
+				// landed, so the engine no longer grants a customer editor that
+				// does not exist.
+				"ENTITLEMENTS_ENABLED": "true",
 				"AUTH_IDENTITY_ENABLED": "true",
 				"ONBOARDING_ENABLED": "true",
 				"PASSKEY_ENABLED": "true",

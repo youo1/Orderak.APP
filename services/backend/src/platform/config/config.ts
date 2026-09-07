@@ -10,6 +10,7 @@
 import { jsonResponse, authSeller, type AuthenticatedSeller } from "../http/shared";
 import { keyedHash, sha256Hex } from "../../domains/identity/auth";
 import { FREE_LIMITS } from "../../domains/commerce/plan-limits";
+import { LEGACY_LIMIT_KEYS } from "../../domains/commerce/legacy-entitlements";
 import {
 	legacySnapshot,
 	projectEntitlementsForAndroid,
@@ -55,7 +56,35 @@ const FREE_CONFIG = {
 export async function loadPlanConfig(env: Env, sellerId: string): Promise<Record<string, unknown>> {
 	if (env.ENTITLEMENTS_ENABLED === "true") {
 		const snapshot = await resolveEntitlements(env, sellerId);
-		return { ...legacyProjection(snapshot), entitlements: snapshot.entitlements };
+		// Implemented-only, because that is what the legacy branch below sends.
+		//
+		// The engine reads entitlement_definitions, which migration 025 seeds with
+		// the whole catalogue — 242 rows, of which 210 are `planned`. The legacy
+		// list is the implemented set. Sending the raw snapshot here would mean
+		// flipping ENTITLEMENTS_ENABLED changed the size of a block that rides on
+		// every orders pull by roughly sevenfold, all of it keys the client
+		// resolves to NotBuilt and never reads.
+		//
+		// That is not a gate bug — an unimplemented key fails closed on the device,
+		// which is correct — but it is exactly the client-visible difference I-4
+		// exists to forbid, and it would arrive as "sync got slower after the
+		// entitlements release" rather than as anything pointing at this line.
+		// /api/v1/entitlements already projects for the same reason; this is the
+		// piggybacked copy, which had been missed.
+		//
+		// The filter is implemented-or-a-limit rather than the plain
+		// implemented-only projection, because `max_team_members` is a limit the
+		// catalogue calls planned — nothing enforces a team size — and the legacy
+		// list sends it anyway, deliberately, so the two key sets match. The app
+		// reads it into ConfigLimits. Dropping it under the engine alone would be
+		// the client-visible difference this whole branch exists to prevent.
+		const entitlements = Object.fromEntries(
+			Object.entries(snapshot.entitlements).filter(
+				([key, item]) =>
+					item.implementation_status === "implemented" || LEGACY_LIMIT_KEYS.includes(key),
+			),
+		);
+		return { ...legacyProjection(snapshot), entitlements };
 	}
 
 	// The same map, from the legacy plan model.
