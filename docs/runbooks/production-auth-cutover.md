@@ -19,26 +19,61 @@ In `services/backend/wrangler.jsonc`, the production `vars` block:
 -    "PASSKEY_ENABLED": "false",
 +    "ONBOARDING_ENABLED": "true",
 +    "PASSKEY_ENABLED": "true",
-...
--    "FIREBASE_PROJECT_ID": ""
-+    "FIREBASE_PROJECT_ID": "<the production Firebase project id>"
 ```
 
-**All three ship together, in one deployment.** This is the whole reason the
-runbook exists. Each pairing of two-without-the-third produces a system that
-looks like it works and cannot (BR-113):
+**That is the whole change to open sign-in.** Two flags.
+
+### What `FIREBASE_PROJECT_ID` does and does not gate
+
+Production has `FIREBASE_PROJECT_ID: ""`, and it is easy to read that as "no
+Firebase". It is not, and getting this wrong in either direction wastes time.
+
+Token verification is `verifyFirebasePhone()` in
+`services/backend/src/domains/stores/api-store.ts`. It has two paths:
+
+- **Local JWKS** — taken only when `LOCAL_JWT_VERIFICATION="true"` **and**
+  `FIREBASE_PROJECT_ID` is set. Production has the first as `"false"`, so this
+  path is off by configuration, not by accident.
+- **Remote** — `identitytoolkit.googleapis.com/v1/accounts:lookup`, keyed on
+  `FIREBASE_WEB_API_KEY`. It does not read `FIREBASE_PROJECT_ID` at all.
+
+`FIREBASE_WEB_API_KEY` is in production's `secrets.required`, so a production
+deploy has one. **Phone sign-in in production therefore verifies against
+whatever project that key belongs to, with `FIREBASE_PROJECT_ID` empty.** The
+empty value costs a network round-trip per verification and nothing else.
+
+Where the empty value *does* bite is account deletion. `firebaseAdminToken()`
+in `domains/identity/deletion.ts` requires `FIREBASE_PROJECT_ID` plus the
+service-account pair, and throws `firebase_admin_credentials_missing` before any
+D1 cleanup — deliberately fail-closed, so a deletion request removes nothing
+rather than removing local data and orphaning a live Firebase identity. With the
+value empty, **account deletion cannot complete**, which is a PDPL obligation.
+
+So set it, and set the service-account pair with it — but set it because
+deletion needs it, not because sign-in is blocked on it. Sign-in is blocked on
+the two flags above.
 
 | Shipped | Result |
 |---|---|
-| Flags true, project id empty | The routes open and every sign-in fails token verification. A seller sees a generic error on a screen that invites them to sign up. |
-| Project id set, flags false | Nothing changes. The project is configured, unreachable, and looks configured — which is worse than absent, because the next person assumes it was tried. |
-| Flags true, project id set, no Digital Asset Links | Phone sign-in works and passkeys silently do not resolve. The app offers a passkey, the ceremony starts, nothing completes. |
+| Both flags true | Sign-in opens and verifies remotely against the `FIREBASE_WEB_API_KEY` project |
+| Flags true, no Digital Asset Links | Phone sign-in works and passkeys silently do not resolve. The app offers a passkey, the ceremony starts, nothing completes |
+| Flags true, `FIREBASE_PROJECT_ID` still empty | Sign-in works; **account deletion fails closed** and stays failed |
 
-Today production accepts **no** sign-in at all. The app's only auth path is
-`POST /api/v1/auth/phone/complete`, gated on `ONBOARDING_ENABLED`; the only
-alternative is passkey, gated on `PASSKEY_ENABLED`; and `FIREBASE_PROJECT_ID`
-is the empty string. Staging has all three set correctly, which is why the flow
-is testable there and nowhere else.
+Today production accepts **no** sign-in: `POST /api/v1/auth/phone/complete` is
+gated on `ONBOARDING_ENABLED`, and the only alternative is passkey, gated on
+`PASSKEY_ENABLED`. Both are `"false"`. Staging has both true, which is why the
+flow is testable there and nowhere else.
+
+### The Android side is separate, and is a real gate
+
+`apps/seller-android/app/google-services.json` is the CI placeholder
+(its `project_id` is the CI placeholder); `app/src/staging/` holds the real
+staging Firebase project's config; there is **no**
+`app/src/production/google-services.json`. Both real
+files are gitignored, so nothing in the repository shows this.
+
+`assembleProductionRelease` fails by design until a production config is
+downloaded. That is the gate the release build hits — not the Worker var.
 
 ## What must be true first
 
