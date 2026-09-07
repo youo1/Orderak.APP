@@ -1,0 +1,163 @@
+# Signed production bundle for Google Play.
+#
+# Manual dispatch only, and behind the `production` GitHub environment, for the
+# same reason production Worker deploys are: this is the one workflow that
+# produces an artifact real sellers install. A push trigger would mean a merge
+# could publish and nobody would have decided to.
+#
+# WHAT THIS DOES NOT DO
+#   It does not upload to Play. Building the bundle and publishing it are
+#   separate decisions, and the first has to be provable before the second is
+#   worth automating. The signed .aab is uploaded as a workflow artifact and a
+#   human takes it to the Play Console.
+#
+# VERSION CODE
+#   `github.run_number`, passed in as a Gradle property. Monotonic per workflow
+#   and stable across re-runs, which is the property that matters: the backend
+#   reads the version code for force-update policy, blocked-version lists and
+#   flag targeting, so a build landing beneath a `minimum_version_code` already
+#   stored in D1 would be refused by the server it was built to talk to. The
+#   mapping from the hand-edited `2` this replaces is in
+#   docs/guides/android-release.md.
+name: Release Android
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: 'Version name shown to sellers (e.g. 1.0.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: orderak-android-release
+  cancel-in-progress: false
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: production
+    env:
+      FIREBASE_PRODUCTION_GOOGLE_SERVICES_JSON: ${{ secrets.FIREBASE_PRODUCTION_GOOGLE_SERVICES_JSON }}
+      ORDERAK_KEYSTORE_BASE64: ${{ secrets.ORDERAK_KEYSTORE_BASE64 }}
+      ORDERAK_KEYSTORE_PASSWORD: ${{ secrets.ORDERAK_KEYSTORE_PASSWORD }}
+      ORDERAK_KEY_ALIAS: ${{ secrets.ORDERAK_KEY_ALIAS }}
+      ORDERAK_KEY_PASSWORD: ${{ secrets.ORDERAK_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-provider: basic
+
+      # Fail before building rather than producing an unsigned bundle that looks
+      # like a release. An unsigned .aab is rejected by Play, but only after
+      # someone has spent the trip to the console finding that out.
+      - name: Validate release secrets
+        run: |
+          missing=""
+          for name in FIREBASE_PRODUCTION_GOOGLE_SERVICES_JSON ORDERAK_KEYSTORE_BASE64 \
+                      ORDERAK_KEYSTORE_PASSWORD ORDERAK_KEY_ALIAS ORDERAK_KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "ERROR: missing required release secrets:$missing"
+            exit 1
+          fi
+        shell: bash
+
+      # Both written outside the repository tree. The build reads the keystore
+      # through ORDERAK_KEYSTORE_PATH, so nothing signing-related ever has a path
+      # inside the checkout that a later step could accidentally commit.
+      - name: Materialize signing and Firebase configuration
+        run: |
+          umask 077
+          printf '%s' "$ORDERAK_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/orderak-upload.jks"
+          printf '%s' "$FIREBASE_PRODUCTION_GOOGLE_SERVICES_JSON" > apps/seller-android/app/google-services.json
+        shell: bash
+
+      - name: Build signed production bundle
+        working-directory: apps/seller-android
+        env:
+          ORDERAK_KEYSTORE_PATH: ${{ runner.temp }}/orderak-upload.jks
+          # Through env rather than interpolated into the script.
+          #
+          # `version_name` is a workflow_dispatch input, so it is whatever the
+          # person triggering the release typed. Interpolated directly, a single
+          # quote in it ends the quoting and the rest runs as shell - on a runner
+          # holding the keystore, its password and the Play credentials. Quoting
+          # it harder does not help: the expression is substituted before the
+          # shell sees the line. An env var is data, and is never parsed as script.
+          ORDERAK_VERSION_CODE: ${{ github.run_number }}
+          ORDERAK_VERSION_NAME: ${{ inputs.version_name }}
+        run: |
+          bash ./gradlew :app:bundleProductionRelease \
+            -PorderakVersionCode="$ORDERAK_VERSION_CODE" \
+            -PorderakVersionName="$ORDERAK_VERSION_NAME" \
+            --stacktrace
+        shell: bash
+
+      # `bundletool` is not on the runner, so the signature is verified through
+      # the APKs the bundle produces rather than asserted from a successful
+      # build. A build can succeed with no signing config at all; that is the
+      # failure this step exists to catch.
+      - name: Verify the bundle is signed
+        working-directory: apps/seller-android
+        env:
+          ORDERAK_KEYSTORE_PATH: ${{ runner.temp }}/orderak-upload.jks
+        run: |
+          set -euo pipefail
+          AAB=app/build/outputs/bundle/productionRelease/app-production-release.aab
+          test -s "$AAB"
+          # jarsigner ships with the JDK and reads the .aab's own signature block.
+          jarsigner -verify -strict "$AAB" && echo "bundle signature verifies"
+        shell: bash
+
+      - name: Report bundle size
+        env:
+          ORDERAK_VERSION_CODE: ${{ github.run_number }}
+          ORDERAK_VERSION_NAME: ${{ inputs.version_name }}
+        run: |
+          AAB=apps/seller-android/app/build/outputs/bundle/productionRelease/app-production-release.aab
+          SIZE=$(stat -c%s "$AAB")
+          echo "Bundle: $SIZE bytes (version code $ORDERAK_VERSION_CODE, name $ORDERAK_VERSION_NAME)"
+          if [ "$SIZE" -gt 52428800 ]; then echo "ERROR: bundle exceeds 50 MB threshold"; exit 1; fi
+        shell: bash
+
+      - name: Upload signed bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: orderak-production-${{ github.run_number }}
+          path: apps/seller-android/app/build/outputs/bundle/productionRelease/app-production-release.aab
+          if-no-files-found: error
+          retention-days: 30
+
+      # Without this a crash from a minified build is an unreadable stack. The
+      # Crashlytics Gradle plugin uploads automatically on release variants, but
+      # the mapping is kept here too so a build can still be symbolicated if the
+      # upload failed.
+      - name: Upload R8 mapping
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: r8-mapping-production-${{ github.run_number }}
+          path: apps/seller-android/app/build/outputs/mapping/productionRelease/**
+          if-no-files-found: warn
+          retention-days: 90
+
+      # The keystore lives in RUNNER_TEMP, which GitHub discards with the runner.
+      # Removed explicitly anyway: `if: always()` means a failed build does not
+      # leave it sitting in a workspace that a later step could archive.
+      - name: Remove signing material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/orderak-upload.jks"
+        shell: bash

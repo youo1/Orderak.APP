@@ -50,6 +50,7 @@ import app.orderak.seller.R
 import app.orderak.seller.core.ui.NoticeBanner
 import app.orderak.seller.core.ui.SemanticRole
 import app.orderak.seller.data.billing.EntitlementManager
+import app.orderak.seller.data.billing.FeatureKeys
 import app.orderak.seller.data.db.CategoryEntity
 import app.orderak.seller.data.db.OrderakDatabase
 import app.orderak.seller.data.remote.BackendApi
@@ -156,6 +157,7 @@ class CategoriesViewModel @Inject constructor(
 @Composable
 fun CategoriesScreen(
     onBack: () -> Unit,
+    onLimitReached: (String) -> Unit = {},
     viewModel: CategoriesViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -206,6 +208,12 @@ fun CategoriesScreen(
                     } else {
                         stringResource(R.string.categories_limit_body_purchase_closed)
                     },
+                    // The banner says a limit was reached; the paywall says what
+                    // the limit is, how much is used and what the next plan gives.
+                    // Offered in both purchase states, because the second and
+                    // third of those are useful whether or not anything is for sale.
+                    actionLabel = stringResource(R.string.paywall_view_plans),
+                    onAction = { onLimitReached(FeatureKeys.MAX_CATEGORIES) },
                 )
                 else -> NoticeBanner(
                     role = SemanticRole.Danger,

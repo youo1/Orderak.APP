@@ -102,6 +102,14 @@ fun MainScreen(
     onLogout: () -> Unit = {},
     onOpenStoreInfo: () -> Unit = {},
     onOpenCategories: () -> Unit = {},
+    /**
+     * A plan limit refused something, named by its entitlement key.
+     *
+     * Routes to the paywall, which is the one place that states the limit, the
+     * usage and what the next plan gives for that same key together. Each screen
+     * used to answer this itself and they did not agree.
+     */
+    onLimitReached: (String) -> Unit = {},
     onOpenSupport: () -> Unit = {},
     onOpenCatalogLanguages: () -> Unit = {},
     onOpenDevices: () -> Unit = {},
@@ -204,7 +212,7 @@ fun MainScreen(
                 SellerSurface.Store -> ProductsScreen(
                     onAdd = onAddProduct,
                     onEdit = onEditProduct,
-                    onUpgrade = onOpenSubscription,
+                    onLimitReached = onLimitReached,
                     sellerPhone = sellerPhone,
                 )
                 SellerSurface.Customers -> CustomersScreen(onOpen = onOpenCustomer)

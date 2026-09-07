@@ -115,6 +115,7 @@ class PlanUsageTest {
 
         val constantFor = mapOf(
             FeatureKeys.OCR_RECEIPT_ASSISTANCE to "FeatureKeys.OCR_RECEIPT_ASSISTANCE",
+            FeatureKeys.EDITABLE_CUSTOMER_PROFILES to "FeatureKeys.EDITABLE_CUSTOMER_PROFILES",
             FeatureKeys.MAX_PRODUCTS to "FeatureKeys.MAX_PRODUCTS",
             FeatureKeys.MAX_CATEGORIES to "FeatureKeys.MAX_CATEGORIES",
             FeatureKeys.MAX_ORDERS_PER_MONTH to "FeatureKeys.MAX_ORDERS_PER_MONTH",

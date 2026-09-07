@@ -56,6 +56,7 @@ import app.orderak.seller.core.ui.SemanticChip
 import app.orderak.seller.core.ui.SemanticRole
 import app.orderak.seller.core.ui.UsageMeter
 import app.orderak.seller.data.billing.EntitlementManager
+import app.orderak.seller.data.billing.FeatureKeys
 import androidx.hilt.navigation.compose.hiltViewModel as hiltVm
 import app.orderak.seller.core.money.DEFAULT_CURRENCY
 import app.orderak.seller.core.money.formatAmount
@@ -69,7 +70,7 @@ import java.io.File
 fun ProductsScreen(
     onAdd: () -> Unit,
     onEdit: (Long) -> Unit,
-    onUpgrade: () -> Unit,
+    onLimitReached: (String) -> Unit,
     sellerPhone: String?,
     viewModel: ProductsViewModel = hiltViewModel(),
     entitlements: EntitlementManager = hiltVm<EntitlementHolderViewModel>().entitlements,
@@ -118,14 +119,23 @@ fun ProductsScreen(
             },
             confirmButton = {
                 // A higher plan existing is not the same as being able to buy it.
-                // Purchase is closed platform-wide, and the six acquisition routes
-                // answer 403, so offering the upgrade on plan shape alone sends the
-                // seller into a dead end.
-                if (quota.upgradePlanKey != null && purchaseOpen) {
+                // Purchase is closed platform-wide and the acquisition routes
+                // answer 403, so the label changes rather than the destination:
+                // the paywall explains what the next plan gives either way, and
+                // only offers to sell when selling is actually open. Sending a
+                // seller to a purchase control the server refuses is the dead end
+                // this avoids (I-5).
+                if (quota.upgradePlanKey != null) {
                     TextButton(onClick = {
                         showLimitDialog = false
-                        onUpgrade()
-                    }) { Text(stringResource(R.string.upgrade_now)) }
+                        onLimitReached(FeatureKeys.MAX_PRODUCTS)
+                    }) {
+                        Text(
+                            stringResource(
+                                if (purchaseOpen) R.string.upgrade_now else R.string.paywall_view_plans,
+                            ),
+                        )
+                    }
                 }
             },
             dismissButton = {

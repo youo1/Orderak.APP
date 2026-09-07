@@ -1,5 +1,6 @@
 package app.orderak.seller.data.demo
 
+import app.orderak.seller.core.phone.CustomerPhone
 import app.orderak.seller.data.db.CategoryEntity
 import app.orderak.seller.data.db.CustomerEntity
 import app.orderak.seller.data.db.OrderEntity
@@ -100,14 +101,35 @@ internal object DemoData {
         )
     }
 
+    /**
+     * Demo customers, keyed exactly as a real one would be.
+     *
+     * The numbers are Egyptian national form, which is what the seller screens
+     * capture, so each is normalised against "EG" rather than being given a
+     * hand-written key. A demo row keyed differently from a real one would make
+     * the demo shop the only place the editor could be seen working.
+     */
     fun customers(now: Long): List<CustomerEntity> = listOf(
-        CustomerEntity(phone = "01012345678", name = "منى عبد الله", createdAt = now - 45 * DAY),
-        CustomerEntity(phone = "01122334455", name = "أحمد يسري", createdAt = now - 38 * DAY),
-        CustomerEntity(phone = "01234567890", name = "كريم فؤاد", createdAt = now - 30 * DAY),
-        CustomerEntity(phone = "01098765432", name = "هدى مصطفى", createdAt = now - 22 * DAY),
-        CustomerEntity(phone = "01155667788", name = "سارة الشناوي", createdAt = now - 14 * DAY),
-        CustomerEntity(phone = "01201020304", name = "محمود العزب", createdAt = now - 6 * DAY),
+        demoCustomer("01012345678", "منى عبد الله", now - 45 * DAY),
+        demoCustomer("01122334455", "أحمد يسري", now - 38 * DAY),
+        demoCustomer("01234567890", "كريم فؤاد", now - 30 * DAY),
+        demoCustomer("01098765432", "هدى مصطفى", now - 22 * DAY),
+        demoCustomer("01155667788", "سارة الشناوي", now - 14 * DAY),
+        demoCustomer("01201020304", "محمود العزب", now - 6 * DAY),
     )
+
+    private fun demoCustomer(phone: String, name: String, createdAt: Long): CustomerEntity {
+        val normalized = CustomerPhone.normalize(phone, "EG")
+        return CustomerEntity(
+            customerKey = normalized.key,
+            phone = phone,
+            phoneE164 = normalized.e164,
+            phoneStatus = normalized.status.name.lowercase(),
+            name = name,
+            createdAt = createdAt,
+            updatedAt = createdAt,
+        )
+    }
 
     /** One order per status, plus the two that carry payment proof. */
     data class DemoOrder(

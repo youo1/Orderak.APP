@@ -6,10 +6,12 @@ applies_to: [production, staging]
 ---
 # Incident-Response Plan
 
-> **Status:** Pre-production draft — not operational until contacts, secure
-> evidence storage, and notification channels are assigned and tested
+> **Status:** Operational for manual detection. **Not** operational for
+> escalation — every contact in section 4 is still `TBD`, which is the one
+> remaining launch blocker in this document. See section 2.1 for exactly what
+> holds and what does not.
 >
-> **Last updated:** 2026-07-19
+> **Last updated:** 2026-09-06
 >
 > **Regulatory note:** Egypt PDPL No. 151/2020 Article 7 states a 72-hour
 > notification period after awareness and notification of affected persons
@@ -40,6 +42,39 @@ Incidents may be detected through:
 | User reports | Support tickets reporting data exposure or account issues |
 | `error_logs` table | Unusual error patterns |
 | `rate_limits` table | Sustained rate limit hits |
+
+### 2.1 Detection is manual, and that is an accepted risk
+
+There is no automated alerting anywhere in this system. `recordBillingAlert()`
+writes a row to D1 and pages nobody. Nothing watches `error_logs`. Nothing
+notices a queue backing up. Every source in the table above is something a
+person has to go and look at.
+
+For a product with no sellers on it, automated paging is not a launch
+prerequisite — the cost of building it now exceeds the cost of a slower first
+detection. Launching on manual detection is therefore an **accepted residual
+risk** rather than an oversight, and it is accepted only while all five of the
+following hold. If any stops holding, this stops being an accepted risk and
+becomes a blocker.
+
+| # | Condition | State |
+|---|---|---|
+| 1 | `SENTRY_DSN` is in `secrets.required` for both Workers in both environments, and set in each | **Declared** — required as of 2026-09-06 and guarded by `verify-deployment-map.mjs`. Whether the secret is *set* is an account fact; confirm with `wrangler secret list` per environment |
+| 2 | `error_logs` and `operational_job_runs` are being written and are readable | **Holds** — both tables are written by the Workers and surfaced in the admin console under System → Errors and System → Jobs |
+| 3 | The billing dead-letter queue is visible and retryable in the console | **Holds** — Commerce → Purchase verification, with an audited requeue |
+| 4 | The stock reconciliation script runs and reports | **Holds** — `services/backend/scripts/reconcile-stock.mjs` |
+| 5 | A named person is responsible for checking them, on a stated cadence | **DOES NOT HOLD** — see below |
+
+Condition 5 is the blocker. An unowned dashboard is not detection: a system
+where anyone might look is a system where nobody does, and the first four
+conditions only put the information somewhere. Someone has to be answerable for
+reading it.
+
+What that requires is a decision, not code: a named primary and backup in
+section 4, and a stated cadence — how often each of the four surfaces above is
+checked, and what happens when the person responsible is unavailable. Until
+that exists, this plan supports responding to an incident someone has already
+noticed, and does not support noticing one.
 
 ## 3. Response Procedure
 
@@ -178,7 +213,10 @@ Every P0 and P1 incident must undergo a post-incident review covering:
 - The exercise must test the 72-hour regulatory notification path and the 3-business-day affected-person notification process
 - Record exercise results and update this plan based on findings
 
-> **Approval:** This plan is ready for security lead and privacy lead review (Plan 7 Gate 3; Plan 5 Phase 7).
+> **Approval:** This plan is ready for security lead and privacy lead review
+> (Plan 7 Gate 3; Plan 5 Phase 7). The review cannot conclude while section 4
+> is `TBD` — a plan whose escalation path is unassigned has not been reviewed,
+> only read.
 
 ## References
 

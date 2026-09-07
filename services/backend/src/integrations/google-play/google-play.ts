@@ -1036,11 +1036,17 @@ export async function handleGooglePlayRoutes(
 ): Promise<Response | null> {
 	if (url.pathname === "/api/v1/billing/catalog" && request.method === "GET") {
 		const enabled = await acquisitionEnabled(env);
+		// Scoped to this environment's package, as every other read of this table
+		// is. Staging has its own Play Console entry, so the table now holds a
+		// mapping set per package; without the filter the catalogue would offer a
+		// staging build production's product ids, and Play would refuse a purchase
+		// for a product that does not exist in the app asking for it.
+		const packageName = env.GOOGLE_PLAY_PACKAGE_NAME || "app.orderak.seller";
 		const { results } = await env.orderak_db.prepare(
 			`SELECT sp.plan_key,sp.name,ppm.product_id,ppm.base_plan_id,ppm.price_snapshot_json
 			 FROM play_product_mappings ppm JOIN subscription_plans sp ON sp.id=ppm.plan_id
-			 WHERE ppm.active=1 ORDER BY sp.sort_order,ppm.base_plan_id`,
-		).all<Json>();
+			 WHERE ppm.active=1 AND ppm.package_name=? ORDER BY sp.sort_order,ppm.base_plan_id`,
+		).bind(packageName).all<Json>();
 		return jsonResponse({
 			ok: true,
 			billing_enabled: enabled,

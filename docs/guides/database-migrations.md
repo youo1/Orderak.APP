@@ -98,6 +98,7 @@ trigger's final semicolon when replaying a fresh remote D1 database.
 - [051_manual_order_origin.sql](#051_manual_order_originsql)
 - [052_stock_movements.sql](#052_stock_movementssql)
 - [053_customers.sql](#053_customerssql)
+- [054_play_mappings_per_package.sql](#054_play_mappings_per_packagesql)
 
 ## 001_init.sql
 
@@ -611,3 +612,14 @@ trigger's final semicolon when replaying a fresh remote D1 database.
 - The key is not `buyer_phone`. The storefront's phone input is a bare `type="tel"` with no pattern, and the value is stripped to digits before it is stored, so the column holds any 8-to-15-digit string on earth with no prefix, no country and no plausibility check. `01012345678` and `+201012345678` are one person and two strings, and a table keyed on the raw value would inherit that split permanently. Identity here is the canonically normalised number, the same normalisation the identity and order systems use.
 - There is both a key and a raw value because normalisation has three outcomes, not two. A value that resolves to exactly one E.164 number is safe to merge two spellings of; one that is ambiguous — a bare national number the store's own country does not explain — or plainly invalid is not. Those are preserved verbatim and keyed to themselves, so an unresolvable value can never collide with another customer. Merging on a guess is how two people's order histories become one, and afterwards nothing can tell that apart from a correct merge.
 - The migration deliberately does not backfill. Classifying a value needs libphonenumber and the store's country, which SQL cannot do, and a crude SQL rule would produce exactly the wrong thing: confident merges indistinguishable from correct ones. The backfill is `scripts/backfill-customers.mjs`, run deliberately and reporting what it could not resolve. The table is otherwise purely additive, so the previous release serves live traffic against this schema without knowing it exists.
+
+## 054_play_mappings_per_package.sql
+
+**Source:** `services/backend/migrations/054_play_mappings_per_package.sql`
+
+### What it does
+
+- Widens `play_product_mappings` to hold one row per package, and seeds the staging package's six mappings inactive. Staging gets its own Play Console entry, so its package is `app.orderak.seller.staging` and its products live under a different app. Product ids are scoped per app, so both packages carry an `orderak_paid1` and they are different products.
+- The lookup was already ready and the table was not. `mappingForItem` matches on product_id, base_plan_id and package_name together, binding the package from the environment - but `UNIQUE (product_id, base_plan_id)` permitted exactly one row per product and base plan across all packages, so the staging rows could not be inserted at all. The constraint was not wrong when there was one package; it is wrong now, and widening it to include the package is what the query has always assumed.
+- This is a table rebuild, because SQLite cannot alter a table-level UNIQUE constraint in place. Three things make it safe in the window where the previous release serves live traffic against the new schema: the only readers are Play purchase verification, which is unreachable while BILLING_ENABLED and GOOGLE_PLAY_LIFECYCLE_ENABLED are both false; every column the old code selects survives with the same name and type, so a read during the window would succeed anyway; and there are six rows, so the window is not long.
+- The new rows are inactive, like the production six. A mapping is activated only once the corresponding product is confirmed to exist in that Play Console entry - an active mapping for a product that does not exist turns a purchase into `play_product_not_enabled` at best, and at worst accepts a token for something else.

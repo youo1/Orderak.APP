@@ -2,7 +2,7 @@
 status: current
 generated: false
 owner: backend
-last_verified: 2026-08-21
+last_verified: 2026-09-06
 applies_to: [production, staging]
 authoritative_for: [billing-domain]
 ---
@@ -26,12 +26,11 @@ separate fact, controlled by the flags in `services/backend/wrangler.jsonc`:
 | `GOOGLE_PLAY_LIFECYCLE_ENABLED` | `false` | `false` | Play verification, RTDN, restore, reconciliation, acknowledgement |
 
 The gate covers acquisition only. `BILLING_ACQUISITION_ROUTES` in
-`services/backend/src/domains/commerce/billing.ts` holds exactly eight paths:
+`services/backend/src/domains/commerce/billing.ts` holds exactly seven paths:
 
 ```text
 /api/v1/subscribe
 /api/v1/cancel
-/api/v1/plans
 /api/v1/coupons/validate
 /api/v1/coupons/apply
 /api/v1/referral/apply
@@ -55,6 +54,16 @@ briefly gated alongside the other two and has been carved back out: it is an
 authenticated GET that returns the caller's own state and grants nothing, so
 closing it protected nothing and cost the rule above. The Play verification
 routes are gated separately by `GOOGLE_PLAY_LIFECYCLE_ENABLED`.
+
+`/api/v1/plans` is deliberately **not** in that set either, for the same rule
+and a stronger case. It left the set on 2026-09-06. It is a read-only comparison of what each plan includes, built from the
+entitlement catalogue: it takes no payment, grants nothing, and names no seller.
+Gating it meant the plans screen and the paywall — the two surfaces built for a
+seller who has just hit a limit and cannot buy — returned `403` in precisely the
+state they exist to serve. The seller was told a limit had stopped them and then
+refused the explanation of what would lift it. Acquisition is still closed:
+`/api/v1/subscribe` remains gated, and neither screen offers a payment while
+purchase is closed.
 
 `tooling/repository/verify-billing-gate.mjs` compares this list against the code
 on every run. The drift it now prevents went unnoticed because no check read a

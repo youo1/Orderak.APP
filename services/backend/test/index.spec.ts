@@ -85,8 +85,13 @@ describe("Orderak worker", () => {
 	});
 
 	it("fails closed on billing acquisition when the launch flag is disabled", async () => {
+		// /api/v1/subscribe, not /api/v1/plans. The plans comparison was carved
+		// out of the acquisition set on 2026-09-06: it takes no payment and
+		// grants nothing, and gating it meant the paywall returned 403 in exactly
+		// the state it exists to serve. Subscribe is the front door and is still
+		// shut. See docs/domains/billing.md.
 		const disabledEnv = { ...env, BILLING_ENABLED: "false" } as TestEnv;
-		const request = new IncomingRequest("https://example.com/api/v1/plans");
+		const request = new IncomingRequest("https://example.com/api/v1/subscribe", { method: "POST" });
 		const ctx = createExecutionContext();
 		const response = await callWorker(worker, request, disabledEnv, ctx);
 		await waitOnExecutionContext(ctx);
