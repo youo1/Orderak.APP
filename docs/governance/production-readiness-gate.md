@@ -85,6 +85,24 @@ reporting had never been exercised by anyone. Staging distribution now ships
 `stagingRelease`, which has it on. A deliberately-triggered non-fatal, arriving
 symbolicated, still has to be produced from a real install.
 
+Crashlytics is now also *told* something. It had been wired since the project
+started and never called: the plugin was applied, the SDK was on the classpath,
+and no code touched it, so a report would have arrived as a stack trace with no
+idea what the seller was doing. Every backend call now records its
+`x-request-id` and redacted route as custom keys, and a 5xx or unparseable
+response is recorded as a non-fatal.
+
+That id is the join between the two tools. The app already sent it and the
+Worker already honoured, logged and echoed it — so a Crashlytics report now
+names a request that can be found in Sentry, which is what makes crash reporting
+on Android and error reporting on Workers two views of one incident rather than
+two dashboards.
+
+The route is redacted, and that is a privacy control rather than tidiness:
+`PATCH /api/v1/customers/{customer_key}` addresses a customer by their
+normalised phone number, so the unredacted path of that call is buyer PII. Nine
+tests pin the redaction, four of them on that case specifically.
+
 There is **no automated alerting anywhere**. `recordBillingAlert()` writes to D1
 and pages nobody. Launching on manual detection is an accepted residual risk
 under five conditions recorded in
