@@ -95,7 +95,7 @@ describe("play product mappings, per package", () => {
 		await seedBothPackages();
 		const request = new Request("https://example.com/api/v1/billing/catalog");
 		const stagingEnv = {
-			...(env as Record<string, unknown>),
+			...(env as unknown as Record<string, unknown>),
 			GOOGLE_PLAY_PACKAGE_NAME: STAGING,
 			BILLING_ENABLED: "true",
 		} as never;

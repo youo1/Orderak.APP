@@ -89,10 +89,20 @@ jobs:
         working-directory: apps/seller-android
         env:
           ORDERAK_KEYSTORE_PATH: ${{ runner.temp }}/orderak-upload.jks
+          # Through env rather than interpolated into the script.
+          #
+          # `version_name` is a workflow_dispatch input, so it is whatever the
+          # person triggering the release typed. Interpolated directly, a single
+          # quote in it ends the quoting and the rest runs as shell - on a runner
+          # holding the keystore, its password and the Play credentials. Quoting
+          # it harder does not help: the expression is substituted before the
+          # shell sees the line. An env var is data, and is never parsed as script.
+          ORDERAK_VERSION_CODE: ${{ github.run_number }}
+          ORDERAK_VERSION_NAME: ${{ inputs.version_name }}
         run: |
           bash ./gradlew :app:bundleProductionRelease \
-            -PorderakVersionCode=${{ github.run_number }} \
-            -PorderakVersionName='${{ inputs.version_name }}' \
+            -PorderakVersionCode="$ORDERAK_VERSION_CODE" \
+            -PorderakVersionName="$ORDERAK_VERSION_NAME" \
             --stacktrace
         shell: bash
 
@@ -113,10 +123,13 @@ jobs:
         shell: bash
 
       - name: Report bundle size
+        env:
+          ORDERAK_VERSION_CODE: ${{ github.run_number }}
+          ORDERAK_VERSION_NAME: ${{ inputs.version_name }}
         run: |
           AAB=apps/seller-android/app/build/outputs/bundle/productionRelease/app-production-release.aab
           SIZE=$(stat -c%s "$AAB")
-          echo "Bundle: $SIZE bytes (version code ${{ github.run_number }}, name ${{ inputs.version_name }})"
+          echo "Bundle: $SIZE bytes (version code $ORDERAK_VERSION_CODE, name $ORDERAK_VERSION_NAME)"
           if [ "$SIZE" -gt 52428800 ]; then echo "ERROR: bundle exceeds 50 MB threshold"; exit 1; fi
         shell: bash
 
