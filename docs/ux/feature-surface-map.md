@@ -27,8 +27,8 @@ five surfaces can hold the whole product.
 | today | 25 | 11 | 13 | 1 | 4 | 2 |
 | orders | 33 | 11 | 22 | 0 | 6 | 5 |
 | store | 48 | 25 | 16 | 7 | 6 | 4 |
-| customers | 34 | 19 | 10 | 5 | 3 | 2 |
-| account | 75 | 42 | 23 | 10 | 12 | 13 |
+| customers | 34 | 19 | 10 | 5 | 3 | 1 |
+| account | 75 | 42 | 23 | 10 | 12 | 14 |
 
 ## Experience levels
 

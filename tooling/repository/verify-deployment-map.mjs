@@ -208,14 +208,22 @@ for (const [relative, expectedServers] of Object.entries(serverExpectations)) {
 // from the account, from a second device, from a reinstall, and from the
 // monthly plan count. The seller read a confirmation and had a note on one
 // phone. Unlike the phone-change raise above, this route is genuinely new.
-// Raised to 253 on 2026-09-06 for the customers resource: GET /api/v1/customers,
-// GET and PATCH /api/v1/customers/{customer_key}. Genuinely new, all three. A
-// buyer was two denormalised columns on `orders` and the app's customer list was
-// an aggregation computed on the device, so there was no row for a seller to
-// edit — while the plan comparison sold "editable customer profiles" at paid1
-// and migration 047 marked it implemented in D1 on the strength of the screen
-// merely existing.
-if (operationCount !== 253) fail(`OpenAPI operation inventory changed: expected 253, found ${operationCount}.`);
+// Lowered to 245 on 2026-09-06 for five operations that were never served. The
+// seller contract declared GET and POST on /api/v1/categories/{category_code},
+// POST /api/v1/store, GET /api/v1/media/upload and GET /api/v1/products/sync;
+// every one is answered with 405. The first lowering, and the mirror image of
+// the phone-change raise above: there the scanner could not read a dispatch and
+// under-reported, here it guessed a method out of a neighbouring block and
+// over-reported, so each phantom silently satisfied the spec entry it had
+// created. Coverage now checks the spec against the Allow header the server
+// actually sends — see contracts/openapi/scripts/method-allow-inventory.mjs.
+// Raised to 248 on 2026-09-06 for the three customer routes. A buyer was two
+// denormalised columns on `orders` and the customer list was aggregated on the
+// device, so there was no row to edit — the catalogue sold editable customer
+// profiles at paid1 while CustomerDetailsScreen had nowhere to put an edit.
+// GET /api/v1/customers, GET and PATCH /api/v1/customers/{customer_key} are the
+// resource that edit goes into.
+if (operationCount !== 248) fail(`OpenAPI operation inventory changed: expected 248, found ${operationCount}.`);
 const seller = JSON.parse(read("contracts/openapi/src/seller-v1.json"));
 for (const [route, pathItem] of Object.entries(seller.paths)) {
   for (const method of ["get", "post", "put", "patch", "delete"]) {

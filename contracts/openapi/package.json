@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "inventory": "node scripts/inventory.mjs",
-    "test:inventory": "node --test scripts/route-inventory.test.mjs",
+    "test:inventory": "node --test scripts/route-inventory.test.mjs scripts/method-allow-inventory.test.mjs",
     "bootstrap": "node scripts/bootstrap-specs.mjs",
     "lint": "spectral lint src/*.json",
     "validate": "redocly lint --config redocly.yaml src/seller-v1.json src/admin-v1.json src/integrations-v1.json",

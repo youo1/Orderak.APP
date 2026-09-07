@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { discoverHonoRoutes, assertMountsAtRoot, assertOpenApiRoutesResolvable, assertHonoPathsResolvable } from "./hono-inventory.mjs";
+import { discoverAllowLists, allowedMethodsFor } from "./method-allow-inventory.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const openapiRoot = path.resolve(here, "..");
@@ -176,6 +177,27 @@ export function discoverRoutes() {
       }
     }
   }
+
+  // Drop the methods this pass guessed that the dispatch itself contradicts.
+  //
+  // The look-behind and look-ahead windows above read method literals out of
+  // neighbouring blocks: at `if (p.startsWith("/api/v1/categories/"))` they
+  // picked up the preceding block's `method === "GET"` / `"POST"` guards and
+  // recorded two operations the handler answers with 405. A wrong guess was
+  // always meant to "surface loudly as a route without a spec" — but these
+  // guesses were themselves written into the spec, so instead they made two
+  // phantom operations look implemented and coverage printed 100%.
+  //
+  // `methodNotAllowed(...)` is the Allow header, which is the server's own
+  // complete statement of what a path serves. Where one exists it outranks the
+  // guess. Applied to the regex results only: Hono routes and route-overrides
+  // entries are exact and are merged after this.
+  const allowLists = discoverAllowLists(backendFiles, workspaceRoot);
+  for (const [key, route] of [...found]) {
+    const allowed = allowedMethodsFor(route.path, allowLists);
+    if (allowed && !allowed.methods.has(route.method)) found.delete(key);
+  }
+
   for (const route of honoRoutes) {
     found.set(`${route.method} ${route.path}`, route);
   }
@@ -224,6 +246,14 @@ export function assertNoOrphanLiterals(unreadable, found, ignores = loadIgnores(
     "  2. Add the route to route-overrides.json, if it is real but not statically readable.\n" +
     "  3. Add it to route-scanner-ignore.json with a reason, if it is not a route at all.\n",
   );
+}
+
+/**
+ * The Allow lists the backend declares, for callers that need them alongside
+ * discoverRoutes() — route-coverage.mjs checks the specs against them.
+ */
+export function discoverBackendAllowLists() {
+  return discoverAllowLists(walk(backendRoot), workspaceRoot);
 }
 
 export function surfaceFor(routePath) {
