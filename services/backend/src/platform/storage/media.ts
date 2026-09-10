@@ -9,7 +9,7 @@
 // ============================================================
 
 import { jsonResponse } from "../http/shared";
-import { PUBLIC_SITE_URL, newUuid } from "../../domains/identity/identity";
+import { publicSiteUrl, newUuid } from "../../domains/identity/identity";
 
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 const ALLOWED_KINDS = new Set(["logo", "cover", "product"]);
@@ -128,5 +128,5 @@ export async function uploadMedia(request: Request, env: Env, storeId: string): 
 		httpMetadata: { contentType: detected.type },
 	});
 
-	return jsonResponse({ ok: true, key, url: `${PUBLIC_SITE_URL}/media/${key}` });
+	return jsonResponse({ ok: true, key, url: `${publicSiteUrl(env)}/media/${key}` });
 }
