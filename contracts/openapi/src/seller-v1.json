@@ -478,6 +478,33 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "No theme file with that name",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/not_found",
+                      "title": "Not Found",
+                      "status": 404,
+                      "code": "not_found",
+                      "detail": "Not Found",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -6248,6 +6275,21 @@
           },
           {
             "$ref": "./components/common.json#/parameters/AppVersion"
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "description": "Response language. Unsupported values are rejected with 400 invalid_language.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ar",
+                "en",
+                "fr"
+              ],
+              "default": "en"
+            }
           }
         ],
         "responses": {
@@ -6463,6 +6505,52 @@
           },
           {
             "$ref": "./components/common.json#/parameters/AppVersion"
+          },
+          {
+            "name": "category_id",
+            "in": "query",
+            "required": true,
+            "description": "The parent category to list subcategories for.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9_]{2,80}$"
+            }
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "required": false,
+            "description": "Free-text search within the category. Omit to list every subcategory of category_id.",
+            "schema": {
+              "type": "string",
+              "maxLength": 80
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 30
+            }
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "description": "Response language. Unsupported values are rejected with 400 invalid_language.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ar",
+                "en",
+                "fr"
+              ],
+              "default": "en"
+            }
           }
         ],
         "responses": {
@@ -15668,6 +15756,33 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "No ticket with that id for this store",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/not_found",
+                      "title": "Not Found",
+                      "status": 404,
+                      "code": "not_found",
+                      "detail": "Not Found",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       },
@@ -15910,6 +16025,33 @@
                       "detail": "The request could not be completed.",
                       "request_id": "018f-example",
                       "retryable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No ticket with that id for this store",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/not_found",
+                      "title": "Not Found",
+                      "status": 404,
+                      "code": "not_found",
+                      "detail": "Not Found",
+                      "request_id": "018f-example"
                     }
                   }
                 }
