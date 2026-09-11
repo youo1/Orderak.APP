@@ -216,6 +216,24 @@ export async function handleEmailVerification(
 	return verificationPage(true);
 }
 
+/**
+ * Package the Asset Links statement vouches for.
+ *
+ * This was the literal string "app.orderak.seller" until 2026-09-10. The
+ * staging flavour applies applicationIdSuffix = ".staging", so a statement
+ * naming the production package can never authorise the staging build: Android
+ * Credential Manager matches the calling package against this value exactly and
+ * silently refuses the ceremony when it differs. Staging therefore served an
+ * assetlinks document that looked configured and authorised nothing.
+ *
+ * Defaulting to the production package keeps production byte-identical to the
+ * previous hardcoded behaviour when the variable is absent.
+ */
+function androidPackageName(env: PublicWorkerEnv): string {
+	const configured = String(env.ANDROID_APP_PACKAGE_NAME ?? "").trim();
+	return /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/.test(configured) ? configured : "app.orderak.seller";
+}
+
 export function assetLinksResponse(env: PublicWorkerEnv): Response {
 	const fingerprints = String(env.ANDROID_RELEASE_SHA256_CERT_FINGERPRINTS ?? "")
 		.split(",")
@@ -231,14 +249,7 @@ export function assetLinksResponse(env: PublicWorkerEnv): Response {
 			relation: ["delegate_permission/common.handle_all_urls", "delegate_permission/common.get_login_creds"],
 			target: {
 				namespace: "android_app",
-				// From the environment, not a literal. The staging Android flavour
-				// applies applicationIdSuffix = ".staging", so this file announced
-				// a package that staging does not install — Digital Asset Links
-				// never validated there, which takes passkeys and credential
-				// auto-fill with it. GOOGLE_PLAY_PACKAGE_NAME already carries the
-				// per-environment identity for exactly this app; a second source
-				// for the same fact is what let the two disagree.
-				package_name: env.GOOGLE_PLAY_PACKAGE_NAME || "app.orderak.seller",
+				package_name: androidPackageName(env),
 				sha256_cert_fingerprints: fingerprints,
 			},
 		},

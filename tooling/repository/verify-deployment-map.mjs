@@ -176,6 +176,11 @@ const SHARED_DATABASE_VARS = [
   "GOOGLE_PLAY_PACKAGE_NAME",
   "BILLING_ENABLED",
   "GOOGLE_PLAY_LIFECYCLE_ENABLED",
+  // Both Workers build store_url from this — the Seller API from
+  // identityBlock(), the Admin store list from its own query — so a difference
+  // would have one of them handing out links to the other deployment, which is
+  // the bug PUBLIC_SITE_URL was introduced to fix.
+  "PUBLIC_SITE_URL",
 ];
 for (const [label, publicEnvironment, adminEnvironment] of [
   ["Production", publicConfig, adminConfig],

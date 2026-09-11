@@ -179,14 +179,14 @@ const STOREFRONT_CSP = [
 	"frame-ancestors 'self'",
 ].join("; ");
 
-function pageShell(env: Env, head: string, body: string, theme: Theme, generatedCss: string, lang: Locale, cacheSeconds = 0): Response {
+function pageShell(head: string, body: string, theme: Theme, generatedCss: string, lang: Locale, siteUrl: string, cacheSeconds = 0): Response {
 	const html = `<!doctype html>
 <html lang="${lang}" dir="${dirFor(lang)}"><head>
 ${head}
 <style>${generatedCss}${baseStyle(theme)}</style>
 </head><body>
 ${body}
-<div class="foot">${esc(t(lang, "catalog.powered_by"))} <a href="${publicSiteUrl(env)}">أوردرك Orderak</a></div>
+<div class="foot">${esc(t(lang, "catalog.powered_by"))} <a href="${siteUrl}">أوردرك Orderak</a></div>
 </body></html>`;
 	const headers: Record<string, string> = {
 		"content-type": "text/html; charset=utf-8",
@@ -387,9 +387,8 @@ export async function renderStorePage(env: Env, store: Store, lang: Locale): Pro
 		image: (store.cover_url as string) || (store.logo_url as string) || null,
 	}, theme);
 	return pageShell(
-		env,
 		`${head}${designSystemFontPreload(revision.snapshot, lang === "ar" ? "arabic" : "latin")}`,
-		body, theme, designSystemCss(revision.snapshot), lang, 30,
+		body, theme, designSystemCss(revision.snapshot), lang, publicSiteUrl(env), 30,
 	);
 }
 
@@ -414,9 +413,8 @@ ${products.length ? orderForm(store, lang, pageCurrency(products)) : ""}`;
 		image: (store.cover_url as string) || (store.logo_url as string) || null,
 	}, theme);
 	return pageShell(
-		env,
 		`${head}${designSystemFontPreload(revision.snapshot, lang === "ar" ? "arabic" : "latin")}`,
-		body, theme, designSystemCss(revision.snapshot), lang, 30,
+		body, theme, designSystemCss(revision.snapshot), lang, publicSiteUrl(env), 30,
 	);
 }
 
@@ -472,9 +470,8 @@ ${inStock ? orderForm(store, lang, productCurrency) : ""}
 		type: "product",
 	}, theme);
 	return pageShell(
-		env,
 		`${head}${designSystemFontPreload(revision.snapshot, lang === "ar" ? "arabic" : "latin")}`,
-		body, theme, designSystemCss(revision.snapshot), lang,
+		body, theme, designSystemCss(revision.snapshot), lang, publicSiteUrl(env),
 	);
 }
 

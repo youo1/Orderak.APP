@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createExecutionContext, env } from "cloudflare:test";
-import { handleAuthV2Routes, handleEmailVerification } from "../src/domains/identity/auth-v2";
+import { assetLinksResponse, handleAuthV2Routes, handleEmailVerification } from "../src/domains/identity/auth-v2";
 import { sha256Hex } from "../src/domains/identity/auth";
+import { publicSiteUrl, storeUrl } from "../src/domains/identity/identity";
 import { BASE, createSchema } from "./helpers";
 
 const PHONE = "+201001234567";
@@ -397,5 +398,69 @@ describe("Global city search", () => {
 				license: "ODbL-1.0",
 			},
 		});
+	});
+});
+
+describe("Asset Links statement", () => {
+	const FINGERPRINT = `${"AB:".repeat(31)}AB`;
+
+	// A plain object rather than Object.create(testEnv): assigning through the
+	// runtime env's prototype chain writes into the shared binding and leaks
+	// into the next test. assetLinksResponse reads only these two values.
+	function envWith(overrides: Record<string, string>) {
+		return { ANDROID_RELEASE_SHA256_CERT_FINGERPRINTS: FINGERPRINT, ...overrides } as unknown as TestEnv;
+	}
+
+	async function packageNameFor(overrides: Record<string, string>) {
+		const response = assetLinksResponse(envWith(overrides));
+		expect(response.status).toBe(200);
+		const statement = await response.json<Array<{ target: { package_name: string; sha256_cert_fingerprints: string[] } }>>();
+		expect(statement[0].target.sha256_cert_fingerprints).toEqual([FINGERPRINT]);
+		return statement[0].target.package_name;
+	}
+
+	it("vouches for the configured package so a suffixed build authorises itself", async () => {
+		expect(await packageNameFor({ ANDROID_APP_PACKAGE_NAME: "app.orderak.seller.staging" }))
+			.toBe("app.orderak.seller.staging");
+	});
+
+	it("keeps the production package when the variable is absent or malformed", async () => {
+		expect(await packageNameFor({})).toBe("app.orderak.seller");
+		// A typo must not publish a statement naming a package nobody controls.
+		expect(await packageNameFor({ ANDROID_APP_PACKAGE_NAME: "not a package name" }))
+			.toBe("app.orderak.seller");
+	});
+
+	it("stays closed when no fingerprint is configured", async () => {
+		const response = assetLinksResponse(
+			{ ANDROID_APP_PACKAGE_NAME: "app.orderak.seller.staging" } as unknown as TestEnv,
+		);
+		expect(response.status).toBe(503);
+		expect(await response.json()).toMatchObject({ code: "asset_links_not_configured" });
+	});
+});
+
+describe("Public site origin", () => {
+	// Regression: this was a module constant pinned to production, so staging
+	// returned store_url/canonical/media links for stores that live only in
+	// staging's D1 — and 301'd visitors from staging into a production 404.
+	it("uses the deployment's own origin for store links", () => {
+		const staging = { PUBLIC_SITE_URL: "https://staging.orderak.app" };
+		expect(publicSiteUrl(staging)).toBe("https://staging.orderak.app");
+		expect(storeUrl(staging, "EG-ayman-UPU9T9C6")).toBe("https://staging.orderak.app/EG-ayman-UPU9T9C6");
+	});
+
+	it("falls back to production when unset, and trims a trailing slash", () => {
+		expect(publicSiteUrl({})).toBe("https://orderak.app");
+		expect(storeUrl({}, "EG-x-1")).toBe("https://orderak.app/EG-x-1");
+		expect(publicSiteUrl({ PUBLIC_SITE_URL: "https://staging.orderak.app/" })).toBe("https://staging.orderak.app");
+	});
+
+	it("ignores a value that is not a bare https origin", () => {
+		// A path, a non-https scheme or embedded junk must never reach a
+		// canonical tag; degrade to production rather than emit it.
+		for (const bad of ["http://orderak.app", "https://orderak.app/EG-x", "https://a b", "orderak.app", ""]) {
+			expect(publicSiteUrl({ PUBLIC_SITE_URL: bad })).toBe("https://orderak.app");
+		}
 	});
 });

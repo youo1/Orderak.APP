@@ -43,6 +43,18 @@
 		"BUSINESS_TAXONOMY_ENABLED": "true",
 		"AI_MONTHLY_BUDGET_MICRO_USD": "0",
 		"GOOGLE_PLAY_PACKAGE_NAME": "app.orderak.seller",
+		// Package the /.well-known/assetlinks.json statement vouches for. This
+		// was hardcoded in assetLinksResponse() until 2026-09-10; naming it here
+		// is what lets staging vouch for its own suffixed package instead of
+		// borrowing production's. The value below is the previous hardcoded
+		// default, so production behaviour is unchanged.
+		"ANDROID_APP_PACKAGE_NAME": "app.orderak.seller",
+		// Origin every public link is built from — store_url in API responses,
+		// canonical/og tags, the 301 that canonicalises an alias, and uploaded
+		// media URLs. Was hardcoded to production in identity.ts, so staging
+		// emitted production links for stores that exist only in staging's D1
+		// and redirected visitors straight into a production 404.
+		"PUBLIC_SITE_URL": "https://orderak.app",
 		"LOCAL_JWT_VERIFICATION": "false",
 		"FIREBASE_PROJECT_ID": ""
 	},
@@ -188,6 +200,21 @@
 				// it at the production package would make staging purchases
 				// resolve against production's products.
 				"GOOGLE_PLAY_PACKAGE_NAME": "app.orderak.seller.staging",
+				// Same reason as the Play package above: a staging build is a
+				// different app, so the Asset Links statement served from
+				// staging.orderak.app has to name the suffixed package or
+				// Credential Manager refuses every Passkey ceremony.
+				"ANDROID_APP_PACKAGE_NAME": "app.orderak.seller.staging",
+				// See the production comment: staging serves the same routes
+				// from its own domain over its own D1, so its links must name
+				// its own origin.
+				"PUBLIC_SITE_URL": "https://staging.orderak.app",
+				// Scopes staging Passkeys to the staging domain. Without this,
+				// rpId() falls through to orderak.app and the production domain
+				// would have to vouch for a debug-signed build to make staging
+				// Passkeys work — a credential issued for the real RP. Staging
+				// credentials are deliberately not portable to production.
+				"WEBAUTHN_RP_ID": "staging.orderak.app",
 				"LOCAL_JWT_VERIFICATION": "true",
 				"FIREBASE_PROJECT_ID": "orderak-staging"
 			},
