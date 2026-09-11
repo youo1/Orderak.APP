@@ -15,6 +15,10 @@ enum class AuthError {
     PASSKEY_UNAVAILABLE,
     PASSKEY_FAILED,
     SERVICE_UNAVAILABLE,
+
+    /** The account exists and is suspended or banned. Signing in again will not help. */
+    ACCOUNT_RESTRICTED,
+
     GENERIC,
 }
 

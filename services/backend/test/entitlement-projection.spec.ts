@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { BASE, SELF, authHeaders, createSchema, env, registerStore, type Registered } from "./helpers";
-import { legacySnapshot, resolveEntitlementsForClient } from "../src/domains/commerce/entitlements";
+import { BASE, SELF, authHeaders, createSchema, env, registerStore, seedEntitlementCatalogue, type Registered } from "./helpers";
+import { legacySnapshot, projectEntitlementsForAndroid, resolveEntitlementsForClient } from "../src/domains/commerce/entitlements";
 import { LEGACY_FEATURE_ENTITLEMENTS, LEGACY_LIMIT_ENTITLEMENTS, LEGACY_LIMIT_KEYS } from "../src/domains/commerce/legacy-entitlements";
 import { loadPlanConfig } from "../src/platform/config/config";
 import catalog from "../../../docs/product/orderak-plan-catalog.json";
@@ -21,6 +21,7 @@ import catalog from "../../../docs/product/orderak-plan-catalog.json";
  */
 
 const engineOff = () => ({ ...env, ENTITLEMENTS_ENABLED: "false" }) as TestEnv;
+const engineOn = () => ({ ...env, ENTITLEMENTS_ENABLED: "true" }) as TestEnv;
 
 type CatalogFeature = { key: string; implementation_status: string; value_type: string };
 const catalogFeatures = (catalog as { features: CatalogFeature[] }).features;
@@ -274,6 +275,93 @@ describe("the piggybacked plan config", () => {
 		const entitlements = config.entitlements as Record<string, { value: unknown }>;
 		expect(entitlements.max_products.value).toBe(200);
 		expect((config.limits as { max_products: number }).max_products).toBe(200);
+	});
+});
+
+describe("the flat limits/features block, whichever engine answers", () => {
+	// The keyed map was already covered. The FLAT block was not, and that is
+	// where the drift was: loadPlanConfig's engine-on branch read entitlement
+	// keys named `custom_domain` and `advanced_analytics`, neither of which is
+	// in the catalogue, so both answered false for every seller on every plan
+	// including the paid tiers that grant them. The engine-off branch read the
+	// legacy plans columns and answered correctly, so the two engines disagreed
+	// about the same seller — the exact thing I-4 forbids, in the one place no
+	// test looked.
+
+	it("names the same limits and features under both engines", async () => {
+		const r = await registerStore({ phone: "+201500003040" });
+		const storeId = await storeIdOf(r);
+
+		const off = await loadPlanConfig(engineOff(), storeId);
+		const on = await loadPlanConfig(engineOn(), storeId);
+
+		const keys = (block: unknown) => Object.keys(block as Record<string, unknown>).sort();
+		expect(keys(on.limits)).toEqual(keys(off.limits));
+		expect(keys(on.features)).toEqual(keys(off.features));
+		// max_concurrent_devices was present under one engine and absent under
+		// the other, and the app reads it into ConfigLimits — where absent and 1
+		// are different answers.
+		expect(keys(off.limits)).toContain("max_concurrent_devices");
+	});
+
+	it("runs the engine against the real catalogue, not a fixture and not the fallback", async () => {
+		// The engine was already covered by entitlements.spec.ts — but only
+		// against the six-key synthetic catalogue createEntitlementSchema()
+		// builds. The 242 definitions migration 025 seeds were never loaded by
+		// any test, because createSchema() clears them and nothing put them back.
+		//
+		// So engine mechanics were tested and engine CONTENT was not, which is
+		// the gap the two dead key names in legacyProjection() lived in: they
+		// referred to catalogue keys, and no test had a catalogue.
+		//
+		// This asserts the seeding actually took, so the helper cannot silently
+		// regress to seeding nothing and leave the tests above passing for the
+		// wrong reason.
+		const r = await registerStore({ phone: "+201500003042" });
+		const storeId = await storeIdOf(r);
+		await seedEntitlementCatalogue();
+
+		const snapshot = await resolveEntitlementsForClient(engineOn(), storeId);
+		expect(snapshot.plan_revision_id).not.toContain("legacy:");
+		expect(snapshot.plan_key).toBe("free");
+		expect(Object.keys(snapshot.entitlements).length).toBeGreaterThan(200);
+
+		// And the Android projection stays a strict, implemented-only subset of
+		// it — the property that keeps the payload bounded.
+		const projected = await projectEntitlementsForAndroid(snapshot);
+		const projectedKeys = Object.keys(projected.entitlements);
+		expect(projectedKeys.length).toBeGreaterThan(0);
+		expect(projectedKeys.length).toBeLessThan(Object.keys(snapshot.entitlements).length);
+		expect(Object.values(projected.entitlements).every(
+			(item) => item.implementation_status === "implemented",
+		)).toBe(true);
+	});
+
+	it("derives features from keys the catalogue actually defines", async () => {
+		const r = await registerStore({ phone: "+201500003041" });
+		const storeId = await storeIdOf(r);
+		await seedEntitlementCatalogue();
+
+		const snapshot = await resolveEntitlementsForClient(engineOn(), storeId);
+		// Proof the engine answered rather than the legacy fallback, which names
+		// its revision "legacy:<plan>" and carries none of these keys.
+		expect(snapshot.plan_revision_id).not.toContain("legacy:");
+
+		const entitlements = snapshot.entitlements;
+		// The same two keys the Android client derives these flags from in
+		// BackendConfig.toBackendConfig(). The names this used to read —
+		// `custom_domain` and `advanced_analytics` — are in no migration, so both
+		// resolved to undefined and answered false on every plan.
+		expect(entitlements["products_catalog.custom_domain"]).toBeTruthy();
+		expect(entitlements["analytics_reporting.operational_dashboard"]).toBeTruthy();
+
+		// Whatever the real catalogue says, the flat block must agree with the
+		// keyed map. That equality is the invariant; the values are the
+		// catalogue's business. A dead key name cannot satisfy it, because it
+		// reports false regardless of what the entitlement actually grants.
+		const features = (await loadPlanConfig(engineOn(), storeId)).features as Record<string, boolean>;
+		expect(features.custom_domain).toBe(entitlements["products_catalog.custom_domain"].available);
+		expect(features.analytics).toBe(entitlements["analytics_reporting.operational_dashboard"].available);
 	});
 });
 

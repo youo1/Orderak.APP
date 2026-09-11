@@ -179,11 +179,24 @@
 				"BILLING_ENABLED": "false",
 				"GOOGLE_PLAY_LIFECYCLE_ENABLED": "false",
 				"AI_ASSISTANT_ENABLED": "false",
-				"ENTITLEMENTS_ENABLED": "false",
+				// ENTITLEMENTS_ENABLED and GOOGLE_PLAY_PACKAGE_NAME must match the
+				// public Worker's staging block. Both Workers share one D1
+				// database, and neither of those two is inert here.
+				// ENTITLEMENTS_ENABLED is what the admin readiness readout
+				// reports as the deployment gate, so the panel was telling
+				// operators entitlements were off while staging had been serving
+				// them since work item 03b. GOOGLE_PLAY_PACKAGE_NAME selects the
+				// play_product_mappings row set (migration 054 carries one set per
+				// package) — and the Play verification queue CONSUMER runs on THIS
+				// Worker, so a staging purchase made against
+				// app.orderak.seller.staging products was resolved here against
+				// production's and failed play_product_not_enabled, with nothing
+				// pointing at the config line that caused it.
+				"ENTITLEMENTS_ENABLED": "true",
 				"AUTH_IDENTITY_ENABLED": "false",
 				"PHONE_CHANGE_ENABLED": "false",
 				"AI_MONTHLY_BUDGET_MICRO_USD": "0",
-				"GOOGLE_PLAY_PACKAGE_NAME": "app.orderak.seller",
+				"GOOGLE_PLAY_PACKAGE_NAME": "app.orderak.seller.staging",
 				// See the production comment: the Admin store list builds
 				// store_url too, and on staging those rows point at staging.
 				"PUBLIC_SITE_URL": "https://staging.orderak.app"

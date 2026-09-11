@@ -1,9 +1,11 @@
 package app.orderak.seller.data.billing
 
+import app.orderak.seller.core.network.NetworkJson
 import app.orderak.seller.data.remote.BackendConfig
 import app.orderak.seller.data.remote.EntitlementDto
 import app.orderak.seller.data.remote.EntitlementSnapshotRes
 import app.orderak.seller.data.remote.VerifyPlayPurchaseRes
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -18,7 +20,7 @@ class BillingReliabilityTest {
         val decision = decideBillingVerification(
             VerifyPlayPurchaseRes(
                 pending = true,
-                status = "verification_pending",
+                status = JsonPrimitive("verification_pending"),
                 verification_id = "verification-1",
                 retry_after_seconds = 5,
             )
@@ -48,6 +50,38 @@ class BillingReliabilityTest {
         assertEquals(
             BillingVerificationDecision.Terminal("unsupported_purchase_shape"),
             decideBillingVerification(VerifyPlayPurchaseRes(error = "unsupported_purchase_shape")),
+        )
+    }
+
+    /**
+     * The decode failure and the retry loop were one bug, so this asserts them
+     * together: a real problem+json body, through the real decoder, into the
+     * real decision.
+     *
+     * `status` is the numeric HTTP status on an error body, so decoding it into
+     * a String field threw. apiCall reported that as "bad_response", which the
+     * branch above classifies as retryable — so a verification that could never
+     * succeed was rescheduled by WorkManager indefinitely, and the seller was
+     * shown "bad_response" instead of the reason.
+     */
+    @Test
+    fun terminalProblemJsonFailuresAreNotRetriedForever() {
+        fun problem(status: Int, code: String) = NetworkJson.decoder.decodeFromString<VerifyPlayPurchaseRes>(
+            """{"type":"https://developers.orderak.app/problems/$code","title":"T",""" +
+                """"status":$status,"code":"$code","detail":"T","request_id":"r1"}""",
+        )
+
+        assertEquals(
+            BillingVerificationDecision.Terminal("play_product_not_enabled"),
+            decideBillingVerification(problem(409, "play_product_not_enabled")),
+        )
+        assertEquals(
+            BillingVerificationDecision.Terminal("verification_not_found"),
+            decideBillingVerification(problem(404, "verification_not_found")),
+        )
+        assertEquals(
+            BillingVerificationDecision.Terminal("billing_lifecycle_disabled"),
+            decideBillingVerification(problem(403, "billing_lifecycle_disabled")),
         )
     }
 

@@ -109,6 +109,18 @@ class EntitlementManager @Inject constructor(
         else -> null
     }
 
+    /**
+     * Whether the authoritative paid period has ended for the loaded snapshot.
+     *
+     * Exposed because the alternative was worse: FeatureAvailabilityResolver
+     * used to infer this by probing a key it assumed was always present and
+     * watching for a DISAGREEMENT between this class and the raw snapshot. That
+     * worked, and would have broken silently the day `max_products` stopped
+     * being universally emitted — with the symptom being paid features staying
+     * open past expiry, which nothing would have reported.
+     */
+    fun isPeriodExpired(): Boolean = _config.value?.let(::isAuthoritativePeriodExpired) ?: false
+
     /** Never extend paid access beyond the server-provided authoritative end. */
     private fun isAuthoritativePeriodExpired(config: BackendConfig): Boolean {
         if (config.subscription_status !in setOf("active", "grace", "canceled")) return false

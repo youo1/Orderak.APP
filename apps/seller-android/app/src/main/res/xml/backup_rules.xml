@@ -1,8 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- API <= 30 backups: exclude both the legacy DataStore location and the
-     encrypted shared-pref secret store that now holds the backend device
-     credential. Restoring either onto another device would leak identity. -->
+<!-- API <= 30 backups.
+
+     Three kinds of thing are held back, for two different reasons.
+
+     Identity: the encrypted secret store holds the backend device credential
+     and the session DataStore holds the phone it belongs to. Restoring either
+     onto another device would hand that device the account.
+
+     Other people's data: orderak.db is the seller's Room database, and it holds
+     their customers' phone numbers, names and notes alongside the full order
+     history. That is personal data belonging to the buyers, not to the seller,
+     and it was being copied to Google's cloud backup and across device
+     transfers with nothing asking either party. It is all recoverable from the
+     server by signing in, so backing it up buys nothing and exports a customer
+     list. The -wal and -shm sidecars are named too: excluding only the main
+     database file leaves the write-ahead log, which contains the same rows.
+
+     The whole datastore directory rather than one file in it: every store in
+     there is either re-fetched from the server on the next sync (entitlements)
+     or a trivial local preference (theme, demo), so listing them individually
+     only creates a way for the next one added to be missed. -->
 <full-backup-content>
-    <exclude domain="file" path="datastore/session.preferences_pb" />
+    <exclude domain="file" path="datastore" />
     <exclude domain="sharedpref" path="orderak_secure_secret.xml" />
+    <exclude domain="database" path="orderak.db" />
+    <exclude domain="database" path="orderak.db-wal" />
+    <exclude domain="database" path="orderak.db-shm" />
 </full-backup-content>

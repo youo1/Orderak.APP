@@ -269,7 +269,8 @@ class SyncRepository @Inject constructor(
         var pushOk = true
         if (hash != lastPushedProductsHash) {
             val push = api.syncProducts(
-                ProductsSyncReq(phone = phone, secret = secret, products = dtos, baseline_version = baseline),
+                phone, secret,
+                ProductsSyncReq(products = dtos, baseline_version = baseline),
             )
             pushOk = push.ok
             // The server refused because this device is behind. Drop the baseline
