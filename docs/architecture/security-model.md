@@ -143,6 +143,9 @@ On mismatch → `401`.
   recovery rotates the primary credential and revokes all previous devices, so
   reinstalling the app or replacing a phone cannot permanently lock out the
   account owner.
+- The device secret does not survive logout. It is removed from encrypted
+  storage after revocation, so a signed-out handset holds no credential and a
+  second seller signing in on that phone is provisioned a fresh one.
 - New Android versions retain an opaque installation ID across logout and send
   it only after authentication. Device list/revoke endpoints are seller-scoped;
   additional credentials can be revoked, while the primary row cannot be
@@ -180,9 +183,13 @@ On mismatch → `401`.
   migration requires a dedicated OTP re-verification contract.
 - Firebase client failures are mapped to stable UI categories; raw exception
   text, phone numbers, OTP codes, and tokens are not logged.
-- Logout uses a behavior-tested sequence: Firebase sign-out first, then the
-  local business database, entitlement cache, and seller session. The build
-  guard protects the contract/profile while unit tests protect ordering.
+- Logout uses a behavior-tested sequence: server-side credential revocation
+  first, then Firebase sign-out, then the local business database, entitlement
+  cache and seller session, and the encrypted device secret last. Revocation is
+  best effort, so a sign-out with no network still completes locally and leaves a
+  credential valid at the server until the account's next sign-in replaces it.
+  The build guard protects the contract/profile and asserts that only one
+  implementation of the sequence exists, while unit tests protect ordering.
 
 ## Admin authentication
 

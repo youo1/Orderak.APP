@@ -181,7 +181,21 @@ async function renderContentPage(env: PublicWorkerEnv, slug: string, lang: Local
 <body><h1>${esc(row.title)}</h1>${row.body_html}</body>
 </html>`;
 
-	return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
+	// `body_html` is stored markup written through the admin surface and emitted
+	// raw, which is the one thing on this page that could carry script. It is
+	// trusted content, but "trusted" here means one compromised or mistaken
+	// administrator away, and these pages (terms, privacy) are the ones every
+	// seller is required to read. The policy costs nothing: the page has no
+	// script of its own, so `default-src 'none'` with inline styles is the whole
+	// of what it needs.
+	return new Response(html, {
+		headers: {
+			"content-type": "text/html; charset=utf-8",
+			"content-security-policy":
+				"default-src 'none'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; "
+				+ "font-src 'self'; form-action 'none'; base-uri 'none'; frame-ancestors 'self'",
+		},
+	});
 }
 
 /**

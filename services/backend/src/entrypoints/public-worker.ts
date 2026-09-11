@@ -35,7 +35,7 @@ import { backfillPlayAccountHashes, handleGooglePlayRoutes, reconcileGooglePlayP
 import { entitlementLimitReached, reserveUsage, voidUsageReservation } from "../domains/commerce/entitlements";
 import { handleSellerOperationRoutes } from "../domains/operations/seller-operations";
 import { handlePhoneChangeRoutes } from "../domains/identity/phone-change";
-import { requireTenantWrite, resolveTenantContextForStore, TenantWriteFencedError } from "../platform/tenancy/tenant-routing";
+import { requireTenantWrite, resolveTenantContextForStore, tenantUnavailableResponse } from "../platform/tenancy/tenant-routing";
 import { runtimeControlEnabled } from "../platform/config/runtime-config";
 import { runObservedJob } from "../platform/jobs/operational-jobs";
 import { AiTemporarilyUnavailableError, callDeepSeek } from "../integrations/ai/deepseek";
@@ -386,11 +386,8 @@ app.use("/api/v1/*", async (c, next) => {
 			try {
 				requireTenantWrite(await resolveTenantContextForStore(c.env, String(account.id)));
 			} catch (error) {
-				if (error instanceof TenantWriteFencedError) {
-					return jsonResponse({ error: "tenant_write_fenced", retryable: true }, 503, {
-						"retry-after": String(error.retryAfterSeconds),
-					});
-				}
+				const unavailable = tenantUnavailableResponse(error);
+				if (unavailable) return unavailable;
 				throw error;
 			}
 		}

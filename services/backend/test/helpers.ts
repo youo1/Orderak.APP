@@ -292,6 +292,105 @@ export interface Registered {
 }
 
 /** Register a fresh store and return its identity. */
+/**
+ * Restore the entitlement catalogue that the migrations seed and createSchema()
+ * clears. Opt-in: call it from a test that needs the v2 policy engine.
+ *
+ * WHY THIS EXISTS
+ *   createSchema() applies the real migrations and then DELETEs every clearable
+ *   table, which is what keeps tests order-independent. `d1_migrations` is
+ *   preserved, so the migrations never re-run — and the reference data they seed
+ *   is therefore wiped once and never restored.
+ *
+ *   For the entitlement catalogue that had a consequence nobody had measured:
+ *   `entitlement_definitions` held zero rows in every test, so
+ *   resolveSubscriptionContext() found no free plan, resolveEntitlements() took
+ *   its legacySnapshot fallback, and every test that set
+ *   ENTITLEMENTS_ENABLED="true" — including the helper named v2() — was
+ *   asserting legacy behaviour. The engine staging has run since work item 03b
+ *   had no test that executed it. That is how the two dead entitlement key names
+ *   in legacyProjection() survived a suite of 400 passing tests.
+ *
+ * WHY OPT-IN RATHER THAN PART OF createSchema()
+ *   Seeding it for everyone breaks tests that legitimately want control of the
+ *   catalogue. plans.spec.ts seeds its own synthetic plans and asserts the exact
+ *   plan list, and one of its cases exists precisely to prove the endpoint
+ *   degrades rather than fails when the catalogue is empty. Both are worth
+ *   keeping, so the engine is something a test asks for.
+ *
+ * WHY IT REPLAYS THE MIGRATIONS RATHER THAN CARRYING A FIXTURE
+ *   A copy of 242 entitlement definitions in test code is a second source of
+ *   truth for the catalogue, and it would drift into a passing test run — the
+ *   same failure vitest.config.mts already refuses for the schema. These are the
+ *   real statements, from the real files, replayed in order: 024 for the plans
+ *   and revisions, 025 for the definitions and their per-revision values, 047
+ *   for the status corrections that decide whether a feature reads as built.
+ *
+ *   Only non-DDL statements run. The tables already exist, so replaying CREATE
+ *   would fail; and 024's backfill INSERTs read from `sellers` and
+ *   `subscriptions`, which are empty at this point, so they insert nothing.
+ */
+const CATALOGUE_SEED_MIGRATIONS = [
+	"024_versioned_entitlements",
+	"025_entitlement_catalog_seed",
+	"047_correct_entitlement_implementation_status",
+];
+
+export async function seedEntitlementCatalogue(): Promise<void> {
+	const migrations = (env as unknown as TestMigrationEnv).TEST_MIGRATIONS;
+	for (const name of CATALOGUE_SEED_MIGRATIONS) {
+		const migration = migrations.find((candidate) => candidate.name.startsWith(name));
+		if (!migration) throw new Error(`Catalogue seed migration missing: ${name}`);
+		// Matched by TARGET TABLE, not just by statement kind.
+		//
+		// Migration 024 carries two different things: the catalogue reference
+		// data, and a one-off backfill that reads existing rows out of `sellers`
+		// and `subscriptions` into the new organization tables. Replaying the
+		// backfill makes this helper order-dependent — call it after
+		// registerStore() and it tries to create a second organization for a
+		// seller that already has one, which the unique index on
+		// organizations.owner_store_id correctly refuses.
+		//
+		// Naming the tables keeps the helper about the catalogue and lets a test
+		// seed before or after it registers anything.
+		const CATALOGUE_TABLES = [
+			"subscription_plans",
+			"plan_revisions",
+			"plan_revision_entitlements",
+			"entitlement_definitions",
+			"storefront_locale_definitions",
+		];
+		// The first KEYWORD and its target, not the first characters: migration
+		// statements carry their rationale as leading `--` comments, so a naive
+		// prefix test matches nothing and silently seeds an empty catalogue —
+		// the same failure this helper exists to fix, one layer down.
+		const target = (query: string): string => {
+			const body = query
+				.split(String.fromCharCode(10))
+				.map((candidate) => candidate.trim())
+				.filter((candidate) => candidate.length > 0 && !candidate.startsWith("--"))
+				.join(" ");
+			return /^(?:INSERT\s+(?:OR\s+\w+\s+)?INTO|UPDATE)\s+([A-Za-z_][A-Za-z0-9_]*)/i
+				.exec(body)?.[1]?.toLowerCase() ?? "";
+		};
+		const statements = migration.queries.filter((query) => CATALOGUE_TABLES.includes(target(query)));
+		if (!statements.length) throw new Error(`No seed statements found in ${name}`);
+		// Batched, not one statement at a time. Migration 025 alone is 1,210
+		// INSERTs, and issuing them individually took six seconds — past the
+		// default per-test timeout, so the first version of this helper made the
+		// tests using it fail on time rather than on their assertions. Chunked
+		// because a batch is a transaction and an unbounded one is its own
+		// problem; order is preserved within and across chunks, which the
+		// foreign key from plan_revision_entitlements to plan_revisions needs.
+		const CHUNK = 100;
+		for (let offset = 0; offset < statements.length; offset += CHUNK) {
+			await env.orderak_db.batch(
+				statements.slice(offset, offset + CHUNK).map((statement) => env.orderak_db.prepare(statement)),
+			);
+		}
+	}
+}
+
 export async function registerStore(
 	overrides: Record<string, unknown> = {},
 ): Promise<Registered> {

@@ -439,6 +439,9 @@ val verifyAuthPhase1Contract by tasks.registering {
         val logoutSequence = mainRoot.resolve(
             "java/app/orderak/seller/feature/settings/LogoutSequence.kt"
         ).readText()
+        val sessionLogoutManager = mainRoot.resolve(
+            "java/app/orderak/seller/data/session/SessionLogoutManager.kt"
+        ).readText()
         val backendAuth = workspaceRoot.resolve("services/backend/src/domains/stores/api-store.ts").readText()
         val backendAuthV2 = workspaceRoot.resolve("services/backend/src/domains/identity/auth-v2.ts").readText()
         val sellerSession = workspaceRoot.resolve("services/backend/src/domains/identity/seller-session.ts").readText()
@@ -473,13 +476,13 @@ val verifyAuthPhase1Contract by tasks.registering {
 
         requireContract(contract.exists(), "The protected contract document is missing.")
         requireContract(
-			"**Contract version:** 7" in contract.readText(),
+			"**Contract version:** 8" in contract.readText(),
             "The recognized Phase 1 contract version changed without a guard migration."
         )
         requireContract(
             securityInvariants.exists() && androidAuthProfile.exists() &&
                 "**Contract version:** 1" in securityInvariants.readText() &&
-                "**Profile version:** 1" in androidAuthProfile.readText(),
+                "**Profile version:** 2" in androidAuthProfile.readText(),
             "Authentication invariants or the Android platform profile are missing."
         )
         requireContract(
@@ -517,12 +520,30 @@ val verifyAuthPhase1Contract by tasks.registering {
             "Logout must sign out of Firebase."
         )
         requireContract(
-            "runLogoutSequence(" in settingsViewModel &&
+            // Auth contract v8, guarantee 10. Strictly more than v7 required.
+            //
+            // v7 asserted that SettingsScreen called runLogoutSequence, which had
+            // the effect of requiring a second copy of the sequence to exist
+            // there — so "the single protected logout sequence used by every
+            // account state" had two callers and only one of them was it. v8
+            // asserts the opposite: the screen delegates, and the sequence lives
+            // in exactly one place.
+            //
+            // The two new steps are pinned by name as well as the four v7 ones,
+            // and the revocation is pinned at its call site, because a sequence
+            // that accepts a revokeCredential lambda and is handed an empty one
+            // would satisfy a shape check while revoking nothing.
+            "sessionLogoutManager.logout()" in settingsViewModel &&
+                "runLogoutSequence(" !in settingsViewModel &&
+                "revokeCredential()" in logoutSequence &&
                 "signOutProvider()" in logoutSequence &&
                 "clearBusinessData()" in logoutSequence &&
                 "clearEntitlements()" in logoutSequence &&
-                "clearSession()" in logoutSequence,
-            "Logout must use the behavior-tested provider-first cleanup sequence."
+                "clearSession()" in logoutSequence &&
+                "clearDeviceSecret()" in logoutSequence &&
+                "backendApi.logout(" in sessionLogoutManager &&
+                "fun clearDeviceSecret()" in sessionStore,
+            "Logout must revoke the credential, keep provider-first local cleanup, drop the device secret, and exist in exactly one place."
         )
         requireContract(
             "completePhoneAuth(" in authViewModel &&

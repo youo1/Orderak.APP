@@ -64,6 +64,7 @@ import android.content.Context
 import app.orderak.seller.data.remote.SyncScheduler
 import app.orderak.seller.data.remote.BackendApi
 import app.orderak.seller.data.db.OrderakDatabase
+import app.orderak.seller.data.session.SessionLogoutManager
 import app.orderak.seller.data.session.SessionStore
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -99,6 +100,7 @@ class SettingsViewModel @Inject constructor(
 	private val entitlementRepository: EntitlementRepository,
 	private val billingManager: BillingManager,
     private val backendApi: BackendApi,
+    private val sessionLogoutManager: SessionLogoutManager,
     private val db: OrderakDatabase,
     @param:ApplicationContext private val appContext: Context,
 ) : ViewModel() {
@@ -176,16 +178,18 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-        /** Debug-only subscription plan switching — guarded by BuildConfig. */
-    /** Fix(#8): logout wipes business data too — next seller starts clean. */
+    /**
+     * Signing out from Settings, through the one sequence every account state
+     * uses. Auth contract v8, guarantee 10.
+     *
+     * This used to assemble the sequence itself — which is how the class
+     * documented as "the single protected logout sequence used by every account
+     * state" acquired a second caller that was not it, and why a change to
+     * logout had to be made in two places or silently be made in one.
+     */
     fun logout(onDone: () -> Unit) {
         viewModelScope.launch {
-            runLogoutSequence(
-                signOutProvider = authRepository::signOut,
-                clearBusinessData = { withContext(Dispatchers.IO) { db.clearAllTables() } },
-                clearEntitlements = entitlementRepository::clear,
-                clearSession = sessionStore::clear, // keeps the device secret (see SessionStore)
-            )
+            sessionLogoutManager.logout()
             onDone()
         }
     }

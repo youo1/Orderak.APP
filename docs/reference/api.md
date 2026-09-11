@@ -119,6 +119,7 @@ for returning sellers.
 | `GET` | `/api/v1/auth/passkeys` | Seller device headers | List the seller's Passkeys without returning credential IDs or public keys. |
 | `PATCH` | `/api/v1/auth/passkeys/{id}` | Seller device headers + recent-auth token | Rename a Passkey. |
 | `DELETE` | `/api/v1/auth/passkeys/{id}` | Seller device headers + recent-auth token | Revoke a Passkey. |
+| `POST` | `/api/v1/auth/logout` | Seller device headers | Retire the calling device's credential and revoke any outstanding recent-auth proof. Called by the Android logout sequence before local teardown (auth contract v8, guarantee 10). Answers `401 auth` when the credential is already gone, which a client treats as success. |
 | `POST` | `/api/v1/account/email/verification/resend` | Seller device headers + recent-auth token | Send a non-blocking, single-use email verification link; maximum three resends per hour. |
 | `GET` | `/verify-email?token=…` | Single-use token | Verify the private account email. The email is not an account-recovery method in V2. |
 | `GET` | `/api/v1/geo/cities?input=الق&language=ar` | Onboarding token; session/IP rate limits | Return at most ten static-catalogue city matches. The Worker derives the country from the verified onboarding session and ignores client country parameters. A blank `input` returns the most populated cities for the phone country. |

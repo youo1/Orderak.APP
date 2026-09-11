@@ -26,6 +26,7 @@ import {
 	slugSuggestions,
 	slugify,
 	storeUrl,
+	publicSiteUrl,
 	syncVerifiedFirebaseIdentity,
 	uniqueSlug,
 	uniqueStoreCode,
@@ -1175,7 +1176,7 @@ async function sendVerificationEmail(
 		email,
 		{
 			name,
-			verify_url: `https://orderak.app/verify-email?token=${encodeURIComponent(token)}`,
+			verify_url: `${publicSiteUrl(env)}/verify-email?token=${encodeURIComponent(token)}`,
 			expires_hours: String(EMAIL_TOKEN_HOURS),
 		},
 		locale,

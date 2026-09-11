@@ -151,6 +151,83 @@ for (const [label, environment] of [
   }
 }
 
+// Vars that must agree between the two Workers sharing one database.
+//
+// The public Worker and the admin Worker are separate deployments reading the
+// same D1, and three of these are not inert on the admin side: it runs the
+// Play verification queue consumer, and it reports the entitlements gate in the
+// admin readiness readout. They had drifted on all four in staging — most
+// damagingly GOOGLE_PLAY_PACKAGE_NAME, which selects the play_product_mappings
+// row set, so the consumer resolved staging purchases against production's
+// products and failed them as play_product_not_enabled.
+//
+// The drift was invisible because each file reads correctly on its own. Only
+// the pair is wrong, which is exactly the thing a per-file review cannot see
+// and a check across both can.
+// AUTH_IDENTITY_ENABLED and PHONE_CHANGE_ENABLED are deliberately absent.
+// Both are declared on the admin Worker and read by nothing there — their only
+// readers are findSellerByVerifiedIdentity(), restoreFirebaseSession() and
+// handlePhoneChangeRoutes(), all of which are mounted on the public Worker. They
+// are inert rather than shared, so requiring them to match would be enforcing a
+// rule about values that have no effect. They are candidates for deletion from
+// wrangler.admin.jsonc, not for alignment.
+const SHARED_DATABASE_VARS = [
+  "ENTITLEMENTS_ENABLED",
+  "GOOGLE_PLAY_PACKAGE_NAME",
+  "BILLING_ENABLED",
+  "GOOGLE_PLAY_LIFECYCLE_ENABLED",
+  // Both Workers build store_url from this — the Seller API from
+  // identityBlock(), the Admin store list from its own query — so a difference
+  // would have one of them handing out links to the other deployment, which is
+  // the bug PUBLIC_SITE_URL was introduced to fix.
+  "PUBLIC_SITE_URL",
+];
+for (const [label, publicEnvironment, adminEnvironment] of [
+  ["Production", publicConfig, adminConfig],
+  ["Staging", publicStaging, adminStaging],
+]) {
+  for (const name of SHARED_DATABASE_VARS) {
+    const fromPublic = publicEnvironment?.vars?.[name];
+    const fromAdmin = adminEnvironment?.vars?.[name];
+    if (fromPublic !== fromAdmin) {
+      fail(
+        `${label} public/admin Workers disagree on ${name} ("${fromPublic}" vs "${fromAdmin}"). `
+        + "They share one D1 database, and the admin Worker runs the Play verification consumer, "
+        + "so a difference here is a behaviour difference rather than a cosmetic one.",
+      );
+    }
+  }
+}
+
+// Billing lifecycle requires the entitlements engine.
+//
+// applyVerifiedPurchase() writes organization_subscriptions, and only the v2
+// engine reads it. With GOOGLE_PLAY_LIFECYCLE_ENABLED on and
+// ENTITLEMENTS_ENABLED off, a verified purchase is recorded and then invisible:
+// /api/v1/entitlements answers from the legacy `subscriptions` table, which the
+// billing path never writes, so the seller is charged and downgraded to free on
+// their next sync.
+//
+// The two flags are independent switches that are not independent facts. This
+// is the check that says so, rather than a comment asking the next person to
+// remember.
+for (const [label, environment] of [
+  ["Production public", publicConfig],
+  ["Staging public", publicStaging],
+  ["Production admin", adminConfig],
+  ["Staging admin", adminStaging],
+]) {
+  const lifecycle = environment?.vars?.GOOGLE_PLAY_LIFECYCLE_ENABLED === "true";
+  const entitlements = environment?.vars?.ENTITLEMENTS_ENABLED === "true";
+  if (lifecycle && !entitlements) {
+    fail(
+      `${label} enables GOOGLE_PLAY_LIFECYCLE_ENABLED without ENTITLEMENTS_ENABLED. `
+      + "A verified Play purchase writes organization_subscriptions, which only the v2 engine reads, "
+      + "so the seller would pay and then be served the free plan.",
+    );
+  }
+}
+
 const edgeProd = loadJsonc("apps/admin-web/wrangler.edge.jsonc");
 const edgeStaging = loadJsonc("apps/admin-web/wrangler.edge.staging.jsonc");
 if (edgeProd.name !== "orderak-admin-edge" || edgeStaging.name !== "orderak-admin-edge-staging") fail("Admin Edge Worker names drifted.");

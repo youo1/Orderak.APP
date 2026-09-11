@@ -17,6 +17,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -101,8 +103,6 @@ data class ProductDto(
  */
 @Serializable
 data class ProductsSyncReq(
-    val phone: String,
-    val secret: String,
     val products: List<ProductDto>,
     val baseline_version: Long? = null,
     val confirm_deletion: Boolean = false,
@@ -118,6 +118,17 @@ data class ProductCodeDto(
     val stock_version: Long = 0,
     val category_code: String? = null,
 )
+
+/**
+ * The body of a status transition.
+ *
+ * Serialized rather than built by hand. This was the one request in the client
+ * assembled by string interpolation into a JSON literal — safe today because
+ * every caller passes an OrderStatus enum name, and a latent injection the
+ * moment one does not.
+ */
+@Serializable
+private data class OrderStatusReq(val status: String)
 
 /** One line of an order the seller is recording. */
 @Serializable
@@ -628,7 +639,44 @@ data class ChatRes(val reply: String? = null, @SerialName("code") val error: Str
 
 // ---- Operations coverage ----
 
-@Serializable data class AccountStatusRes(val ok: Boolean = false, val status: String = "active", @SerialName("code") val error: String? = null)
+/**
+ * The domain meaning of a `status` field, or null when the body did not carry one.
+ *
+ * `status` is not one key on this API, it is two. A 2xx body uses it for a
+ * domain state — "active", "verification_pending" — while an RFC 9457
+ * problem+json error body uses it for the numeric HTTP status, because the RFC
+ * requires exactly that (`shared.ts` jsonResponse).
+ *
+ * A DTO that has to decode both therefore cannot declare it as a String.
+ * [NetworkJson] runs with `isLenient = false`, so a number arriving in a String
+ * field throws; `apiCall` turns the throw into "bad_response"; and the real
+ * reason — sitting in the same body under `code`, which these DTOs already map
+ * to `error` — is thrown away with it. For the billing DTO that mattered twice
+ * over, because decideBillingVerification treats "bad_response" as retryable,
+ * so a terminal failure became an unbounded WorkManager retry.
+ *
+ * Declaring the field as [JsonElement] decodes both shapes. This reads back the
+ * half a caller actually means: a JSON string yields its content, and a number
+ * or an absent field yields null.
+ */
+private fun JsonElement?.domainStatus(): String? =
+    (this as? JsonPrimitive)?.takeIf { it.isString }?.content
+
+@Serializable
+data class AccountStatusRes(
+    val ok: Boolean = false,
+    /** Raw wire value — read it through [accountStatus], never directly. */
+    val status: JsonElement? = null,
+    @SerialName("code") val error: String? = null,
+) {
+    /**
+     * The account state: "active", "suspended", "banned".
+     *
+     * Falls back to "active" only for a success body that omitted the field.
+     * Both callers gate on [ok] first, so an error body never reaches this.
+     */
+    val accountStatus: String get() = status.domainStatus() ?: "active"
+}
 @Serializable data class DeletionRequestDto(val id: String, val status: String, val requested_at: String? = null, val deadline_at: String? = null, val verified_at: String? = null, val completed_at: String? = null, val notes: String? = null)
 @Serializable data class DeletionStatusRes(val ok: Boolean = false, val request: DeletionRequestDto? = null, @SerialName("code") val error: String? = null)
 @Serializable data class SupportTicketDto(val id: Long, val subject: String, val status: String, val priority: String = "normal", val last_message: String? = null, val created_at: String? = null, val updated_at: String? = null)
@@ -724,13 +772,21 @@ data class BillingCatalogRes(
 @Serializable data class VerifyPlayPurchaseRes(
     val ok: Boolean = false,
     val pending: Boolean = false,
-    val status: String? = null,
+    /** Raw wire value — read it through [verificationState], never directly. */
+    val status: JsonElement? = null,
     val verification_id: String? = null,
     val retry_after_seconds: Long? = null,
     val purchase_status: String? = null,
     val entitlements: EntitlementSnapshotRes? = null,
     @SerialName("code") val error: String? = null,
-)
+) {
+    /**
+     * Where the verification stands: "verification_pending", "succeeded",
+     * "acknowledgement_pending", "verification_failed" — or null on an error
+     * body, where [error] carries the reason instead.
+     */
+    val verificationState: String? get() = status.domainStatus()
+}
 
 /**
  * عميل HTTP بسيط للـ Worker.
@@ -1101,7 +1157,7 @@ class BackendApi @Inject constructor(
 
     suspend fun setOrderStatus(phone: String, secret: String, orderNo: Long, status: String): OrderStatusRes =
         apiCall({ OrderStatusRes(error = it) }) {
-            patchRaw("/api/v1/orders/$orderNo/status", """{"status":"$status"}""", creds(phone, secret))
+            patchRaw("/api/v1/orders/$orderNo/status", json.encodeToString(OrderStatusReq(status)), creds(phone, secret))
         }
 
     /** The server's catalogue, with the baseline version a push must send back. */
@@ -1110,9 +1166,9 @@ class BackendApi @Inject constructor(
             getRaw("/api/v1/products", creds(phone, secret))
         }
 
-    suspend fun syncProducts(req: ProductsSyncReq): ProductsSyncRes =
+    suspend fun syncProducts(phone: String, secret: String, req: ProductsSyncReq): ProductsSyncRes =
         apiCall({ ProductsSyncRes(error = it) }) {
-            postRaw("/api/v1/products/sync", json.encodeToString(req), creds(req.phone, req.secret))
+            postRaw("/api/v1/products/sync", json.encodeToString(req), creds(phone, secret))
         }
 
     // ---- Plans ----
@@ -1248,6 +1304,20 @@ class BackendApi @Inject constructor(
                 json.encodeToString(VerifyPlayPurchaseReq(token)),
                 creds(phone, secret),
             )
+        }
+
+    /**
+     * Retire this device's credential server-side.
+     *
+     * The Worker has always had this route; the client never called it, so
+     * signing out tore down local state and left the device secret valid on the
+     * server indefinitely. It also revokes any outstanding step-up proof, which
+     * is why it is worth calling even where the local teardown would otherwise
+     * look sufficient. Auth contract v8, guarantee 10.
+     */
+    suspend fun logout(phone: String, secret: String): OkRes =
+        apiCall({ OkRes(error = it) }) {
+            postRaw("/api/v1/auth/logout", "{}", creds(phone, secret))
         }
 
     suspend fun requestAccountDeletion(phone: String, secret: String): OkRes =

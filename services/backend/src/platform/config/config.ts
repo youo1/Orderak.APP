@@ -37,6 +37,12 @@ const FREE_CONFIG = {
 	limits: {
 		...FREE_LIMITS,
 		max_team_members: 1,
+		// Present here because the engine's projection sends it. A key that
+		// appears in `limits` under one engine and not the other is exactly the
+		// client-visible difference I-4 forbids, and the app reads this one into
+		// ConfigLimits.max_concurrent_devices — where absent and 1 are not the
+		// same answer. One is what the free plan permits; the other is nothing.
+		max_concurrent_devices: 1,
 	},
 	features: {
 		custom_domain: false,
@@ -130,6 +136,11 @@ export async function loadPlanConfig(env: Env, sellerId: string): Promise<Record
 			max_orders_per_month: n(sub.max_orders_per_month),
 			max_ai_requests_per_month: n(sub.max_ai_requests_per_month),
 			max_team_members: n(sub.max_team_members),
+			// Derived the way legacySnapshot() derives it, because the legacy
+			// `plans` table has no device count — only the multi_device_enabled
+			// boolean. Two is what the first paid tier gives; one is what a plan
+			// without the flag permits.
+			max_concurrent_devices: sub.multi_device_enabled === 1 ? 2 : 1,
 		},
 		features: {
 			custom_domain: sub.custom_domain_enabled === 1,
@@ -186,8 +197,23 @@ function legacyProjection(snapshot: EntitlementSnapshot): Record<string, unknown
 			max_concurrent_devices: numberValue("max_concurrent_devices"),
 		},
 		features: {
-			custom_domain: enabled("custom_domain"),
-			analytics: enabled("advanced_analytics"),
+			// Catalogue keys, not the bare names this used to read.
+			//
+			// `custom_domain` and `advanced_analytics` are not in
+			// entitlement_definitions — migration 025 seeds
+			// `products_catalog.custom_domain` and the `analytics_reporting.*`
+			// family, and neither bare name appears among its 242 rows. So both
+			// of these resolved to `undefined?.available === true` and answered
+			// false for every seller on every plan, including the paid tiers the
+			// catalogue grants them to.
+			//
+			// The names below are the ones the Android client already derives the
+			// same two flags from, in BackendConfig.toBackendConfig(). Using a
+			// different key here meant a device could hold two contradictory
+			// answers for `features.analytics` depending on whether it last read
+			// /api/v1/config or /api/v1/entitlements.
+			custom_domain: enabled("products_catalog.custom_domain"),
+			analytics: enabled("analytics_reporting.operational_dashboard"),
 			priority_support: enabled("support_service.priority_queue"),
 			ai_assistant: enabled("ai_capabilities.basic_ai_assistance"),
 			multi_device: (numberValue("max_concurrent_devices") ?? Number.MAX_SAFE_INTEGER) > 1,
