@@ -163,6 +163,42 @@ object Countries {
         return all.any { it.iso == country.iso }
     }
 
+    /**
+     * How many digits a national number in this country can run to.
+     *
+     * Input fields cap what the seller can type, and the cap used to be a flat
+     * `take(11)` — Egypt's national length — on a picker that offers every ISO
+     * country. A Gulf buyer's number was not too long for the backend, which
+     * accepts 8 to 15 digits; it was too long for one hardcoded assumption.
+     *
+     * Read from libphonenumber's example number for the region rather than a
+     * table, for the same reason the money module reads exponents from ICU: a
+     * hand-maintained list of national lengths is a second source of truth that
+     * can only drift, and it would drift silently.
+     *
+     * [FALLBACK_MAX] is E.164's own ceiling minus the shortest calling code, so
+     * a region libphonenumber has no example for is permissive rather than
+     * wrong. Trimming to a real length is a convenience; refusing a valid number
+     * is a defect.
+     */
+    fun nationalDigitsMax(country: Country): Int {
+        val example = try {
+            phoneUtil.getExampleNumberForType(country.iso, PhoneNumberUtil.PhoneNumberType.MOBILE)
+                ?: phoneUtil.getExampleNumber(country.iso)
+        } catch (_: Exception) {
+            null
+        } ?: return FALLBACK_MAX
+        // A few regions carry a leading zero in national format that the
+        // national-number long does not, so allow one digit of headroom.
+        return (example.nationalNumber.toString().length + 1).coerceIn(MIN_MAX, FALLBACK_MAX)
+    }
+
+    /** E.164 allows 15 digits including the calling code. */
+    private const val FALLBACK_MAX = 15
+
+    /** Never cap below the shortest national number anyone dials. */
+    private const val MIN_MAX = 8
+
     /** Converts "EG" -> "🇪🇬" */
     private fun isoToFlag(iso: String): String {
         if (iso.length != 2) return "🌐"

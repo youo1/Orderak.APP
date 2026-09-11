@@ -147,7 +147,9 @@ describe("public checkout integrity", () => {
 		const [a, b] = await Promise.all([place("quota-race-a"), place("quota-race-b")]);
 
 		const statuses = [a.status, b.status].sort();
-		expect(statuses).toEqual([200, 409]);
+		// 429 for a monthly allowance; see order-status.spec.ts on why the status
+		// no longer depends on which entitlement engine is enabled.
+		expect(statuses).toEqual([200, 429]);
 		const total = await env.orderak_db.prepare("SELECT COUNT(*) AS c FROM orders WHERE store_id=?")
 			.bind(seller!.id).first<{ c: number }>();
 		expect(total?.c).toBe(50);

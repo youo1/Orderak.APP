@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -62,6 +63,34 @@ class OrderDetailsViewModel @Inject constructor(
 
     private val _proof = MutableStateFlow<ProofUiState>(ProofUiState.Idle)
     val proof: StateFlow<ProofUiState> = _proof.asStateFlow()
+
+    /**
+     * The server's reason for refusing this order, or null while it is merely
+     * waiting to be sent.
+     *
+     * Drives which banner the screen draws. An order with no `remoteId` is not
+     * on the account either way; this is only the difference between "not yet"
+     * and "not ever, and here is why" — which is the difference between an
+     * honest message and the one the screen used to show.
+     */
+    val refusalCode: StateFlow<String?> =
+        repo.refusedPushes
+            .map { it[orderId] }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /**
+     * Remove an order the server refused, returning its stock.
+     *
+     * [onDone] navigates away only on success, for the same reason [cancel]
+     * does: leaving the screen on a refused removal would return the seller to a
+     * list still showing the order they believe they just removed.
+     */
+    fun discardRefused(onDone: () -> Unit) {
+        val o = order.value?.order ?: return
+        viewModelScope.launch {
+            if (repo.discardLocalOnlyOrder(o.id)) onDone() else _actionFailed.emit(Unit)
+        }
+    }
 
     /**
      * Emitted when a status change did not land.

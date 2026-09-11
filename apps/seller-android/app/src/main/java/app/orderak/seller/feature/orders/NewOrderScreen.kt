@@ -143,7 +143,7 @@ fun NewOrderScreen(
 
             item { Text(stringResource(R.string.order_pay_method), style = MaterialTheme.typography.titleMedium) }
             item { FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PayMethod.entries.forEach { m ->
+                state.payMethods.forEach { m ->
                     FilterChip(
                         selected = state.payMethod == m,
                         onClick = { viewModel.onPayMethod(m) },

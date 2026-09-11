@@ -6,6 +6,63 @@ applies_to: [production, staging]
 ---
 # API changelog
 
+## 2026-09-12 — cross-layer audit remediation
+
+Behaviour changes, in the order a client is most likely to notice them.
+
+- **Plan limits that reset now answer `429` with `Retry-After`.** Exceeding
+  `max_orders_per_month` or `max_ai_requests_per_month` previously answered
+  `409` through the legacy plan model and `429` through the entitlements
+  engine — the same condition, a different status, decided by
+  `ENTITLEMENTS_ENABLED`, which staging and production sit on opposite sides
+  of. Both paths now read one rule: a resetting allowance is `429`, a
+  structural cap such as `max_products` stays `409`. The `code` is
+  `plan_limit_reached` either way and was always the stable identifier.
+- **`PATCH /api/v1/customers/{customer_key}` enforces its entitlement.** The
+  catalogue has sold `customers_crm.editable_customer_profiles` as a paid
+  feature since migration 025 and the Android client gates its editor on it; the
+  API accepted the write from any authenticated seller. A seller without the
+  entitlement now receives `403 plan_feature_unavailable`. The check runs
+  before the record lookup, so the refusal cannot be used to probe which
+  customer keys exist.
+- **Credentialed writes are refused for a client the version policy blocks.**
+  `governance.version` has always reported `force_update`, `blocked` and
+  `maintenance`; nothing acted on them. Those three now answer `403
+  client_version_refused` on credentialed non-GET requests, carrying the
+  decision as `version_status` and the full policy as `version`. Reads are
+  unaffected, and the pre-auth surface — register, phone completion, onboarding,
+  the plan catalogue — is deliberately exempt, because it carries no device
+  headers and gating it would close sign-in entirely.
+- **`x-orderak-version-code` is validated.** A malformed value now answers
+  `400 invalid_version_code` instead of being coerced to `NaN`, and an
+  absent one no longer satisfies a configured minimum. Both are the same fix:
+  the input the version policy is evaluated against was the one input nothing
+  checked.
+- **`POST /api/v1/orders` adds `total` as a Money object.** It was the only
+  money field on the Seller API sent as a bare `total_minor` beside a separate
+  `currency`, against ADR-009. Both existing keys are still sent; installed
+  builds read them.
+- **French is a supported response locale.** `LOCALES` is now
+  `ar, en, fr`. The Android app has shipped `fr` as a selectable UI language
+  throughout and sends `Accept-Language: fr`, which previously matched nothing
+  and fell through to the Arabic default — including when selecting the legal
+  version recorded against a seller's consent.
+- **Public `404` bodies follow the resolved locale** instead of always being
+  Arabic.
+
+Contract and CORS:
+
+- Documented `Governance`, `AppVersionPolicy`, `GovernedFeature`,
+  `PlanLimits`, `PlanFeatures` and `ClientConfig`, and added `config` to
+  the `GET /api/v1/orders` response schema. Both were sent on every call the
+  Android client makes most often and neither was described, so Schemathesis,
+  the Prism mock and every generated client were blind to the fields the app
+  depends on most.
+- `Access-Control-Allow-Methods` gained `PATCH`, and
+  `Access-Control-Allow-Headers` gained `x-orderak-version-code`,
+  `If-None-Match` and `x-lang` — all of which the API already reads.
+- `localhost` origins are allowed only outside production.
+
 ## 2026-08-10 — live-contract conformance
 
 - Enforced the documented Seller compatibility headers before both public and

@@ -14,14 +14,29 @@
 
 import { ar } from "./messages/ar";
 import { en } from "./messages/en";
+import { fr } from "./messages/fr";
 
-export type Locale = "ar" | "en";
+export type Locale = "ar" | "en" | "fr";
 
-export const LOCALES: Locale[] = ["ar", "en"];
+/**
+ * The languages this Worker can answer in.
+ *
+ * `fr` joined ar and en on 2026-09-12. It was already a selectable UI language
+ * in the Android app — AppLocales.supported, a complete values-fr/ string set,
+ * and `Accept-Language: fr` on every request — while this list held two
+ * entries, so localeFromAcceptLanguage returned null and pickLocale fell
+ * through to DEFAULT_LOCALE. A French seller was answered in Arabic, and
+ * recordLegalAcceptance wrote "ar" into their consent row.
+ *
+ * The rest of the backend already carried it (geo.ts, business-taxonomy.ts,
+ * email/repository.ts, the admin content surface); this module was the one
+ * place that did not, which is why the gap was invisible.
+ */
+export const LOCALES: Locale[] = ["ar", "en", "fr"];
 export const DEFAULT_LOCALE: Locale = "ar";
 const RTL = new Set<Locale>(["ar"]);
 
-const DICTS: Record<Locale, Record<string, string>> = { ar, en };
+const DICTS: Record<Locale, Record<string, string>> = { ar, en, fr };
 
 /** Is `x` one of our supported locales? */
 export function isLocale(x: unknown): x is Locale {

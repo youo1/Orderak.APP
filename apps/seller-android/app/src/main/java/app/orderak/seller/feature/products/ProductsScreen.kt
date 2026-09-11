@@ -51,6 +51,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.orderak.seller.R
 import app.orderak.seller.core.text.SearchText
 import app.orderak.seller.core.ui.FullScreenEmpty
+import app.orderak.seller.core.ui.NoticeBanner
 import app.orderak.seller.core.ui.SearchField
 import app.orderak.seller.core.ui.SemanticChip
 import app.orderak.seller.core.ui.SemanticRole
@@ -84,6 +85,7 @@ fun ProductsScreen(
     val shopName by viewModel.shopName.collectAsStateWithLifecycle()
     val storeUrl by viewModel.storeUrl.collectAsStateWithLifecycle()
     val quota by viewModel.quota.collectAsStateWithLifecycle()
+    val pendingBulkDeletion by viewModel.pendingBulkDeletion.collectAsStateWithLifecycle()
     var showLimitDialog by rememberSaveable { mutableStateOf(false) }
     val purchaseOpen = entitlements.isPurchaseOpen()
 
@@ -166,6 +168,23 @@ fun ProductsScreen(
         }
     } else {
         Column(Modifier.fillMaxSize()) {
+            // Above the meter, because it describes something the seller has
+            // already done that has not taken effect. A banner about the state
+            // of their catalogue belongs before the count of it.
+            pendingBulkDeletion?.let { pending ->
+                NoticeBanner(
+                    role = SemanticRole.Danger,
+                    title = stringResource(R.string.catalog_bulk_delete_title),
+                    message = stringResource(
+                        R.string.catalog_bulk_delete_message,
+                        pending.deleting,
+                        pending.of,
+                    ),
+                    actionLabel = stringResource(R.string.catalog_bulk_delete_confirm),
+                    onAction = viewModel::confirmBulkDeletion,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
             // The shared meter rather than a sentence: the same component the
             // dashboard and the subscription screen use, so "how close am I to
             // the limit" reads identically wherever a seller meets it.

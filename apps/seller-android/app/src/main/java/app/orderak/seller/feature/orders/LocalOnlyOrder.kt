@@ -7,6 +7,7 @@ import app.orderak.seller.R
 import app.orderak.seller.core.ui.NoticeBanner
 import app.orderak.seller.core.ui.SemanticChip
 import app.orderak.seller.core.ui.SemanticRole
+import app.orderak.seller.core.ui.backendErrorResource
 import app.orderak.seller.data.db.OrderEntity
 
 /**
@@ -24,17 +25,27 @@ import app.orderak.seller.data.db.OrderEntity
  *   on the account, and nothing else on the row tells them apart, so the app
  *   says which is which.
  *
- *   This used to describe a permanent state: there was no POST /api/v1/orders at
- *   all, and an order typed in here stopped in Room forever. Work item 05 added
- *   the route, so what is left is a retry window rather than a dead end — and
- *   the copy says "not yet", not "never".
+ * WHY THERE ARE NOW TWO STATES AND NOT ONE
+ *   "Waiting" was the only thing this could say, and for one class of order it
+ *   was never going to become true. The server refuses an order outright when it
+ *   cannot accept it as it stands — a payment method this store has not
+ *   configured, a product that no longer exists, a plan limit already reached —
+ *   and it will refuse the identical payload on every later attempt. Telling
+ *   that seller it will "send on the next sync" was the app asserting something
+ *   it had already been told was false, and the only action it offered them was
+ *   the one that could not work.
+ *
+ *   So a refusal is drawn as a refusal, with the server's own reason, and the
+ *   screen offers the action that does work: remove the order and take the stock
+ *   back. See OrderRepository.discardLocalOnlyOrder.
  *
  * WHY IT KEYS OFF remoteId
  *   `remoteId` is the per-store order number, written when the server accepts
- *   the order — by the inbound pull for storefront orders, and by the create
- *   call for these. An order that has one is on the account; an order without
- *   one is not, whatever the reason. So the marker needs no state of its own and
- *   clears itself the instant the post succeeds.
+ *   the order. An order that has one is on the account; an order without one is
+ *   not, whatever the reason. So the marker needs no state of its own and clears
+ *   itself the instant the post succeeds. The refusal reason is carried
+ *   alongside rather than stored, because it only changes what the app SAYS —
+ *   never whether the order is on the account.
  */
 val OrderEntity.livesOnlyOnThisPhone: Boolean
     get() = remoteId == null
@@ -42,29 +53,60 @@ val OrderEntity.livesOnlyOnThisPhone: Boolean
 /**
  * The list marker.
  *
- * Warning rather than Danger: nothing has failed and the seller has done nothing
- * wrong. SemanticChip pairs the role's colour with its icon and the label, so
- * the meaning survives greyscale, colour blindness and a phone in the sun —
- * which matters more than usual here, because the difference this marks is
- * invisible everywhere else on the screen.
+ * Warning for an order still on its way — nothing has failed and the seller has
+ * done nothing wrong. Danger for one the server refused, because that one will
+ * not resolve itself and does need them. SemanticChip pairs each role's colour
+ * with its own icon and label, so the difference survives greyscale, colour
+ * blindness and a phone in the sun — which matters more than usual here,
+ * because it is invisible everywhere else on the row.
  */
 @Composable
-fun LocalOnlyOrderChip(modifier: Modifier = Modifier) {
+fun LocalOnlyOrderChip(refused: Boolean = false, modifier: Modifier = Modifier) {
     SemanticChip(
-        role = SemanticRole.Warning,
-        label = stringResource(R.string.order_local_only_chip),
+        role = if (refused) SemanticRole.Danger else SemanticRole.Warning,
+        label = stringResource(
+            if (refused) R.string.order_refused_chip else R.string.order_local_only_chip,
+        ),
         modifier = modifier,
     )
 }
 
-/** The full explanation, for the screens with room to give one. */
+/**
+ * The full explanation, for the screens with room to give one.
+ *
+ * [refusalCode] is the stable backend code, or null while the order is simply
+ * waiting. It is rendered through [backendErrorResource] so the seller reads the
+ * same sentence for "plan limit reached" here as everywhere else in the app, and
+ * so a code nobody has mapped yet still produces a sentence rather than a blank.
+ */
 @Composable
-fun LocalOnlyOrderBanner(modifier: Modifier = Modifier) {
+fun LocalOnlyOrderBanner(
+    refusalCode: String? = null,
+    modifier: Modifier = Modifier,
+    onDiscard: (() -> Unit)? = null,
+) {
+    if (refusalCode == null) {
+        NoticeBanner(
+            role = SemanticRole.Warning,
+            title = stringResource(R.string.order_local_only_title),
+            message = stringResource(R.string.order_local_only_message),
+            modifier = modifier,
+        )
+        return
+    }
     NoticeBanner(
-        role = SemanticRole.Warning,
-        title = stringResource(R.string.order_local_only_title),
-        message = stringResource(R.string.order_local_only_message),
+        role = SemanticRole.Danger,
+        title = stringResource(R.string.order_refused_title),
+        message = stringResource(
+            R.string.order_refused_message,
+            stringResource(backendErrorResource(refusalCode)),
+        ),
         modifier = modifier,
+        // The action sits on the banner that explains why it is needed, rather
+        // than among the pipeline buttons below — which are all correctly
+        // disabled for an order the server does not have, and which this is not
+        // one of.
+        actionLabel = onDiscard?.let { stringResource(R.string.order_refused_discard) },
+        onAction = onDiscard,
     )
 }
-

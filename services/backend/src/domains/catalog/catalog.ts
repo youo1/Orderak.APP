@@ -656,7 +656,7 @@ export async function createOrder(env: Env, store: Store, input: CreateOrderInpu
 		const quota = env.ENTITLEMENTS_ENABLED === "true"
 			? await reserveUsage(env, String(store.id), "max_orders_per_month", 1, idempotencyKey)
 			: null;
-		if (quota && !quota.allowed) return fail(entitlementLimitReached(quota.snapshot, "max_orders_per_month", 429));
+		if (quota && !quota.allowed) return fail(entitlementLimitReached(quota.snapshot, "max_orders_per_month"));
 		quotaReservationId = quota?.reservation_id ?? null;
 
 		// Per-store human-friendly order number. MAX+1 races under concurrency,
