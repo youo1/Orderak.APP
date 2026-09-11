@@ -44,14 +44,14 @@
     "tsx": "4.23.12",
     "typescript": "~6.0.2",
     "vitest": "^4.1.11",
-    "wrangler": "^4.125.0"
+    "wrangler": "^4.131.0"
   },
   "dependencies": {
     "@hono/zod-openapi": "^1.6.1",
     "@material/material-color-utilities": "0.3.0",
     "@sentry/cloudflare": "^10.71.0",
     "@simplewebauthn/server": "^13.3.2",
-    "hono": "^4.13.4",
+    "hono": "^4.13.7",
     "jose": "^6.2.9",
     "libphonenumber-js": "^1.13.11",
     "postal-mime": "^2.7.5",
