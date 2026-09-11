@@ -125,7 +125,7 @@ for returning sellers.
 | `POST` | `/api/v1/geo/cities/select` | Onboarding token | Verify that `city_id` exists in the active pinned catalogue and belongs to the phone country, then persist its ID, dataset version, and display name in the onboarding session. |
 | `GET` | `/api/v1/catalog/business-categories?language=fr` | Source-IP rate limit | Return the active global main-category version in Arabic, English, or French. Country/city parameters have no effect. |
 | `GET` | `/api/v1/catalog/business-subcategories?category_id=…&query=…&language=fr` | Source-IP rate limit | Search one active category’s global subcategories; maximum 50 results. Undocumented query parameters are rejected with `400`. |
-| `GET` | `/.well-known/assetlinks.json` | None | Serve the release/Play App Signing Digital Asset Links statement configured for the production Android package. |
+| `GET` | `/.well-known/assetlinks.json` | None | Serve the Digital Asset Links statement for `ANDROID_APP_PACKAGE_NAME` (production package by default, `app.orderak.seller.staging` on staging) with the fingerprints in `ANDROID_RELEASE_SHA256_CERT_FINGERPRINTS`. `503 asset_links_not_configured` until fingerprints are set. |
 
 Passkey registration requires `residentKey=required`,
 `userVerification=required`, and `attestation=none`. Authentication requires
@@ -345,6 +345,11 @@ Response (new seller):
   "store_url": "https://orderak.app/EG-fresh-market-7KX9MP4R"
 }
 ```
+
+`store_url` is built from the deployment's own `PUBLIC_SITE_URL`, so the same
+store is `https://staging.orderak.app/...` on staging. Staging and production
+hold separate databases: a staging store has no production page, and opening its
+production URL returns the public 404.
 
 ### Store Information, Categories, Media (authenticated)
 

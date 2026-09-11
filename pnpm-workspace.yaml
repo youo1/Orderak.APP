@@ -79,8 +79,25 @@ overrides:
   # the case that entry refuses — a consumer handed a version it never declared
   # support for — and it does not arise here.
   qs@<6.16.0: ">=6.16.0"
+  # GHSA-2883-xcg3-v3hh (high) — `maxTotalMergeKeys` does not bound CPU use for
+  # empty merge sources, so a crafted YAML document can spin the parser. Fixed
+  # in 3.15.2, the last 3.x release before js-yaml moved to its 4.x rewrite.
+  #
+  # Reaches the tree only as @stoplight/prism-cli > ... > json-schema-faker >
+  # json-schema-ref-parser > js-yaml, three separate paths through the same
+  # OpenAPI mock dependency, so it parses YAML nowhere but inside Prism during
+  # CI and never in a Worker.
+  #
+  # The upper bound is load-bearing, and this one was measured rather than
+  # reasoned: json-schema-ref-parser@6.1.0 declares `js-yaml: ^3.12.1`, so 3.15.2
+  # is inside its range — but an override *replaces* the range instead of
+  # narrowing it, so a bare ">=3.15.2" resolved to 5.4.1, two majors past what
+  # the consumer declares. Held inside major 3 this is 3.15.1 to 3.15.2, a patch
+  # within the minor already resolved. Same hazard as fast-uri, same fix.
+  js-yaml@<3.15.2: ">=3.15.2 <4"
 
-# One advisory is not fixed here, because the fix is not one this tree can take.
+# Two advisories are not fixed here, because neither fix is one this tree can
+# take.
 #
 # GHSA-qxc2-j82w-r537 (high) — @faker-js/faker's `helpers.fake()` evaluates the
 # template string it is handed, so a caller that passes attacker-controlled text
@@ -104,6 +121,32 @@ overrides:
 # severity threshold or a package. If postman-collection widens its pin, the
 # override belongs above and this entry goes. Retire Prism and this entry goes
 # with all three overrides.
+# GHSA-rgj7-g3m4-5g8c (high) — heap overflows in the libheif decoder sharp
+# bundles, reached through HEIF/AVIF input. Patched in sharp 0.35.4.
+#
+# sharp reaches this tree only under miniflare, which arrives through the
+# wrangler dev server and @cloudflare/vitest-pool-workers. A Worker never
+# bundles sharp, so nothing in any deployed artifact decodes an image with it;
+# the exposure is a local dev server and the test pool decoding input a
+# developer already supplied.
+#
+# It is ignored rather than overridden for the same reason as faker below, and
+# the reason was measured. wrangler 4.131.0 — already the resolved version for
+# both workspaces that declare it, and the newest in `^4.131.0` — depends on
+# miniflare 5.20260910.0-alpha, which pins sharp 0.35.4 and is clean. The one
+# remaining source is @cloudflare/vitest-pool-workers@0.22.0, which pins
+# `wrangler: 4.124.0` and `miniflare: 5.20260815.0-alpha` exactly, not as
+# ranges. Overriding either hands it a version it never declared support for —
+# the trade the fast-uri upper bound exists to refuse. 0.22.0 is the latest
+# published release, so there is no in-range or out-of-range upgrade to take.
+#
+# This entry goes when Cloudflare ships a vitest-pool-workers built on
+# miniflare 5.20260910.0-alpha or later. Re-check on the next audit failure.
 auditConfig:
   ignoreGhsas:
     - GHSA-qxc2-j82w-r537
+    - GHSA-rgj7-g3m4-5g8c
+
+minimumReleaseAgeExclude:
+  - miniflare@5.20260910.0-alpha
+  - wrangler@4.131.0

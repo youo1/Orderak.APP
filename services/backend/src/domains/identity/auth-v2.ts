@@ -215,6 +215,24 @@ export async function handleEmailVerification(
 	return verificationPage(true);
 }
 
+/**
+ * Package the Asset Links statement vouches for.
+ *
+ * This was the literal string "app.orderak.seller" until 2026-09-10. The
+ * staging flavour applies applicationIdSuffix = ".staging", so a statement
+ * naming the production package can never authorise the staging build: Android
+ * Credential Manager matches the calling package against this value exactly and
+ * silently refuses the ceremony when it differs. Staging therefore served an
+ * assetlinks document that looked configured and authorised nothing.
+ *
+ * Defaulting to the production package keeps production byte-identical to the
+ * previous hardcoded behaviour when the variable is absent.
+ */
+function androidPackageName(env: PublicWorkerEnv): string {
+	const configured = String(env.ANDROID_APP_PACKAGE_NAME ?? "").trim();
+	return /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/.test(configured) ? configured : "app.orderak.seller";
+}
+
 export function assetLinksResponse(env: PublicWorkerEnv): Response {
 	const fingerprints = String(env.ANDROID_RELEASE_SHA256_CERT_FINGERPRINTS ?? "")
 		.split(",")
@@ -230,7 +248,7 @@ export function assetLinksResponse(env: PublicWorkerEnv): Response {
 			relation: ["delegate_permission/common.handle_all_urls", "delegate_permission/common.get_login_creds"],
 			target: {
 				namespace: "android_app",
-				package_name: "app.orderak.seller",
+				package_name: androidPackageName(env),
 				sha256_cert_fingerprints: fingerprints,
 			},
 		},
@@ -282,7 +300,7 @@ async function completePhoneAuth(request: Request, env: PublicWorkerEnv, url: UR
 			ok: true,
 			exists: true,
 			phone,
-			store: fullStore(seller),
+			store: fullStore(env, seller),
 			recent_auth_token: recent.token,
 			recent_auth_expires_at: recent.expiresAt,
 			passkey_registration_available: featureEnabled(env, "PASSKEY_ENABLED"),
@@ -403,7 +421,7 @@ async function completeOnboarding(
 			ok: true,
 			exists: true,
 			phone: existing.phone,
-			store: fullStore(existing),
+			store: fullStore(env, existing),
 			idempotent: true,
 			recent_auth_token: recent.token,
 			recent_auth_expires_at: recent.expiresAt,
@@ -583,7 +601,7 @@ async function completeOnboarding(
 					ok: true,
 					exists: true,
 					phone: existing.phone,
-					store: fullStore(existing),
+					store: fullStore(env, existing),
 					idempotent: true,
 					recent_auth_token: recent.token,
 					recent_auth_expires_at: recent.expiresAt,
@@ -633,8 +651,8 @@ async function completeOnboarding(
 	return jsonResponse({
 		ok: true,
 		exists: true,
-		store: fullStore(store),
-		store_url: storeUrl(publicIdentifier),
+		store: fullStore(env, store),
+		store_url: storeUrl(env, publicIdentifier),
 		recent_auth_token: recent.token,
 		recent_auth_expires_at: recent.expiresAt,
 		email_verification_pending: Boolean(session.email_private),
@@ -831,7 +849,7 @@ async function passkeyAuthenticationComplete(request: Request, env: PublicWorker
 			ok: true,
 			exists: true,
 			phone: stored.phone,
-			store: fullStore(seller),
+			store: fullStore(env, seller),
 			recent_auth_token: recent.token,
 			recent_auth_expires_at: recent.expiresAt,
 		});

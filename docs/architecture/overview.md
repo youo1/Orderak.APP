@@ -91,7 +91,7 @@ before activating a second market.
 ```mermaid
 graph TD
     A["Android App<br/>Compose + Credential Manager"] -->|"Firebase SMS OTP"| G["Firebase Auth"]
-    A -->|"WebAuthn ceremonies<br/>RP orderak.app"| B["Public Cloudflare Worker"]
+    A -->|"WebAuthn ceremonies<br/>RP per environment"| B["Public Cloudflare Worker"]
     A -->|"Versioned REST + client context"| B["Public Cloudflare Worker"]
     J["Admin browser"] --> P["Admin Edge Worker<br/>Static Assets"]
     P -->|"private service binding"| W["Private Admin Worker"]
@@ -129,7 +129,9 @@ The public Worker and private admin delivery path split responsibilities:
 Production and Staging run the same source revision through different deployment
 configuration. Staging uses `*.staging.orderak.app`, distinct public/admin/edge
 Workers, separate primary and geo D1 databases, separate R2 buckets, queues,
-and a separate Firebase Android application.
+and a separate Firebase Android application. Each environment also names its
+own public origin, so `store_url`, canonical tags and media URLs address the
+deployment that actually holds the store rather than always naming Production.
 No storage or session binding crosses the environment boundary.
 
 Android's `stagingDebug` variant has application ID
@@ -174,8 +176,9 @@ interaction.
    and explicit Verify is required after manual entry or SMS Autofill. OTP state
    remains phone-scoped and generation-checked.
 2. Passkey assertions are verified by the Worker against a hash-only,
-   single-use five-minute challenge, RP ID `orderak.app`, an approved Android
-   APK origin, the signature, and required user verification. The platform
+   single-use five-minute challenge, the deployment's RP ID (`orderak.app` in
+   Production, `staging.orderak.app` in Staging), an approved Android APK
+   origin, the signature, and required user verification. The platform
    performs biometrics locally; biometric data never crosses this boundary.
 3. A new phone identity completes `POST /api/v1/auth/phone/complete`. An existing
    seller receives a normal device session. A new seller receives a hash-only
