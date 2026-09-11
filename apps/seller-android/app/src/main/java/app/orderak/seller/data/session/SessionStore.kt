@@ -536,15 +536,33 @@ class SessionStore @Inject constructor(
             }
         }
 
-    /** Fix(#8): logout clears the profile but keeps the device secret and device ID —
-     *  the backend identity survives re-login with the same phone. */
+    /**
+     * Drop the device credential itself. Auth contract v8, guarantee 10.
+     *
+     * Separate from [clear] because it is the one part of logout that must run
+     * after the server has been told: the revocation call authenticates with
+     * this value, so clearing it first would make the request that retires it
+     * impossible to send.
+     *
+     * The credential used to survive logout deliberately, so re-login with the
+     * same phone kept one backend identity. That saved a round trip and cost two
+     * things. A signed-out handset kept a credential that still authenticated as
+     * the account which had just left it; and when a different seller signed in
+     * on that phone, getOrCreateSecret() handed the server the previous seller's
+     * secret to provision for the new account, leaving one value valid for two
+     * accounts at once.
+     */
+    fun clearDeviceSecret() {
+        secureSecretPrefs.edit().remove(SECRET_PREFS_KEY).apply()
+    }
+
+    /** Clears profile and session routing state. The opaque installation ID
+     *  survives: it carries no account and no user data, and keeping it stable
+     *  is what lets the device list show one row per handset rather than one per
+     *  sign-in. It cannot authenticate. */
     suspend fun clear() = context.dataStore.edit { prefs ->
-        val legacySecret = prefs[Keys.LEGACY_SECRET]
         val deviceId = prefs[Keys.DEVICE_ID]
         prefs.clear()
-        if (!legacySecret.isNullOrBlank() && secureSecretPrefs.getString(SECRET_PREFS_KEY, null).isNullOrBlank()) {
-            secureSecretPrefs.edit().putString(SECRET_PREFS_KEY, legacySecret).apply()
-        }
         deviceId?.let { prefs[Keys.DEVICE_ID] = it }
         secureSecretPrefs.edit()
             .remove(ONBOARDING_TOKEN_PREFS_KEY)
