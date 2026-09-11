@@ -206,7 +206,7 @@ app.all("/privacy", () => notFound());
 const legacyStoreRedirect = async (c: { env: PublicWorkerEnv; req: { param: (k: string) => string } }) => {
 	const store = await findStoreByIdentifier(c.env, decodeURIComponent(c.req.param("identifier")));
 	if (!store) return notFound();
-	return redirect301(storeUrl(String(store.public_identifier)));
+	return redirect301(storeUrl(c.env, String(store.public_identifier)));
 };
 app.all("/c/:identifier", legacyStoreRedirect);
 // The original matched on segments[0] === "c" and ignored anything past
@@ -238,7 +238,7 @@ app.all("/:pid", async (c) => {
 
 	// Canonicalize aliases (bare slug / store_code) to the full identifier.
 	const canonical = String(store.public_identifier);
-	if (first !== canonical) return redirect301(storeUrl(canonical));
+	if (first !== canonical) return redirect301(storeUrl(c.env, canonical));
 	return renderStorePage(c.env, store, pickLocale(c.req.raw, new URL(c.req.url)));
 });
 

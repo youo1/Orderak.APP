@@ -216,7 +216,7 @@ export function hasFreshFirebaseProof(identity: FirebaseIdentity): boolean {
 // Shape of the identity block returned after register / store reads. Read-only
 // fields (country_code, store_code, public_identifier, store_url) are derived,
 // never client-editable.
-function identityBlock(store: Row): Record<string, unknown> {
+function identityBlock(env: Env, store: Row): Record<string, unknown> {
 	const pid = String(store.public_identifier);
 	return {
 		store_name: store.store_name,
@@ -224,7 +224,7 @@ function identityBlock(store: Row): Record<string, unknown> {
 		country_code: store.country_code,
 		store_code: store.store_code,
 		public_identifier: pid,
-		store_url: storeUrl(pid),
+		store_url: storeUrl(env, pid),
 	};
 }
 
@@ -323,7 +323,7 @@ export async function handleStoreRoutes(
 
 	// ---- /api/v1/store ----
 	if (p === "/api/v1/store") {
-		if (method === "GET") return jsonResponse({ ok: true, store: fullStore(store) });
+		if (method === "GET") return jsonResponse({ ok: true, store: fullStore(env, store) });
 		if (method === "PUT") return handleStoreUpdate(request, env, url, store);
 		return methodNotAllowed("GET", "PUT");
 	}
@@ -514,7 +514,7 @@ async function handleRegister(request: Request, env: Env, url: URL): Promise<Res
 				if (attempt === 1) return jsonResponse({ error: "slug_taken", message: t(lang, "slug.taken") }, 409);
 			}
 		}
-		return jsonResponse({ ok: true, ...identityBlock(store!) });
+		return jsonResponse({ ok: true, ...identityBlock(env, store!) });
 	}
 
 	// Existing store re-registering. store_code is PERMANENT; country updates
@@ -563,16 +563,16 @@ async function handleRegister(request: Request, env: Env, url: URL): Promise<Res
 	if (firebaseIdentity) await syncVerifiedFirebaseIdentity(env, String(store.id), firebaseIdentity.uid, phone);
 	return jsonResponse({
 		ok: true,
-		...identityBlock({ store_name: storeName, slug: newSlug, store_code: storeCode, country_code: countryCode, public_identifier: publicId }),
+		...identityBlock(env, { store_name: storeName, slug: newSlug, store_code: storeCode, country_code: countryCode, public_identifier: publicId }),
 	});
 }
 
 // ---- Store Information ------------------------------------------------------
 
 // Full Store Information object (editable fields + read-only identity block).
-export function fullStore(store: Row): Record<string, unknown> {
+export function fullStore(env: Env, store: Row): Record<string, unknown> {
 	return {
-		...identityBlock(store),
+		...identityBlock(env, store),
 		description: store.description ?? "",
 		phone: store.phone ?? "",
 		whatsapp: store.whatsapp ?? "",
@@ -717,7 +717,7 @@ async function handleStoreUpdate(request: Request, env: Env, url: URL, store: Ro
 		.run();
 
 	const updated = (await env.orderak_db.prepare("SELECT * FROM sellers WHERE id = ?").bind(storeId).first()) as Row;
-	return jsonResponse({ ok: true, store: fullStore(updated) });
+	return jsonResponse({ ok: true, store: fullStore(env, updated) });
 }
 
 // ---- Categories ------------------------------------------------------------
@@ -1436,11 +1436,11 @@ async function restoreFirebaseSession(request: Request, env: Env): Promise<Respo
 	// Logging back into an already-authorized device is available on every plan.
 	// Only adding a genuinely new device is a paid feature.
 	if (await authSeller(env, verifiedPhone, deviceSecret)) {
-		return jsonResponse({ ok: true, exists: true, store: fullStore(seller) });
+		return jsonResponse({ ok: true, exists: true, store: fullStore(env, seller) });
 	}
 	const provisioned = await provisionDeviceSecret(env, seller, verifiedPhone, deviceSecret);
 	if (!provisioned.ok) return provisioned.response;
-	return jsonResponse({ ok: true, exists: true, store: fullStore(seller) });
+	return jsonResponse({ ok: true, exists: true, store: fullStore(env, seller) });
 }
 
 async function logoutSeller(request: Request, env: Env, url: URL): Promise<Response> {

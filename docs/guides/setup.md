@@ -151,9 +151,9 @@ Then open `.dev.vars` and fill in values:
 | `FIREBASE_PROJECT_ID` | For deletion fulfillment | Firebase/Google Cloud project ID used by the Identity Platform Admin REST API. |
 | `FIREBASE_SERVICE_ACCOUNT_EMAIL` | For deletion fulfillment | Least-privilege service-account issuer with Firebase Auth user lookup/delete permissions. |
 | `FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY` | For deletion fulfillment | PKCS#8 private key stored only as a Worker secret; escaped newlines are supported. |
-| `WEBAUTHN_ANDROID_ORIGINS` | Passkeys | Comma-separated exact `android:apk-key-hash:<base64url-sha256>` origins. Production contains release and Play App Signing certificates only; staging contains its debug certificate. |
+| `WEBAUTHN_ANDROID_ORIGINS` | Passkeys | Comma-separated exact `android:apk-key-hash:<base64url-sha256>` origins. Production contains release and Play App Signing certificates only; staging contains its debug certificate. The base64url value is the raw SHA-256 **bytes**, not the colon-formatted text — see Section 6.4. |
 | `WEBAUTHN_WEB_ORIGIN` | Optional web Passkeys | Exact `https://orderak.app` in production or `https://staging.orderak.app` with the staging RP. Omit until that web Passkey client is deliberately released. |
-| `ANDROID_RELEASE_SHA256_CERT_FINGERPRINTS` | Asset Links | Comma-separated, colon-formatted SHA-256 fingerprints for the signed release and Play App Signing certificates. |
+| `ANDROID_RELEASE_SHA256_CERT_FINGERPRINTS` | Asset Links | Comma-separated, colon-formatted SHA-256 fingerprints for the signed release and Play App Signing certificates. On staging this is the debug certificate, and it is served for `ANDROID_APP_PACKAGE_NAME` (`app.orderak.seller.staging`) rather than the production package. |
 | `GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL` | Play lifecycle | Least-privilege Android Publisher issuer; set on public and Admin Workers. |
 | `GOOGLE_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY` | Play lifecycle | PKCS#8 key for the same account; set on public and Admin Workers. |
 | `GOOGLE_PLAY_TOKEN_ENCRYPTION_KEY` | Play lifecycle | Base64-encoded 32-byte AES-GCM key shared by both Workers. |
@@ -550,6 +550,43 @@ belong to a separate Firebase project:
    Firebase ID tokens on new-store registration and device restore — set
    `FIREBASE_WEB_API_KEY` in `.dev.vars` (local) and as a Worker secret
    (Production, Section 4.4) or with `--env staging`.
+
+### 6.4 Staging Passkeys
+
+Passkeys need three values that Phone Auth does not, and all three are derived
+from the **same** debug certificate registered in step 5. `PASSKEY_ENABLED` being
+`true` is not enough — with these unset the routes answer `503
+passkey_origin_not_configured` and Asset Links answers `503
+asset_links_not_configured`.
+
+`ANDROID_APP_PACKAGE_NAME` and `WEBAUTHN_RP_ID` are already checked in for both
+environments in `wrangler.jsonc`. The remaining two are secrets:
+
+```cmd
+cd apps\seller-android
+gradlew.bat signingReport
+```
+
+Take the debug variant's SHA-256. `ANDROID_RELEASE_SHA256_CERT_FINGERPRINTS` uses
+it verbatim, colons and all. `WEBAUTHN_ANDROID_ORIGINS` needs the same 32 bytes
+base64url-encoded without padding, which is *not* a transformation of the printed
+text:
+
+```bash
+echo "<sha256-hex-without-colons>" | xxd -r -p | base64 | tr '+/' '-_' | tr -d '=
+'
+```
+
+Then, from `services/backend`:
+
+```bash
+npx wrangler secret put ANDROID_RELEASE_SHA256_CERT_FINGERPRINTS --env staging
+npx wrangler secret put WEBAUTHN_ANDROID_ORIGINS --env staging
+```
+
+Prefix the second value with `android:apk-key-hash:`. Regenerating the debug
+keystore changes both values and silently breaks Passkeys and Phone Auth
+together; re-run this section and step 5 when that happens.
 
 For automated account deletion, create a dedicated service account with only
 Firebase Authentication user lookup and delete permissions

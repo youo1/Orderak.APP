@@ -152,7 +152,7 @@ async function listStores(env: AdminWorkerEnv, url: URL): Promise<Response> {
 	const base = "SELECT s.id,s.store_code,s.public_identifier,s.country_code,s.store_name,s.status,s.created_at,(SELECT COUNT(*) FROM products WHERE store_id=s.id) AS product_count,(SELECT COUNT(*) FROM categories WHERE store_id=s.id) AS category_count FROM sellers s";
 	const stmt = q ? env.orderak_db.prepare(base+" WHERE s.store_name LIKE ? OR s.store_code LIKE ? OR s.public_identifier LIKE ? ORDER BY s.created_at DESC LIMIT ?").bind('%'+q+'%','%'+q+'%','%'+q+'%',limit) : env.orderak_db.prepare(base+" ORDER BY s.created_at DESC LIMIT ?").bind(limit);
 	const {results} = (await stmt.all()) as {results:Record<string,unknown>[]};
-	return jsonResponse({ok:true,stores:(results??[]).map(r=>({...r,store_url:storeUrl(String(r.public_identifier))}))});
+	return jsonResponse({ok:true,stores:(results??[]).map(r=>({...r,store_url:storeUrl(env,String(r.public_identifier))}))});
 }
 
 async function listPlans(env: AdminWorkerEnv): Promise<Response> {

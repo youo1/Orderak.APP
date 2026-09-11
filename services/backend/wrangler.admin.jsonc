@@ -50,7 +50,13 @@
 		"AUTH_IDENTITY_ENABLED": "false",
 		"PHONE_CHANGE_ENABLED": "false",
 		"AI_MONTHLY_BUDGET_MICRO_USD": "0",
-		"GOOGLE_PLAY_PACKAGE_NAME": "app.orderak.seller"
+		"GOOGLE_PLAY_PACKAGE_NAME": "app.orderak.seller",
+		// Origin every public link is built from — store_url in API responses,
+		// canonical/og tags, the 301 that canonicalises an alias, and uploaded
+		// media URLs. Was hardcoded to production in identity.ts, so staging
+		// emitted production links for stores that exist only in staging's D1
+		// and redirected visitors straight into a production 404.
+		"PUBLIC_SITE_URL": "https://orderak.app"
 	},
 	"triggers": { "crons": ["* * * * *", "*/15 * * * *"] },
 	"d1_databases": [{
@@ -177,7 +183,10 @@
 				"AUTH_IDENTITY_ENABLED": "false",
 				"PHONE_CHANGE_ENABLED": "false",
 				"AI_MONTHLY_BUDGET_MICRO_USD": "0",
-				"GOOGLE_PLAY_PACKAGE_NAME": "app.orderak.seller"
+				"GOOGLE_PLAY_PACKAGE_NAME": "app.orderak.seller",
+				// See the production comment: the Admin store list builds
+				// store_url too, and on staging those rows point at staging.
+				"PUBLIC_SITE_URL": "https://staging.orderak.app"
 			},
 			"triggers": { "crons": ["* * * * *", "*/15 * * * *"] },
 			"d1_databases": [{

@@ -23,7 +23,7 @@ import { landingPageHtml } from "../landing";
 import { publicDesignSystemCss, publicDesignSystemResponse } from "../domains/admin/admin-theme";
 import { designSystemCss, designSystemFontPreload, loadActiveDesignSystem } from "../domains/design/design-system";
 import { createOrder } from "../domains/catalog/catalog";
-import { PUBLIC_SITE_URL } from "../domains/identity/identity";
+import { publicSiteUrl } from "../domains/identity/identity";
 import { authSeller, logError, jsonResponse, methodNotAllowed, corsHeaders, allowedCorsOrigin, readCreds, checkRateLimit, recordDeviceMetadata, enforceRequestBodyLimit, type AuthenticatedSeller } from "../platform/http/shared";
 import { getPlanLimit } from "../domains/commerce/plan-limits";
 import { handleStoreRoutes } from "../domains/stores/api-store";
@@ -316,7 +316,7 @@ app.use("/api/v1/*", async (c, next) => {
 // Versioned: the ETag is a content hash, so clients sending If-None-Match get
 // a bodyless 304 when nothing changed.
 app.get("/api/v1/theme", (c) =>
-	cachedPublicGet(c.req.raw, c.env, wctx(c), () => publicDesignSystemResponse(c.req.raw, c.env, PUBLIC_SITE_URL)));
+	cachedPublicGet(c.req.raw, c.env, wctx(c), () => publicDesignSystemResponse(c.req.raw, c.env, publicSiteUrl(c.env))));
 app.get("/api/theme.css", (c) =>
 	cachedPublicGet(c.req.raw, c.env, wctx(c), () => publicDesignSystemCss(c.req.raw, c.env)));
 app.get("/api/theme/:file", async (c) => {
