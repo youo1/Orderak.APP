@@ -1,9 +1,12 @@
 package app.orderak.seller.data.remote
 
 import androidx.room.withTransaction
+import app.orderak.seller.core.phone.CustomerPhone
 import app.orderak.seller.data.db.OrderEntity
 import app.orderak.seller.data.db.OrderItemEntity
 import app.orderak.seller.data.db.CustomerEntity
+import app.orderak.seller.data.db.adoptedCustomer
+import app.orderak.seller.data.db.mayAcceptServerCopy
 import app.orderak.seller.data.db.OrderakDatabase
 import app.orderak.seller.data.db.ProductEntity
 import app.orderak.seller.data.demo.DemoDataSeeder
@@ -122,7 +125,7 @@ class SyncRepository @Inject constructor(
         while (pulled.ok) {
             if (pulled.orders.isNotEmpty()) {
                 db.withTransaction {
-                    pulled.orders.forEach { insertRemoteOrderInTransaction(it) }
+                    pulled.orders.forEach { insertRemoteOrderInTransaction(it, countryIso) }
                 }
             }
             if (!pulled.has_more) break
@@ -224,6 +227,16 @@ class SyncRepository @Inject constructor(
         // codeless simply stays pending for one more sync.
         val ordersPushed = orderRepository.pushPendingOrders()
 
+        // 2d) Reconcile customers: post local edits, then take the server's list.
+        //
+        // Push before pull, and only that order. The pull replaces each row with
+        // the server's copy, so pulling first would show the seller their own
+        // unsaved correction reverted — and then push it back a moment later,
+        // which reads as the edit having been lost and then spontaneously
+        // returning. A row that fails to post keeps its dirty flag and is not
+        // overwritten, so the local value stays visible until it is acknowledged.
+        val customersSynced = syncCustomers(phone, secret)
+
         // 3) Upload any local product images that don't yet have a public URL,
         //    then push products (full mirror) and persist the returned codes.
         //    image_url must be the backend R2 URL — never the local file path,
@@ -280,7 +293,69 @@ class SyncRepository @Inject constructor(
             }
         }
 
-        return pushOk && pullOk && ordersPushed
+        return pushOk && pullOk && ordersPushed && customersSynced
+    }
+
+    /**
+     * Post local customer edits, then take the server's list.
+     *
+     * Returns false if anything failed, so the sync as a whole reports a partial
+     * result and runs again rather than reporting success over a dropped edit.
+     *
+     * A pull failure is not treated as a reason to discard anything: the local
+     * rows stay exactly as they are. The only rows this overwrites are ones with
+     * no unacknowledged edit, which is what makes push-before-pull safe.
+     */
+    private suspend fun syncCustomers(phone: String, secret: String): Boolean {
+        var ok = true
+
+        for (local in db.customerDao().dirty()) {
+            val res = api.updateCustomer(
+                phone, secret, local.customerKey,
+                CustomerUpdateReq(
+                    name = local.name.orEmpty(),
+                    alt_contact = local.altContact.orEmpty(),
+                    note = local.note.orEmpty(),
+                ),
+            )
+            if (res.ok) {
+                db.customerDao().clearDirty(local.customerKey)
+            } else {
+                // A customer the server has never heard of — recorded on this
+                // device from an offline order whose push has not landed yet.
+                // Not an error: the order carries the buyer, so the customer
+                // appears server-side once the order does, and the edit posts on
+                // a later sync. Anything else is a real failure worth retrying.
+                if (res.error != "not_found") ok = false
+            }
+        }
+
+        val remote = api.listCustomers(phone, secret)
+        if (!remote.ok) return false
+
+        // Re-read each row rather than trusting the list from before the push: a
+        // row may have been edited while the push was in flight, and that edit
+        // must survive this pull. mayAcceptServerCopy is the rule, extracted so
+        // it is asserted rather than assumed — see CustomerMergeTest.
+        val now = System.currentTimeMillis()
+        for (dto in remote.customers) {
+            val existing = db.customerDao().findByKey(dto.customer_key)
+            if (!mayAcceptServerCopy(existing)) continue
+            db.customerDao().upsert(
+                adoptedCustomer(
+                    customerKey = dto.customer_key,
+                    phoneRaw = dto.phone_raw,
+                    phoneE164 = dto.phone_e164,
+                    phoneStatus = dto.phone_status,
+                    name = dto.name,
+                    altContact = dto.alt_contact,
+                    note = dto.note,
+                    local = existing,
+                    now = now,
+                )
+            )
+        }
+        return ok
     }
 
     /**
@@ -340,12 +415,24 @@ class SyncRepository @Inject constructor(
         null
     }
 
-    private suspend fun insertRemoteOrderInTransaction(o: RemoteOrder) {
+    private suspend fun insertRemoteOrderInTransaction(o: RemoteOrder, region: String?) {
         // Dedup by the per-store order number (buyer orders come from the link).
         if (db.orderDao().countByRemoteId(o.order_no) > 0) return
-        db.customerDao().insertIgnore(CustomerEntity(phone = o.buyer_phone, name = o.buyer_name))
+        // The same key the server derives, so the customer this order belongs to
+        // is the one the customer pull will land on rather than a second row for
+        // the same person (I-6).
+        val normalized = CustomerPhone.normalize(o.buyer_phone, region)
+        db.customerDao().insertIgnore(
+            CustomerEntity(
+                customerKey = normalized.key,
+                phone = o.buyer_phone,
+                phoneE164 = normalized.e164,
+                phoneStatus = normalized.status.name.lowercase(),
+                name = o.buyer_name,
+            )
+        )
         o.buyer_name?.takeIf { it.isNotBlank() }
-            ?.let { db.customerDao().fillName(o.buyer_phone, it) }
+            ?.let { db.customerDao().fillName(normalized.key, it) }
         val localId = db.orderDao().insert(
             OrderEntity(
                 remoteId = o.order_no,

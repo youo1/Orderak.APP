@@ -156,6 +156,9 @@ object FeatureKeys {
     // ---- Features gated by plan --------------------------------------------
     const val OCR_RECEIPT_ASSISTANCE = "payments_finance.ocr_receipt_assistance"
 
+    /** Editing a customer's name, alternate contact and note. */
+    const val EDITABLE_CUSTOMER_PROFILES = "customers_crm.editable_customer_profiles"
+
     // ---- Limits the app measures usage against -----------------------------
     //
     // These were inline literals at every call site, which is how the dashboard
@@ -174,6 +177,7 @@ object FeatureKeys {
     /** Every key above, for tests and tooling that check the set as a whole. */
     val ALL: List<String> = listOf(
         OCR_RECEIPT_ASSISTANCE,
+        EDITABLE_CUSTOMER_PROFILES,
         MAX_PRODUCTS,
         MAX_CATEGORIES,
         MAX_ORDERS_PER_MONTH,

@@ -15,6 +15,42 @@ plugins {
     id("com.google.gms.google-services")
 }
 
+/**
+ * The version code, from CI or from a developer's machine.
+ *
+ * A developer never edits this. It was a hand-edited literal `2`, which is a
+ * problem larger than untidiness: the app sends the value as
+ * `x-orderak-version-code`, and the backend uses it for force-update policy,
+ * blocked-version lists and feature-flag targeting. A scheme that ever produced
+ * a non-monotonic or environment-dependent number would silently mis-evaluate
+ * minimums and block lists written against the old numbering.
+ *
+ * CI passes `-PorderakVersionCode=${{ github.run_number }}`. run_number is
+ * monotonic per workflow and stable across re-runs of an older commit, which is
+ * the property that matters: a re-run must never publish a value below one
+ * already released. Commit count would have worked too, but all five Android
+ * checkouts are shallow, so `git rev-list --count HEAD` returns 1.
+ *
+ * The local default is deliberately below every value CI can produce, so a
+ * developer build can never be mistaken for a released one.
+ */
+val orderakVersionCode = (providers.gradleProperty("orderakVersionCode").orNull ?: "1").toInt()
+val orderakVersionName = providers.gradleProperty("orderakVersionName").orNull ?: "0.3.0"
+
+/**
+ * Release signing material, read from the environment and never from the tree.
+ *
+ * Absent, the release build is simply unsigned — that is what a developer wants
+ * locally, and CI supplies all four values. What must not happen is a keystore
+ * living in the repository, so nothing here reads a path inside it and
+ * .gitignore refuses the file extensions outright.
+ */
+val keystorePath: String? = System.getenv("ORDERAK_KEYSTORE_PATH")
+val keystorePassword: String? = System.getenv("ORDERAK_KEYSTORE_PASSWORD")
+val keyAlias: String? = System.getenv("ORDERAK_KEY_ALIAS")
+val keyPassword: String? = System.getenv("ORDERAK_KEY_PASSWORD")
+val hasSigningMaterial = listOf(keystorePath, keystorePassword, keyAlias, keyPassword).all { !it.isNullOrBlank() }
+
 android {
     experimentalProperties["android.experimental.enableScreenshotTest"] = true
     namespace = "app.orderak.seller"
@@ -31,8 +67,8 @@ android {
         applicationId = "app.orderak.seller"
         minSdk = 24            // low-end EG devices coverage
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.3.0"
+        versionCode = orderakVersionCode
+        versionName = orderakVersionName
         vectorDrawables.useSupportLibrary = true
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Crashlytics: enabled in production/staging release builds only.
@@ -83,6 +119,24 @@ android {
         }
     }
 
+    signingConfigs {
+        // Registered only when CI supplied the material. Declaring it
+        // unconditionally with null fields makes Gradle fail at configuration
+        // time on every developer machine.
+        if (hasSigningMaterial) {
+            create("release") {
+                storeFile = file(keystorePath!!)
+                storePassword = keystorePassword
+                this.keyAlias = keyAlias
+                this.keyPassword = keyPassword
+                enableV1Signing = false
+                enableV2Signing = true
+                enableV3Signing = true
+                enableV4Signing = true
+            }
+        }
+    }
+
     buildTypes {
         debug {
             manifestPlaceholders["crashlyticsCollectionEnabled"] = "false"
@@ -94,6 +148,10 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // Unsigned when the material is absent, which is every local build.
+            // An unsigned release artifact is obviously unreleasable; a
+            // debug-signed one looks shippable and is not.
+            signingConfig = signingConfigs.findByName("release")
         }
     }
     androidResources {
@@ -122,6 +180,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     buildFeatures { compose = true; buildConfig = true }
+
+    // Room exports the schema here so a future migration can be written and
+    // tested against the shipped one rather than against a description of it.
+    ksp { arg("room.schemaLocation", "$projectDir/schemas") }
 
     packaging {
         resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" }
@@ -587,9 +649,29 @@ val verifySellerApiContract by tasks.registering {
                 ".url(Backend.BASE_URL + ApiRoutes.versioned(path))" in backendApi,
             "Seller calls must cross the central v1-only routing boundary."
         )
+        // Correlation is the property, not the expression.
+        //
+        // This used to pin one exact inlined call:
+        //     .header("x-request-id", clientContextProvider.newRequestId())
+        // which held the right behaviour in place right up until the id had to
+        // be used twice — once on the header and once handed to the crash
+        // reporter, so a Crashlytics report names the request a Sentry event can
+        // be found by. Binding it to a local is the same behaviour and did not
+        // match the literal.
+        //
+        // So the check now accepts either shape, and in the local-variable form
+        // requires the value sent as the header to be the one that came from the
+        // provider — the two stay welded together, which is the thing actually
+        // worth protecting. It is not looser about that; it is looser only about
+        // whether the call is written on one line or two.
+        val correlationInline =
+            ".header(\"x-request-id\", clientContextProvider.newRequestId())" in backendApi
+        val correlationViaLocal = Regex(
+            """val requestId = clientContextProvider\.newRequestId\(\)[\s\S]{0,800}?\.header\("x-request-id", requestId\)"""
+        ).containsMatchIn(backendApi)
         requireContract(
             "interface ClientContextProvider" in clientContext &&
-                ".header(\"x-request-id\", clientContextProvider.newRequestId())" in backendApi &&
+                (correlationInline || correlationViaLocal) &&
                 "x-orderak-platform" in backendApi,
             "Request correlation or the platform-neutral client context is missing."
         )

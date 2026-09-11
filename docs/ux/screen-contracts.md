@@ -290,12 +290,12 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Route | `CustomerRoute` |
 | Phase | 8 |
 | States | loading · content · error · **offline overlay** |
-| Entitlement | — |
+| Entitlement | `customers_crm.editable_customer_profiles` |
 | Status | implemented |
 | Entry | customers · order-details |
 | Exit | OrderDetailsRoute · رجوع |
-| Data | customer · order history · contact |
-| Actions | open order `onOpenOrder` · contact *(planned)* · edit *(planned)* |
+| Data | customer · order history · contact · edit availability |
+| Actions | open order `onOpenOrder` · contact `contactCustomer` · edit `save` |
 
 ## Surface: account
 
@@ -485,11 +485,11 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Phase | 9 |
 | States | loading · content · error |
 | Entitlement | — |
-| Status | planned |
+| Status | implemented |
 | Entry | subscription · paywall |
 | Exit | رجوع |
 | Data | plan catalogue · current plan · billing flag state |
-| Actions | compare plans *(planned)* |
+| Actions | compare plans `PlanComparison` |
 
 ### `paywall`
 
@@ -501,8 +501,8 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Phase | 9 |
 | States | content |
 | Entitlement | — |
-| Status | planned |
+| Status | implemented |
 | Entry | store — إضافة عند الحد · product-edit · categories · new-order · devices |
 | Exit | PlansRoute · رجوع للشاشة اللي جت منها |
 | Data | which limit · current usage · next plan limits · billing flag state |
-| Actions | upgrade *(planned)* · register interest *(planned)* · dismiss *(planned)* |
+| Actions | view plans `onViewPlans` · dismiss `onBack` |

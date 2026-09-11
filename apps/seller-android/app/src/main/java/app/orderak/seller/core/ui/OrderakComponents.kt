@@ -1,5 +1,7 @@
 package app.orderak.seller.core.ui
 
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.material3.TextButton
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -144,6 +146,14 @@ fun NoticeBanner(
     title: String,
     message: String,
     modifier: Modifier = Modifier,
+    /**
+     * An optional way out of the state the banner describes.
+     *
+     * Both must be supplied or neither: a label with nothing behind it, or an
+     * action with nothing naming it, are each worse than no button.
+     */
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
 ) {
     val spacing = LocalOrderakSpacing.current
     val colors = role.colors()
@@ -169,6 +179,14 @@ fun NoticeBanner(
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(text = title, style = MaterialTheme.typography.labelLarge)
                 Text(text = message, style = MaterialTheme.typography.bodySmall)
+                if (actionLabel != null && onAction != null) {
+                    TextButton(
+                        onClick = onAction,
+                        contentPadding = PaddingValues(horizontal = 0.dp, vertical = spacing.space1),
+                    ) {
+                        Text(actionLabel, style = MaterialTheme.typography.labelLarge)
+                    }
+                }
             }
         }
     }

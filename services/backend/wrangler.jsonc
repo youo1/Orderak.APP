@@ -43,6 +43,18 @@
 		"BUSINESS_TAXONOMY_ENABLED": "true",
 		"AI_MONTHLY_BUDGET_MICRO_USD": "0",
 		"GOOGLE_PLAY_PACKAGE_NAME": "app.orderak.seller",
+		// Package the /.well-known/assetlinks.json statement vouches for. This
+		// was hardcoded in assetLinksResponse() until 2026-09-10; naming it here
+		// is what lets staging vouch for its own suffixed package instead of
+		// borrowing production's. The value below is the previous hardcoded
+		// default, so production behaviour is unchanged.
+		"ANDROID_APP_PACKAGE_NAME": "app.orderak.seller",
+		// Origin every public link is built from — store_url in API responses,
+		// canonical/og tags, the 301 that canonicalises an alias, and uploaded
+		// media URLs. Was hardcoded to production in identity.ts, so staging
+		// emitted production links for stores that exist only in staging's D1
+		// and redirected visitors straight into a production 404.
+		"PUBLIC_SITE_URL": "https://orderak.app",
 		"LOCAL_JWT_VERIFICATION": "false",
 		"FIREBASE_PROJECT_ID": ""
 	},
@@ -126,7 +138,8 @@
 			"DEEPSEEK_API_KEY",
 			"FIREBASE_WEB_API_KEY",
 			"FORWARD_TO",
-			"PAYMENT_WEBHOOK_SECRET"
+			"PAYMENT_WEBHOOK_SECRET",
+			"SENTRY_DSN"
 		]
 	},
 	"env": {
@@ -134,14 +147,22 @@
 			"name": "orderak-worker-staging",
 			"workers_dev": true,
 			"preview_urls": false,
-			// Staging runs with billing, AI and email forwarding off, and
-			// carries only these two. Requiring Production's provider
-			// credentials here would fail every staging deploy for services
-			// this environment does not call.
+			// Staging runs with billing, AI and email forwarding off, so it
+			// carries only what it actually calls. Requiring Production's
+			// provider credentials here would fail every staging deploy for
+			// services this environment does not use.
+			//
+			// SENTRY_DSN is required in both environments as of 2026-09-06.
+			// Sentry is wired in both Workers and no-ops silently when the DSN is
+			// unset, so nothing proved errors were aggregating anywhere — the
+			// failure mode of an observability tool that is not there is that
+			// everything looks quiet. Requiring it turns "was it ever set?" from
+			// a question nobody can answer into a deploy that stops.
 			"secrets": {
 				"required": [
 					"BUYER_PRIVACY_PEPPER",
-					"FIREBASE_WEB_API_KEY"
+					"FIREBASE_WEB_API_KEY",
+					"SENTRY_DSN"
 				]
 			},
 			"vars": {
@@ -149,7 +170,20 @@
 				"BILLING_ENABLED": "false",
 				"GOOGLE_PLAY_LIFECYCLE_ENABLED": "false",
 				"AI_ASSISTANT_ENABLED": "false",
-				"ENTITLEMENTS_ENABLED": "false",
+				// Work item 03b, staging only, 2026-09-06. Production stays
+				// "false" until a staging snapshot has been watched — the plan
+				// calls this a release rather than a config change because it
+				// swaps the source of every gate and meter in the app at once,
+				// and it is the first real exercise of a subsystem that has
+				// never served a request.
+				//
+				// Safe to flip because the shape is held by test rather than by
+				// hope: entitlements.spec asserts the engine and the legacy path
+				// answer with the same key set and the same per-key fields, so
+				// the client cannot tell which one replied (I-4). Item 11 has
+				// landed, so the engine no longer grants a customer editor that
+				// does not exist.
+				"ENTITLEMENTS_ENABLED": "true",
 				"AUTH_IDENTITY_ENABLED": "true",
 				"ONBOARDING_ENABLED": "true",
 				"PASSKEY_ENABLED": "true",
@@ -157,7 +191,30 @@
 				"STATIC_CITY_CATALOG_ENABLED": "true",
 				"BUSINESS_TAXONOMY_ENABLED": "true",
 				"AI_MONTHLY_BUDGET_MICRO_USD": "0",
-				"GOOGLE_PLAY_PACKAGE_NAME": "app.orderak.seller",
+				// Staging has its own Play Console entry. The staging Android
+				// flavour applies applicationIdSuffix = ".staging", so a staging
+				// build is a different app to Google, with its own products —
+				// product ids are scoped per app. The mapping lookup binds this
+				// value, and migration 054 carries a set of mappings for each
+				// package, so this string is what selects between them. Pointing
+				// it at the production package would make staging purchases
+				// resolve against production's products.
+				"GOOGLE_PLAY_PACKAGE_NAME": "app.orderak.seller.staging",
+				// Same reason as the Play package above: a staging build is a
+				// different app, so the Asset Links statement served from
+				// staging.orderak.app has to name the suffixed package or
+				// Credential Manager refuses every Passkey ceremony.
+				"ANDROID_APP_PACKAGE_NAME": "app.orderak.seller.staging",
+				// See the production comment: staging serves the same routes
+				// from its own domain over its own D1, so its links must name
+				// its own origin.
+				"PUBLIC_SITE_URL": "https://staging.orderak.app",
+				// Scopes staging Passkeys to the staging domain. Without this,
+				// rpId() falls through to orderak.app and the production domain
+				// would have to vouch for a debug-signed build to make staging
+				// Passkeys work — a credential issued for the real RP. Staging
+				// credentials are deliberately not portable to production.
+				"WEBAUTHN_RP_ID": "staging.orderak.app",
 				"LOCAL_JWT_VERIFICATION": "true",
 				"FIREBASE_PROJECT_ID": "orderak-staging"
 			},

@@ -56,12 +56,47 @@ data class CategoryEntity(
     val createdAt: Long = System.currentTimeMillis()
 )
 
+/**
+ * A customer the seller can edit, rather than a shape derived from orders.
+ *
+ * The primary key is [customerKey], not [phone]. The phone a buyer types is not
+ * normalised anywhere it is captured — the storefront strips it to digits, the
+ * manual-order screen takes eleven digits and no country — so `01012345678` and
+ * `+201012345678` are one person and two strings. Keying on the raw value would
+ * inherit that split permanently (I-6). The key is the canonically normalised
+ * number when the value resolved, and the raw value itself when it did not, so
+ * an unresolvable customer keys only to itself and can never be merged with
+ * someone else by accident.
+ *
+ * [phone] is kept beside the key rather than replaced by it: it is what the
+ * order carries, what the seller recognises, and what the server's own raw
+ * column holds.
+ */
 @Entity(tableName = "customers")
 @Immutable
 data class CustomerEntity(
-    @PrimaryKey val phone: String,
+    @PrimaryKey val customerKey: String,
+    /** Exactly what was entered on the order. Never rewritten. */
+    val phone: String,
+    /** Present only when the number resolved; null records that it did not. */
+    val phoneE164: String? = null,
+    /** "valid" | "ambiguous" | "invalid" — anything but valid is unmergeable. */
+    val phoneStatus: String = "valid",
     val name: String? = null,
-    val createdAt: Long = System.currentTimeMillis()
+    val altContact: String? = null,
+    val note: String? = null,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis(),
+    /**
+     * Set when the device has an edit the server has not acknowledged.
+     *
+     * The editor writes locally first so a seller at a stall with no signal can
+     * still correct a name. Sync posts every dirty row and clears the flag on
+     * acknowledgement; until then the local value is the one displayed, because
+     * showing the seller their own unsaved edit reverted is worse than showing
+     * it unsynced.
+     */
+    val dirty: Boolean = false
 )
 
 @Entity(
@@ -138,6 +173,9 @@ data class OrderWithItems(
 
 @Immutable
 data class CustomerSummary(
+    /** The identity, and what navigation carries. See [CustomerEntity]. */
+    val customerKey: String,
+    /** What the seller recognises, and what the order rows join on. */
     val phone: String,
     val name: String?,
     val ordersCount: Int,

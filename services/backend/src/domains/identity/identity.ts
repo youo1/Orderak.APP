@@ -14,7 +14,26 @@ type SellerIdentityRow = {
 export const STORE_PUBLIC_COLUMNS =
 	"id, store_code, country_code, store_name, slug, public_identifier, phone, " +
 	"whatsapp, instapay, vfcash, description, email, website, address, logo_url, cover_url";
-export const PUBLIC_SITE_URL = "https://orderak.app";
+/**
+ * Origin every public link is built from, when the environment does not say
+ * otherwise. Staging must say otherwise: it serves the same routes from
+ * staging.orderak.app over a *different* D1, so a production origin here made
+ * staging emit links to stores that only exist on staging. The visible symptom
+ * was a 301 from staging straight into a production 404, plus canonical/og tags
+ * and uploaded-media URLs all pointing at the wrong deployment.
+ */
+export const DEFAULT_PUBLIC_SITE_URL = "https://orderak.app";
+
+/**
+ * The deployment's own public origin. Anything that is not a plain https origin
+ * (no path, no query) is ignored rather than trusted, so a malformed variable
+ * degrades to production links instead of emitting a broken or attacker-shaped
+ * absolute URL into a canonical tag.
+ */
+export function publicSiteUrl(env: { PUBLIC_SITE_URL?: string }): string {
+	const configured = String(env?.PUBLIC_SITE_URL ?? "").trim().replace(/\/+$/, "");
+	return /^https:\/\/[a-z0-9.-]+$/i.test(configured) ? configured : DEFAULT_PUBLIC_SITE_URL;
+}
 /**
  * Slugs a store may not claim, because the first path segment is also how the
  * public Worker addresses its own pages.
@@ -124,7 +143,9 @@ export async function slugSuggestions(env: Env, base: string): Promise<string[]>
 export function buildPublicIdentifier(countryIso: string, slug: string, storeCode: string): string {
 	return `${(countryIso || "XX").toUpperCase()}-${slugify(slug) || "store"}-${storeCode.toUpperCase()}`;
 }
-export function storeUrl(publicIdentifier: string): string { return `${PUBLIC_SITE_URL}/${publicIdentifier}`; }
+export function storeUrl(env: { PUBLIC_SITE_URL?: string }, publicIdentifier: string): string {
+	return `${publicSiteUrl(env)}/${publicIdentifier}`;
+}
 export function countryIsoFromPhone(phone: string): string {
 	const digits = String(phone ?? "").replace(/\D/g, "");
 	if (/^201|^010|^011|^012|^015/.test(digits)) return "EG";

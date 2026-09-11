@@ -4,6 +4,7 @@ import {
 	LEGACY_FEATURE_ENTITLEMENTS,
 	LEGACY_LIMIT_ENTITLEMENTS,
 	LEGACY_MULTI_DEVICE_KEY,
+	LEGACY_PAID_ONLY_KEYS,
 } from "./legacy-entitlements";
 
 export type EntitlementValueMode = "value" | "disabled" | "unlimited" | "custom_required";
@@ -463,12 +464,16 @@ export async function legacySnapshot(env: Env, storeId: string): Promise<Entitle
 
 	// ---- Implemented features ------------------------------------------------
 	//
-	// Everything the app has actually built. One of them is gated by the legacy
-	// plan row; the rest are open on every plan, which is what the app permits
-	// today. Emitting them matters because the resolver reads an absent key as
-	// NotBuilt — so before this, every built feature looked unbuilt.
+	// Everything the app has actually built. Two are gated — one by the legacy
+	// plan row's multi_device flag, one by the plan row existing at all — and the
+	// rest are open on every plan, which is what the app permits today. Emitting
+	// them matters because the resolver reads an absent key as NotBuilt, so before
+	// this every built feature looked unbuilt.
 	for (const feature of LEGACY_FEATURE_ENTITLEMENTS) {
-		const available = feature.key === LEGACY_MULTI_DEVICE_KEY ? multiDevice : true;
+		const available =
+			feature.key === LEGACY_MULTI_DEVICE_KEY ? multiDevice
+			: LEGACY_PAID_ONLY_KEYS.includes(feature.key) ? plan != null
+			: true;
 		entitlements[feature.key] = {
 			key: feature.key,
 			category: feature.category,

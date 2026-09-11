@@ -13,7 +13,7 @@
 // ============================================================
 
 import { esc, jsonResponse, logError, checkRateLimit } from "../../platform/http/shared";
-import { PUBLIC_SITE_URL, storeUrl, newUuid } from "../identity/identity";
+import { publicSiteUrl, storeUrl, newUuid } from "../identity/identity";
 import { requireTenantWrite, resolveTenantContextForStore, TenantWriteFencedError } from "../../platform/tenancy/tenant-routing";
 import { getPlanLimit, limitReached } from "../commerce/plan-limits";
 import type { Theme } from "../design/theme";
@@ -123,14 +123,14 @@ input,select,textarea{width:100%;padding:12px;margin:4px 0 12px;border:1px solid
 .foot{text-align:center;color:#999;font-size:12px;margin:20px 0}
 .foot a{color:var(--g);text-decoration:none;font-weight:600}`;
 
-function pageShell(head: string, body: string, theme: Theme, generatedCss: string, lang: Locale, cacheSeconds = 0): Response {
+function pageShell(head: string, body: string, theme: Theme, generatedCss: string, lang: Locale, siteUrl: string, cacheSeconds = 0): Response {
 	const html = `<!doctype html>
 <html lang="${lang}" dir="${dirFor(lang)}"><head>
 ${head}
 <style>${generatedCss}${baseStyle(theme)}</style>
 </head><body>
 ${body}
-<div class="foot">${esc(t(lang, "catalog.powered_by"))} <a href="${PUBLIC_SITE_URL}">أوردرك Orderak</a></div>
+<div class="foot">${esc(t(lang, "catalog.powered_by"))} <a href="${siteUrl}">أوردرك Orderak</a></div>
 </body></html>`;
 	const headers: Record<string, string> = {
 		"content-type": "text/html; charset=utf-8",
@@ -326,12 +326,12 @@ export async function renderStorePage(env: Env, store: Store, lang: Locale): Pro
 	const head = seoHead({
 		title: `${String(store.store_name)} — أوردرك`,
 		description: (store.description as string) || t(lang, "catalog.shop_description", { store: String(store.store_name) }),
-		canonical: storeUrl(pid),
+		canonical: storeUrl(env, pid),
 		image: (store.cover_url as string) || (store.logo_url as string) || null,
 	}, theme);
 	return pageShell(
 		`${head}${designSystemFontPreload(revision.snapshot, lang === "ar" ? "arabic" : "latin")}`,
-		body, theme, designSystemCss(revision.snapshot), lang, 30,
+		body, theme, designSystemCss(revision.snapshot), lang, publicSiteUrl(env), 30,
 	);
 }
 
@@ -352,12 +352,12 @@ ${products.length ? orderForm(store, lang, pageCurrency(products)) : ""}`;
 	const head = seoHead({
 		title: `${String(category.name)} — ${String(store.store_name)}`,
 		description: t(lang, "catalog.category_description", { category: String(category.name), store: String(store.store_name) }),
-		canonical: `${PUBLIC_SITE_URL}/${pid}/c/${esc(category.category_code)}`,
+		canonical: `${publicSiteUrl(env)}/${pid}/c/${esc(category.category_code)}`,
 		image: (store.cover_url as string) || (store.logo_url as string) || null,
 	}, theme);
 	return pageShell(
 		`${head}${designSystemFontPreload(revision.snapshot, lang === "ar" ? "arabic" : "latin")}`,
-		body, theme, designSystemCss(revision.snapshot), lang, 30,
+		body, theme, designSystemCss(revision.snapshot), lang, publicSiteUrl(env), 30,
 	);
 }
 
@@ -371,7 +371,7 @@ export async function renderProductPage(env: Env, store: Store, product: Record<
 	).bind(product.id, lang, product.name, String(product.description ?? "")).first<{ name: string; description: string | null }>();
 	if (translated) product = { ...product, name: translated.name, description: translated.description };
 	const pid = String(store.public_identifier);
-	const canonical = `${PUBLIC_SITE_URL}/${pid}/p/${esc(product.product_code)}`;
+	const canonical = `${publicSiteUrl(env)}/${pid}/p/${esc(product.product_code)}`;
 	const productCurrency = String(product.currency || DEFAULT_CURRENCY) as Currency;
 	const price = amountLabel(Number(product.price_minor), productCurrency, lang);
 	const inStock = Number(product.stock) > 0 && Number(product.available) === 1;
@@ -414,7 +414,7 @@ ${inStock ? orderForm(store, lang, productCurrency) : ""}
 	}, theme);
 	return pageShell(
 		`${head}${designSystemFontPreload(revision.snapshot, lang === "ar" ? "arabic" : "latin")}`,
-		body, theme, designSystemCss(revision.snapshot), lang,
+		body, theme, designSystemCss(revision.snapshot), lang, publicSiteUrl(env),
 	);
 }
 

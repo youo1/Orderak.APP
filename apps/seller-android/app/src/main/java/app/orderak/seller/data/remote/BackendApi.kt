@@ -3,7 +3,11 @@ import app.orderak.seller.core.network.Backend
 import app.orderak.seller.core.locale.AppLocales
 import app.orderak.seller.core.network.ApiRoutes
 import app.orderak.seller.core.network.NetworkJson
+import app.orderak.seller.core.platform.ApiFailure
 import app.orderak.seller.core.platform.ClientContextProvider
+import app.orderak.seller.core.platform.CrashReporter
+import app.orderak.seller.core.platform.isReportableFailure
+import app.orderak.seller.core.platform.redactRoute
 import app.orderak.seller.data.session.SessionRouteMonitor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -206,6 +210,100 @@ data class ProductsPullRes(
     val catalog_version: Long = 0,
     val products: List<RemoteProductDto> = emptyList(),
     @SerialName("code") val error: String? = null,
+)
+
+// ---- Plans ----
+
+/**
+ * One row of the plan comparison: an entitlement and what each plan gives for it.
+ *
+ * The server sends only features whose `implementation_status` is `implemented`
+ * (BR-506), so a row reaching the app is a feature the app has. `values` is
+ * keyed by plan key — "free", "paid1", "paid2", "paid3" — and holds the display
+ * string the catalogue carries, not a number this app should format.
+ */
+@Serializable
+data class PlanComparisonRowDto(
+    val entitlement_key: String,
+    val category: String,
+    val name: String,
+    val value_type: String = "boolean",
+    val values: Map<String, String> = emptyMap(),
+)
+
+@Serializable
+data class PlanSummaryDto(
+    val plan_key: String,
+    val name: String,
+    val description: String? = null,
+    val sort_order: Int = 0,
+)
+
+@Serializable
+data class PlansRes(
+    val ok: Boolean = false,
+    val plans: List<PlanSummaryDto> = emptyList(),
+    val comparison: List<PlanComparisonRowDto> = emptyList(),
+    @SerialName("code") val error: String? = null,
+)
+
+// ---- Customers ----
+
+/**
+ * A customer as the server holds them.
+ *
+ * `customer_key` is the identity and `phone_raw` is what the order carries; they
+ * differ whenever the buyer typed a national number that resolved. Both are
+ * stored on the device for the same reason the server keeps both — the order
+ * rows join on the raw value, and the editor addresses the key.
+ *
+ * `phone_status` other than "valid" means the number could not be resolved to
+ * exactly one E.164 number. Such a customer is real and editable; it simply may
+ * never be merged with another spelling, because nothing can prove they are the
+ * same person.
+ */
+@Serializable
+data class CustomerDto(
+    val customer_key: String,
+    val phone_raw: String,
+    val phone_e164: String? = null,
+    val phone_status: String = "valid",
+    val name: String? = null,
+    val alt_contact: String? = null,
+    val note: String? = null,
+    val orders_count: Int = 0,
+    val total_minor: Long = 0,
+    val last_order_at: String? = null,
+    val created_at: String? = null,
+    val updated_at: String? = null,
+)
+
+@Serializable
+data class CustomersRes(
+    val ok: Boolean = false,
+    val customers: List<CustomerDto> = emptyList(),
+    @SerialName("code") val error: String? = null,
+)
+
+@Serializable
+data class CustomerRes(
+    val ok: Boolean = false,
+    val customer: CustomerDto? = null,
+    @SerialName("code") val error: String? = null,
+)
+
+/**
+ * A seller's edit.
+ *
+ * Only the three editable fields, and no phone in any form: the server refuses a
+ * body carrying one with `phone_not_editable`, and the app must not be the thing
+ * that discovers that at runtime.
+ */
+@Serializable
+data class CustomerUpdateReq(
+    val name: String? = null,
+    val alt_contact: String? = null,
+    val note: String? = null,
 )
 
 // ---- Store Information ----
@@ -644,6 +742,7 @@ class BackendApi @Inject constructor(
     private val client: OkHttpClient,
     private val sessionRouteMonitor: SessionRouteMonitor,
     private val clientContextProvider: ClientContextProvider,
+    private val crashReporter: CrashReporter,
 ) {
     // Not constructor-injected to avoid a Hilt qualifier for one binding;
     // swap to injection if a test ever needs a TestDispatcher here.
@@ -728,17 +827,44 @@ class BackendApi @Inject constructor(
 
     /** Executes on [io]: OkHttp enqueue is async, but body.string() blocks. */
     private suspend fun execute(request: Request): String = withContext(io) {
-        client.newCall(request).await().use { it.bodyOrThrow() }
+        try {
+            client.newCall(request).await().use { it.bodyOrThrow() }
+        } catch (e: IOException) {
+            // Report here rather than in apiCall, which knows the error code but
+            // not which endpoint produced it — the path lives on the request and
+            // nowhere else. Doing it here also keeps the ~80 call sites unchanged.
+            //
+            // Only server-side failures, never the offline case: see
+            // isReportableFailure.
+            val code = e.message.orEmpty()
+            if (isReportableFailure(code)) {
+                crashReporter.recordApiFailure(
+                    ApiFailure(
+                        route = redactRoute(request.url.encodedPath),
+                        requestId = request.header("x-request-id"),
+                        code = code,
+                    ),
+                )
+            }
+            throw e
+        }
     }
 
-    private fun builder(path: String, headers: Map<String, String>) = Request.Builder()
-        .url(Backend.BASE_URL + ApiRoutes.versioned(path))
-        // The app UI locale is independent from seller-authored product text.
-        // The Worker may use this only for optional messages and communication;
-        // API decisions always use stable machine-readable codes.
-        .header("Accept-Language", AppLocales.currentTag())
-        .header("x-request-id", clientContextProvider.newRequestId())
-        .apply { headers.forEach { (k, v) -> header(k, v) } }
+    private fun builder(path: String, headers: Map<String, String>): Request.Builder {
+        val requestId = clientContextProvider.newRequestId()
+        // The id the Worker will log and echo. Recorded before the call goes out
+        // so that if the app dies mid-request, the crash still names it and the
+        // matching Sentry event can be found from the Crashlytics report.
+        crashReporter.noteRequest(requestId, redactRoute(ApiRoutes.versioned(path)))
+        return Request.Builder()
+            .url(Backend.BASE_URL + ApiRoutes.versioned(path))
+            // The app UI locale is independent from seller-authored product text.
+            // The Worker may use this only for optional messages and communication;
+            // API decisions always use stable machine-readable codes.
+            .header("Accept-Language", AppLocales.currentTag())
+            .header("x-request-id", requestId)
+            .apply { headers.forEach { (k, v) -> header(k, v) } }
+    }
 
     private suspend fun postRaw(path: String, body: String, headers: Map<String, String> = emptyMap()): String =
         execute(builder(path, headers).post(body.toRequestBody(mediaJson)).build())
@@ -987,6 +1113,46 @@ class BackendApi @Inject constructor(
     suspend fun syncProducts(req: ProductsSyncReq): ProductsSyncRes =
         apiCall({ ProductsSyncRes(error = it) }) {
             postRaw("/api/v1/products/sync", json.encodeToString(req), creds(req.phone, req.secret))
+        }
+
+    // ---- Plans ----
+
+    /**
+     * The plan comparison, built by the server from the entitlement catalogue.
+     *
+     * Deliberately carries no prices: Play owns what a seller pays, in their own
+     * currency, and a second number from here would disagree the moment Google
+     * applied a regional price or a promotion.
+     */
+    suspend fun listPlans(): PlansRes =
+        apiCall({ PlansRes(error = it) }) { getRaw("/api/v1/plans") }
+
+    // ---- Customers ----
+
+    suspend fun listCustomers(phone: String, secret: String): CustomersRes =
+        apiCall({ CustomersRes(error = it) }) { getRaw("/api/v1/customers", creds(phone, secret)) }
+
+    /**
+     * Post one seller edit.
+     *
+     * The key is percent-encoded because it is a phone number: a resolved one
+     * begins with "+", and an unresolved one is whatever the buyer typed.
+     *
+     * URLEncoder is form encoding, not path encoding — it emits "+" for a space,
+     * and the server reads the segment with decodeURIComponent, which returns a
+     * literal plus for that. A raw value containing a space would come back as a
+     * different key and address a customer that does not exist, so the one
+     * character the two encodings disagree about is rewritten here.
+     */
+    suspend fun updateCustomer(
+        phone: String,
+        secret: String,
+        customerKey: String,
+        req: CustomerUpdateReq,
+    ): CustomerRes =
+        apiCall({ CustomerRes(error = it) }) {
+            val encoded = java.net.URLEncoder.encode(customerKey, "UTF-8").replace("+", "%20")
+            patchRaw("/api/v1/customers/$encoded", json.encodeToString(req), creds(phone, secret))
         }
 
     // ---- Store Information ----

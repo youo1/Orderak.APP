@@ -23,6 +23,9 @@ same table. See [One table, two meanings](#one-table-two-meanings).
 | `ONBOARDING_ENABLED` | `false` | `true` |
 | `PASSKEY_ENABLED` | `false` | `true` |
 | `LOCAL_JWT_VERIFICATION` | `false` | `true` |
+| `ANDROID_APP_PACKAGE_NAME` | `app.orderak.seller` | `app.orderak.seller.staging` |
+| `WEBAUTHN_RP_ID` | unset (`orderak.app`) | `staging.orderak.app` |
+| `PUBLIC_SITE_URL` | `https://orderak.app` | `https://staging.orderak.app` |
 
 Onboarding v2 and passkeys are held closed in production until the release
 gates in the [production auth plan](../product/production-auth-plan.md) are met —
@@ -31,6 +34,23 @@ testable. Flip them together with that document, not before.
 
 `LOCAL_JWT_VERIFICATION` is a staging convenience. Production verifies Firebase
 tokens against Google, not locally.
+
+`PUBLIC_SITE_URL` is the origin every public link is built from: `store_url` in
+API responses, `canonical`/`og:url` on catalog pages, the 301 that canonicalises
+a bare slug or store code, and uploaded-media URLs. It was a module constant
+pinned to production until 2026-09-10, so staging handed out production links for
+stores that exist only in staging's D1 — opening one 301'd from staging into a
+production 404. A value that is not a bare `https://host` origin is ignored and
+the production default is used, so a malformed variable cannot reach a canonical
+tag. The Android onboarding link *preview* is deliberately excluded: it always
+shows the production domain, asserted by `ShopSetupPolicyTest`.
+
+`ANDROID_APP_PACKAGE_NAME` is the package the Asset Links statement vouches for.
+A staging build is a different app to Android (`applicationIdSuffix = ".staging"`),
+and Credential Manager matches the calling package exactly, so a statement naming
+the production package authorises nothing on staging. `WEBAUTHN_RP_ID` keeps
+staging Passkeys scoped to `staging.orderak.app`; without it the production
+domain would have to vouch for a debug-signed build.
 
 ## One table, two meanings
 

@@ -129,6 +129,28 @@ for (const [label, environment] of [["Production admin", adminConfig], ["Staging
   checkKeyVersion(label, environment, "ADMIN_AUDIT_KEY_CURRENT", AUDIT_KEY_BY_VERSION);
 }
 
+// Sentry must be a required secret on every Worker that initialises it.
+//
+// Both Workers read SENTRY_DSN and both no-op silently when it is unset — which
+// is the worst property an observability tool can have, because the symptom of
+// its absence is that everything looks quiet. Nothing in CI or configuration
+// proved it had ever been set, so "are errors aggregating anywhere?" was a
+// question with no answer short of causing one and looking.
+//
+// Required, it fails at deploy time instead. This check exists so the
+// requirement cannot be quietly dropped the first time a deploy complains.
+for (const [label, environment] of [
+  ["Production public", publicConfig],
+  ["Staging public", publicStaging],
+  ["Production admin", adminConfig],
+  ["Staging admin", adminStaging],
+]) {
+  const required = new Set(environment?.secrets?.required ?? []);
+  if (!required.has("SENTRY_DSN")) {
+    fail(`${label} does not require SENTRY_DSN. Sentry no-ops silently without it, so an unset DSN reads as "no errors" rather than as a missing tool.`);
+  }
+}
+
 const edgeProd = loadJsonc("apps/admin-web/wrangler.edge.jsonc");
 const edgeStaging = loadJsonc("apps/admin-web/wrangler.edge.staging.jsonc");
 if (edgeProd.name !== "orderak-admin-edge" || edgeStaging.name !== "orderak-admin-edge-staging") fail("Admin Edge Worker names drifted.");
