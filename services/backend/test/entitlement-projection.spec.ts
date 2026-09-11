@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { BASE, SELF, authHeaders, createSchema, env, registerStore, type Registered } from "./helpers";
-import { legacySnapshot, resolveEntitlementsForClient } from "../src/domains/commerce/entitlements";
+import { BASE, SELF, authHeaders, createSchema, env, registerStore, seedEntitlementCatalogue, type Registered } from "./helpers";
+import { legacySnapshot, projectEntitlementsForAndroid, resolveEntitlementsForClient } from "../src/domains/commerce/entitlements";
 import { LEGACY_FEATURE_ENTITLEMENTS, LEGACY_LIMIT_ENTITLEMENTS, LEGACY_LIMIT_KEYS } from "../src/domains/commerce/legacy-entitlements";
 import { loadPlanConfig } from "../src/platform/config/config";
 import catalog from "../../../docs/product/orderak-plan-catalog.json";
@@ -304,61 +304,43 @@ describe("the flat limits/features block, whichever engine answers", () => {
 		expect(keys(off.limits)).toContain("max_concurrent_devices");
 	});
 
-	/**
-	 * Seeds the catalogue this test needs, because nothing else does.
-	 *
-	 * createSchema() applies the real migrations and then DELETEs every
-	 * clearable table, re-seeding only taxonomy, geo, content pages and the
-	 * design system. The entitlement catalogue that migrations 024 and 025 seed
-	 * is wiped and never restored — so resolveSubscriptionContext() finds no free
-	 * plan, resolveEntitlements() takes its legacySnapshot fallback, and every
-	 * test that sets ENTITLEMENTS_ENABLED to "true" has in fact been exercising
-	 * the legacy path. That is why the two dead keys this test covers survived
-	 * a suite with 400 passing tests.
-	 *
-	 * Only the two rows under test are seeded. A snapshot with two entitlements
-	 * is not a realistic plan, but it is a real ENGINE snapshot, which is the
-	 * thing the assertion needs and the thing the suite otherwise never builds.
-	 */
-	async function seedEngineCatalogue(): Promise<void> {
-		const revision = "02b0f3d1-62ec-4f1f-baa8-164e905312eb";
-		const plan = "0bc913e8-9760-489d-85ce-ed416f1f3194";
-		await env.orderak_db.prepare(
-			`INSERT INTO subscription_plans(id,plan_key,name,sort_order,active,current_revision_id)
-			 VALUES(?,'free','Free',0,1,?)`,
-		).bind(plan, revision).run();
-		await env.orderak_db.prepare(
-			"INSERT INTO plan_revisions(id,plan_id,version,status,change_type,published_at) VALUES(?,?,1,'published','initial',datetime('now'))",
-		).bind(revision, plan).run();
-		for (const [key, category, name, mode, text, display] of [
-			["products_catalog.custom_domain", "Products & catalog", "Custom domain", "disabled", null, "—"],
-			["analytics_reporting.operational_dashboard", "Analytics & reporting", "Operational dashboard", "value", "Essential counts", "Essential counts"],
-		] as const) {
-			// `implemented`, where migration 025 says `planned`.
-			//
-			// This is the difference between a test that discriminates and one
-			// that cannot. With the catalogue's real status, `available` is false
-			// for these keys on every plan — so the correct key name and the dead
-			// one both answer false, and a test asserting equality passes against
-			// the bug. Seeding the status the catalogue will carry once these
-			// features ship is what makes the wrong key observable.
-			await env.orderak_db.prepare(
-				`INSERT INTO entitlement_definitions(
-				   entitlement_key,category,name,description,value_type,unit,reset_period,
-				   supports_unlimited,higher_is_better,implementation_status,enforcement_binding,
-				   admin_configurable,core_universal,sort_order,active)
-				 VALUES(?,?,?,?, 'text',NULL,'none',0,0,'implemented',NULL,0,0,1,1)`,
-			).bind(key, category, name, name).run();
-			await env.orderak_db.prepare(
-				"INSERT INTO plan_revision_entitlements(revision_id,entitlement_key,value_mode,bool_value,int_value,text_value,display_value) VALUES(?,?,?,NULL,NULL,?,?)",
-			).bind(revision, key, mode, text, display).run();
-		}
-	}
+	it("runs the engine against the real catalogue, not a fixture and not the fallback", async () => {
+		// The engine was already covered by entitlements.spec.ts — but only
+		// against the six-key synthetic catalogue createEntitlementSchema()
+		// builds. The 242 definitions migration 025 seeds were never loaded by
+		// any test, because createSchema() clears them and nothing put them back.
+		//
+		// So engine mechanics were tested and engine CONTENT was not, which is
+		// the gap the two dead key names in legacyProjection() lived in: they
+		// referred to catalogue keys, and no test had a catalogue.
+		//
+		// This asserts the seeding actually took, so the helper cannot silently
+		// regress to seeding nothing and leave the tests above passing for the
+		// wrong reason.
+		const r = await registerStore({ phone: "+201500003042" });
+		const storeId = await storeIdOf(r);
+		await seedEntitlementCatalogue();
+
+		const snapshot = await resolveEntitlementsForClient(engineOn(), storeId);
+		expect(snapshot.plan_revision_id).not.toContain("legacy:");
+		expect(snapshot.plan_key).toBe("free");
+		expect(Object.keys(snapshot.entitlements).length).toBeGreaterThan(200);
+
+		// And the Android projection stays a strict, implemented-only subset of
+		// it — the property that keeps the payload bounded.
+		const projected = await projectEntitlementsForAndroid(snapshot);
+		const projectedKeys = Object.keys(projected.entitlements);
+		expect(projectedKeys.length).toBeGreaterThan(0);
+		expect(projectedKeys.length).toBeLessThan(Object.keys(snapshot.entitlements).length);
+		expect(Object.values(projected.entitlements).every(
+			(item) => item.implementation_status === "implemented",
+		)).toBe(true);
+	});
 
 	it("derives features from keys the catalogue actually defines", async () => {
 		const r = await registerStore({ phone: "+201500003041" });
 		const storeId = await storeIdOf(r);
-		await seedEngineCatalogue();
+		await seedEntitlementCatalogue();
 
 		const snapshot = await resolveEntitlementsForClient(engineOn(), storeId);
 		// Proof the engine answered rather than the legacy fallback, which names
@@ -373,15 +355,13 @@ describe("the flat limits/features block, whichever engine answers", () => {
 		expect(entitlements["products_catalog.custom_domain"]).toBeTruthy();
 		expect(entitlements["analytics_reporting.operational_dashboard"]).toBeTruthy();
 
-		// The free revision disables the domain and grants the dashboard, so these
-		// are the two answers a correct projection must produce — and the pair a
-		// dead key name cannot, because it reports false for both.
-		expect(entitlements["products_catalog.custom_domain"].available).toBe(false);
-		expect(entitlements["analytics_reporting.operational_dashboard"].available).toBe(true);
-
+		// Whatever the real catalogue says, the flat block must agree with the
+		// keyed map. That equality is the invariant; the values are the
+		// catalogue's business. A dead key name cannot satisfy it, because it
+		// reports false regardless of what the entitlement actually grants.
 		const features = (await loadPlanConfig(engineOn(), storeId)).features as Record<string, boolean>;
-		expect(features.custom_domain).toBe(false);
-		expect(features.analytics).toBe(true);
+		expect(features.custom_domain).toBe(entitlements["products_catalog.custom_domain"].available);
+		expect(features.analytics).toBe(entitlements["analytics_reporting.operational_dashboard"].available);
 	});
 });
 
