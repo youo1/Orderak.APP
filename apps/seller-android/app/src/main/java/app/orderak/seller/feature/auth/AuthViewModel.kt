@@ -419,8 +419,16 @@ class AuthViewModel @Inject constructor(
         )
         if (!authOperations.isCurrent(operation)) return
         if (!response.ok) {
+            // A restricted account is a distinct answer and deserves one. It
+            // used to fall through to GENERIC ("something went wrong"), which
+            // invites the one action that cannot work — trying again — and tells
+            // a suspended seller nothing about why or whom to ask.
             _state.value = restoredPhone().copy(
-                error = if (response.error == "feature_disabled") AuthError.SERVICE_UNAVAILABLE else AuthError.GENERIC,
+                error = when (response.error) {
+                    "feature_disabled" -> AuthError.SERVICE_UNAVAILABLE
+                    "account_restricted" -> AuthError.ACCOUNT_RESTRICTED
+                    else -> AuthError.GENERIC
+                },
             )
             return
         }

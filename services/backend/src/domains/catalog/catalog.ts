@@ -13,8 +13,8 @@
 // ============================================================
 
 import { esc, jsonResponse, logError, checkRateLimit } from "../../platform/http/shared";
-import { PUBLIC_SITE_URL, storeUrl, newUuid } from "../identity/identity";
-import { requireTenantWrite, resolveTenantContextForStore, TenantWriteFencedError } from "../../platform/tenancy/tenant-routing";
+import { publicSiteUrl, storeUrl, newUuid } from "../identity/identity";
+import { requireTenantWrite, resolveTenantContextForStore, tenantUnavailableResponse } from "../../platform/tenancy/tenant-routing";
 import { getPlanLimit, limitReached } from "../commerce/plan-limits";
 import type { Theme } from "../design/theme";
 import { designSystemCss, designSystemFontPreload, loadActiveDesignSystem } from "../design/design-system";
@@ -123,18 +123,75 @@ input,select,textarea{width:100%;padding:12px;margin:4px 0 12px;border:1px solid
 .foot{text-align:center;color:#999;font-size:12px;margin:20px 0}
 .foot a{color:var(--g);text-decoration:none;font-weight:600}`;
 
-function pageShell(head: string, body: string, theme: Theme, generatedCss: string, lang: Locale, cacheSeconds = 0): Response {
+/**
+ * Serialise a value for interpolation inside a `<script>` element.
+ *
+ * `JSON.stringify` alone is not safe here and this page proved it. Inside a
+ * script element the HTML tokenizer does not decode entities, but it does still
+ * look for the closing tag — so a seller-controlled product name containing
+ * `</script>` ended that element, and everything after it was parsed as markup.
+ * `name` is capped at 80 characters and `description` at 500; a payload needs
+ * about 35.
+ *
+ * Escaping `<` as its JSON unicode escape closes that off without changing what
+ * anything reads: `<` is the same character to every JSON parser, and it is
+ * no longer a character sequence the tokenizer can act on. U+2028 and U+2029 are
+ * escaped alongside it because they terminate a line in JavaScript source but
+ * not in JSON, which breaks the two blocks below that are real script rather
+ * than an `application/ld+json` data block.
+ */
+function jsonInScript(value: unknown): string {
+	return JSON.stringify(value)
+		.replace(/</g, "\\u003c")
+		.replace(/\u2028/g, "\\u2028")
+		.replace(/\u2029/g, "\\u2029");
+}
+
+/**
+ * The storefront's content security policy.
+ *
+ * Deliberately not a nonce policy. This page carries inline `onclick` handlers
+ * on every quantity button and an inline order script, so `script-src` cannot
+ * drop `unsafe-inline` without rewriting both — and a policy that breaks the
+ * order form protects nothing, because the page stops selling.
+ *
+ * What it does buy, even with `unsafe-inline`, is the difference between script
+ * running and script being useful: `connect-src 'self'` means injected script
+ * cannot post a buyer's phone number or the seller's catalogue to another
+ * origin, `default-src 'none'` and `object-src` leave nothing else to load, and
+ * `base-uri 'none'` stops a `<base>` tag repointing every relative URL on the
+ * page. The escaping above is the fix; this is what is left standing if another
+ * injection point is ever found.
+ *
+ * `img-src` admits any https host because `logo_url`, `cover_url` and
+ * `image_url` are seller-supplied and validated only for scheme. `font-src` is
+ * self only — the design system serves its own woff2 from /static/fonts.
+ */
+const STOREFRONT_CSP = [
+	"default-src 'none'",
+	"img-src 'self' https: data:",
+	"style-src 'self' 'unsafe-inline'",
+	"script-src 'unsafe-inline'",
+	"font-src 'self'",
+	"connect-src 'self'",
+	"form-action 'none'",
+	"base-uri 'none'",
+	"frame-ancestors 'self'",
+].join("; ");
+
+function pageShell(env: Env, head: string, body: string, theme: Theme, generatedCss: string, lang: Locale, cacheSeconds = 0): Response {
 	const html = `<!doctype html>
 <html lang="${lang}" dir="${dirFor(lang)}"><head>
 ${head}
 <style>${generatedCss}${baseStyle(theme)}</style>
 </head><body>
 ${body}
-<div class="foot">${esc(t(lang, "catalog.powered_by"))} <a href="${PUBLIC_SITE_URL}">أوردرك Orderak</a></div>
+<div class="foot">${esc(t(lang, "catalog.powered_by"))} <a href="${publicSiteUrl(env)}">أوردرك Orderak</a></div>
 </body></html>`;
 	const headers: Record<string, string> = {
 		"content-type": "text/html; charset=utf-8",
 		"content-language": lang,
+		"content-security-policy": STOREFRONT_CSP,
 		vary: "Accept-Language",
 	};
 	// Anonymous listing pages can be edge-cached briefly — a viral store link
@@ -201,7 +258,7 @@ function productCard(store: Store, p: Record<string, unknown>, linkToPage: boole
 // store's public_identifier root — codes only, never UUIDs.
 function orderForm(store: Store, lang: Locale, currency: Currency): string {
 	const postUrl = "/" + esc(store.public_identifier);
-	const js = (key: string) => JSON.stringify(t(lang, key));
+	const js = (key: string) => jsonInScript(t(lang, key));
 	const numberLocale = lang === "ar" ? "ar-EG" : "en-EG";
 	// The browser script below works in minor units and needs the divisor for
 	// the currency being displayed. Injected rather than written as 100: KWD,
@@ -238,7 +295,7 @@ function orderForm(store: Store, lang: Locale, currency: Currency): string {
 </form>
 <div class="ok" id="ok" role="status" aria-live="polite"></div>
 <script>
-var POST_URL=${JSON.stringify(postUrl)};
+var POST_URL=${jsonInScript(postUrl)};
 var qty={};
 var orderKey=(self.crypto&&crypto.randomUUID)?crypto.randomUUID():String(Date.now())+'-'+Math.random().toString(16).slice(2);
 function chg(code,d,max){
@@ -326,10 +383,11 @@ export async function renderStorePage(env: Env, store: Store, lang: Locale): Pro
 	const head = seoHead({
 		title: `${String(store.store_name)} — أوردرك`,
 		description: (store.description as string) || t(lang, "catalog.shop_description", { store: String(store.store_name) }),
-		canonical: storeUrl(pid),
+		canonical: storeUrl(env, pid),
 		image: (store.cover_url as string) || (store.logo_url as string) || null,
 	}, theme);
 	return pageShell(
+		env,
 		`${head}${designSystemFontPreload(revision.snapshot, lang === "ar" ? "arabic" : "latin")}`,
 		body, theme, designSystemCss(revision.snapshot), lang, 30,
 	);
@@ -352,10 +410,11 @@ ${products.length ? orderForm(store, lang, pageCurrency(products)) : ""}`;
 	const head = seoHead({
 		title: `${String(category.name)} — ${String(store.store_name)}`,
 		description: t(lang, "catalog.category_description", { category: String(category.name), store: String(store.store_name) }),
-		canonical: `${PUBLIC_SITE_URL}/${pid}/c/${esc(category.category_code)}`,
+		canonical: `${publicSiteUrl(env)}/${pid}/c/${esc(category.category_code)}`,
 		image: (store.cover_url as string) || (store.logo_url as string) || null,
 	}, theme);
 	return pageShell(
+		env,
 		`${head}${designSystemFontPreload(revision.snapshot, lang === "ar" ? "arabic" : "latin")}`,
 		body, theme, designSystemCss(revision.snapshot), lang, 30,
 	);
@@ -371,7 +430,7 @@ export async function renderProductPage(env: Env, store: Store, product: Record<
 	).bind(product.id, lang, product.name, String(product.description ?? "")).first<{ name: string; description: string | null }>();
 	if (translated) product = { ...product, name: translated.name, description: translated.description };
 	const pid = String(store.public_identifier);
-	const canonical = `${PUBLIC_SITE_URL}/${pid}/p/${esc(product.product_code)}`;
+	const canonical = `${publicSiteUrl(env)}/${pid}/p/${esc(product.product_code)}`;
 	const productCurrency = String(product.currency || DEFAULT_CURRENCY) as Currency;
 	const price = amountLabel(Number(product.price_minor), productCurrency, lang);
 	const inStock = Number(product.stock) > 0 && Number(product.available) === 1;
@@ -401,7 +460,7 @@ export async function renderProductPage(env: Env, store: Store, product: Record<
 ${product.description ? `<div class="desc">${esc(product.description)}</div>` : ""}
 ${card}${soldOut}
 ${inStock ? orderForm(store, lang, productCurrency) : ""}
-<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>`;
+<script type="application/ld+json">${jsonInScript(jsonLd)}</script>`;
 
 	const revision = await loadActiveDesignSystem(env);
 	const theme = revision.legacyTheme;
@@ -413,6 +472,7 @@ ${inStock ? orderForm(store, lang, productCurrency) : ""}
 		type: "product",
 	}, theme);
 	return pageShell(
+		env,
 		`${head}${designSystemFontPreload(revision.snapshot, lang === "ar" ? "arabic" : "latin")}`,
 		body, theme, designSystemCss(revision.snapshot), lang,
 	);
@@ -744,9 +804,8 @@ export async function createOrder(env: Env, store: Store, input: CreateOrderInpu
 		return { ok: true, order: { orderId, orderNo, totalMinor: total, currency: orderCurrency, replayed: false } };
 	} catch (e) {
 		if (quotaReservationId) await voidUsageReservation(env, quotaReservationId);
-		if (e instanceof TenantWriteFencedError) {
-			return fail(jsonResponse({ error: "tenant_write_fenced", retryable: true }, 503, { "retry-after": String(e.retryAfterSeconds) }));
-		}
+		const unavailable = tenantUnavailableResponse(e);
+		if (unavailable) return fail(unavailable);
 		await logError(env, input.logContext, e);
 		return fail(jsonResponse({ error: "server" }, 500));
 	}

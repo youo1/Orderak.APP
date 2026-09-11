@@ -44,6 +44,29 @@ async function deletionTestEnv(): Promise<Env> {
 	} as TestEnv;
 }
 
+/**
+ * Remove a store's organization entirely, dependents first.
+ *
+ * The foundation statements create four rows together — the organization, the
+ * store membership, the owner member and the routing row — and three of them
+ * carry a foreign key to the first. Deleting the organization alone fails the
+ * constraint, which is itself worth knowing: the "missing organization" state
+ * these tests reproduce is one the schema actively prevents from occurring by
+ * halves.
+ */
+async function detachOrganization(storeId: string): Promise<void> {
+	const org = await env.orderak_db.prepare("SELECT organization_id FROM organization_stores WHERE store_id=?")
+		.bind(storeId).first<{ organization_id: string }>();
+	if (!org) return;
+	for (const sql of [
+		"DELETE FROM organization_members WHERE organization_id=?",
+		"DELETE FROM organization_routing WHERE organization_id=?",
+		"DELETE FROM organization_subscriptions WHERE organization_id=?",
+		"DELETE FROM organization_stores WHERE organization_id=?",
+		"DELETE FROM organizations WHERE id=?",
+	]) await env.orderak_db.prepare(sql).bind(org.organization_id).run();
+}
+
 describe("POST /api/v1/register", () => {
 	it("returns ok:true so the app persists the identity", async () => {
 		// Regression: a missing ok flag made the app treat register as failed and
@@ -377,6 +400,47 @@ describe("multi-device plan enforcement", () => {
 		expect((await SELF.fetch(`${BASE}/api/v1/store`, { headers })).status).toBe(401);
 		// The primary device is never blocked by the multi-device feature.
 		expect((await SELF.fetch(`${BASE}/api/v1/store`, { headers: authHeaders(r) })).status).toBe(200);
+	});
+
+	it("keeps the first device signed in when a second device re-registers", async () => {
+		// POST /api/v1/register used to rewrite sellers.secret with whatever
+		// secret the caller presented. Any authorized device can reach it, so
+		// the second phone's own routine sync signed the first phone out —
+		// silently, because nothing in the response or the client reports a
+		// credential being replaced.
+		const first = await registerStore({ secret: "first-device-secret" });
+		const seller = await env.orderak_db.prepare("SELECT id FROM sellers WHERE phone=?")
+			.bind(first.phone).first<{ id: string }>();
+		await env.orderak_db.prepare(
+			"INSERT INTO plans(id,name,active,multi_device_enabled) VALUES('free','Free',1,1)",
+		).run();
+		await env.orderak_db.prepare("INSERT INTO seller_devices(seller_id,secret_hash) VALUES(?,?)")
+			.bind(seller!.id, await hashSecret("second-device-secret")).run();
+		const secondDevice = { "x-orderak-phone": first.phone, "x-orderak-secret": "second-device-secret" };
+
+		// Exactly what SyncRepository sends on the second device's first sync
+		// after a cold start: this account, this device's secret, and a
+		// shop-config change to make the re-register fire at all.
+		const reRegister = await SELF.fetch(`${BASE}/api/v1/register`, {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({
+				phone: first.phone,
+				secret: "second-device-secret",
+				store_name: "Renamed From Second Device",
+			}),
+		});
+		expect(reRegister.status).toBe(200);
+
+		// Both devices still authenticate, and the rename still landed — the
+		// write is not being refused, only narrowed.
+		expect((await SELF.fetch(`${BASE}/api/v1/store`, { headers: authHeaders(first) })).status).toBe(200);
+		expect((await SELF.fetch(`${BASE}/api/v1/store`, { headers: secondDevice })).status).toBe(200);
+
+		const stored = await env.orderak_db.prepare("SELECT secret,store_name FROM sellers WHERE id=?")
+			.bind(seller!.id).first<{ secret: string; store_name: string }>();
+		expect(stored!.secret).toBe(await hashSecret("first-device-secret"));
+		expect(stored!.store_name).toBe("Renamed From Second Device");
 	});
 });
 
@@ -1007,3 +1071,91 @@ describe("POST /api/v1/products/sync", () => {
 		expect(await growth.json()).toMatchObject({ code: "plan_limit_reached", limit: 20, used: 24 });
 	});
 });
+
+describe("register applies the fences the credential middleware cannot", () => {
+	// /api/v1/register reads its credentials from the BODY, while the account
+	// restriction and tenant-write fences live in middleware that engages only
+	// on the x-orderak-phone/x-orderak-secret headers. Neither fence had ever
+	// run for this route, so a suspended seller could still rename their store,
+	// move its slug and public_identifier, and change the payout details the
+	// storefront shows to buyers.
+
+	it("refuses a restricted account", async () => {
+		const r = await registerStore({ phone: "+201500008001", secret: "restricted-device" });
+		await env.orderak_db.prepare("UPDATE sellers SET status='suspended' WHERE phone=?").bind(r.phone).run();
+
+		const res = await SELF.fetch(`${BASE}/api/v1/register`, {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ phone: r.phone, secret: r.secret, store_name: "Renamed While Suspended" }),
+		});
+
+		expect(res.status).toBe(403);
+		expect((await res.json() as { code: string }).code).toBe("account_restricted");
+		const stored = await env.orderak_db.prepare("SELECT store_name FROM sellers WHERE phone=?")
+			.bind(r.phone).first<{ store_name: string }>();
+		expect(stored!.store_name).not.toBe("Renamed While Suspended");
+	});
+
+	it("repairs a missing organization row rather than answering 500", async () => {
+		// resolveTenantContextForStore() threw a bare Error for a store with no
+		// organization_stores row, and every caller rethrew anything that was not
+		// a write fence — so the seller got a 500 on every non-GET request and
+		// every buyer of that store got one when ordering. Register is where the
+		// row is repaired, so the fence must not block the call that fixes it.
+		const r = await registerStore({ phone: "+201500008002", secret: "orphan-device" });
+		const seller = await env.orderak_db.prepare("SELECT id FROM sellers WHERE phone=?")
+			.bind(r.phone).first<{ id: string }>();
+		// The whole organization, not just the membership. Every writer creates
+		// the four rows in one batch, so the state a seller can actually be
+		// missing is all of it rather than half.
+		await detachOrganization(seller!.id);
+
+		const res = await SELF.fetch(`${BASE}/api/v1/register`, {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ phone: r.phone, secret: r.secret, store_name: "Repaired Store" }),
+		});
+
+		expect(res.status).toBe(200);
+		const repaired = await env.orderak_db.prepare("SELECT organization_id FROM organization_stores WHERE store_id=?")
+			.bind(seller!.id).first();
+		expect(repaired).toBeTruthy();
+	});
+});
+
+describe("a store with no organization row", () => {
+	it("is refused honestly instead of writing past its limit", async () => {
+		// Two fixes meet here, and the order they run in is the point.
+		//
+		// The category limit counted across the seller's organization, so a NULL
+		// organization lookup made the count zero and the limit unenforced. The
+		// tenant resolver, separately, threw a bare Error for the same missing
+		// row — which every caller rethrew, so the seller got a 500 on every
+		// non-GET request.
+		//
+		// With the resolver typed, the write fence now answers 503 before the
+		// insert is reached, so the unbounded path is no longer reachable over
+		// HTTP at all. That is the behaviour worth pinning: an honest, retryable
+		// refusal, and nothing written. The `c.store_id = ?` floor added to the
+		// insert stays as defence in depth for any caller that does not pass
+		// through the fence.
+		const r = await registerStore({ phone: "+201500008010", secret: "no-org-device" });
+		const seller = await env.orderak_db.prepare("SELECT id FROM sellers WHERE phone=?")
+			.bind(r.phone).first<{ id: string }>();
+		await detachOrganization(seller!.id);
+
+		const blocked = await SELF.fetch(`${BASE}/api/v1/categories`, {
+			method: "POST",
+			headers: authHeaders(r),
+			body: JSON.stringify({ name: "Sixth" }),
+		});
+
+		expect(blocked.status).toBe(503);
+		expect((await blocked.json() as { code: string }).code).toBe("tenant_unavailable");
+		const count = await env.orderak_db.prepare("SELECT COUNT(*) AS c FROM categories WHERE store_id=?")
+			.bind(seller!.id).first<{ c: number }>();
+		expect(count!.c).toBe(0);
+	});
+});
+

@@ -165,9 +165,25 @@ export async function handleSellerOperationRoutes(
 
 	const announcementRead = path.match(/^\/api\/v1\/announcements\/(\d+)\/read$/);
 	if (announcementRead && method === "POST") {
+		// Scoped to announcements this seller can actually see, matching the GET
+		// above. It used to insert a receipt for any integer id, so a caller
+		// could record reads against announcements that were inactive, expired,
+		// targeted at another plan, or simply did not exist — writing rows the
+		// read-rate reporting then counted.
+		const announcementId = Number(announcementRead[1]);
+		const visible = await env.orderak_db.prepare(
+			`SELECT 1 AS ok FROM announcements a
+			 WHERE a.id=? AND a.active=1
+			   AND a.target_plan IN ('all', COALESCE((
+			     SELECT plan_id FROM subscriptions WHERE seller_id=? AND status='active' ORDER BY id DESC LIMIT 1
+			   ), 'free'))
+			   AND (a.starts_at IS NULL OR a.starts_at<=datetime('now'))
+			   AND (a.ends_at IS NULL OR a.ends_at>=datetime('now'))`,
+		).bind(announcementId, seller.id).first();
+		if (!visible) return jsonResponse({ error: "not_found" }, 404);
 		await env.orderak_db.prepare(
 			"INSERT OR REPLACE INTO announcement_reads(announcement_id,seller_id,read_at) VALUES(?,?,datetime('now'))",
-		).bind(Number(announcementRead[1]), seller.id).run();
+		).bind(announcementId, seller.id).run();
 		return jsonResponse({ ok: true });
 	}
 

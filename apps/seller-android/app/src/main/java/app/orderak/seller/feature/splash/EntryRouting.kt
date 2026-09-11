@@ -152,12 +152,12 @@ class EntryRouteResolver @Inject constructor(
 
         val remote = when {
             response == null -> RemoteAccountState.Unavailable
-            response.ok && response.status.equals("active", ignoreCase = true) -> {
+            response.ok && response.accountStatus.equals("active", ignoreCase = true) -> {
                 cacheStatus("active")
                 RemoteAccountState.Active
             }
             response.ok -> {
-                val status = response.status.ifBlank { "restricted" }
+                val status = response.accountStatus.ifBlank { "restricted" }
                 cacheStatus(status)
                 RemoteAccountState.Restricted(status)
             }

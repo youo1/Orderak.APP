@@ -26,6 +26,7 @@ import {
 	slugSuggestions,
 	slugify,
 	storeUrl,
+	publicSiteUrl,
 	syncVerifiedFirebaseIdentity,
 	uniqueSlug,
 	uniqueStoreCode,
@@ -230,7 +231,14 @@ export function assetLinksResponse(env: PublicWorkerEnv): Response {
 			relation: ["delegate_permission/common.handle_all_urls", "delegate_permission/common.get_login_creds"],
 			target: {
 				namespace: "android_app",
-				package_name: "app.orderak.seller",
+				// From the environment, not a literal. The staging Android flavour
+				// applies applicationIdSuffix = ".staging", so this file announced
+				// a package that staging does not install — Digital Asset Links
+				// never validated there, which takes passkeys and credential
+				// auto-fill with it. GOOGLE_PLAY_PACKAGE_NAME already carries the
+				// per-environment identity for exactly this app; a second source
+				// for the same fact is what let the two disagree.
+				package_name: env.GOOGLE_PLAY_PACKAGE_NAME || "app.orderak.seller",
 				sha256_cert_fingerprints: fingerprints,
 			},
 		},
@@ -282,7 +290,7 @@ async function completePhoneAuth(request: Request, env: PublicWorkerEnv, url: UR
 			ok: true,
 			exists: true,
 			phone,
-			store: fullStore(seller),
+			store: fullStore(env, seller),
 			recent_auth_token: recent.token,
 			recent_auth_expires_at: recent.expiresAt,
 			passkey_registration_available: featureEnabled(env, "PASSKEY_ENABLED"),
@@ -403,7 +411,7 @@ async function completeOnboarding(
 			ok: true,
 			exists: true,
 			phone: existing.phone,
-			store: fullStore(existing),
+			store: fullStore(env, existing),
 			idempotent: true,
 			recent_auth_token: recent.token,
 			recent_auth_expires_at: recent.expiresAt,
@@ -583,7 +591,7 @@ async function completeOnboarding(
 					ok: true,
 					exists: true,
 					phone: existing.phone,
-					store: fullStore(existing),
+					store: fullStore(env, existing),
 					idempotent: true,
 					recent_auth_token: recent.token,
 					recent_auth_expires_at: recent.expiresAt,
@@ -633,8 +641,8 @@ async function completeOnboarding(
 	return jsonResponse({
 		ok: true,
 		exists: true,
-		store: fullStore(store),
-		store_url: storeUrl(publicIdentifier),
+		store: fullStore(env, store),
+		store_url: storeUrl(env, publicIdentifier),
 		recent_auth_token: recent.token,
 		recent_auth_expires_at: recent.expiresAt,
 		email_verification_pending: Boolean(session.email_private),
@@ -831,7 +839,7 @@ async function passkeyAuthenticationComplete(request: Request, env: PublicWorker
 			ok: true,
 			exists: true,
 			phone: stored.phone,
-			store: fullStore(seller),
+			store: fullStore(env, seller),
 			recent_auth_token: recent.token,
 			recent_auth_expires_at: recent.expiresAt,
 		});
@@ -1157,7 +1165,7 @@ async function sendVerificationEmail(
 		email,
 		{
 			name,
-			verify_url: `https://orderak.app/verify-email?token=${encodeURIComponent(token)}`,
+			verify_url: `${publicSiteUrl(env)}/verify-email?token=${encodeURIComponent(token)}`,
 			expires_hours: String(EMAIL_TOKEN_HOURS),
 		},
 		locale,

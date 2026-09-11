@@ -1,14 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- API 31+ backups & transfer: exclude both the legacy DataStore location and
-     the encrypted shared-pref secret store that hold the backend device
-     credential. A restored/transferred app re-authenticates via Firebase OTP. -->
+<!-- API 31+ cloud backup and device-to-device transfer.
+
+     Same set as backup_rules.xml, and for the same two reasons: the encrypted
+     secret store and the session DataStore are the account credential, and
+     orderak.db holds the seller's customers — buyer phone numbers, names and
+     notes, plus the order history — which is personal data belonging to people
+     who never agreed to it being copied anywhere.
+
+     Both blocks list it. <cloud-backup> and <device-transfer> are evaluated
+     independently, so an exclusion in one says nothing about the other, and a
+     direct transfer to a new handset is exactly the case where a restored
+     customer list would be least expected.
+
+     A restored or transferred install re-authenticates through Firebase OTP and
+     re-downloads the catalogue, customers and orders from the server, so
+     nothing here is lost — only re-fetched under a fresh credential. -->
 <data-extraction-rules>
     <cloud-backup>
-        <exclude domain="file" path="datastore/session.preferences_pb" />
+        <exclude domain="file" path="datastore" />
         <exclude domain="sharedpref" path="orderak_secure_secret.xml" />
+        <exclude domain="database" path="orderak.db" />
+        <exclude domain="database" path="orderak.db-wal" />
+        <exclude domain="database" path="orderak.db-shm" />
     </cloud-backup>
     <device-transfer>
-        <exclude domain="file" path="datastore/session.preferences_pb" />
+        <exclude domain="file" path="datastore" />
         <exclude domain="sharedpref" path="orderak_secure_secret.xml" />
+        <exclude domain="database" path="orderak.db" />
+        <exclude domain="database" path="orderak.db-wal" />
+        <exclude domain="database" path="orderak.db-shm" />
     </device-transfer>
 </data-extraction-rules>

@@ -14,7 +14,32 @@ type SellerIdentityRow = {
 export const STORE_PUBLIC_COLUMNS =
 	"id, store_code, country_code, store_name, slug, public_identifier, phone, " +
 	"whatsapp, instapay, vfcash, description, email, website, address, logo_url, cover_url";
-export const PUBLIC_SITE_URL = "https://orderak.app";
+const PRODUCTION_SITE_URL = "https://orderak.app";
+const STAGING_SITE_URL = "https://staging.orderak.app";
+
+/** What a Worker needs to carry for the origin below to be derivable. */
+export type SiteUrlEnv = { DEPLOYMENT_ENVIRONMENT?: string };
+
+/**
+ * The public origin this deployment actually serves.
+ *
+ * This was a hardcoded production constant, and it made staging structurally
+ * unable to exercise three flows that run through it:
+ *
+ *   * an emailed verification link pointed at production, where the token does
+ *     not exist — so no staging email verification could ever succeed;
+ *   * `store_url` pointed at production, so a staging seller's share link
+ *     resolved to a 404 or, worse, to an unrelated production store;
+ *   * an uploaded image's URL pointed at production while the object itself sat
+ *     in orderak-media-staging, so every staging product image was broken.
+ *
+ * Derived from DEPLOYMENT_ENVIRONMENT rather than from a new variable, so there
+ * is nothing extra to set and nothing that can be set inconsistently with the
+ * hostnames the Worker is already routed on.
+ */
+export function publicSiteUrl(env: SiteUrlEnv): string {
+	return env.DEPLOYMENT_ENVIRONMENT === "staging" ? STAGING_SITE_URL : PRODUCTION_SITE_URL;
+}
 /**
  * Slugs a store may not claim, because the first path segment is also how the
  * public Worker addresses its own pages.
@@ -124,7 +149,9 @@ export async function slugSuggestions(env: Env, base: string): Promise<string[]>
 export function buildPublicIdentifier(countryIso: string, slug: string, storeCode: string): string {
 	return `${(countryIso || "XX").toUpperCase()}-${slugify(slug) || "store"}-${storeCode.toUpperCase()}`;
 }
-export function storeUrl(publicIdentifier: string): string { return `${PUBLIC_SITE_URL}/${publicIdentifier}`; }
+export function storeUrl(env: SiteUrlEnv, publicIdentifier: string): string {
+	return `${publicSiteUrl(env)}/${publicIdentifier}`;
+}
 export function countryIsoFromPhone(phone: string): string {
 	const digits = String(phone ?? "").replace(/\D/g, "");
 	if (/^201|^010|^011|^012|^015/.test(digits)) return "EG";

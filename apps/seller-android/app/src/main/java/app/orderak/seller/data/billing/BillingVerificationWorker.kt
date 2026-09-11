@@ -32,7 +32,7 @@ internal fun decideBillingVerification(response: VerifyPlayPurchaseRes): Billing
     if (response.ok && snapshot?.ok == true) return BillingVerificationDecision.Succeeded(snapshot)
     val retryableError = response.error == "network" || response.error == "bad_response" ||
         response.error?.let { it == "http_408" || it == "http_409" || it == "http_429" || it.startsWith("http_5") } == true
-    if (response.pending || response.status == "verification_pending" || retryableError) {
+    if (response.pending || response.verificationState == "verification_pending" || retryableError) {
         return BillingVerificationDecision.Retry((response.retry_after_seconds ?: 15L).coerceIn(15L, 21_600L))
     }
     return BillingVerificationDecision.Terminal(response.error ?: "verification_failed")

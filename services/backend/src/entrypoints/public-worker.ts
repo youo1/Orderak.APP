@@ -23,7 +23,7 @@ import { landingPageHtml } from "../landing";
 import { publicDesignSystemCss, publicDesignSystemResponse } from "../domains/admin/admin-theme";
 import { designSystemCss, designSystemFontPreload, loadActiveDesignSystem } from "../domains/design/design-system";
 import { createOrder } from "../domains/catalog/catalog";
-import { PUBLIC_SITE_URL } from "../domains/identity/identity";
+import { publicSiteUrl } from "../domains/identity/identity";
 import { authSeller, logError, jsonResponse, methodNotAllowed, corsHeaders, allowedCorsOrigin, readCreds, checkRateLimit, recordDeviceMetadata, enforceRequestBodyLimit, type AuthenticatedSeller } from "../platform/http/shared";
 import { getPlanLimit } from "../domains/commerce/plan-limits";
 import { handleStoreRoutes } from "../domains/stores/api-store";
@@ -35,7 +35,7 @@ import { backfillPlayAccountHashes, handleGooglePlayRoutes, reconcileGooglePlayP
 import { entitlementLimitReached, reserveUsage, voidUsageReservation } from "../domains/commerce/entitlements";
 import { handleSellerOperationRoutes } from "../domains/operations/seller-operations";
 import { handlePhoneChangeRoutes } from "../domains/identity/phone-change";
-import { requireTenantWrite, resolveTenantContextForStore, TenantWriteFencedError } from "../platform/tenancy/tenant-routing";
+import { requireTenantWrite, resolveTenantContextForStore, tenantUnavailableResponse } from "../platform/tenancy/tenant-routing";
 import { runtimeControlEnabled } from "../platform/config/runtime-config";
 import { runObservedJob } from "../platform/jobs/operational-jobs";
 import { AiTemporarilyUnavailableError, callDeepSeek } from "../integrations/ai/deepseek";
@@ -316,7 +316,7 @@ app.use("/api/v1/*", async (c, next) => {
 // Versioned: the ETag is a content hash, so clients sending If-None-Match get
 // a bodyless 304 when nothing changed.
 app.get("/api/v1/theme", (c) =>
-	cachedPublicGet(c.req.raw, c.env, wctx(c), () => publicDesignSystemResponse(c.req.raw, c.env, PUBLIC_SITE_URL)));
+	cachedPublicGet(c.req.raw, c.env, wctx(c), () => publicDesignSystemResponse(c.req.raw, c.env, publicSiteUrl(c.env))));
 app.get("/api/theme.css", (c) =>
 	cachedPublicGet(c.req.raw, c.env, wctx(c), () => publicDesignSystemCss(c.req.raw, c.env)));
 app.get("/api/theme/:file", async (c) => {
@@ -386,11 +386,8 @@ app.use("/api/v1/*", async (c, next) => {
 			try {
 				requireTenantWrite(await resolveTenantContextForStore(c.env, String(account.id)));
 			} catch (error) {
-				if (error instanceof TenantWriteFencedError) {
-					return jsonResponse({ error: "tenant_write_fenced", retryable: true }, 503, {
-						"retry-after": String(error.retryAfterSeconds),
-					});
-				}
+				const unavailable = tenantUnavailableResponse(error);
+				if (unavailable) return unavailable;
 				throw error;
 			}
 		}
