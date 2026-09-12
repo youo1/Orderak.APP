@@ -17,7 +17,7 @@
 // public_identifier and categories/products by their immutable codes.
 // ============================================================
 
-import { jsonResponse, methodNotAllowed, readCreds, authSeller, hashSecret, checkRateLimit, revokeSellerCredential, type AuthenticatedSeller, clientIpOf } from "../../platform/http/shared";
+import { jsonResponse, methodNotAllowed, readCreds, authSeller, hashSecret, checkRateLimit, revokeSellerCredential, type AuthenticatedSeller, clientIpOf, logError } from "../../platform/http/shared";
 import { uploadMedia } from "../../platform/storage/media";
 import { verifyFirebaseToken } from "../../platform/auth/local-jwt";
 import { t, pickLocale } from "../../platform/localization/i18n";
@@ -608,7 +608,20 @@ async function handleRegister(request: Request, env: Env, url: URL): Promise<Res
 				store.id,
 			)
 			.run();
-	} catch {
+	} catch (error) {
+		// Only a uniqueness collision is slug_taken.
+		//
+		// This caught everything and answered 409 "that slug is in use" to all of
+		// it, so a disk error, a constraint on another column or a malformed bind
+		// all told the seller to pick a different name — and nothing was logged,
+		// because the handler had already produced a tidy answer. The seller then
+		// picks a different name and gets the same 409, with no way to tell that
+		// the name was never the problem.
+		const message = String((error as { message?: string })?.message ?? error);
+		if (!/UNIQUE constraint failed/i.test(message)) {
+			logError(env, "store_update_failed", error);
+			return jsonResponse({ error: "store_update_failed" }, 500);
+		}
 		return jsonResponse({ error: "slug_taken", message: t(lang, "slug.taken") }, 409);
 	}
 

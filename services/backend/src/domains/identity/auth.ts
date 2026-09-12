@@ -84,14 +84,42 @@ export async function hashPassword(password: string): Promise<string> {
 }
 
 /** Verify a password against a stored "pbkdf2$..." string (constant-time). */
+/**
+ * A stored hash that no password matches, for the unknown-account case.
+ *
+ * admin-auth.ts hands this to verifyPassword when the email is not found, so
+ * that a request for an account that does not exist costs the same PBKDF2 work
+ * as one for an account that does. It used to be the literal
+ * "pbkdf2$100000$AAAA$AAAA" written inline — load-bearing for a security
+ * property nothing stated, with an iteration count that could drift from
+ * ADMIN_PBKDF2_ITERATIONS silently, and four characters that happen to be valid
+ * base64url. Built from the same constant instead, and named for what it is.
+ */
+export const UNKNOWN_ACCOUNT_HASH =
+	`pbkdf2$${ADMIN_PBKDF2_ITERATIONS}$${b64urlEncode(new Uint8Array(16))}$${b64urlEncode(new Uint8Array(32))}`;
+
+/**
+ * Total: a malformed stored hash is `false`, never a throw.
+ *
+ * b64urlDecode raises on input that is not base64url, and this runs on the admin
+ * login path — so a stored value that was truncated, or a dummy hash edited to
+ * something that no longer decodes, turned "wrong password" into an unhandled
+ * 500. The shape checks below already return false for the cases they can see;
+ * this makes the rest of the function agree with them.
+ */
 export async function verifyPassword(password: string, stored: string): Promise<boolean> {
 	const parts = stored.split("$");
 	if (parts.length !== 4 || parts[0] !== "pbkdf2") return false;
-	const iter = parseInt(parts[1], 10) || ADMIN_PBKDF2_ITERATIONS;
-	const salt = b64urlDecode(parts[2]);
-	const expected = b64urlDecode(parts[3]);
-	const actual = new Uint8Array(await deriveBits(password, salt, iter));
-	return timingSafeEqual(actual, expected);
+	try {
+		const iter = parseInt(parts[1], 10) || ADMIN_PBKDF2_ITERATIONS;
+		const salt = b64urlDecode(parts[2]);
+		const expected = b64urlDecode(parts[3]);
+		if (salt.length === 0 || expected.length === 0) return false;
+		const actual = new Uint8Array(await deriveBits(password, salt, iter));
+		return timingSafeEqual(actual, expected);
+	} catch {
+		return false;
+	}
 }
 
 export function passwordNeedsRehash(stored: string): boolean {

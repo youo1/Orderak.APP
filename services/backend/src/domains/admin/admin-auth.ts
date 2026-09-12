@@ -5,6 +5,7 @@ import {
 	hashPassword,
 	passwordNeedsRehash,
 	verifyPassword,
+	UNKNOWN_ACCOUNT_HASH,
 	verifyJwt,
 	generateTotpSecret,
 	verifyTotp,
@@ -414,7 +415,7 @@ async function login(request: Request, env: AdminWorkerEnv, lang: Locale): Promi
 	if (email && !(await checkRateLimit(env, `adminlogin:account:${email}`, 10, 900))) return jsonResponse({ error: "rate_limited" }, 429);
 	if (!(await checkRateLimit(env, `adminlogin:${ip}:${email}`, 15, 300))) return jsonResponse({ error: "rate_limited" }, 429);
 	const row = await env.orderak_db.prepare("SELECT * FROM admin_users WHERE email=? AND active=1").bind(email).first<AdminRow>();
-	const ok = await verifyPassword(password, row?.password_hash ?? "pbkdf2$100000$AAAA$AAAA");
+	const ok = await verifyPassword(password, row?.password_hash ?? UNKNOWN_ACCOUNT_HASH);
 	if (!row || !ok) {
 		await auditDb(env, null, "admin.login_failed", { email }, request);
 		return jsonResponse({ error: "bad_credentials", message: t(lang, "admin.login.bad") }, 401);
