@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Bell, ChevronDown, Command, LogOut, Menu, Search, ShieldCheck, X } from 'lucide-react';
 import { sections } from '@/app/config/sections';
@@ -71,7 +71,11 @@ export function AppShell() {
     </aside>
     <div className="workspace">
       <header className="topbar"><button className="menu-button" aria-controls="admin-navigation" aria-expanded={navigationExpanded} aria-label={navigationLabel} onClick={toggleNavigation}><Menu size={19} /></button><div className="breadcrumb"><Link to="/">Admin</Link><span>/</span><strong>{current?.label || 'Control Center'}</strong></div><div className="topbar-actions"><span className="secure-label"><ShieldCheck size={15} /> Secure session</span><button className="icon-button" aria-label="Security alerts" onClick={() => navigate('/system/security')}><Bell size={18} /></button><button className="profile-button" onClick={() => navigate('/system/security')}><span>{auth.admin?.email}</span><ChevronDown size={14} /></button></div></header>
-      <main className="page"><Outlet /></main>
+      {/* One boundary for every routed page, because they are all code-split
+          now. Inside <main> rather than around the shell, so the navigation and
+          header stay painted while a destination chunk loads — a fallback that
+          replaced the whole console would read as a page reload on every click. */}
+      <main className="page"><Suspense fallback={<div className="ork-spinner" aria-label="Loading" />}><Outlet /></Suspense></main>
     </div>
     {paletteOpen && <CommandPalette sections={visible} close={() => setPaletteOpen(false)} navigate={path => { navigate(path); setPaletteOpen(false); }} />}
   </div>;

@@ -23,11 +23,31 @@ export default {
         headers: { accept: "text/css" },
         redirect: "follow",
       });
-      const headers = new Headers(theme.headers);
-      headers.set("content-type", "text/css; charset=utf-8");
-      headers.set("cache-control", "public, max-age=60");
-      headers.delete("set-cookie");
-      return new Response(theme.body, { status: theme.status, headers });
+      // The upstream status used to be forwarded while the cache policy was set
+      // unconditionally, so a 502 from the theme origin was relabelled as CSS
+      // and marked publicly cacheable for a minute — one bad response became a
+      // minute of them.
+      //
+      // Fail to an empty stylesheet instead of propagating. The console renders
+      // unstyled-but-usable without its theme; serving an error body as a
+      // stylesheet is strictly worse, and caching it is worse again.
+      if (!theme.ok) {
+        return new Response("/* theme unavailable */", {
+          status: 200,
+          headers: { "content-type": "text/css; charset=utf-8", "cache-control": "no-store" },
+        });
+      }
+      // Only the headers this response actually needs. Copying the upstream set
+      // wholesale carried whatever the origin happened to send — the deleted
+      // set-cookie was the visible case, not the only one.
+      return new Response(theme.body, {
+        status: 200,
+        headers: {
+          "content-type": "text/css; charset=utf-8",
+          "cache-control": "public, max-age=60",
+          "x-content-type-options": "nosniff",
+        },
+      });
     }
 
     const asset = await env.ASSETS.fetch(request);
