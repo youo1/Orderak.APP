@@ -233,14 +233,62 @@ export function constantTimeEqual(a: string, b: string): boolean {
 	return diff === 0;
 }
 
-// Failed-auth throttle: after AUTH_FAIL_LIMIT wrong secrets for a phone within
-// AUTH_FAIL_WINDOW seconds, further attempts are rejected without touching
-// crypto or the devices table. A legitimate device never fails auth (its secret
-// is stored), so real users are unaffected; the residual trade-off is that an
-// attacker spamming junk secrets can lock a phone out for the remainder of a
-// window — pair with a per-IP Cloudflare WAF rate rule for defense in depth.
+/**
+ * Keys per `IN (...)` list built from a variable-length array.
+ *
+ * D1 rejects a statement carrying more than 100 bound parameters, so this is a
+ * correctness bound and not a tuning knob: it may fall, it may not rise above
+ * 100, and it must leave room for the other parameters in the same statement
+ * (a store id, a tenant id) which is why it is 90 rather than 100.
+ *
+ * Every dynamic `IN (...)` in this codebase must either chunk by this constant
+ * or carry a stated upper bound at the site — verify-d1-parameter-bounds.mjs
+ * fails CI on any that does neither. Two have already shipped past that line:
+ * the media sweep destroyed R2 objects and then wedged on the D1 delete, and
+ * the entitlement editor failed on a full plan revision.
+ */
+export const D1_IN_CHUNK = 90;
+
+// Failed-auth throttle: after AUTH_FAIL_LIMIT wrong secrets for one (phone, IP)
+// pair within AUTH_FAIL_WINDOW seconds, further attempts from that IP are
+// rejected without touching crypto or the devices table.
+//
+// The IP is part of the key, and that is the whole point of it.
+//
+// This counter used to be keyed on the phone alone. A seller's phone number is
+// not a secret — STORE_PUBLIC_COLUMNS publishes it and the storefront renders
+// it as a wa.me link — so twenty junk requests from anywhere on the internet
+// locked every one of that seller's own devices out of their account for the
+// rest of the window, renewable for twenty requests per five minutes. The
+// control intended to stop an attacker was a denial-of-service primitive
+// against the account it was protecting, and it needed no credential to fire.
+//
+// Scoping to (phone, IP) keeps the load-shedding property — a hammering client
+// still gets refused before any crypto or DB work — while confining the refusal
+// to the address doing the hammering. The seller's own device, on its own
+// address, is never affected by someone else's failures.
+//
+// Dropping the phone-wide refusal costs nothing against the threat it named.
+// Device secrets are ~122 bits of CSPRNG output (newSecret below), so a
+// distributed guessing attack does not become feasible by being distributed;
+// it stays infeasible. What the phone-wide counter actually produced was the
+// lockout above. Failures are still logged per phone, so a spread-out attempt
+// remains visible even though it is no longer answered with a lockout.
 const AUTH_FAIL_LIMIT = 20;
 const AUTH_FAIL_WINDOW = 300; // seconds
+
+/**
+ * The address a failed attempt is charged to.
+ *
+ * `null` means the caller genuinely has no request to read one from. Those
+ * callers do not get a throttle: an unscoped bucket is exactly the defect above,
+ * and a bucket shared by every unknown-IP caller is the same defect wearing a
+ * different key. Every network-reachable path passes a real address — this is
+ * for internal callers that authenticate a seller without an inbound request.
+ */
+export function clientIpOf(request: Request): string {
+	return request.headers.get("cf-connecting-ip")?.trim() || "unknown";
+}
 
 /**
  * Read the failure counter from whichever store recordAuthFailure() writes to.
@@ -251,8 +299,8 @@ const AUTH_FAIL_WINDOW = 300; // seconds
  * absent row, always returned false, and the brute-force lockout silently
  * stopped existing. Both halves now resolve the backing store the same way.
  */
-async function authFailuresExceeded(env: Env, phone: string): Promise<boolean> {
-	const bucket = `authfail:${phone}`;
+async function authFailuresExceeded(env: Env, phone: string, ip: string): Promise<boolean> {
+	const bucket = `authfail:${phone}:${ip}`;
 	try {
 		const now = Math.floor(Date.now() / 1000);
 		const windowStart = now - (now % AUTH_FAIL_WINDOW);
@@ -273,14 +321,20 @@ async function authFailuresExceeded(env: Env, phone: string): Promise<boolean> {
 	}
 }
 
-async function recordAuthFailure(env: Env, phone: string): Promise<void> {
-	try {
+async function recordAuthFailure(env: Env, phone: string, ip: string | null): Promise<void> {
+	if (ip !== null) try {
 		// Reuse the fixed-window counter; the "limit" is irrelevant here because
-		// authFailuresExceeded() reads the count directly.
-		await checkRateLimit(env, `authfail:${phone}`, Number.MAX_SAFE_INTEGER, AUTH_FAIL_WINDOW);
+		// authFailuresExceeded() reads the count directly. The key must match
+		// authFailuresExceeded()'s exactly — when these two drifted apart before,
+		// the throttle silently stopped existing.
+		await checkRateLimit(env, `authfail:${phone}:${ip}`, Number.MAX_SAFE_INTEGER, AUTH_FAIL_WINDOW);
 	} catch {
 		// Best-effort.
 	}
+	// The phone-wide view, kept as a signal now that it is no longer a refusal.
+	// A single attacker rotating addresses defeats the per-IP counter by design;
+	// this is what makes that attempt visible rather than silent.
+	console.warn(JSON.stringify({ signal: "seller_auth_failed", phone_suffix: phone.slice(-4) }));
 }
 
 /**
@@ -289,7 +343,8 @@ async function recordAuthFailure(env: Env, phone: string): Promise<void> {
  * Stored formats: "sha256$..." (current), "pbkdf2$..." (previous), or legacy
  * plaintext. Older formats keep working and are transparently upgraded to
  * sha256 on first successful login — no re-registration needed.
- * Repeated failures for a phone are throttled (see AUTH_FAIL_LIMIT above).
+ * Repeated failures from one address against one phone are throttled (see
+ * AUTH_FAIL_LIMIT above); failures from elsewhere never affect this caller.
  */
 export type AuthenticatedSeller = Record<string, unknown>;
 
@@ -297,11 +352,14 @@ export async function authSeller(
 	env: Env,
 	phone: string,
 	secret: string,
+	clientIp: string | null,
 ): Promise<AuthenticatedSeller | null> {
 	if (!phone || !secret) return null;
-	if (await authFailuresExceeded(env, phone)) return null;
+	// Only a known address can be throttled. See clientIpOf() for why a null
+	// address is not quietly folded into a shared bucket instead.
+	if (clientIp !== null && await authFailuresExceeded(env, phone, clientIp)) return null;
 	const seller = await verifySeller(env, phone, secret);
-	if (!seller) await recordAuthFailure(env, phone);
+	if (!seller) await recordAuthFailure(env, phone, clientIp);
 	return seller;
 }
 

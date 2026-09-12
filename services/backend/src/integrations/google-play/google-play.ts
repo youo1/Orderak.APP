@@ -1,4 +1,4 @@
-import { authSeller, jsonResponse, readCreds, type AuthenticatedSeller } from "../../platform/http/shared";
+import { authSeller, jsonResponse, readCreds, type AuthenticatedSeller, clientIpOf } from "../../platform/http/shared";
 import { ensureOrganizationForStore, resolveEntitlementsForClient } from "../../domains/commerce/entitlements";
 import {
 	acquireProviderPermit,
@@ -1084,7 +1084,7 @@ export async function handleGooglePlayRoutes(
 	if (url.pathname === "/api/v1/billing/google/verify" && request.method === "POST") {
 		if (!lifecycleEnabled(env)) return jsonResponse({ error: "billing_lifecycle_disabled" }, 403);
 		const { phone, secret } = readCreds(request, url);
-		const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret);
+		const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret, clientIpOf(request));
 		if (!seller) return jsonResponse({ error: "auth" }, 401);
 		const body = await request.json<Json>().catch(() => ({} as Json));
 		const purchaseToken = String(body.purchase_token ?? "");
@@ -1123,7 +1123,7 @@ export async function handleGooglePlayRoutes(
 	if (verificationMatch && request.method === "GET") {
 		if (!lifecycleEnabled(env)) return jsonResponse({ error: "billing_lifecycle_disabled" }, 403);
 		const { phone, secret } = readCreds(request, url);
-		const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret);
+		const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret, clientIpOf(request));
 		if (!seller) return jsonResponse({ error: "auth" }, 401);
 		const job = await loadJob(env, verificationMatch[1]);
 		if (!job || job.seller_id !== String(seller.id)) return jsonResponse({ error: "verification_not_found" }, 404);

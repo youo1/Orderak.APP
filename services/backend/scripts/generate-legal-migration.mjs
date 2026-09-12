@@ -1,13 +1,42 @@
 import { readFile, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const backendDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const repoDir = resolve(backendDir, "..");
-const outputName = process.argv[2] ?? "034_publish_legal_v3.sql";
-if (!/^\d{3}_[a-z0-9_]+\.sql$/.test(outputName)) {
-  throw new Error("Output must be a migration filename such as 034_publish_legal_v3.sql");
+// Two levels: backendDir is services/backend, so one "…/.." is services/, which
+// has no docs/ in it. The generator could not read a single source file and had
+// not been runnable for as long as this line has been here.
+const repoDir = resolve(backendDir, "..", "..");
+// No default. This used to fall back to "034_publish_legal_v3.sql", which is a
+// migration that exists and has been applied — so running the generator with no
+// argument to draft the next legal revision silently overwrote an applied one.
+// Nothing would have caught it: verify-migrations.mjs lints filenames and does
+// not checksum applied files, and wrangler matches applied state by name, so the
+// edited content would never reach production while the repository asserted a
+// history that was never applied. That is the exact divergence 039b and 041 were
+// written to repair, reachable here from a defaulted argument.
+const outputName = process.argv[2];
+if (!outputName) {
+  throw new Error(
+    "Pass the migration filename explicitly, e.g. 056_publish_legal_v4.sql. " +
+    "There is deliberately no default: the previous one named an already-applied migration.",
+  );
 }
+if (!/^\d{3}_[a-z0-9_]+\.sql$/.test(outputName)) {
+  throw new Error("Output must be a migration filename such as 056_publish_legal_v4.sql");
+}
+
+const output = join(backendDir, "migrations", outputName);
+// Applied migrations are immutable. Refuse rather than overwrite: an edit to a
+// file wrangler has already recorded as applied never reaches any database, so
+// the repository would claim a history that no environment has.
+if (existsSync(output)) {
+  throw new Error(
+    `${outputName} already exists. Applied migrations are immutable — pass the next unused number.`,
+  );
+}
+
 
 const pages = [
   ["terms", "en", "terms-of-service.md"],
@@ -100,6 +129,5 @@ for (const [slug, lang, file] of pages) {
 }
 
 sql.push("");
-const output = join(backendDir, "migrations", outputName);
 await writeFile(output, sql.join("\n"), "utf8");
 console.log(`Wrote ${output}`);

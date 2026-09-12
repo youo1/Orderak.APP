@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { BASE, SELF, authHeaders, createSchema, env, registerStore, type Registered } from "./helpers";
+import { handlePhoneChangeRoutes } from "../src/domains/identity/phone-change";
 
 /**
  * The app-version policy, as a control rather than a notice.
@@ -125,6 +126,36 @@ describe("version policy enforcement", () => {
 		const r = await registerStore({ phone: "+201500009013", country_iso: "EG" });
 		await setPolicy({ minimum_version_code: 50, enforce_after: "2099-01-01 00:00:00" });
 		expect((await writeStore(r, headers(r, "49"))).status).toBe(200);
+	});
+
+	it("refuses a phone change from a client the policy has stopped", async () => {
+		// phone-change resolves in public-worker's pre-auth fan-out, above the
+		// middleware that applies this gate, so it never reached it — but unlike
+		// register and sign-in it is a *credentialed* write. The exemption below
+		// exists because the pre-auth surface sends no device headers at all; a
+		// client changing its phone number already holds a credential and sends
+		// them like any other write.
+		//
+		// Between them these two routes move the account to a new phone number and
+		// re-provision the device secret. A build the policy has blocked could not
+		// rename the store and could change the number the account is reached at.
+		const r = await registerStore({ phone: "+201500009017", country_iso: "EG" });
+		await setPolicy({ maintenance_mode: 1 });
+
+		const enabled = { ...env, PHONE_CHANGE_ENABLED: "true", FIREBASE_WEB_API_KEY: "test-key" };
+		const path = `${BASE}/api/v1/auth/phone-change/challenges`;
+		const res = await handlePhoneChangeRoutes(
+			new Request(path, {
+				method: "POST",
+				headers: { "content-type": "application/json", ...headers(r, "999999") },
+				body: JSON.stringify({ new_phone: "+201500009018", id_token: "irrelevant" }),
+			}),
+			enabled as unknown as Parameters<typeof handlePhoneChangeRoutes>[1],
+			new URL(path),
+		);
+
+		expect(res?.status).toBe(403);
+		expect(await res!.json()).toMatchObject({ version_status: "maintenance" });
 	});
 
 	it("does not refuse reads", async () => {

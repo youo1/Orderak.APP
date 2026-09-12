@@ -19,13 +19,9 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { env } from "cloudflare:test";
 import { createSchema } from "./helpers";
-// Vite resolves `?raw` at runtime; TypeScript cannot model it here, because an
-// ambient wildcard module declaration only matches a *non-relative* specifier
-// and this one is relative. An alias would fix the types at the cost of adding
-// build configuration for a test-only concern, so the suppression stays local —
-// and @ts-expect-error fails loudly if the import ever does resolve, rather than
-// rotting into a comment nobody rechecks.
-// @ts-expect-error -- see above: `?raw` has no type declaration for a relative path
+// `?raw` is typed now: test/env.d.ts references vite/client, which declares it.
+// This carried a @ts-expect-error until then, with a comment saying it would
+// fail loudly if the import ever did resolve. It did, and it did.
 import deletionSource from "../src/domains/identity/deletion.ts?raw";
 
 /** Every table named by a `DELETE FROM x` in the erasure path. */

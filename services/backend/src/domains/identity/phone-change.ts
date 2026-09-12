@@ -1,7 +1,8 @@
 import { verifyFirebasePhone } from "../stores/api-store";
+import { versionGateRefusal } from "../../platform/config/config";
 import { revokeRecentAuthProofsStatement } from "./auth-v2";
 import { playAccountHash, validE164 } from "./identity";
-import { authSeller, hashSecret, jsonResponse, methodNotAllowed, readCreds } from "../../platform/http/shared";
+import { authSeller, hashSecret, jsonResponse, methodNotAllowed, readCreds, clientIpOf } from "../../platform/http/shared";
 
 type Body = Record<string, unknown>;
 const CHALLENGE_TTL_SECONDS = 600;
@@ -34,11 +35,22 @@ export async function handlePhoneChangeRoutes(request: Request, env: Env, url: U
 	}
 
 	const { phone, secret } = readCreds(request, url);
-	const seller = await authSeller(env, phone, secret);
+	const seller = await authSeller(env, phone, secret, clientIpOf(request));
 	if (!seller) return jsonResponse({ error: "auth" }, 401);
 	if (seller.status && seller.status !== "active") {
 		return jsonResponse({ error: "account_restricted", status: seller.status }, 403);
 	}
+	// The version gate, applied here rather than inherited.
+	//
+	// public-worker runs it as middleware after the credential middleware, but
+	// these routes resolve in the pre-auth fan-out above it and authenticate
+	// themselves — so they never reached it. Both are POSTs, and between them
+	// they move the account to a new phone number and re-provision the device
+	// credential. A client the governance policy has marked force_update or
+	// blocked could not create an order and could change the phone number the
+	// account is reached at, which is the wrong way round.
+	const outdated = await versionGateRefusal(env, request, seller as Record<string, unknown>);
+	if (outdated) return outdated;
 
 	if (url.pathname.endsWith("/challenges")) {
 		const newPhone = String(body.new_phone ?? "");

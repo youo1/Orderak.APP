@@ -1,4 +1,4 @@
-import { authSeller, jsonResponse, methodNotAllowed, readCreds, type AuthenticatedSeller } from "../../platform/http/shared";
+import { authSeller, jsonResponse, methodNotAllowed, readCreds, type AuthenticatedSeller, clientIpOf } from "../../platform/http/shared";
 import { pickLocale } from "../../platform/localization/i18n";
 import { auditDb } from "../admin/admin-auth";
 
@@ -37,7 +37,7 @@ async function sellerFor(
 ): Promise<Row | null> {
 	if (authenticatedSeller !== undefined) return authenticatedSeller;
 	const { phone, secret } = readCreds(request, url);
-	return authSeller(env, phone, secret);
+	return authSeller(env, phone, secret, clientIpOf(request));
 }
 
 function boundedText(value: unknown, max: number): string {
