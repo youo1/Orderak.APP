@@ -98,6 +98,8 @@ export function retentionRuleTables(): string[] {
 export async function runRetentionCleanup(env: Env): Promise<number> {
 	let total = 0;
 	const counts: Record<string, number> = {};
+	/** Rules that exhausted MAX_BATCHES_PER_RULE with rows still matching. */
+	const backlogged: string[] = [];
 	try {
 		for (const rule of CLEANUP_RULES) {
 			let affectedForRule = 0;
@@ -112,11 +114,39 @@ export async function runRetentionCleanup(env: Env): Promise<number> {
 				const affected = Number(result.meta.changes ?? result.meta.rows_written ?? 0);
 				affectedForRule += affected;
 				if (affected < RETENTION_BATCH_SIZE) break;
+				// Past the early break on the final batch: rows still match this
+				// rule, so it did not finish and will start tomorrow further behind
+				// than it started today.
+				//
+				// `counts` below already reports how many rows each rule deleted,
+				// but a count alone cannot tell "10,000 because that was all there
+				// was" from "10,000 because this is the ceiling" — both log the same
+				// number, and only the second one is a problem. Without this, a rule
+				// that can no longer keep up reports success indefinitely, which is
+				// indistinguishable from the rule not existing. inbound_emails
+				// carries a written two-year retention commitment; error_logs,
+				// ad_impressions and email_events are the rules most likely to reach
+				// this first.
+				if (batch === MAX_BATCHES_PER_RULE - 1) {
+					backlogged.push(rule.label);
+					console.error(JSON.stringify({
+						signal: "retention_backlog",
+						rule: rule.label,
+						deleted: affectedForRule,
+					}));
+				}
 			}
 			counts[rule.label] = affectedForRule;
 			total += affectedForRule;
 		}
-		console.log(JSON.stringify({ signal: "retention_cleanup_completed", affected_total: total, counts }));
+		console.log(JSON.stringify({
+			signal: "retention_cleanup_completed",
+			affected_total: total,
+			counts,
+			// Empty on a healthy run. Named on the summary line as well as its own
+			// signal so one log entry answers "did everything finish?".
+			backlogged,
+		}));
 		return total;
 	} catch (error) {
 		console.error(JSON.stringify({ signal: "retention_cleanup_failed", message: error instanceof Error ? error.message : "unknown" }));

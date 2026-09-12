@@ -111,9 +111,25 @@ describe("admin browser security contract", () => {
 		const { authorization_id } = await authorization.json<{ authorization_id: string }>();
 		const download = await call("/api/admin/v1/exports/sensitive/download", { method: "POST", headers: { ...headers, "x-admin-action-authorization": authorization_id }, body: "{}" });
 		expect(download.status).toBe(200);
+		// The one-use token rides a cookie, never the URL: a query parameter
+		// outlives its own five-minute expiry in every log that saw the request,
+		// and these artifacts are bulk exports of buyer and store data.
+		const downloadCookie = download.headers.getSetCookie()
+			.find((cookie) => cookie.startsWith("__Secure-orderak_export_download="));
+		expect(downloadCookie).toBeDefined();
+		expect(downloadCookie).toContain("Path=/api/admin/v1/exports");
+		expect(downloadCookie).toContain("HttpOnly");
+		expect(downloadCookie).toContain("SameSite=Strict");
 		const { download_url } = await download.json<{ download_url: string }>();
-		expect((await call(download_url, { headers: { cookie: owner.cookie } })).status).toBe(200);
+		expect(download_url).not.toContain("token");
+		expect(download_url).not.toContain("?");
+		const withToken = `${owner.cookie}; ${downloadCookie!.split(";")[0]}`;
+		// Without the cookie the session alone is not enough. Checked first
+		// because it must not consume the token — the guard returns before the
+		// row is marked downloaded.
 		expect((await call(download_url, { headers: { cookie: owner.cookie } })).status).toBe(403);
+		expect((await call(download_url, { headers: { cookie: withToken } })).status).toBe(200);
+		expect((await call(download_url, { headers: { cookie: withToken } })).status).toBe(403);
 		await env.orderak_db.prepare("INSERT INTO admin_exports(id,export_type,classification,filters_json,status,r2_key,expires_at,requested_by) VALUES('expired','stores','internal','{}','completed','exports/sensitive.csv',datetime('now','-1 minute'),1)").run();
 		expect((await call("/api/admin/v1/exports/expired/download", { method: "POST", headers, body: "{}" })).status).toBe(404);
 	});

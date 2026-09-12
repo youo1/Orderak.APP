@@ -150,36 +150,87 @@ function jsonInScript(value: unknown): string {
 /**
  * The storefront's content security policy.
  *
- * Deliberately not a nonce policy. This page carries inline `onclick` handlers
- * on every quantity button and an inline order script, so `script-src` cannot
- * drop `unsafe-inline` without rewriting both — and a policy that breaks the
- * order form protects nothing, because the page stops selling.
+ * `script-src` was `'unsafe-inline'`, and the reasoning recorded here was that
+ * the page could not drop it: the quantity buttons carried `onclick` and the
+ * form carried `onsubmit`, so a stricter policy would have broken the order
+ * form, and a policy that stops the page selling protects nothing. That was a
+ * true constraint about the markup, not about CSP — the markup has since moved
+ * those three handlers into the one inline script block (see the delegated
+ * listeners at the end of it), which leaves nothing that a hash cannot cover.
  *
- * What it does buy, even with `unsafe-inline`, is the difference between script
- * running and script being useful: `connect-src 'self'` means injected script
- * cannot post a buyer's phone number or the seller's catalogue to another
- * origin, `default-src 'none'` and `object-src` leave nothing else to load, and
- * `base-uri 'none'` stops a `<base>` tag repointing every relative URL on the
- * page. The escaping above is the fix; this is what is left standing if another
+ * What that buys is the layer the escaping does not. `connect-src 'self'` was
+ * already the difference between injected script running and injected script
+ * being useful — it cannot post a buyer's phone number or the seller's
+ * catalogue to another origin — and `default-src 'none'` plus `base-uri 'none'`
+ * leave nothing else to load or repoint. Now injected script does not run at
+ * all unless its bytes were on the page when the hash was computed. jsonInScript()
+ * remains the fix for the injection itself; this is what stands if another
  * injection point is ever found.
  *
  * `img-src` admits any https host because `logo_url`, `cover_url` and
  * `image_url` are seller-supplied and validated only for scheme. `font-src` is
  * self only — the design system serves its own woff2 from /static/fonts.
  */
-const STOREFRONT_CSP = [
+/**
+ * Everything in the storefront policy except `script-src`, which is computed
+ * per response — see scriptSrcDirective() below.
+ */
+const STOREFRONT_CSP_BASE = [
 	"default-src 'none'",
 	"img-src 'self' https: data:",
 	"style-src 'self' 'unsafe-inline'",
-	"script-src 'unsafe-inline'",
 	"font-src 'self'",
 	"connect-src 'self'",
 	"form-action 'none'",
 	"base-uri 'none'",
 	"frame-ancestors 'self'",
-].join("; ");
+];
 
-function pageShell(head: string, body: string, theme: Theme, generatedCss: string, lang: Locale, siteUrl: string, cacheSeconds = 0): Response {
+/** Matches one inline script element; capture group 1 is its exact content. */
+const INLINE_SCRIPT = /<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g;
+
+/**
+ * A `script-src` naming the SHA-256 of every inline script actually on the page.
+ *
+ * This directive was `script-src 'unsafe-inline'`, which is the one place the
+ * header discipline applied everywhere else in this system was not applied. The
+ * escaping around it is careful — see jsonInScript() above, which exists because
+ * a product name containing `</script>` really did close the element — but
+ * 'unsafe-inline' gives away the layer that would contain the next such mistake
+ * rather than rely on having found them all. These are the pages that render
+ * seller-authored text to buyers and collect a buyer's phone number and address.
+ *
+ * Hashes rather than a nonce, specifically because of the edge cache. These
+ * responses are stored in caches.default by cachedPublicGet() in
+ * public-worker.ts, header and body together, so a per-response nonce would be
+ * served to every subsequent visitor from cache — the same value for everyone,
+ * which is exactly what a nonce must not be. A content hash has no such
+ * requirement: it is a property of the markup, so caching the pair is correct.
+ *
+ * Computed from the assembled HTML rather than from the fragments that built it,
+ * so the hash cannot drift from what ships. The non-greedy match to the first
+ * `</script>` is correct by construction here for the same reason jsonInScript()
+ * escapes `<`: no inline block on these pages can contain that sequence.
+ *
+ * The `application/ld+json` block is hashed too. It is a data block and never
+ * executes, but browsers apply script-src to script elements regardless of type,
+ * and a blocked structured-data block fails silently — the page looks fine and
+ * the SEO markup is simply gone.
+ */
+async function scriptSrcDirective(html: string): Promise<string> {
+	const sources: string[] = [];
+	for (const [, content] of html.matchAll(INLINE_SCRIPT)) {
+		if (!content) continue;
+		const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(content));
+		sources.push(`'sha256-${btoa(String.fromCharCode(...new Uint8Array(digest)))}'`);
+	}
+	// A page with no inline script gets 'none', not an empty directive: an empty
+	// script-src falls back to default-src, which is already 'none' here, but
+	// saying it explicitly keeps the header readable and the intent obvious.
+	return sources.length ? `script-src ${sources.join(" ")}` : "script-src 'none'";
+}
+
+async function pageShell(head: string, body: string, theme: Theme, generatedCss: string, lang: Locale, siteUrl: string, cacheSeconds = 0): Promise<Response> {
 	const html = `<!doctype html>
 <html lang="${lang}" dir="${dirFor(lang)}"><head>
 ${head}
@@ -191,7 +242,7 @@ ${body}
 	const headers: Record<string, string> = {
 		"content-type": "text/html; charset=utf-8",
 		"content-language": lang,
-		"content-security-policy": STOREFRONT_CSP,
+		"content-security-policy": [...STOREFRONT_CSP_BASE, await scriptSrcDirective(html)].join("; "),
 		vary: "Accept-Language",
 	};
 	// Anonymous listing pages can be edge-cached briefly — a viral store link
@@ -247,15 +298,27 @@ function productCard(store: Store, p: Record<string, unknown>, linkToPage: boole
 		${img}
 		<div class="info">${nameHtml}<div class="price">${amountLabel(Number(p.price_minor), String(p.currency || DEFAULT_CURRENCY) as Currency, lang)} ${esc(t(lang, "catalog.currency"))}</div></div>
 		<div class="qty">
-			<button type="button" aria-label="${esc(t(lang, "catalog.decrease"))}" onclick="chg('${code}',-1)">−</button>
+			<button type="button" aria-label="${esc(t(lang, "catalog.decrease"))}" data-qty-delta="-1">−</button>
 			<span id="q_${code}">0</span>
-			<button type="button" aria-label="${esc(t(lang, "catalog.increase"))}" onclick="chg('${code}',1,${p.stock})">+</button>
+			<button type="button" aria-label="${esc(t(lang, "catalog.increase"))}" data-qty-delta="1" data-qty-max="${Number(p.stock)}">+</button>
 		</div>
 	</div>`;
 }
 
 // Order form + client script. Posts item {product_code, qty} lists to the
 // store's public_identifier root — codes only, never UUIDs.
+//
+// Every handler lives inside the one script block, bound by delegation at the
+// bottom of it. The quantity buttons used to carry onclick="chg(...)" and the
+// form onsubmit="return send(event)"; a hash-based script-src does not cover
+// inline event handlers, so those three attributes would have stopped working
+// the moment 'unsafe-inline' was dropped — and failed quietly, because the page
+// still renders and the form still accepts a phone number while no button adds
+// anything to the basket. The click listener is on document rather than
+// per-button because the cards are server-rendered and never change after load.
+//
+// Explanatory comments belong here and not in the template literal below: this
+// script ships to every buyer on every page view, on metered mobile data.
 function orderForm(store: Store, lang: Locale, currency: Currency): string {
 	const postUrl = "/" + esc(store.public_identifier);
 	const js = (key: string) => jsonInScript(t(lang, key));
@@ -280,7 +343,7 @@ function orderForm(store: Store, lang: Locale, currency: Currency): string {
 		`<option value="COD">${esc(t(lang, "catalog.cod"))}</option>`,
 	].join("");
 	return `
-<form id="f" onsubmit="return send(event)">
+<form id="f">
 	<div class="total">${esc(t(lang, "catalog.total"))}: <span id="total">0</span> ${esc(t(lang, "catalog.currency"))}</div>
 	<label for="phone">${esc(t(lang, "catalog.phone"))}</label>
 	<input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="${esc(t(lang, "catalog.phone_placeholder"))}" required>
@@ -338,6 +401,15 @@ async function send(e){
 	ok.style.display='block';window.scrollTo(0,document.body.scrollHeight);
 	return false;
 }
+document.addEventListener('click',function(e){
+	var btn=e.target&&e.target.closest?e.target.closest('[data-qty-delta]'):null;
+	if(!btn)return;
+	var card=btn.closest('.card');
+	if(!card)return;
+	var max=btn.dataset.qtyMax;
+	chg(card.dataset.code,Number(btn.dataset.qtyDelta),max===undefined?null:Number(max));
+});
+document.getElementById('f').addEventListener('submit',send);
 </script>`;
 }
 
