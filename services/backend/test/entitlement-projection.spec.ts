@@ -125,6 +125,61 @@ describe("legacy entitlement projection", () => {
 		}
 	});
 
+	// The defect PLAY_PROJECTION_PENDING names, asserted rather than described.
+	//
+	// This test passes because the behaviour is wrong. That is deliberate: the
+	// gap is real, it is not reachable while billing is disabled, and fixing it
+	// means deciding how two plan vocabularies line up — legacy free / starter /
+	// professional against v2 free / paid1 / paid2 / paid3, three tiers against
+	// four, at prices that are not the same numbers.
+	//
+	// So this is a tripwire in both directions. verify-billing-entitlement-path
+	// fails the build if billing is enabled while the gap is open; this fails the
+	// moment somebody closes the gap, so the marker, the guard and this test are
+	// retired together rather than left behind claiming a problem that is gone.
+	it("does not yet carry a Play purchase into the client snapshot (PLAY_PROJECTION_PENDING)", async () => {
+		// createSchema clears the tables the migrations seeded, so the v2 plan
+		// catalogue has to be put back before a revision can be pointed at.
+		await seedEntitlementCatalogue();
+		const r = await registerStore({ phone: "+201500003190" });
+		const storeId = await storeIdOf(r);
+
+		// Registration already gives the store its organization, which is what
+		// verifyAndApplyPlayPurchase resolves the purchase against.
+		const org = await env.orderak_db
+			.prepare("SELECT id FROM organizations WHERE owner_store_id=?")
+			.bind(storeId).first<{ id: string }>();
+		expect(org?.id, "a registered store should already have an organization").toBeTruthy();
+
+		// A google_play subscription row may only be written at the organization's
+		// current verification generation — trg_google_subscription_generation_insert
+		// (migration 030) aborts anything staler, which is what stops a replayed
+		// verification reinstating a lapsed subscription.
+		await env.orderak_db.prepare(
+			"INSERT INTO billing_verification_heads(organization_id,latest_generation) VALUES(?,1)",
+		).bind(org!.id).run();
+
+		// What the verifier writes on a successful verification.
+		await env.orderak_db.prepare(
+			`INSERT INTO organization_subscriptions(id,organization_id,plan_revision_id,source,status,
+			                                        current_period_end,verification_generation)
+			 VALUES('sub-play',?,(SELECT current_revision_id FROM subscription_plans WHERE plan_key='paid2'),
+			        'google_play','active',datetime('now','+30 days'),1)`,
+		).bind(org!.id).run();
+
+		// The row really is there, so a "free" answer below is the projection
+		// missing rather than the seeding failing.
+		const written = await env.orderak_db
+			.prepare("SELECT status FROM organization_subscriptions WHERE organization_id=?")
+			.bind(org!.id).first<{ status: string }>();
+		expect(written?.status).toBe("active");
+
+		// The seller has paid Google and the purchase is recorded. The app asks
+		// for its entitlements the only way it can, and is told it is on free.
+		const snapshot = await resolveEntitlementsForClient(engineOff(), storeId);
+		expect(snapshot.plan_key).toBe("free");
+	});
+
 	it("keeps the customer editor closed on free and open on a paid plan", async () => {
 		// The catalogue's plan revisions put this at `disabled` on free and
 		// `Included` on all three paid tiers, and the legacy plans table has no
