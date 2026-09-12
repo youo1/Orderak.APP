@@ -58,15 +58,22 @@ android {
     // 1.12.0 refuses to link against anything older. AGP 8.13.2 capped at 36,
     // which is why the plugin, Gradle, and this all move together.
     //
-    // targetSdk deliberately stays at 35. compileSdk only widens the APIs the
-    // code may reference; targetSdk opts the app into new runtime behaviour and
-    // is a product decision with its own testing, not a toolchain bump.
+    // targetSdk is 36 as of 2026-09-12. It sat at 35 as "a time-bounded
+    // development baseline" (docs/guides/setup.md), and that bound expired on
+    // 31 August 2026, when Google Play began requiring API 36 for new apps and
+    // updates. Play refuses an upload below it, so this is not a toolchain
+    // preference — every other release gate is downstream of an artifact the
+    // store will not accept.
+    //
+    // targetSdk still opts the app into new runtime behaviour and still needs
+    // its own testing: see the Android 16 regression checklist in
+    // docs/guides/setup.md before releasing this.
     compileSdk = 37
 
     defaultConfig {
         applicationId = "app.orderak.seller"
         minSdk = 24            // low-end EG devices coverage
-        targetSdk = 35
+        targetSdk = 36
         versionCode = orderakVersionCode
         versionName = orderakVersionName
         vectorDrawables.useSupportLibrary = true

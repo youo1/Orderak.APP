@@ -1,5 +1,5 @@
 import { jsonResponse } from "../../platform/http/shared";
-import { auditDb, verifyFreshAdminAuth } from "./admin-auth";
+import { auditDb, cookieValue, verifyFreshAdminAuth } from "./admin-auth";
 import { ALL_ROLES, hashPassword, keyedHash, randomToken, sha256Hex, type AdminClaims, type AdminRole } from "../identity/auth";
 import { R2CsvWriter } from "../../platform/storage/r2-csv-writer";
 import { Hono } from "hono";
@@ -751,7 +751,51 @@ async function downloadExport(request: Request, env: AdminWorkerEnv, id: string,
 	if (!pepper) return jsonResponse({ error: "server_misconfigured" }, 500);
 	await env.orderak_db.prepare("UPDATE admin_exports SET download_token_hash=?,download_expires_at=datetime('now','+5 minutes') WHERE id=?").bind(await keyedHash(token, pepper), id).run();
 	await auditDb(env, admin, "export.download_authorized", { entity: "admin_export", entity_id: id, acknowledgement: input.acknowledgement ?? null }, request);
-	return jsonResponse({ ok: true, download_url: `/api/admin/v1/exports/${id}/file?token=${encodeURIComponent(token)}`, expires_in_seconds: 300 });
+	// The token rides a cookie, not the URL.
+	//
+	// It used to be `?token=...` on download_url. The token is single-use, hashed
+	// at rest and expires in five minutes, so the exposure was bounded — but a URL
+	// parameter still reaches Cloudflare request logs, Sentry breadcrumbs and
+	// browser history, and none of those are bounded by the five minutes. These
+	// artifacts are bulk exports of buyer and store data, and shared.ts already
+	// states the rule for the seller surface: credentials never travel in query
+	// strings, for log hygiene. Same rule, more sensitive payload.
+	//
+	// A header is not an option: the download is a browser navigation, which
+	// cannot carry one. A cookie can, and is scoped so it rides nothing else.
+	return withDownloadCookie(
+		jsonResponse({ ok: true, download_url: `/api/admin/v1/exports/${id}/file`, expires_in_seconds: 300 }),
+		token,
+		request,
+	);
+}
+
+/**
+ * Attach the one-use export download token as a narrowly-scoped cookie.
+ *
+ * `__Secure-` rather than `__Host-`: the `__Host-` prefix mandates `Path=/`, which
+ * would put this token on every admin request for the next five minutes. Narrow
+ * path beats prefix strength here — `__Secure-` still guarantees the cookie was
+ * set over HTTPS, and `Path` keeps it off every request that is not this download.
+ *
+ * Mirrors withSessionCookie() in admin-auth.ts, including its http fallback so
+ * local development over plain http still works.
+ */
+function withDownloadCookie(response: Response, token: string, request: Request): Response {
+	const secure = new URL(request.url).protocol === "https:";
+	const name = secure ? "__Secure-orderak_export_download" : "orderak_export_download";
+	const headers = new Headers(response.headers);
+	headers.append(
+		"set-cookie",
+		`${name}=${encodeURIComponent(token)}; Path=/api/admin/v1/exports; HttpOnly; SameSite=Strict; Max-Age=300${secure ? "; Secure" : ""}`,
+	);
+	return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
+/** The download token presented by a request, from whichever cookie name applies. */
+function downloadCookieToken(request: Request): string {
+	return cookieValue(request, "__Secure-orderak_export_download")
+		|| cookieValue(request, "orderak_export_download");
 }
 
 export async function handleExportFile(request: Request, env: AdminWorkerEnv, url: URL, admin: AdminClaims): Promise<Response | null> {
@@ -759,12 +803,28 @@ export async function handleExportFile(request: Request, env: AdminWorkerEnv, ur
 	if (!match || request.method !== "GET") return null;
 	const row = await env.orderak_db.prepare("SELECT * FROM admin_exports WHERE id=? AND status='completed' AND downloaded_at IS NULL AND expires_at>datetime('now') AND download_expires_at>datetime('now')").bind(match[1]).first<Record<string, unknown>>();
 	const pepper = env.ADMIN_EXPORT_SIGNING_KEY ?? env.ADMIN_SESSION_PEPPER;
-	if (!row || !pepper || !url.searchParams.get("token") || await keyedHash(url.searchParams.get("token")!, pepper) !== row.download_token_hash || (admin.role !== "owner" && Number(row.requested_by) !== admin.sub)) return jsonResponse({ error: "download_token_invalid" }, 403);
+	// Read from the cookie downloadExport() set, not from the query string. A
+	// token in the URL outlives its own five-minute expiry in every log that saw
+	// the request; see the comment on withDownloadCookie() above.
+	const presented = downloadCookieToken(request);
+	if (!row || !pepper || !presented || await keyedHash(presented, pepper) !== row.download_token_hash || (admin.role !== "owner" && Number(row.requested_by) !== admin.sub)) return jsonResponse({ error: "download_token_invalid" }, 403);
 	const object = env.orderak_audit && row.r2_key ? await env.orderak_audit.get(String(row.r2_key)) : null;
 	if (!object) return jsonResponse({ error: "artifact_unavailable" }, 404);
 	await env.orderak_db.prepare("UPDATE admin_exports SET downloaded_at=datetime('now'),download_token_hash=NULL WHERE id=?").bind(match[1]).run();
 	await auditDb(env, admin, "export.downloaded", { entity: "admin_export", entity_id: match[1], record_count: row.row_count }, request);
-	return new Response(object.body, { headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="orderak-${row.export_type}-${match[1]}.csv"`, "cache-control": "no-store", "x-content-type-options": "nosniff" } });
+	const secure = new URL(request.url).protocol === "https:";
+	return new Response(object.body, {
+		headers: {
+			"content-type": "text/csv; charset=utf-8",
+			"content-disposition": `attachment; filename="orderak-${row.export_type}-${match[1]}.csv"`,
+			"cache-control": "no-store",
+			"x-content-type-options": "nosniff",
+			// The row above already cleared download_token_hash, so the token is
+			// spent server-side regardless. Expiring the cookie too keeps a dead
+			// credential from riding the next four minutes of export requests.
+			"set-cookie": `${secure ? "__Secure-orderak_export_download" : "orderak_export_download"}=; Path=/api/admin/v1/exports; HttpOnly; SameSite=Strict; Max-Age=0${secure ? "; Secure" : ""}`,
+		},
+	});
 }
 
 /**

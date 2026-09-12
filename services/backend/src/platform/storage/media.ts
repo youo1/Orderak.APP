@@ -128,5 +128,18 @@ export async function uploadMedia(request: Request, env: Env, storeId: string): 
 		httpMetadata: { contentType: detected.type },
 	});
 
+	// Record provenance so the object can be reclaimed if nothing ever references
+	// it. Best-effort and after the put on purpose: an upload that succeeded must
+	// not fail because bookkeeping did, and an object with no row is only ever
+	// missed by the sweep — never deleted by it. reclaimOrphanedMedia() adopts
+	// anything that slipped through from the bucket listing.
+	try {
+		await env.orderak_db.prepare(
+			"INSERT OR IGNORE INTO media_objects(key,store_id,kind) VALUES(?,?,?)",
+		).bind(key, storeId, kind).run();
+	} catch {
+		// Rolling deployments may serve this before migration 055 lands.
+	}
+
 	return jsonResponse({ ok: true, key, url: `${publicSiteUrl(env)}/media/${key}` });
 }

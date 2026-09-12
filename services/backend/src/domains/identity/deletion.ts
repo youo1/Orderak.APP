@@ -175,6 +175,16 @@ async function fulfillDeletion(env: Env, req: DeletionRequest): Promise<void> {
 		} while (truncated);
 		const remaining = await env.orderak_media.list({ prefix, limit: 1 });
 		if (remaining.objects.length) throw new Error("deletion_r2_verification_failed");
+		// Drop the provenance rows for the objects just removed. Without this the
+		// nightly sweep keeps finding rows whose objects are already gone and
+		// re-issues deletes for them forever — harmless, but it means an erased
+		// account leaves a permanent trace of how many images it had and when they
+		// were uploaded, in a table the retention matrix never accounted for.
+		try {
+			await env.orderak_db.prepare("DELETE FROM media_objects WHERE store_id=?").bind(sellerUuid).run();
+		} catch {
+			// Rolling deployments may run this before migration 055 lands.
+		}
 	}
 
 	// 3. Remove the Firebase identity while the UID/phone mapping is still

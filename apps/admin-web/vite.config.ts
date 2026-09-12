@@ -43,6 +43,29 @@ export default defineConfig({
         admin: path.resolve(__dirname, 'index.html'),
         preview: path.resolve(__dirname, 'theme-preview.html'),
       },
+      output: {
+        // Everything shipped as one 659 KB chunk, so the login screen could not
+        // paint until the whole console had parsed, and a one-line change to any
+        // feature page invalidated the bundle for every administrator on every
+        // deploy.
+        //
+        // These three groups move on dependency bumps rather than on feature
+        // work, which is what makes them worth separating: they stay cached
+        // across the deploys that only touch src/features.
+        //
+        // The function form rather than the `{ name: [packages] }` map: the map
+        // names entry points only, so a transitive dependency React cannot run
+        // without — `scheduler` is the one that bites — lands back in the main
+        // chunk and drags a re-download with it on every deploy. Matching on the
+        // resolved module path catches the whole subtree.
+        manualChunks(id: string) {
+          if (!id.includes('node_modules')) return undefined;
+          if (/[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/.test(id)) return 'react-vendor';
+          if (id.includes('@tanstack')) return 'data-vendor';
+          if (id.includes('@radix-ui')) return 'ui-vendor';
+          return undefined;
+        },
+      },
     },
   },
 })

@@ -41,6 +41,16 @@
 		"PHONE_CHANGE_ENABLED": "true",
 		"STATIC_CITY_CATALOG_ENABLED": "true",
 		"BUSINESS_TAXONOMY_ENABLED": "true",
+		// Whether the nightly media sweep may actually delete from R2. While
+		// "false" it adopts untracked objects and reports what it would remove,
+		// which is the only way to check the reference query against real data
+		// before letting it act. Flip staging first, read a media_reclaim_dry_run
+		// line, confirm the count and the sample are objects that should go, and
+		// only then consider production. The failure mode of getting this wrong
+		// is a seller's live product photos, so it stays closed by default in
+		// both environments — unlike the feature flags above, where staging
+		// leads.
+		"MEDIA_RECLAIM_ENABLED": "false",
 		"AI_MONTHLY_BUDGET_MICRO_USD": "0",
 		"GOOGLE_PLAY_PACKAGE_NAME": "app.orderak.seller",
 		// Package the /.well-known/assetlinks.json statement vouches for. This
@@ -190,6 +200,9 @@
 				"PHONE_CHANGE_ENABLED": "true",
 				"STATIC_CITY_CATALOG_ENABLED": "true",
 				"BUSINESS_TAXONOMY_ENABLED": "true",
+				// See the production comment: closed here too, and this is the
+				// environment where it opens first once a dry run has been read.
+				"MEDIA_RECLAIM_ENABLED": "false",
 				"AI_MONTHLY_BUDGET_MICRO_USD": "0",
 				// Staging has its own Play Console entry. The staging Android
 				// flavour applies applicationIdSuffix = ".staging", so a staging

@@ -28,6 +28,7 @@ import { authSeller, logError, jsonResponse, methodNotAllowed, corsHeaders, allo
 import { getPlanLimit } from "../domains/commerce/plan-limits";
 import { handleStoreRoutes } from "../domains/stores/api-store";
 import { serveMedia } from "../platform/storage/media";
+import { reclaimOrphanedMedia } from "../platform/storage/media-reclaim";
 import { handlePublicRoutes } from "./public-router";
 import { runRetentionCleanup } from "../domains/identity/retention";
 import { processDeletionRequests } from "../domains/identity/deletion";
@@ -516,6 +517,13 @@ export default withSentry<PublicWorkerEnv, QueuedEmailMessage>(
 	async scheduled(controller, env): Promise<void> {
 		if (controller.cron === "17 2 * * *") {
 			await runObservedJob(env, "retention", () => runRetentionCleanup(env));
+			// Shares the retention cron rather than claiming a fifth one: it is the
+			// same nightly housekeeping window and adding a trigger would mean a
+			// wrangler change in both environments for a job that has no reason to
+			// run at a different time. Separate runObservedJob so the two report
+			// independently — a media sweep that fails must not read as a retention
+			// failure, and vice versa.
+			await runObservedJob(env, "media-reclaim", () => reclaimOrphanedMedia(env));
 		} else if (controller.cron === "32 2 * * *") {
 			await runObservedJob(env, "play-account-hash-backfill", () => backfillPlayAccountHashes(env, 1_000));
 		} else if (controller.cron === "47 2 * * *") {

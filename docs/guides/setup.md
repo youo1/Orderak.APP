@@ -734,14 +734,35 @@ cd apps/seller-android
 gradlew.bat :app:assembleStagingDebug
 ```
 
-The debug APK is written to `app/build/outputs/apk/debug/`. The project
-targets compileSdk/targetSdk 35 with minSdk 24, and builds with the bundled
-JDK 17 (Gradle 8.13 via the wrapper — never install Gradle manually).
-Google Play requires new mobile apps and updates to target API 36 from
-31 August 2026, so the current target is a time-bounded development baseline,
-not the launch target. Recheck the
+The debug APK is written to `app/build/outputs/apk/debug/`. The project builds
+against compileSdk 37, targets API 36, and supports minSdk 24, using the bundled
+JDK 17 (Gradle via the wrapper — never install Gradle manually).
+
+`targetSdk` moved from 35 to 36 on 2026-09-12. It had been described here as a
+time-bounded development baseline, and that bound expired on 31 August 2026,
+when Google Play began requiring API 36 for new apps and updates — so the
+previous value was not merely behind, it was an artifact the store would refuse
+to accept. Recheck the
 [official target API requirement](https://developer.android.com/google/play/requirements/target-sdk)
-before submission.
+before each submission; the deadline moves every year.
+
+### Android 16 regression checklist
+
+A `targetSdk` bump opts the app into new runtime behaviour, so it needs a pass on
+a physical Android 16 handset that no CI job can perform. Before releasing:
+
+- **Edge-to-edge is enforced at API 36.** Check window insets on the two longest
+  scrolling surfaces, `ShopSetupScreen` and `OperationsScreens`, plus any screen
+  with a bottom action bar — content must not sit under the system bars or the
+  IME.
+- **Predictive back.** Confirm the back gesture animates and lands on the
+  expected destination from a nested navigation stack.
+- **RTL.** Repeat the inset checks in Arabic; the two are independent.
+- **Low-end device.** `minSdk` is 24 for a reason — verify on a real low-end
+  handset, not only an emulator.
+
+Record the result against `FND-003` in the findings register, which also asks for
+the final AAB and Play Console evidence before it can close.
 
 For a clean diagnostic rebuild:
 
