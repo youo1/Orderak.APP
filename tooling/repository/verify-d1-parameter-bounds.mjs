@@ -72,6 +72,12 @@ let checked = 0;
 for (const file of sourceFiles(searchRoot)) {
   const lines = readFileSync(file, "utf8").split("\n");
   lines.forEach((line, index) => {
+    // Comments first: a line describing this rule quotes the pattern it is
+    // about, and a guard that flags its own documentation teaches people to
+    // stop writing it. verify-money-locale.mjs skips them the same way.
+    const trimmed = line.trimStart();
+    if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")) return;
+
     // A template interpolation inside an IN list. Anything else is a literal
     // placeholder list, whose length is visible in the source.
     if (!/IN \(\$\{/.test(line)) return;

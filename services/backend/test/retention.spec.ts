@@ -110,6 +110,40 @@ describe("privacy retention cleanup", () => {
 	 * break it — a new cleanup rule naming the table — at the point it is written,
 	 * rather than two years later when the rows are already gone.
 	 */
+	it("scrubs the verification token out of an outbox job that never sent", async () => {
+		// payload is the whole rendered job, and for an account verification that
+		// includes verify_url with a live token in it. Delivery clears it; nothing
+		// else did. A job that failed terminally, or never reached a terminal state
+		// at all, kept a working bearer token indefinitely — and the 90-day rule
+		// could not reach either, because it matches sent and failed rows only and
+		// ages them by updated_at.
+		const token = "raw-verification-token-0001";
+		await env.orderak_db.batch([
+			env.orderak_db.prepare(
+				`INSERT INTO outbound_email_jobs(id,status,attempt_count,payload,created_at)
+				 VALUES('stranded','queued',0,?,datetime('now','-8 days'))`,
+			).bind(JSON.stringify({ verify_url: `https://orderak.app/verify-email?token=${token}` })),
+			env.orderak_db.prepare(
+				`INSERT INTO outbound_email_jobs(id,status,attempt_count,payload,created_at,updated_at)
+				 VALUES('deadletter','failed',5,?,datetime('now','-30 days'),datetime('now','-8 days'))`,
+			).bind(JSON.stringify({ verify_url: `https://orderak.app/verify-email?token=${token}` })),
+		]);
+
+		await runRetentionCleanup(env);
+
+		const { results } = await env.orderak_db.prepare(
+			"SELECT id,status,payload FROM outbound_email_jobs ORDER BY id",
+		).all<{ id: string; status: string; payload: string | null }>();
+
+		// No row anywhere still carries the token.
+		expect(JSON.stringify(results)).not.toContain(token);
+		// The record that the mail was requested survives; only the body goes.
+		expect(results?.map((row) => row.id).sort()).toEqual(["deadletter", "stranded"]);
+		// And the stranded job is settled, so the one-minute sweep stops re-queuing
+		// a message whose token expired seven days ago.
+		expect(results?.every((row) => row.status === "failed")).toBe(true);
+	});
+
 	it("never prunes the stock ledger", async () => {
 		await env.orderak_db.batch([
 			env.orderak_db.prepare(`INSERT INTO stock_movements(id,store_id,product_id,product_code,delta,balance_after,cause,actor,created_at)
