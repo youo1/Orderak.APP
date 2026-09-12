@@ -54,7 +54,21 @@ export const format = {
   },
   date(value: unknown, timezone = 'Africa/Cairo') {
     if (!value) return '—';
-    const normalized = String(value).includes('T') ? String(value) : `${value}Z`;
-    return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZone: timezone }).format(new Date(normalized));
+    // Guarded, because this runs inside render.
+    //
+    // SQLite datetimes arrive without a zone, so a `Z` is appended to read them
+    // as UTC — and anything that does not parse then reaches Date as Invalid
+    // Date, which makes Intl.DateTimeFormat.format throw RangeError. Thrown from
+    // a cell renderer that is a blank console page, not a blank cell: one row
+    // with an unexpected timestamp takes down the table it is in.
+    const raw = String(value);
+    const parsed = new Date(raw.includes('T') ? raw : `${raw}Z`);
+    if (Number.isNaN(parsed.getTime())) return '—';
+    try {
+      return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZone: timezone }).format(parsed);
+    } catch {
+      // An unknown timeZone is the other RangeError this can raise.
+      return parsed.toISOString();
+    }
   },
 };
