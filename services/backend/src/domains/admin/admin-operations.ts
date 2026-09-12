@@ -201,7 +201,7 @@ op.post(`${B}/billing/verifications/:jobId{[0-9a-fA-F-]+}/retry`, async (c) => {
 		const body = await readBody(request);
 		const reason = textValue(body.reason, 1000);
 		if (!reason) return jsonResponse({ error: "reason_required" }, 400);
-		if (!await consumeActionAuthorization(request, env, admin, "billing.verification_retry", id)) {
+		if (!await consumeActionAuthorization(request, env, admin, "billing.verification_retry", id, reason)) {
 			return jsonResponse({ error: "fresh_action_authorization_required" }, 403);
 		}
 		const newId = await requeuePlayVerificationJob(env, id);
