@@ -11788,11 +11788,7 @@
                       "type": "integer"
                     },
                     "config": {
-                      "allOf": [
-                        {
-                          "$ref": "#/components/schemas/ClientConfig"
-                        }
-                      ],
+                      "$ref": "#/components/schemas/ClientConfig",
                       "description": "Plan, entitlement and governance state, piggybacked so the client does not spend a separate authenticated request on GET /api/v1/config every sync. Always present."
                     }
                   },
