@@ -619,7 +619,7 @@ async function handleRegister(request: Request, env: Env, url: URL): Promise<Res
 		// the name was never the problem.
 		const message = String((error as { message?: string })?.message ?? error);
 		if (!/UNIQUE constraint failed/i.test(message)) {
-			logError(env, "store_update_failed", error);
+			await logError(env, "store_update_failed", error);
 			return jsonResponse({ error: "store_update_failed" }, 500);
 		}
 		return jsonResponse({ error: "slug_taken", message: t(lang, "slug.taken") }, 409);
