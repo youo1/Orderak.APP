@@ -102,6 +102,22 @@ class NewOrderViewModel @Inject constructor(
     fun totalMinor(): Long =
         products.value.sumOf { p -> (( _state.value.qty[p.id] ?: 0) * p.priceMinor) }
 
+    /**
+     * The currency of the selected lines, or null when they do not agree.
+     *
+     * [totalMinor] adds minor units, which is only money within one currency.
+     * The screen rendered that sum with a hardcoded EGP, so a mixed selection —
+     * and a wholly non-EGP one — showed a total that was wrong in both the digits
+     * and the name. Null here means the screen has no total to show, which is the
+     * honest answer rather than a plausible one.
+     */
+    fun selectedCurrency(): String? =
+        products.value
+            .filter { (_state.value.qty[it.id] ?: 0) > 0 }
+            .map { it.currency }
+            .distinct()
+            .singleOrNull()
+
     fun save(onDone: (Long) -> Unit) {
         val s = _state.value
         if (!s.canSave || s.saving) return
@@ -115,7 +131,7 @@ class NewOrderViewModel @Inject constructor(
                 _state.value = s.copy(saving = false, stockError = true)
                 return@launch
             }
-            val lines = selected.map { (p, q, _) -> NewOrderLine(p.id, p.name, q, p.priceMinor) }
+            val lines = selected.map { (p, q, _) -> NewOrderLine(p.id, p.name, q, p.priceMinor, p.currency) }
             val id = orderRepo.create(
                 buyerPhone = s.phone, buyerName = s.name.ifBlank { null },
                 payMethod = s.payMethod, note = s.note.ifBlank { null }, lines = lines

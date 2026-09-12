@@ -41,7 +41,8 @@ internal object DemoData {
     /** Hour offsets back from "now", so the newest order is 40 minutes old. */
     private const val MINUTE = 60_000L
     private const val HOUR = 60 * MINUTE
-    private const val DAY = 24 * HOUR
+    private const val DEMO_CURRENCY = "EGP"
+private const val DAY = 24 * HOUR
 
     fun categories(): List<CategoryEntity> = listOf(
         CategoryEntity(name = "حلويات شرقية", categoryCode = "c-orntl", slug = "oriental", sortOrder = 1),
@@ -76,6 +77,11 @@ internal object DemoData {
             categoryId = category,
             categoryCode = code,
             productCode = "DEMO-${name.hashCode().toUInt().toString(16).uppercase().take(6)}",
+            // Stated rather than defaulted: the demo store is an Egyptian one and
+            // its prices are in piasters. Entities no longer default a currency,
+            // because a defaulted one is how real rows acquired a currency nobody
+            // chose.
+            currency = DEMO_CURRENCY,
             createdAt = now - ageDays * DAY,
         )
 
@@ -144,7 +150,8 @@ internal object DemoData {
             order = OrderEntity(
                 buyerPhone = "01201020304", buyerName = "محمود العزب",
                 status = OrderStatus.NEW.name, payMethod = PayMethod.COD.name,
-                totalMinor = 63_000, note = "التسليم بعد المغرب",
+                totalMinor = 63_000,
+                currency = DEMO_CURRENCY, note = "التسليم بعد المغرب",
                 createdAt = now - 40 * MINUTE,
             ),
             items = listOf("تورتة شوكولاتة" to 1, "عصير مانجو طازة" to 4),
@@ -154,11 +161,12 @@ internal object DemoData {
                 buyerPhone = "01155667788", buyerName = "سارة الشناوي",
                 status = OrderStatus.PAID.name, payMethod = PayMethod.INSTAPAY.name,
                 totalMinor = 38_000,
+                currency = DEMO_CURRENCY,
                 createdAt = now - 3 * HOUR,
             ),
             items = listOf("تشيز كيك فراولة" to 1),
             payment = PaymentEntity(
-                orderId = 0, ref = "INSTA-9F42C1", amountMinor = 38_000,
+                orderId = 0, ref = "INSTA-9F42C1", amountMinor = 38_000, currency = DEMO_CURRENCY,
                 verified = true, createdAt = now - 3 * HOUR + 12 * MINUTE,
             ),
         ),
@@ -167,6 +175,7 @@ internal object DemoData {
                 buyerPhone = "01098765432", buyerName = "هدى مصطفى",
                 status = OrderStatus.CONFIRMED.name, payMethod = PayMethod.COD.name,
                 totalMinor = 27_500,
+                currency = DEMO_CURRENCY,
                 createdAt = now - 9 * HOUR,
             ),
             items = listOf("بسبوسة بالقشطة" to 2, "سحلب" to 1, "قهوة تركي" to 1),
@@ -176,11 +185,12 @@ internal object DemoData {
                 buyerPhone = "01234567890", buyerName = "كريم فؤاد",
                 status = OrderStatus.SHIPPED.name, payMethod = PayMethod.VF_CASH.name,
                 totalMinor = 26_000,
+                currency = DEMO_CURRENCY,
                 createdAt = now - 1 * DAY - 2 * HOUR,
             ),
             items = listOf("بقلاوة بالفستق" to 1),
             payment = PaymentEntity(
-                orderId = 0, ref = "VF-7731AA", amountMinor = 26_000,
+                orderId = 0, ref = "VF-7731AA", amountMinor = 26_000, currency = DEMO_CURRENCY,
                 verified = true, createdAt = now - 1 * DAY - 1 * HOUR,
             ),
         ),
@@ -189,11 +199,12 @@ internal object DemoData {
                 buyerPhone = "01122334455", buyerName = "أحمد يسري",
                 status = OrderStatus.DONE.name, payMethod = PayMethod.INSTAPAY.name,
                 totalMinor = 87_500,
+                currency = DEMO_CURRENCY,
                 createdAt = now - 2 * DAY - 5 * HOUR,
             ),
             items = listOf("تورتة شوكولاتة" to 1, "كب كيك (٦ قطع)" to 2, "براوني" to 1),
             payment = PaymentEntity(
-                orderId = 0, ref = "INSTA-4B10E7", amountMinor = 87_500,
+                orderId = 0, ref = "INSTA-4B10E7", amountMinor = 87_500, currency = DEMO_CURRENCY,
                 verified = true, createdAt = now - 2 * DAY - 4 * HOUR,
             ),
         ),
@@ -201,7 +212,8 @@ internal object DemoData {
             order = OrderEntity(
                 buyerPhone = "01012345678", buyerName = "منى عبد الله",
                 status = OrderStatus.CANCELLED.name, payMethod = PayMethod.COD.name,
-                totalMinor = 18_000, note = "المشتري أجّل المناسبة",
+                totalMinor = 18_000,
+                currency = DEMO_CURRENCY, note = "المشتري أجّل المناسبة",
                 createdAt = now - 4 * DAY,
             ),
             items = listOf("كنافة بالمانجو" to 1),
@@ -211,7 +223,8 @@ internal object DemoData {
             order = OrderEntity(
                 buyerPhone = "01012345678", buyerName = "منى عبد الله",
                 status = OrderStatus.NEW.name, payMethod = PayMethod.INSTAPAY.name,
-                totalMinor = 45_000, note = "في انتظار إثبات التحويل",
+                totalMinor = 45_000,
+                currency = DEMO_CURRENCY, note = "في انتظار إثبات التحويل",
                 createdAt = now - 6 * DAY - 3 * HOUR,
             ),
             items = listOf("ريد فيلفت" to 1, "قهوة تركي" to 1),

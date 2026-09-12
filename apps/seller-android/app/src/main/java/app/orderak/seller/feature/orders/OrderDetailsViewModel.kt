@@ -156,7 +156,12 @@ class OrderDetailsViewModel @Inject constructor(
                 repo.recordPayment(
                     PaymentEntity(
                         orderId = o.id, ref = result.ref ?: "",
-                        amountMinor = o.totalMinor,
+                        // The order's currency, not PaymentEntity's "EGP" default.
+                        // The verifier one line above already reads the receipt
+                        // against Money(o.totalMinor, o.currency), so the payment
+                        // was checked in the right currency and then filed in the
+                        // wrong one.
+                        amountMinor = o.totalMinor, currency = o.currency,
                         verified = true, proofPath = path
                     )
                 )

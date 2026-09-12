@@ -8,7 +8,6 @@
     <string name="common_cancel">Cancel</string>
     <string name="common_confirm">Confirm</string>
     <string name="error_generic">Something went wrong, try again</string>
-    <string name="currency_egp">EGP %1$s</string>
 
     <string name="auth_title">Ready to Sell on Orderak?</string>
     <string name="auth_subtitle">Let\'s get started.</string>
