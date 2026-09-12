@@ -40,8 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.orderak.seller.R
-import app.orderak.seller.core.money.DEFAULT_CURRENCY
-import app.orderak.seller.core.money.formatAmount
+import app.orderak.seller.core.money.formatAmountLabel
 import app.orderak.seller.core.ui.FullScreenEmpty
 import app.orderak.seller.core.ui.PriorityListRow
 import app.orderak.seller.core.ui.SemanticChip
@@ -144,7 +143,7 @@ fun OrderCard(o: OrderEntity, refused: Boolean = false, onClick: () -> Unit) {
                     // Same locale the date above uses. Reading the ambient default
                     // here would let money keep Latin digits on a screen whose
                     // dates have already switched to Arabic-Indic.
-                    stringResource(R.string.currency_egp, formatAmount(o.totalMinor, o.currency, locale)),
+                    formatAmountLabel(o.totalMinor, o.currency, locale),
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Spacer(Modifier.height(4.dp))

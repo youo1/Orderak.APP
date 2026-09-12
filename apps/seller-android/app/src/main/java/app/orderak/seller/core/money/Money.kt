@@ -140,6 +140,42 @@ fun formatAmount(
 ): String = formatMoney(Money(amountMinor, currency), locale)
 
 /**
+ * An amount with its currency, placed and written the way the locale does it.
+ *
+ * `formatMoney` deliberately returns digits only, and every screen paired it
+ * with one string resource, `currency_egp`, which reads "EGP %1$s". So every
+ * amount in the app was labelled EGP whatever currency the row actually carried:
+ * a 15.000 KWD order rendered its digits correctly — formatMoney has always read
+ * the exponent from the currency — and then announced them as pounds.
+ *
+ * Three per-locale resources were maintaining what ICU already knows: the
+ * symbol, and which side of the number it belongs on. Arabic puts it after and
+ * writes ج.م, English puts it before. Keeping that as translated strings meant
+ * seven currencies times four locales of hand-written placement, every one of
+ * which could be wrong on its own; and the version that shipped was one currency
+ * times four locales, applied to all seven.
+ *
+ * minimumFractionDigits is forced back to 0 to match formatMoney, which is what
+ * every existing screen renders: a whole-pound price stays "150" rather than
+ * becoming "150.00". The maximum still comes from the currency, so KWD keeps its
+ * three places when it needs them.
+ */
+fun formatMoneyLabel(money: Money, locale: Locale = Locale.getDefault()): String {
+    val nf = NumberFormat.getCurrencyInstance(locale)
+    nf.currency = JavaCurrency.getInstance(money.currency)
+    nf.minimumFractionDigits = 0
+    nf.maximumFractionDigits = exponentOf(money.currency)
+    return nf.format(money.amountMinor / pow10(exponentOf(money.currency)))
+}
+
+/** [formatMoneyLabel] for a loose amount and currency, as [formatAmount] is for [formatMoney]. */
+fun formatAmountLabel(
+    amountMinor: Long,
+    currency: String,
+    locale: Locale = Locale.getDefault(),
+): String = formatMoneyLabel(Money(amountMinor, currency), locale)
+
+/**
  * Parse a user-entered major-unit amount into minor units.
  *
  * The locale handling below is unchanged from `parseEgpToPiasters` and is

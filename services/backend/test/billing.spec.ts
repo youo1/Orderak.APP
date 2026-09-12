@@ -56,6 +56,52 @@ describe("coupon redemption", () => {
 	// /subscribe, which applies the discount and creates the subscription, never
 	// consulted the table, so posting straight to it redeemed the same coupon on
 	// every purchase up to the coupon's global max_uses.
+	// Two requests carrying one idempotency key, arriving together.
+	//
+	// subscribe() checks for an existing subscription with that key and inserts
+	// if it finds none. That check is a read, and nothing in fifty-five
+	// migrations made it an interlock: no UNIQUE constraint on `subscriptions`
+	// existed at all. So both requests saw no row and both inserted one, and
+	// which of the two the seller ended up on depended on how the writes
+	// interleaved — createOrReplaceSubscription cancels prior active rows before
+	// inserting, so the loser could cancel the winner.
+	//
+	// Migration 056 makes the database the interlock. The loser now sees a UNIQUE
+	// violation and is answered with the winner's row, which is the same answer
+	// the pre-flight read would have given it a moment later.
+	it("writes one subscription for one idempotency key, however the requests race", async () => {
+		const seller = await registerStore();
+		await seedPaidPlan();
+
+		const [first, second] = await Promise.all([
+			subscribe(seller, { plan_id: "growth", idempotency_key: "same-key" }),
+			subscribe(seller, { plan_id: "growth", idempotency_key: "same-key" }),
+		]);
+		expect([first.status, second.status]).toEqual([200, 200]);
+
+		// One row, and the second request was told so rather than making another.
+		const rows = await env.orderak_db.prepare(
+			"SELECT seller_id, COUNT(*) AS c FROM subscriptions WHERE idempotency_key = 'same-key'",
+		).first<{ seller_id: string; c: number }>();
+		expect(rows?.c).toBe(1);
+
+		// And the seller is left on exactly that one, rather than on a row the
+		// other request cancelled on its way past.
+		const active = await env.orderak_db.prepare(
+			"SELECT COUNT(*) AS c FROM subscriptions WHERE seller_id = ? AND status IN ('active','pending')",
+		).bind(rows!.seller_id).first<{ c: number }>();
+		expect(active?.c).toBe(1);
+
+		// The invariant above currently holds because the pre-flight read caught
+		// it. This is the guarantee underneath, which holds when that read does
+		// not: migration 056's index, asserted directly because a serialised test
+		// runtime cannot reliably produce the interleaving it exists for.
+		await expect(env.orderak_db.prepare(
+			`INSERT INTO subscriptions (seller_id, plan_id, status, gateway, amount_minor, idempotency_key)
+			 VALUES (?, 'growth', 'active', 'mock', 50000, 'same-key')`,
+		).bind(rows!.seller_id).run()).rejects.toThrow(/UNIQUE constraint failed/i);
+	});
+
 	it("refuses a coupon the same seller has already redeemed", async () => {
 		const seller = await registerStore();
 		await seedPaidPlan();
@@ -169,6 +215,72 @@ describe("payment webhook", () => {
 	// status. Signature verification was skipped entirely when no secret was
 	// configured, and staging did not require PAYMENT_WEBHOOK_SECRET — so on a
 	// deployed environment an unset secret made it an unauthenticated endpoint.
+	// An activation can legitimately arrive before the row it activates.
+	// subscribe() calls the gateway and inserts the subscription afterwards, so a
+	// webhook landing in that window finds nothing.
+	//
+	// The handler used to record the event id first and resolve the subscription
+	// second, so that delivery burned the id, answered 200, and every retry the
+	// gateway made afterwards was refused as a replay. The seller had paid, the
+	// subscription never went active, and the only trace was a pair of 200s.
+	/** The signature the webhook gate wants, for a body and a secret. */
+	async function sign(payload: string, secret: string): Promise<string> {
+		const key = await crypto.subtle.importKey(
+			"raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
+		);
+		const mac = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload)));
+		return [...mac].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+	}
+
+	/** A deployed environment that accepts `body`, and the headers to send it with. */
+	async function signedWebhook(): Promise<{ testEnv: TestEnv; headers: Record<string, string> }> {
+		const secret = "webhook-secret";
+		const testEnv = deployedEnv();
+		testEnv.PAYMENT_WEBHOOK_SECRET = secret;
+		return { testEnv, headers: { "x-webhook-signature": await sign(body, secret) } };
+	}
+
+	it("does not burn an event id for a subscription that does not exist yet", async () => {
+		const { testEnv, headers } = await signedWebhook();
+		const early = await call("/api/integrations/v1/payment", { method: "POST", headers, body }, testEnv);
+		expect(early.status).toBe(200);
+		expect(await early.json()).toMatchObject({ ok: true, ignored: "unknown_subscription" });
+
+		// Nothing recorded, so the retry below is not a replay.
+		const recorded = await env.orderak_db
+			.prepare("SELECT COUNT(*) AS c FROM webhook_events WHERE event_id = 'evt_1'")
+			.first<{ c: number }>();
+		expect(recorded?.c).toBe(0);
+
+		// subscribe() commits, as it would have a moment later in production.
+		await env.orderak_db.prepare(
+			`INSERT INTO subscriptions (seller_id, plan_id, status, gateway, gateway_sub_id, amount_minor)
+			 VALUES ('seller-webhook', 'growth', 'pending', 'test', 'sub_1', 9900)`,
+		).run();
+
+		const retry = await call("/api/integrations/v1/payment", { method: "POST", headers, body }, testEnv);
+		expect(retry.status).toBe(200);
+		expect(await retry.json()).toMatchObject({ ok: true, status: "active" });
+
+		const applied = await env.orderak_db
+			.prepare("SELECT status FROM subscriptions WHERE gateway_sub_id = 'sub_1'")
+			.first<{ status: string }>();
+		expect(applied?.status).toBe("active");
+	});
+
+	it("still refuses a genuine replay once the event has been applied", async () => {
+		const { testEnv, headers } = await signedWebhook();
+		await env.orderak_db.prepare(
+			`INSERT INTO subscriptions (seller_id, plan_id, status, gateway, gateway_sub_id, amount_minor)
+			 VALUES ('seller-replay', 'growth', 'pending', 'test', 'sub_1', 9900)`,
+		).run();
+
+		expect(await (await call("/api/integrations/v1/payment", { method: "POST", headers, body }, testEnv)).json())
+			.toMatchObject({ ok: true, status: "active" });
+		// Same event again: the id is recorded now, so this is a replay.
+		expect(await (await call("/api/integrations/v1/payment", { method: "POST", headers, body }, testEnv)).json())
+			.toMatchObject({ ok: true, idempotent: true });
+	});
 	it("refuses an unsigned body on a deployed environment", async () => {
 		const testEnv = deployedEnv();
 		testEnv.PAYMENT_WEBHOOK_SECRET = undefined;

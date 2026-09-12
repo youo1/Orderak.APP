@@ -3,6 +3,7 @@ package app.orderak.seller.data.session
 import android.util.Log
 import app.orderak.seller.data.auth.AuthRepository
 import app.orderak.seller.data.billing.EntitlementRepository
+import app.orderak.seller.core.images.ImageStore
 import app.orderak.seller.data.db.OrderakDatabase
 import app.orderak.seller.data.remote.BackendApi
 import app.orderak.seller.feature.settings.runLogoutSequence
@@ -28,6 +29,7 @@ class SessionLogoutManager @Inject constructor(
     private val backendApi: BackendApi,
     private val database: OrderakDatabase,
     private val entitlementRepository: EntitlementRepository,
+    private val imageStore: ImageStore,
     private val sessionStore: SessionStore,
 ) {
     suspend fun logout() {
@@ -40,6 +42,7 @@ class SessionLogoutManager @Inject constructor(
             revokeCredential = { revokeCredential(phone, secret) },
             signOutProvider = { authRepository.signOut() },
             clearBusinessData = { withContext(Dispatchers.IO) { database.clearAllTables() } },
+            clearStoredImages = { imageStore.clear() },
             clearEntitlements = { entitlementRepository.clear() },
             clearSession = { sessionStore.clear() },
             clearDeviceSecret = { sessionStore.clearDeviceSecret() },

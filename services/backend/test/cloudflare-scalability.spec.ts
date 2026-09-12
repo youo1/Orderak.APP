@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { SELF, env } from "cloudflare:test";
-import { createSchema } from "./helpers";
+import { burstWithinOneWindow, createSchema } from "./helpers";
 import { classifyAdminQueue } from "../src/entrypoints/admin-worker";
 import { classifyPublicQueue } from "../src/entrypoints/public-worker";
 import { checkRateLimit, rateLimiterStub } from "../src/platform/http/shared";
@@ -24,13 +24,19 @@ describe("Cloudflare scalability safeguards", () => {
 	});
 
 	it("increments rate limits atomically under concurrent calls", async () => {
-		const results = await Promise.all(Array.from({ length: 20 }, () => checkRateLimit(env, "atomic:test", 5, 60)));
+		// Bursted inside one calendar window: the limiter's window is aligned to
+		// the clock, so a burst that crosses a boundary is two partial bursts and
+		// six of twenty pass legitimately. See burstWithinOneWindow.
+		const { allowed, bucket } = await burstWithinOneWindow(
+			(b) => checkRateLimit(env, b, 5, 60),
+			async (b) => (await (await rateLimiterStub(env, b))!.peek())?.count,
+			{ bucket: "atomic:test", calls: 20 },
+		);
 		// Exactly five of twenty concurrent calls may pass. More would mean an
 		// increment was lost to a read-modify-write race.
-		expect(results.filter(Boolean)).toHaveLength(5);
+		expect(allowed).toBe(5);
 		// And every one of the twenty must have been counted.
-		const namespace = env.RATE_LIMITER;
-		const counter = await (await rateLimiterStub(env, "atomic:test"))!.peek();
+		const counter = await (await rateLimiterStub(env, bucket))!.peek();
 		expect(counter).toMatchObject({ count: 20 });
 	});
 

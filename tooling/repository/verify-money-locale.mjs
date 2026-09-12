@@ -105,9 +105,16 @@ for (const file of walk(androidSrc)) {
     }
   });
 
-  for (const match of source.matchAll(/\bformat(?:Amount|Money)\s*\(/g)) {
+  // The Label variants render the currency symbol as well as the digits, so the
+  // locale matters to them for one more reason: it decides which side of the
+  // number the symbol goes on. They were added after this guard, and would have
+  // slipped past a pattern that stopped at formatAmount/formatMoney.
+  for (const match of source.matchAll(/\bformat(?:Amount|Money)(?:Label)?\s*\(/g)) {
     const open = match.index + match[0].length - 1;
     const count = argumentCount(source, open);
+    // formatAmountLabel starts with formatAmount, so the amount+currency+locale
+    // arity carries over unchanged; formatMoney and formatMoneyLabel both take a
+    // Money, which already carries the currency.
     const needed = match[0].startsWith("formatAmount") ? 3 : 2;
     if (count < needed) {
       const line = source.slice(0, match.index).split("\n").length;

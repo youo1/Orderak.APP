@@ -21,7 +21,14 @@ data class ProductEntity(
     val name: String,
     val description: String? = null,
     val priceMinor: Long,
-    val currency: String = "EGP",
+    /**
+     * No default. A defaulted currency is how a row acquires one nobody chose:
+     * every construction site that omitted it wrote "EGP" over whatever the
+     * amount beside it actually was, and the compiler had nothing to say. Money
+     * is an amount plus a currency (ADR-009) and this is the half that was
+     * optional.
+     */
+    val currency: String,
     val stock: Int,
     val discountType: String? = null, // "PERCENTAGE", "AMOUNT", or null
     val discountValue: Double? = null,
@@ -119,7 +126,7 @@ data class OrderEntity(
     val status: String,             // OrderStatus.name
     val payMethod: String,          // PayMethod.name
     val totalMinor: Long,
-    val currency: String = "EGP",
+    val currency: String,
     val note: String? = null,
     /**
      * The key this order is posted under, stable across every retry.
@@ -158,7 +165,7 @@ data class PaymentEntity(
     val orderId: Long,
     val ref: String,
     val amountMinor: Long,
-    val currency: String = "EGP",
+    val currency: String,
     val verified: Boolean,
     val proofPath: String? = null,
     val createdAt: Long = System.currentTimeMillis()
@@ -179,6 +186,15 @@ data class CustomerSummary(
     val phone: String,
     val name: String?,
     val ordersCount: Int,
-    val totalMinor: Long
+    val totalMinor: Long,
+    /**
+     * How many distinct currencies the summed orders were in.
+     *
+     * 0 for a customer with no orders, 1 for the ordinary case, more than 1 when
+     * [totalMinor] is a sum of unlike things and must not be shown as a total.
+     */
+    val currencyCount: Int,
+    /** The currency of those orders when there is exactly one; null with none. */
+    val currency: String?
 )
 

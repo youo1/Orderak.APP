@@ -10,6 +10,7 @@ internal suspend fun runLogoutSequence(
     revokeCredential: suspend () -> Unit,
     signOutProvider: () -> Unit,
     clearBusinessData: suspend () -> Unit,
+    clearStoredImages: suspend () -> Unit,
     clearEntitlements: suspend () -> Unit,
     clearSession: suspend () -> Unit,
     clearDeviceSecret: () -> Unit,
@@ -38,6 +39,11 @@ internal suspend fun runLogoutSequence(
     }
     signOutProvider()
     clearBusinessData()
+    // Beside the database, because it is the same data. The rows describing an
+    // order and the image attached to it are one record split across two stores,
+    // and clearing only the half that is easy to enumerate is what left payment
+    // proofs on the handset after sign-out.
+    clearStoredImages()
     clearEntitlements()
     clearSession()
     clearDeviceSecret()

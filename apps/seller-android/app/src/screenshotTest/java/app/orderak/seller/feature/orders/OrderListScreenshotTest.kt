@@ -43,6 +43,10 @@ private fun order(id: Long, name: String, status: OrderStatus, total: Long, remo
     status = status.name,
     payMethod = "CASH",
     totalMinor = total,
+    // Stated, because OrderEntity no longer defaults it. The reference images are
+    // an Egyptian store's, and the label is now derived from this rather than
+    // from a resource that said EGP whatever the row held.
+    currency = "EGP",
     createdAt = 1_756_000_000_000L + id * 3_600_000L,
 )
 

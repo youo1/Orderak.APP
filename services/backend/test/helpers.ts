@@ -422,3 +422,49 @@ export function authHeaders(r: Registered): Record<string, string> {
 }
 
 export { SELF, env, BASE };
+
+/**
+ * Fire a burst of rate-limit probes inside one calendar window.
+ *
+ * checkRateLimit uses a calendar-aligned fixed window —
+ * `windowStart = now - (now % windowSec)` — so a burst that straddles a boundary
+ * is counted as two partial bursts and the number allowed is the sum of two
+ * smaller allowances rather than one. That is not a flaw in the limiter, and it
+ * is not something a test can assert around: it makes an exact expectation
+ * wrong occasionally, for a reason that has nothing to do with what is being
+ * tested.
+ *
+ * The straddle is detectable — if every call had landed in one window the final
+ * counter would read exactly `calls` — so this bursts, checks, and retries on a
+ * fresh bucket if it hit a boundary. Which is what billing.spec.ts already does
+ * for the coupon-probe limit, after that test failed CI on 2026-08-25 on a
+ * documentation-only pull request and passed on re-run with the same commit.
+ *
+ * Retrying rather than loosening the assertion is the point. RATE_LIMITER is
+ * bound at the top level of wrangler.jsonc, so these run against the Durable
+ * Object, whose increments the runtime serialises: within one window the outcome
+ * is exact, and a weaker assertion would pass just as happily if an increment
+ * were being lost.
+ */
+export async function burstWithinOneWindow(
+	limiter: (bucket: string) => Promise<boolean>,
+	peek: (bucket: string) => Promise<number | undefined>,
+	options: { bucket: string; calls: number; attempts?: number },
+): Promise<{ allowed: number; bucket: string }> {
+	const attempts = options.attempts ?? 3;
+	for (let attempt = 0; attempt < attempts; attempt += 1) {
+		// A fresh bucket per attempt, so a straddled attempt's counts cannot leak
+		// into the next one.
+		const bucket = attempt === 0 ? options.bucket : `${options.bucket}:retry${attempt}`;
+		const results = await Promise.all(
+			Array.from({ length: options.calls }, () => limiter(bucket)),
+		);
+		if ((await peek(bucket)) === options.calls) {
+			return { allowed: results.filter(Boolean).length, bucket };
+		}
+	}
+	throw new Error(
+		`Every one of ${attempts} bursts straddled a window boundary. A burst takes about a ` +
+		"second against a boundary that comes once a minute, so this is not the boundary.",
+	);
+}

@@ -7,17 +7,25 @@
      notes, plus the order history — which is personal data belonging to people
      who never agreed to it being copied anywhere.
 
+     filesDir/images is held back for a different reason from the rest: it holds
+     payment proofs a buyer sent, and unlike the database nothing re-fetches them
+     from the server. Losing them on transfer is the intended trade — a device
+     transfer is exactly the case where a stranger's handset should not receive
+     the pictures attached to someone else's disputed payments.
+
      Both blocks list it. <cloud-backup> and <device-transfer> are evaluated
      independently, so an exclusion in one says nothing about the other, and a
      direct transfer to a new handset is exactly the case where a restored
      customer list would be least expected.
 
      A restored or transferred install re-authenticates through Firebase OTP and
-     re-downloads the catalogue, customers and orders from the server, so
-     nothing here is lost — only re-fetched under a fresh credential. -->
+     re-downloads the catalogue, customers and orders from the server, so nothing
+     here is lost except the stored images, which are deliberately not carried
+     over for the reason above. -->
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="file" path="datastore" />
+        <exclude domain="file" path="images" />
         <exclude domain="sharedpref" path="orderak_secure_secret.xml" />
         <exclude domain="database" path="orderak.db" />
         <exclude domain="database" path="orderak.db-wal" />
@@ -25,6 +33,7 @@
     </cloud-backup>
     <device-transfer>
         <exclude domain="file" path="datastore" />
+        <exclude domain="file" path="images" />
         <exclude domain="sharedpref" path="orderak_secure_secret.xml" />
         <exclude domain="database" path="orderak.db" />
         <exclude domain="database" path="orderak.db-wal" />

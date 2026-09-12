@@ -255,10 +255,26 @@ interface CustomerDao {
      * so the join has to be on the value the order actually carries. The key is
      * selected beside it because it is what navigation and editing address.
      */
+    /**
+     * SUM over minor units is only meaningful within one currency.
+     *
+     * This summed every order for a customer and handed the result to a screen
+     * that labelled it EGP, so a customer with one 150 EGP order and one 15.000
+     * KWD order showed a lifetime total of 30000 of nothing, and ORDER BY sorted
+     * the list on it. Money.plus refuses to add across currencies precisely to
+     * stop this; the two paths that put a number in front of the seller were the
+     * two that went around it.
+     *
+     * currencyCount is selected so the screen can tell "one currency, and this is
+     * it" from "more than one, so there is no such number" — rather than the
+     * screen guessing, or the query silently picking a winner.
+     */
     @Query(
         """SELECT c.customerKey AS customerKey, c.phone AS phone, c.name AS name,
                   COUNT(o.id) AS ordersCount,
-                  COALESCE(SUM(o.totalMinor), 0) AS totalMinor
+                  COALESCE(SUM(o.totalMinor), 0) AS totalMinor,
+                  COUNT(DISTINCT o.currency) AS currencyCount,
+                  MAX(o.currency) AS currency
            FROM customers c
            LEFT JOIN orders o ON o.buyerPhone = c.phone AND o.status != 'CANCELLED'
            GROUP BY c.customerKey ORDER BY totalMinor DESC"""

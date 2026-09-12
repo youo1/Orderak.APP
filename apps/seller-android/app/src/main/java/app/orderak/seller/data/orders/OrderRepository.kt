@@ -26,7 +26,21 @@ import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
-data class NewOrderLine(val productId: Long, val name: String, val qty: Int, val priceMinor: Long)
+/**
+ * A line, with the currency its price is in.
+ *
+ * The currency used to be absent, so OrderEntity took its "EGP" default and the
+ * order recorded a currency nobody had chosen. A store in Kuwait wrote KWD
+ * prices into orders stamped EGP, which is wrong by a factor of ten as well as
+ * wrong by name.
+ */
+data class NewOrderLine(
+    val productId: Long,
+    val name: String,
+    val qty: Int,
+    val priceMinor: Long,
+    val currency: String,
+)
 
 @Singleton
 class OrderRepository @Inject constructor(
@@ -80,6 +94,14 @@ class OrderRepository @Inject constructor(
         val region = sessionStore.countryIso.first()
         val normalized = CustomerPhone.normalize(buyerPhone, region)
 
+        // One order, one currency. Summing minor units across currencies produces
+        // a number that is not money, and totalMinor is a single column with a
+        // single currency beside it — there is nowhere to record a mixed order
+        // even if one were meaningful. The caller filters to a single currency
+        // before it gets here; this is the invariant stated where it is relied on.
+        val currency = lines.map { it.currency }.distinct().singleOrNull()
+            ?: error("An order must be in exactly one currency, got ${lines.map { it.currency }.distinct()}")
+
         val orderId = db.withTransaction {
             db.customerDao().insertIgnore(
                 CustomerEntity(
@@ -96,7 +118,7 @@ class OrderRepository @Inject constructor(
                 OrderEntity(
                     buyerPhone = buyerPhone, buyerName = buyerName,
                     status = OrderStatus.NEW.name, payMethod = payMethod.name,
-                    totalMinor = total, note = note,
+                    totalMinor = total, currency = currency, note = note,
                     idempotencyKey = UUID.randomUUID().toString(),
                 )
             )

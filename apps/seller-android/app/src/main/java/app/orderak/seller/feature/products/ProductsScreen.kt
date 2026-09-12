@@ -59,8 +59,7 @@ import app.orderak.seller.core.ui.UsageMeter
 import app.orderak.seller.data.billing.EntitlementManager
 import app.orderak.seller.data.billing.FeatureKeys
 import androidx.hilt.navigation.compose.hiltViewModel as hiltVm
-import app.orderak.seller.core.money.DEFAULT_CURRENCY
-import app.orderak.seller.core.money.formatAmount
+import app.orderak.seller.core.money.formatAmountLabel
 import app.orderak.seller.data.db.ProductEntity
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
@@ -298,7 +297,7 @@ private fun ProductCard(p: ProductEntity, onClick: () -> Unit) {
                     ),
                 )
                 Text(
-                    stringResource(R.string.currency_egp, formatAmount(p.priceMinor, p.currency, locale)),
+                    formatAmountLabel(p.priceMinor, p.currency, locale),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
