@@ -84,6 +84,45 @@ describe("media reclamation", () => {
 		expect(await trackedKeys()).not.toContain(key);
 	});
 
+	it("reclaims a batch larger than D1's bound-parameter limit", async () => {
+		// The sweep selected up to SWEEP_LIMIT (500) orphans and then bound every
+		// key into ONE `DELETE ... WHERE key IN (...)`. D1 caps a statement at 100
+		// bound parameters, so the first genuinely full batch threw — *after*
+		// env.orderak_media.delete() had already destroyed the objects. The rows
+		// survived, stayed older than the grace window, and the same 500 were
+		// re-selected every night: R2 deletes became no-ops and D1 threw again,
+		// forever. api-store.ts:1314 already chunks the identical pattern at 90.
+		//
+		// 150 is past the limit and cheap. The old code fails here; nothing else
+		// in this suite went past two objects, which is why it shipped.
+		const r = await registerStore({ store_name: "Fresh Market" });
+		const storeId = (await env.orderak_db.prepare("SELECT id FROM sellers WHERE public_identifier=?")
+			.bind(r.public_identifier).first<{ id: string }>())!.id;
+
+		const keys = Array.from({ length: 150 }, (_, i) => `stores/${storeId}/product-bulk${String(i).padStart(4, "0")}.png`);
+		for (const key of keys) await env.orderak_media.put(key, PNG, { httpMetadata: { contentType: "image/png" } });
+		await env.orderak_db.batch(keys.map((key) => env.orderak_db.prepare(
+			"INSERT INTO media_objects(key,store_id,kind,created_at) VALUES(?,?,'product',datetime('now','-40 days'))",
+		).bind(key, storeId)));
+
+		const deleted = await reclaimOrphanedMedia(testEnv({ MEDIA_RECLAIM_ENABLED: "true" }));
+
+		expect(deleted).toBe(150);
+		// Both sides actually gone — not R2 emptied with the rows left behind,
+		// which is exactly the state the unchunked DELETE left them in.
+		//
+		// Scoped to this test's keys rather than asserting the table is empty:
+		// createSchema() clears D1 between tests but the R2 bucket persists across
+		// the file, so adoptUntrackedObjects() legitimately re-adopts objects left
+		// by earlier tests. Those are inside the grace window and must survive.
+		const remaining = await trackedKeys();
+		for (const key of keys) expect(remaining).not.toContain(key);
+		expect(await env.orderak_media.get(keys[0])).toBeNull();
+		expect(await env.orderak_media.get(keys[89])).toBeNull();   // chunk boundary
+		expect(await env.orderak_media.get(keys[90])).toBeNull();   // first of chunk 2
+		expect(await env.orderak_media.get(keys[149])).toBeNull();
+	});
+
 	it("never deletes an object inside the grace window", async () => {
 		const r = await registerStore({ store_name: "Fresh Market" });
 		const key = await upload(r);

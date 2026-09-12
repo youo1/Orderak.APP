@@ -247,6 +247,23 @@ async function fulfillDeletion(env: Env, req: DeletionRequest): Promise<void> {
 		);
 
 		// --- Support ---
+		// Children first. support_messages carries
+		//   FOREIGN KEY (ticket_id) REFERENCES support_tickets(id)
+		// with no ON DELETE (003_admin.sql:121-128), and D1 enforces foreign keys.
+		// Deleting the tickets alone raised SQLITE_CONSTRAINT_FOREIGNKEY, which
+		// aborted this entire batch — including the statement that marks the
+		// request completed. The status stayed 'verified', the next run re-selected
+		// the same row and failed the same way, and the only outward sign was a
+		// deletion_backlog line. Any seller who had ever opened a support ticket
+		// could therefore never be erased, and the 90-day statutory deadline could
+		// never be met for them.
+		//
+		// The messages are the seller's own words and a support agent's, so this is
+		// a privacy obligation and not merely an ordering bug.
+		stmts.push(env.orderak_db.prepare(
+			`DELETE FROM support_messages WHERE ticket_id IN
+			 (SELECT id FROM support_tickets WHERE seller_id = ?)`,
+		).bind(sId));
 		stmts.push(env.orderak_db.prepare("DELETE FROM support_tickets WHERE seller_id = ?").bind(sId));
 		stmts.push(env.orderak_db.prepare("DELETE FROM announcement_reads WHERE seller_id = ?").bind(sId));
 
