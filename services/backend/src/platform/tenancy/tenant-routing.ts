@@ -67,10 +67,39 @@ export async function resolveTenantContext(env: Env, organizationId: string): Pr
 	};
 }
 
+/**
+ * The tenant context for a store, in one read rather than two.
+ *
+ * This is the hottest path in the Worker — every seller write and every buyer
+ * order calls it — and it used to cost two sequential D1 reads: one to map the
+ * store to its organization, then resolveTenantContext() for the routing row.
+ * Both are on the request's critical path, and the second one exists to learn a
+ * value that is currently the same for every tenant.
+ *
+ * The join gets it to one read while leaving the sharding path fully live:
+ * `shard_key` is still read and still checked, so the day a second shard exists
+ * this keeps refusing to serve it from the wrong database.
+ *
+ * Deliberately NOT cached, in memory or anywhere else. `migration_state` is what
+ * requireTenantWrite() fences writes on, so a stale "stable" would let writes
+ * through a fence during a shard migration — losing exactly the writes the fence
+ * exists to protect. A saved round trip is not worth that; a join is.
+ *
+ * LEFT JOIN, not INNER: an organization with no routing row yet must still reach
+ * resolveTenantContext()'s backfill rather than looking like a missing store.
+ */
 export async function resolveTenantContextForStore(env: Env, storeId: string): Promise<TenantContext> {
 	const row = await env.orderak_db.prepare(
-		"SELECT organization_id FROM organization_stores WHERE store_id=?",
-	).bind(storeId).first<{ organization_id: string }>();
+		`SELECT s.organization_id, r.shard_key, r.routing_version, r.migration_state
+		 FROM organization_stores s
+		 LEFT JOIN organization_routing r ON r.organization_id = s.organization_id
+		 WHERE s.store_id = ?`,
+	).bind(storeId).first<{
+		organization_id: string;
+		shard_key: string | null;
+		routing_version: number | null;
+		migration_state: string | null;
+	}>();
 	if (!row) {
 		// Logged as its own signal, because the previous bare throw arrived in
 		// the error log as an anonymous stack from whichever route happened to
@@ -78,7 +107,20 @@ export async function resolveTenantContextForStore(env: Env, storeId: string): P
 		console.error(JSON.stringify({ signal: "tenant_route_missing", store_id: storeId }));
 		throw new TenantRouteMissingError(storeId);
 	}
-	return resolveTenantContext(env, row.organization_id);
+	// No routing row: fall through to the slow path, which backfills it. Rare by
+	// construction — migration 024 backfilled every organization that existed and
+	// both account-creation paths write the row.
+	if (row.shard_key === null || row.migration_state === null) {
+		return resolveTenantContext(env, row.organization_id);
+	}
+	if (row.shard_key !== "primary") throw new Error("tenant_shard_unavailable");
+	return {
+		organizationId: row.organization_id,
+		shardKey: "primary",
+		routingVersion: Number(row.routing_version ?? 1),
+		db: env.orderak_db,
+		migrationState: row.migration_state,
+	};
 }
 
 /**

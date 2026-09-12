@@ -430,6 +430,12 @@ job IDs.
 - Admin browser sessions are opaque random tokens hashed in D1, with a
   15-minute idle timeout and eight-hour absolute timeout. Login rotates session
   identity; access changes and credential issuance revoke older sessions.
+- The idle window slides at most once per minute, not on every request. Each
+  authenticated call otherwise paid for a D1 write whose result the request never
+  read, on the database every tenant shares. The cost is that idle expiry is
+  accurate to within 60 seconds of the 15-minute window rather than exactly; the
+  absolute timeout, revocation and `u.active` checks are unaffected because they
+  are evaluated on every request from the session row itself.
 - The cookie is `__Host-orderak_admin_session`, `HttpOnly`, `Secure`,
   `SameSite=Strict`, `Path=/`, with no Domain. Every mutation also requires a
   per-session CSRF token and exact `https://admin.orderak.app` Origin/Referer.

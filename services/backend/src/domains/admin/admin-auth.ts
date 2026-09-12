@@ -25,6 +25,15 @@ import type { AdminSessionResponse } from "../../../../../contracts/typescript/a
 const MIN_PASSWORD_LEN = 12;
 const IDLE_SECONDS = 15 * 60;
 const ABSOLUTE_SECONDS = 8 * 60 * 60;
+/**
+ * How stale the idle window must be before resolveAdmin() writes it forward.
+ *
+ * Must stay far below IDLE_SECONDS: it is the error bar on idle expiry, and a
+ * value approaching the window would let a session expire while still in use.
+ * One minute against fifteen is a 0.9% error and removes the write from
+ * essentially every request in a burst.
+ */
+const SESSION_TOUCH_MIN_MS = 60_000;
 const MFA_CHALLENGE_SECONDS = 5 * 60;
 const RECOVERY_CODE_COUNT = 10;
 const BREAK_GLASS_IPS_REQUIRED_ERROR = { error: "break_glass_source_forbidden" };
@@ -105,7 +114,14 @@ type SessionRow = AdminRow & {
 	csrf_hash: string;
 };
 
-function cookieValue(request: Request, name: string): string {
+/**
+ * Read one cookie value from a request.
+ *
+ * Exported for admin-control-plane.ts, which reads the export download cookie
+ * the same way. One parser, so the two surfaces cannot disagree about how a
+ * cookie header is split.
+ */
+export function cookieValue(request: Request, name: string): string {
 	return decodeURIComponent((request.headers.get("cookie") ?? "")
 		.split(";")
 		.map((part) => part.trim())
@@ -215,9 +231,29 @@ export async function resolveAdmin(request: Request, env: AdminWorkerEnv): Promi
 		 AND s.expires_at>datetime('now') AND s.idle_expires_at>datetime('now') LIMIT 1`,
 	).bind(tokenHash).first<SessionRow>();
 	if (!row) return null;
-	await env.orderak_db.prepare(
-		"UPDATE admin_sessions SET last_used_at=datetime('now'),idle_expires_at=datetime('now',?) WHERE id=?",
-	).bind(`+${IDLE_SECONDS} seconds`, row.session_id).run();
+	// Slide the idle window, but not on every single request.
+	//
+	// This ran unconditionally, so every authenticated admin call paid for a D1
+	// write whose result the request never reads — on a console whose pages fire
+	// several requests each, and against the one database every tenant shares.
+	//
+	// `idle_expires_at` is always `last_used_at + IDLE_SECONDS`, so the time since
+	// the last touch can be derived from the row already selected; no extra column
+	// and no second query. Below the threshold the session is valid for the same
+	// IDLE_SECONDS either way and the write changes nothing an observer could see.
+	//
+	// The cost is that idle expiry is now accurate to within SESSION_TOUCH_MIN_MS
+	// rather than exactly — one minute against a fifteen-minute window. That is a
+	// deliberate trade and is recorded in docs/architecture/security-model.md.
+	const idleExpiresMs = Date.parse(row.idle_expires_at.replace(" ", "T") + "Z");
+	const sinceLastTouchMs = Date.now() - (idleExpiresMs - IDLE_SECONDS * 1000);
+	// NaN when the timestamp is unparseable — write, rather than silently stop
+	// sliding the window on a row we cannot read.
+	if (!(sinceLastTouchMs < SESSION_TOUCH_MIN_MS)) {
+		await env.orderak_db.prepare(
+			"UPDATE admin_sessions SET last_used_at=datetime('now'),idle_expires_at=datetime('now',?) WHERE id=?",
+		).bind(`+${IDLE_SECONDS} seconds`, row.session_id).run();
+	}
 	return claims(row, row.session_id, row.created_at, row.expires_at);
 }
 
