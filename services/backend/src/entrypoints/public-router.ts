@@ -22,7 +22,7 @@ import {
 	renderProductPage,
 	handleCatalogOrder,
 } from "../domains/catalog/catalog";
-import { pickLocale, type Locale } from "../platform/localization/i18n";
+import { DEFAULT_LOCALE, LOCALES, dirFor, pickLocale, t, type Locale } from "../platform/localization/i18n";
 import { checkRateLimit, esc } from "../platform/http/shared";
 import { storeCapabilityEnabled } from "../domains/operations/capabilities";
 import { Hono } from "hono";
@@ -30,8 +30,21 @@ import { Hono } from "hono";
 type Store = Record<string, unknown>;
 type ResourceHandler = (env: PublicWorkerEnv, store: Store, code: string, request: Request) => Promise<Response>;
 
-function notFound(): Response {
-	return new Response("غير موجود", {
+/**
+ * The public 404, in the language the request asked for.
+ *
+ * The body was the literal "غير موجود" regardless of locale, on a router that
+ * threads `pickLocale` through every other response it produces. An English or
+ * French visitor following a dead product link was answered in Arabic — a small
+ * thing, and the only string on these surfaces that ignored the locale it had
+ * already resolved.
+ *
+ * `lang` is optional because a few call sites resolve a store before they
+ * resolve a locale, and a 404 must never be the thing that fails for want of
+ * one. Those fall back to the default, which is what they did before.
+ */
+function notFound(lang: Locale = DEFAULT_LOCALE): Response {
+	return new Response(t(lang, "errors.not_found"), {
 		status: 404,
 		headers: { "content-type": "text/plain; charset=utf-8" },
 	});
@@ -71,7 +84,7 @@ async function handleDeletionRequest(request: Request, env: PublicWorkerEnv, lan
 		const revision = await loadActiveDesignSystem(env, request);
 		return deletionPage(lang, false, designSystemCss(revision.snapshot));
 	}
-	if (request.method !== "POST") return notFound();
+	if (request.method !== "POST") return notFound(lang);
 	const ip = request.headers.get("cf-connecting-ip") || "unknown";
 	if (!(await checkRateLimit(env, `delete-request:ip:${ip}`, 5, 3600))) {
 		return new Response("Too many requests", { status: 429 });
@@ -105,6 +118,7 @@ async function handleDeletionRequest(request: Request, env: PublicWorkerEnv, lan
 // ---- Resource handlers (ownership-scoped) ----------------------------------
 
 async function handleCategory(env: PublicWorkerEnv, store: Store, code: string, request: Request): Promise<Response> {
+	const lang = pickLocale(request, new URL(request.url));
 	const category = (await env.orderak_db
 		.prepare(
 			`SELECT id, category_code, name, slug FROM categories
@@ -112,11 +126,12 @@ async function handleCategory(env: PublicWorkerEnv, store: Store, code: string, 
 		)
 		.bind(store.id, code)
 		.first()) as Record<string, unknown> | null;
-	if (!category) return notFound();
-	return renderCategoryPage(env, store, category, pickLocale(request, new URL(request.url)));
+	if (!category) return notFound(lang);
+	return renderCategoryPage(env, store, category, lang);
 }
 
 async function handleProduct(env: PublicWorkerEnv, store: Store, code: string, request: Request): Promise<Response> {
+	const lang = pickLocale(request, new URL(request.url));
 	const product = (await env.orderak_db
 		.prepare(
 			`SELECT id, product_code, name, slug, description, price_minor, currency, stock, available, image_url
@@ -124,8 +139,8 @@ async function handleProduct(env: PublicWorkerEnv, store: Store, code: string, r
 		)
 		.bind(store.id, code)
 		.first()) as Record<string, unknown> | null;
-	if (!product) return notFound();
-	return renderProductPage(env, store, product, pickLocale(request, new URL(request.url)));
+	if (!product) return notFound(lang);
+	return renderProductPage(env, store, product, lang);
 }
 
 // Extensible registry — add a new ERP module by registering one handler here.
@@ -148,25 +163,30 @@ async function renderContentPage(env: PublicWorkerEnv, slug: string, lang: Local
 		.bind(slug, lang)
 		.first()) as { title: string; body_html: string } | null;
 
-	// Fallback to the other language.
+	// Fallback, in a stated order rather than "the other one".
+	//
+	// That phrasing was accurate while there were exactly two languages and
+	// became wrong the moment French was added: a French request would have
+	// fallen back to Arabic, which is further from it than English is. The order
+	// is explicit now — English first, because it is the language most likely to
+	// be partially readable by someone who reads either of the others, and
+	// because content_page_versions is seeded in ar and en.
 	if (!row) {
-		const other: Locale = lang === "ar" ? "en" : "ar";
-		row = (await env.orderak_db
-			.prepare("SELECT title, body_html FROM content_page_versions WHERE slug=? AND lang=? AND status='published' ORDER BY version DESC LIMIT 1")
-			.bind(slug, other)
-			.first()) as { title: string; body_html: string } | null;
+		for (const other of LOCALES.filter((candidate) => candidate !== lang)
+			.sort((a, b) => (a === "en" ? -1 : b === "en" ? 1 : 0))) {
+			row = (await env.orderak_db
+				.prepare("SELECT title, body_html FROM content_page_versions WHERE slug=? AND lang=? AND status='published' ORDER BY version DESC LIMIT 1")
+				.bind(slug, other)
+				.first()) as { title: string; body_html: string } | null;
+			if (row) break;
+		}
 	}
 
-	if (!row) {
-		return new Response("غير موجود", {
-			status: 404,
-			headers: { "content-type": "text/plain; charset=utf-8" },
-		});
-	}
+	if (!row) return notFound(lang);
 
 	const revision = await loadActiveDesignSystem(env);
 	const t = revision.legacyTheme;
-	const dir = lang === "ar" ? "rtl" : "ltr";
+	const dir = dirFor(lang);
 	const html = `<!doctype html>
 <html lang="${lang}" dir="${dir}">
 <head>
@@ -181,7 +201,21 @@ async function renderContentPage(env: PublicWorkerEnv, slug: string, lang: Local
 <body><h1>${esc(row.title)}</h1>${row.body_html}</body>
 </html>`;
 
-	return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
+	// `body_html` is stored markup written through the admin surface and emitted
+	// raw, which is the one thing on this page that could carry script. It is
+	// trusted content, but "trusted" here means one compromised or mistaken
+	// administrator away, and these pages (terms, privacy) are the ones every
+	// seller is required to read. The policy costs nothing: the page has no
+	// script of its own, so `default-src 'none'` with inline styles is the whole
+	// of what it needs.
+	return new Response(html, {
+		headers: {
+			"content-type": "text/html; charset=utf-8",
+			"content-security-policy":
+				"default-src 'none'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; "
+				+ "font-src 'self'; form-action 'none'; base-uri 'none'; frame-ancestors 'self'",
+		},
+	});
 }
 
 /**
@@ -197,15 +231,18 @@ app.all("/delete-account", (c) =>
 
 app.get("/terms", (c) => renderContentPage(c.env, "terms", pickLocale(c.req.raw, new URL(c.req.url))));
 app.get("/privacy", (c) => renderContentPage(c.env, "privacy", pickLocale(c.req.raw, new URL(c.req.url))));
-app.all("/terms", () => notFound());
-app.all("/privacy", () => notFound());
+app.all("/terms", (c) => notFound(pickLocale(c.req.raw, new URL(c.req.url))));
+app.all("/privacy", (c) => notFound(pickLocale(c.req.raw, new URL(c.req.url))));
 
 // Legacy store URL: /c/{identifier} -> 301 to /{public_identifier}. In the
 // current scheme "c" only appears as a *second* segment, so a leading "/c/" is
 // unambiguously the old form.
-const legacyStoreRedirect = async (c: { env: PublicWorkerEnv; req: { param: (k: string) => string } }) => {
+const legacyStoreRedirect = async (c: {
+	env: PublicWorkerEnv;
+	req: { param: (k: string) => string; raw: Request; url: string };
+}) => {
 	const store = await findStoreByIdentifier(c.env, decodeURIComponent(c.req.param("identifier")));
-	if (!store) return notFound();
+	if (!store) return notFound(pickLocale(c.req.raw, new URL(c.req.url)));
 	return redirect301(storeUrl(c.env, String(store.public_identifier)));
 };
 app.all("/c/:identifier", legacyStoreRedirect);
@@ -213,7 +250,7 @@ app.all("/c/:identifier", legacyStoreRedirect);
 // segments[1], so deeper legacy URLs redirect too rather than falling through
 // to the /:pid/:module/:code route.
 app.all("/c/:identifier/*", legacyStoreRedirect);
-app.all("/c", () => notFound());
+app.all("/c", (c) => notFound(pickLocale(c.req.raw, new URL(c.req.url))));
 
 /**
  * Resolve the store named by the first path segment, applying the same
@@ -229,32 +266,34 @@ async function resolveVisibleStore(env: PublicWorkerEnv, identifier: string): Pr
 
 // ---- Store root: /{pid} ----
 app.all("/:pid", async (c) => {
+	const lang = pickLocale(c.req.raw, new URL(c.req.url));
 	const first = decodeURIComponent(c.req.param("pid"));
 	const store = await resolveVisibleStore(c.env, first);
-	if (!store) return notFound();
+	if (!store) return notFound(lang);
 
 	if (c.req.method === "POST") return handleCatalogOrder(c.req.raw, c.env, store);
-	if (c.req.method !== "GET") return notFound();
+	if (c.req.method !== "GET") return notFound(lang);
 
 	// Canonicalize aliases (bare slug / store_code) to the full identifier.
 	const canonical = String(store.public_identifier);
 	if (first !== canonical) return redirect301(storeUrl(c.env, canonical));
-	return renderStorePage(c.env, store, pickLocale(c.req.raw, new URL(c.req.url)));
+	return renderStorePage(c.env, store, lang);
 });
 
 // ---- Sub-resource: /{pid}/{module}/{code} ----
 app.all("/:pid/:module/:code", async (c) => {
-	if (c.req.method !== "GET") return notFound();
+	const lang = pickLocale(c.req.raw, new URL(c.req.url));
+	if (c.req.method !== "GET") return notFound(lang);
 	const store = await resolveVisibleStore(c.env, decodeURIComponent(c.req.param("pid")));
-	if (!store) return notFound();
+	if (!store) return notFound(lang);
 
 	const handler = RESOURCE_REGISTRY[c.req.param("module").toLowerCase()];
 	const code = decodeURIComponent(c.req.param("code"));
-	if (!handler || !code) return notFound();
+	if (!handler || !code) return notFound(lang);
 	return handler(c.env, store, code, c.req.raw);
 });
 
-app.all("*", () => notFound());
+app.all("*", (c) => notFound(pickLocale(c.req.raw, new URL(c.req.url))));
 
 /**
  * Handle a public store URL. Returns a Response, or null if the path is empty

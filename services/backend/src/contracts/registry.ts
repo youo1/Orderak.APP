@@ -81,6 +81,35 @@ export const ProductSchema = z
 	.openapi("Product");
 
 /**
+ * What POST /api/v1/products/sync actually answers with, per submitted row.
+ *
+ * NOT [ProductSchema]. The entry below used to claim it was, which described a
+ * payload the handler has never produced: the mirror replies with the identity
+ * it assigned to each row the client sent — `app_id` echoed back so the device
+ * can find its own local row, `remote_uuid` as the identity every later push is
+ * matched on, and the authoritative stock and revision — and carries none of
+ * `id`, `name`, `price`, `slug`, `description` or `available`.
+ *
+ * It was inert, because `src/seller-v1.json` hand-authors this operation and
+ * the hand-authored document wins. Inert and wrong is worse than absent: this
+ * map is the generator's fallback, so the day someone removed the hand-authored
+ * entry the contract would have silently acquired a fabricated shape — and a
+ * wrong schema looks authoritative to Schemathesis, to Prism and to every
+ * generated client, which is the reason the header of this file gives for not
+ * inventing schemas in the first place.
+ */
+export const SyncedProductIdentitySchema = z
+	.object({
+		app_id: z.number().int(),
+		product_code: z.string(),
+		remote_uuid: z.string().nullable(),
+		category_code: z.string().nullable(),
+		stock: z.number().int(),
+		stock_version: z.number().int(),
+	})
+	.openapi("SyncedProductIdentity");
+
+/**
  * A modelled operation carries its example with it.
  *
  * The generator used to attach three generic examples to every operation — a
@@ -133,14 +162,19 @@ export const RESPONSE_SCHEMAS: Record<string, ModelledResponse> = {
 		example: { ok: true, id: "018f-example", order_no: 12, status: "CONFIRMED", changed: true },
 	},
 	"POST /api/v1/products/sync": {
-		schema: ok({ products: z.array(ProductSchema) }),
+		schema: ok({
+			count: z.number().int(),
+			products: z.array(SyncedProductIdentitySchema),
+			catalog_version: z.number().int(),
+		}),
 		example: {
 			ok: true,
+			count: 1,
 			products: [{
-				id: "018f-product", product_code: "P-0001", name: "Cola", slug: "cola",
-				description: null, price: exampleMoney, stock: 10, stock_version: 1,
-				available: true, image_url: null, category_code: null,
+				app_id: 1, product_code: "p-A1B2C3", remote_uuid: "018f-product",
+				category_code: null, stock: 10, stock_version: 1,
 			}],
+			catalog_version: 8,
 		},
 	},
 };

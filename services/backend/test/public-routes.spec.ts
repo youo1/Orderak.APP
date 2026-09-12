@@ -147,7 +147,9 @@ describe("public checkout integrity", () => {
 		const [a, b] = await Promise.all([place("quota-race-a"), place("quota-race-b")]);
 
 		const statuses = [a.status, b.status].sort();
-		expect(statuses).toEqual([200, 409]);
+		// 429 for a monthly allowance; see order-status.spec.ts on why the status
+		// no longer depends on which entitlement engine is enabled.
+		expect(statuses).toEqual([200, 429]);
 		const total = await env.orderak_db.prepare("SELECT COUNT(*) AS c FROM orders WHERE store_id=?")
 			.bind(seller!.id).first<{ c: number }>();
 		expect(total?.c).toBe(50);
@@ -258,5 +260,48 @@ describe("account deletion resource", () => {
 		).bind("+201001234567").first<Record<string, unknown>>();
 		expect(row).toMatchObject({ phone_e164: "+201001234567", email: "seller@example.com", status: "pending" });
 		expect(Date.parse(String(row?.deadline_at))).toBeGreaterThan(Date.now() + 89 * 24 * 60 * 60 * 1000);
+	});
+});
+
+describe("storefront script safety", () => {
+	// A product name is seller-controlled and capped at 80 characters. The
+	// JSON-LD block interpolated it through JSON.stringify, which does not
+	// escape the sequence that closes a script element — so a name containing
+	// one ended the element and everything after it was parsed as markup, in an
+	// origin shared by every store on the platform.
+	const PAYLOAD = "</script><script>alert(1)</script>";
+
+	it("escapes seller text that would otherwise close the JSON-LD element", async () => {
+		const r = await registerStore({ phone: "+201500007001" });
+		const code = await seedProduct(r, 1, PAYLOAD);
+		const page = await SELF.fetch(`${SITE}/${r.public_identifier}/p/${code}`);
+		const html = await page.text();
+
+		// Nothing anywhere on the page reconstitutes the injected element.
+		expect(html).not.toContain("<script>alert(1)</script>");
+
+		// And the block is still valid JSON-LD carrying the real name, so the
+		// escaping did not cost the SEO payload its meaning. The non-greedy match
+		// stops at the first literal closing tag, which is the assertion: if the
+		// payload had survived, that tag would be the seller's, not ours.
+		const block = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(html);
+		expect(block).toBeTruthy();
+		const parsed = JSON.parse(block![1]) as { name: string };
+		expect(parsed.name).toBe(PAYLOAD);
+	});
+
+	it("serves a content security policy that confines injected script", async () => {
+		const r = await registerStore({ phone: "+201500007002" });
+		await seedProduct(r, 1, "Cola");
+		const page = await SELF.fetch(`${SITE}/${r.public_identifier}`);
+		const policy = page.headers.get("content-security-policy") ?? "";
+
+		// script-src keeps 'unsafe-inline' because the order form and its
+		// quantity buttons are inline, so these are the directives that still do
+		// work under it: nothing can be exfiltrated to another origin, and
+		// nothing else can be loaded at all.
+		expect(policy).toContain("connect-src 'self'");
+		expect(policy).toContain("default-src 'none'");
+		expect(policy).toContain("base-uri 'none'");
 	});
 });

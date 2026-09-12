@@ -122,25 +122,19 @@ class FeatureAvailabilityResolver @Inject constructor(
     }
 
     /**
-     * Mirrors [EntitlementManager]'s own expiry rule rather than reaching into
-     * it, so an expired paid period reads as a plan boundary here too.
+     * Asks [EntitlementManager] directly, which owns the rule.
+     *
+     * This used to infer the answer by probing `max_products` and watching for a
+     * disagreement between the manager and the raw snapshot — correct, but only
+     * for as long as that one key stayed universally present in every snapshot.
+     * The failure mode if it ever stopped was paid features remaining open past
+     * their expiry, silently, which is the wrong direction for a gate to fail in.
      */
     private fun isPeriodExpired(config: BackendConfig): Boolean =
-        config.subscription_status in EXPIRABLE_STATUSES &&
-            config.current_period_end != null &&
-            !entitlements.isEntitlementAvailable(EXPIRY_PROBE_KEY) &&
-            config.entitlements[EXPIRY_PROBE_KEY]?.available == true
+        config.subscription_status in EXPIRABLE_STATUSES && entitlements.isPeriodExpired()
 
     private companion object {
         val EXPIRABLE_STATUSES = setOf("active", "grace", "canceled")
-
-        /**
-         * Any always-present entitlement works as a probe: when the authoritative
-         * period has ended, EntitlementManager reports every key unavailable while
-         * the snapshot itself still says otherwise, and that disagreement is the
-         * signal.
-         */
-        const val EXPIRY_PROBE_KEY = "max_products"
     }
 }
 

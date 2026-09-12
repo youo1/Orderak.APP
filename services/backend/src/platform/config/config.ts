@@ -37,6 +37,12 @@ const FREE_CONFIG = {
 	limits: {
 		...FREE_LIMITS,
 		max_team_members: 1,
+		// Present here because the engine's projection sends it. A key that
+		// appears in `limits` under one engine and not the other is exactly the
+		// client-visible difference I-4 forbids, and the app reads this one into
+		// ConfigLimits.max_concurrent_devices — where absent and 1 are not the
+		// same answer. One is what the free plan permits; the other is nothing.
+		max_concurrent_devices: 1,
 	},
 	features: {
 		custom_domain: false,
@@ -130,6 +136,11 @@ export async function loadPlanConfig(env: Env, sellerId: string): Promise<Record
 			max_orders_per_month: n(sub.max_orders_per_month),
 			max_ai_requests_per_month: n(sub.max_ai_requests_per_month),
 			max_team_members: n(sub.max_team_members),
+			// Derived the way legacySnapshot() derives it, because the legacy
+			// `plans` table has no device count — only the multi_device_enabled
+			// boolean. Two is what the first paid tier gives; one is what a plan
+			// without the flag permits.
+			max_concurrent_devices: sub.multi_device_enabled === 1 ? 2 : 1,
 		},
 		features: {
 			custom_domain: sub.custom_domain_enabled === 1,
@@ -186,13 +197,75 @@ function legacyProjection(snapshot: EntitlementSnapshot): Record<string, unknown
 			max_concurrent_devices: numberValue("max_concurrent_devices"),
 		},
 		features: {
-			custom_domain: enabled("custom_domain"),
-			analytics: enabled("advanced_analytics"),
+			// Catalogue keys, not the bare names this used to read.
+			//
+			// `custom_domain` and `advanced_analytics` are not in
+			// entitlement_definitions — migration 025 seeds
+			// `products_catalog.custom_domain` and the `analytics_reporting.*`
+			// family, and neither bare name appears among its 242 rows. So both
+			// of these resolved to `undefined?.available === true` and answered
+			// false for every seller on every plan, including the paid tiers the
+			// catalogue grants them to.
+			//
+			// The names below are the ones the Android client already derives the
+			// same two flags from, in BackendConfig.toBackendConfig(). Using a
+			// different key here meant a device could hold two contradictory
+			// answers for `features.analytics` depending on whether it last read
+			// /api/v1/config or /api/v1/entitlements.
+			custom_domain: enabled("products_catalog.custom_domain"),
+			analytics: enabled("analytics_reporting.operational_dashboard"),
 			priority_support: enabled("support_service.priority_queue"),
 			ai_assistant: enabled("ai_capabilities.basic_ai_assistance"),
 			multi_device: (numberValue("max_concurrent_devices") ?? Number.MAX_SAFE_INTEGER) > 1,
 		},
 	};
+}
+
+/**
+ * Refuse a write from a client the version policy says must stop, or null.
+ *
+ * WHY WRITES AND NOT EVERYTHING
+ *   Refusing reads would leave a blocked seller unable to see their own orders
+ *   while the app told them to update — punishing them for the update rather
+ *   than gating the thing that matters. Writes are where a client too old to be
+ *   trusted can do damage, and refusing them leaves the account readable.
+ *
+ * WHY ONLY CREDENTIALED CALLS
+ *   Every credentialed call from the app carries the full header set, so a
+ *   missing version code THERE means a client that is not the app, or one that
+ *   stripped it — which the restrictive reading above catches. The pre-auth
+ *   routes are different: register, auth/phone/complete, onboarding/* and the
+ *   plan catalogue are all called before there is a credential and send no
+ *   device headers at all. Applying the same rule to them would refuse sign-in
+ *   for everyone the moment any policy row existed, which is the lockout this
+ *   scoping exists to prevent.
+ *
+ * WHY THE PLATFORM IS CHECKED
+ *   Policies are per-platform. A caller declaring a platform this policy is not
+ *   about is not covered by it.
+ */
+export async function versionGateRefusal(
+	env: Env,
+	request: Request,
+	seller: Record<string, unknown>,
+): Promise<Response | null> {
+	const platform = request.headers.get("x-orderak-platform");
+	if (platform !== null && platform !== "android") return null;
+	const country = String(seller.country_code ?? "").toUpperCase() || null;
+	const policy = await effectiveVersionPolicy(env, "android", country);
+	if (!policy) return null;
+	const header = request.headers.get("x-orderak-version-code");
+	const decision = versionDecision(policy, header === null ? 0 : Number(header));
+	const status = String(decision.status);
+	if (!BLOCKING_VERSION_STATUSES.has(status)) return null;
+	return jsonResponse({
+		error: "client_version_refused",
+		// Not `status`: jsonResponse reserves that key for the numeric HTTP
+		// status on a problem body and moves anything else to resource_status.
+		// Naming it plainly keeps the client's read unambiguous.
+		version_status: status,
+		version: decision,
+	}, 403);
 }
 
 export async function handleConfigRoute(
@@ -256,6 +329,17 @@ async function effectiveVersionPolicy(env: Env, platform: string, country: strin
 	).bind(platform, country, country).first<DbRow>();
 }
 
+/**
+ * Statuses that mean "this client must stop", as opposed to "this client should
+ * update soon".
+ *
+ * The same three the Android client treats as blocking
+ * (AppVersionGovernance.blockingStatuses). Client and server agreeing on the
+ * set is the point: a policy that blocks in the UI and not at the API is a
+ * notice, not a control.
+ */
+export const BLOCKING_VERSION_STATUSES = new Set(["force_update", "blocked", "maintenance"]);
+
 function versionDecision(policy: DbRow | null, versionCode: number): Record<string, unknown> {
 	if (!policy) return { status: "ok", policy_id: null };
 	const blocked = parseJson<number[]>(policy.blocked_version_codes_json, []);
@@ -263,10 +347,21 @@ function versionDecision(policy: DbRow | null, versionCode: number): Record<stri
 	const graceElapsed = enforceAfter == null || enforceAfter <= Date.now();
 	const minimum = Number(policy.minimum_version_code ?? 0);
 	const recommended = Number(policy.recommended_version_code ?? 0);
+	// An unknown version is not evidence of compliance.
+	//
+	// `versionCode > 0` used to guard the force_update arm, so a caller that
+	// sent no x-orderak-version-code — or a tampered one — resolved to "ok" and
+	// walked past a minimum it could not prove it met. That is the wrong
+	// direction for a gate: the honest answer to "I cannot tell which version
+	// you are" is the restrictive one.
+	//
+	// `known` is still required for `warning`, which is advice rather than a
+	// boundary and would only nag a caller we know nothing about.
+	const known = versionCode > 0;
 	const status = Number(policy.maintenance_mode) === 1 ? "maintenance"
-		: blocked.includes(versionCode) ? "blocked"
-		: minimum > 0 && versionCode > 0 && versionCode < minimum && graceElapsed ? "force_update"
-		: recommended > 0 && versionCode > 0 && versionCode < recommended ? "warning"
+		: known && blocked.includes(versionCode) ? "blocked"
+		: minimum > 0 && graceElapsed && (!known || versionCode < minimum) ? "force_update"
+		: recommended > 0 && known && versionCode < recommended ? "warning"
 		: "ok";
 	return {
 		status,

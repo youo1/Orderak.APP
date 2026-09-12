@@ -1,5 +1,6 @@
 import { jsonResponse } from "../../platform/http/shared";
 import { normalizeBuyerPhone, isPrivacySentinel } from "../identity/phone";
+import { EDITABLE_CUSTOMER_PROFILES, entitlementAllows } from "../commerce/entitlements";
 
 /**
  * Customers a seller can edit.
@@ -156,6 +157,28 @@ export async function updateCustomer(
 	key: string,
 	body: Row,
 ): Promise<Response> {
+	// The plan boundary, checked here rather than only on the device.
+	//
+	// The catalogue has sold editable customer profiles as a paid feature since
+	// migration 025 — `customers_crm.editable_customer_profiles` is in
+	// LEGACY_PAID_ONLY_KEYS — and the app gates the editor on it. The API did
+	// not, so a free-plan seller could not reach the edit through the app and
+	// could reach it through the API, which is the wrong way round for a rule a
+	// plan is sold on. CustomerDetailsScreen's own comment asserted "the server
+	// is the authority on whether an edit is accepted"; this is what makes that
+	// sentence true rather than aspirational.
+	//
+	// Before the read and before the field validation, so a seller without the
+	// entitlement is told about the plan rather than about their payload — and
+	// so the refusal cannot be used to probe which customer keys exist.
+	if (!(await entitlementAllows(env, storeId, EDITABLE_CUSTOMER_PROFILES))) {
+		return jsonResponse({
+			error: "plan_feature_unavailable",
+			entitlement_key: EDITABLE_CUSTOMER_PROFILES,
+			message: "Editing customer details is not included in this plan.",
+		}, 403);
+	}
+
 	for (const field of ["phone", "phone_e164", "phone_raw", "customer_key", "store_id"]) {
 		if (field in body) {
 			return jsonResponse({

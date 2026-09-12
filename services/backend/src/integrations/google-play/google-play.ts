@@ -1,5 +1,5 @@
 import { authSeller, jsonResponse, readCreds, type AuthenticatedSeller } from "../../platform/http/shared";
-import { ensureOrganizationForStore, resolveEntitlements } from "../../domains/commerce/entitlements";
+import { ensureOrganizationForStore, resolveEntitlementsForClient } from "../../domains/commerce/entitlements";
 import {
 	acquireProviderPermit,
 	ProviderCircuitOpenError,
@@ -377,11 +377,6 @@ async function applyVerifiedPurchase(
 	await validatePaid3(env, organizationId, mapping);
 	if (pendingMapping) await validatePaid3(env, organizationId, pendingMapping);
 
-	const external = purchase.externalAccountIdentifiers as Json | undefined;
-	if (external?.obfuscatedExternalAccountId && String(external.obfuscatedExternalAccountId) !== await sha256(organizationId)) {
-		throw new PlayError("play_account_binding_mismatch", { security: true });
-	}
-
 	const tokenHash = await sha256(purchaseToken);
 	const existing = await env.orderak_db.prepare(
 		`SELECT pp.organization_id,pp.subscription_id,pp.purchase_token_encrypted,
@@ -403,6 +398,37 @@ async function applyVerifiedPurchase(
 	if (linkedTokenHash && !linked) throw new PlayError("linked_purchase_not_found");
 	if (linked && linked.organization_id !== organizationId) {
 		throw new PlayError("linked_purchase_cross_organization", { security: true });
+	}
+
+	// Every purchase must be tied to this organization by something.
+	//
+	// This check used to be `if (id && id !== expected) throw` — so a purchase
+	// carrying NO obfuscatedExternalAccountId skipped it entirely and was
+	// applied to whichever organization presented the token first. The app
+	// always sets the id (BillingManager.launchBillingFlow), but not every
+	// purchase comes from the app: a subscription resumed from the Play Store's
+	// own Subscriptions page produces a token with no external identifiers at
+	// all.
+	//
+	// Absence is therefore legitimate, but only for a purchase this organization
+	// can already be shown to own. That is what `existing` and `linked` are: the
+	// token is one we have already bound here, or it replaces one we have. Both
+	// were checked against organizationId above, so reaching this line with
+	// either of them set is proof of ownership.
+	//
+	// A first sighting of a token with no account binding is not proof of
+	// anything, and is refused as a security conflict rather than silently
+	// granting a subscription to the caller.
+	const external = purchase.externalAccountIdentifiers as Json | undefined;
+	const declaredAccount = external?.obfuscatedExternalAccountId
+		? String(external.obfuscatedExternalAccountId)
+		: null;
+	if (declaredAccount !== null) {
+		if (declaredAccount !== await sha256(organizationId)) {
+			throw new PlayError("play_account_binding_mismatch", { security: true });
+		}
+	} else if (!existing && !linked) {
+		throw new PlayError("play_account_binding_mismatch", { security: true });
 	}
 
 	const state = normalizeState(purchase.subscriptionState);
@@ -892,7 +918,7 @@ async function verificationResponse(env: Env, job: VerificationJob, sellerId: st
 			ok: true,
 			status: job.status === "applied_ack_pending" ? "acknowledgement_pending" : "succeeded",
 			purchase_status: job.purchase_status,
-			entitlements: await resolveEntitlements(env, sellerId),
+			entitlements: await resolveEntitlementsForClient(env, sellerId),
 		});
 	}
 	return jsonResponse({
@@ -1077,7 +1103,7 @@ export async function handleGooglePlayRoutes(
 			return jsonResponse({
 				ok: true,
 				purchase_status: outcome.purchaseStatus,
-				entitlements: await resolveEntitlements(env, String(seller.id)),
+				entitlements: await resolveEntitlementsForClient(env, String(seller.id)),
 			});
 		}
 		if (outcome.status === "retry") {

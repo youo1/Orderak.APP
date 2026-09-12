@@ -18,6 +18,10 @@ import kotlinx.coroutines.flow.first
 import app.orderak.seller.domain.OrderStatus
 import app.orderak.seller.domain.PayMethod
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -52,11 +56,18 @@ class OrderRepository @Inject constructor(
      * on the account, does not reach a second device, does not survive a
      * reinstall and is not counted against the plan.
      *
-     * A failed post is not an error the seller has to act on. The row keeps its
-     * idempotency key, [SyncRepository] retries it on the next sync, and the
+     * A post that FAILED is not an error the seller has to act on. The row keeps
+     * its idempotency key, [SyncRepository] retries it on the next sync, and the
      * screens say plainly that it is not on the account yet — see
      * LocalOnlyOrder.kt. The key is what makes that retry safe: the server
      * returns the order already written rather than creating a second one.
+     *
+     * A post the server REFUSED is different, and used to be treated the same.
+     * A refusal answers identically however many times it is sent, so retrying
+     * is not patience, it is a loop — and the seller was shown "it will send on
+     * the next sync" about an order that never would. [pushOrder] separates the
+     * two now, the refusal is surfaced with the server's reason, and
+     * [discardLocalOnlyOrder] is the way out.
      */
     suspend fun create(
         buyerPhone: String, buyerName: String?, payMethod: PayMethod,
@@ -101,24 +112,42 @@ class OrderRepository @Inject constructor(
     }
 
     /**
-     * Post one locally created order and record what the server assigned.
+     * Orders the server refused outright, by local id, with the reason.
      *
-     * Returns true when the order is on the account afterwards, including the
-     * case where it already was — a replay answers with the existing order, and
-     * that is a success, not a conflict.
+     * Held in memory rather than on the row: `remoteId` already answers "is this
+     * on the account", and a persisted second field meaning "and here is why
+     * not" would be a schema change plus a value to keep in step with it. What
+     * is lost by not persisting is the reason text across a process restart —
+     * after which the order is pushed once more, refused the same way, and the
+     * reason comes back. One wasted request per launch, and it is self-limiting.
+     *
+     * What matters for recovery does not depend on this map at all: an order
+     * with no `remoteId` is not on the account whatever the cause, and
+     * [discardLocalOnlyOrder] is offered for every such order.
+     */
+    private val _refusedPushes = MutableStateFlow<Map<Long, String>>(emptyMap())
+    val refusedPushes: StateFlow<Map<Long, String>> = _refusedPushes.asStateFlow()
+
+    /**
+     * Post one locally created order and record what the server assigned.
      *
      * Stock is deliberately not adjusted here. The local decrement happened when
      * the order was recorded, and the server's trigger takes its own units when
      * it accepts the order; touching stock again would double-count. The
      * authoritative figure arrives on the next catalogue sync.
+     *
+     * The return type is the point. This used to answer Boolean, so a refusal
+     * and a dropped connection were the same answer and the caller retried both
+     * forever — see [OrderPushOutcome].
      */
-    suspend fun pushOrder(orderId: Long): Boolean {
-        val order = orderDao.byId(orderId) ?: return false
-        if (order.remoteId != null) return true
-        val key = order.idempotencyKey ?: return false
-        val phone = sessionStore.phone.first() ?: return false
+    suspend fun pushOrder(orderId: Long): OrderPushOutcome {
+        val order = orderDao.byId(orderId) ?: return OrderPushOutcome.NotReady
+        if (order.remoteId != null) return OrderPushOutcome.Accepted
+        val key = order.idempotencyKey ?: return OrderPushOutcome.NotReady
+        val phone = sessionStore.phone.first() ?: return OrderPushOutcome.Retryable("no_session")
         val secret = sessionStore.getOrCreateSecret()
-        val items = orderDao.itemsOf(orderId).mapNotNull { item ->
+        val lines = orderDao.itemsOf(orderId)
+        val items = lines.mapNotNull { item ->
             // The server addresses products by their immutable public code. A
             // line whose product has never synced has none, so the order cannot
             // be expressed yet; it stays pending and the next sync, which pushes
@@ -127,7 +156,7 @@ class OrderRepository @Inject constructor(
                 NewOrderLineDto(product_code = code, qty = item.qty)
             }
         }
-        if (items.size != orderDao.itemsOf(orderId).size) return false
+        if (items.size != lines.size) return OrderPushOutcome.NotReady
         val response = api.createOrder(
             phone, secret,
             CreateOrderReq(
@@ -139,9 +168,47 @@ class OrderRepository @Inject constructor(
                 note = order.note,
             ),
         )
-        if (!response.ok) return false
-        orderDao.acceptRemoteId(orderId, response.order_no)
-        return true
+        if (response.ok) {
+            orderDao.acceptRemoteId(orderId, response.order_no)
+            _refusedPushes.update { it - orderId }
+            return OrderPushOutcome.Accepted
+        }
+        val code = response.error ?: "bad_response"
+        if (isRetryableOrderPushCode(code)) {
+            _refusedPushes.update { it - orderId }
+            return OrderPushOutcome.Retryable(code)
+        }
+        _refusedPushes.update { it + (orderId to code) }
+        return OrderPushOutcome.Refused(code)
+    }
+
+    /**
+     * Delete an order this device recorded and the server never accepted, and
+     * give its stock back.
+     *
+     * Exists because until now there was no way out. An order the server refuses
+     * — a payment method this store cannot use, a product that no longer
+     * exists — has no `remoteId`, and without one it cannot be advanced,
+     * cancelled or removed: the screens correctly refuse to move an order the
+     * server does not have, so the row sat in the list forever with its stock
+     * deducted on this phone and nowhere else.
+     *
+     * Stock is restored here because the local decrement at [create] was this
+     * device's own bookkeeping for an order the server never took units for.
+     * Returning them is what makes the counts agree again.
+     *
+     * Refuses an order the server holds. That case is a cancellation, which is a
+     * different operation with a different server-side effect.
+     */
+    suspend fun discardLocalOnlyOrder(orderId: Long): Boolean = db.withTransaction {
+        val order = orderDao.byId(orderId) ?: return@withTransaction false
+        if (order.remoteId != null) return@withTransaction false
+        orderDao.itemsOf(orderId).forEach { db.productDao().restoreStock(it.productId, it.qty) }
+        orderDao.deleteItemsOf(orderId)
+        orderDao.deletePaymentsOf(orderId)
+        val removed = orderDao.deleteLocalOnly(orderId) > 0
+        if (removed) _refusedPushes.update { it - orderId }
+        removed
     }
 
     /**
@@ -165,11 +232,27 @@ class OrderRepository @Inject constructor(
         )
     }
 
-    /** Post everything this device recorded and the server has not acknowledged. */
+    /**
+     * Post everything this device recorded and the server has not acknowledged.
+     *
+     * A refused order is not retried within the process and does not make the
+     * sync report failure: the sync cannot fix it, and reporting failure would
+     * make WorkManager retry the whole cycle on behalf of one order that will be
+     * refused identically. The refusal is surfaced on the order instead, where
+     * the seller can act on it.
+     */
     suspend fun pushPendingOrders(): Boolean {
         var allSucceeded = true
         for (order in orderDao.pendingUpload()) {
-            if (!runCatching { pushOrder(order.id) }.getOrDefault(false)) allSucceeded = false
+            if (_refusedPushes.value.containsKey(order.id)) continue
+            val outcome = runCatching { pushOrder(order.id) }
+                .getOrElse { OrderPushOutcome.Retryable("network") }
+            when (outcome) {
+                is OrderPushOutcome.Accepted -> Unit
+                is OrderPushOutcome.Refused -> Unit
+                is OrderPushOutcome.NotReady -> allSucceeded = false
+                is OrderPushOutcome.Retryable -> allSucceeded = false
+            }
         }
         return allSucceeded
     }
@@ -204,9 +287,9 @@ class OrderRepository @Inject constructor(
         // One attempt to get it onto the account first: an order recorded
         // seconds ago while the signal was out should not block the seller from
         // working it the moment the signal returns.
-        val remoteNo = order.remoteId
-            ?: (if (runCatching { pushOrder(id) }.getOrDefault(false)) orderDao.byId(id)?.remoteId else null)
-            ?: return false
+        val pushed = order.remoteId != null ||
+            runCatching { pushOrder(id) }.getOrNull() is OrderPushOutcome.Accepted
+        val remoteNo = (if (pushed) orderDao.byId(id)?.remoteId else null) ?: return false
         val phone = sessionStore.phone.first() ?: return false
         val secret = sessionStore.getOrCreateSecret()
         val response = api.setOrderStatus(phone, secret, remoteNo, target.name)

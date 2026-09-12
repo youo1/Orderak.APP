@@ -6,7 +6,7 @@ applies_to: [production, staging]
 ---
 # Android Authentication Profile
 
-**Profile version:** 1  
+**Profile version:** 2  
 **Safety contract:**
 [`../contracts/authentication-security-invariants.md`](../contracts/authentication-security-invariants.md)
 
@@ -21,9 +21,13 @@ cross-platform-readiness migration.
   association.
 - Encrypted preferences protect the onboarding token and device credential;
   DataStore remains a resumable non-authoritative draft/cache.
-- Logout signs out of Firebase before clearing Room, entitlement cache, and the
-  local seller session. The opaque installation ID may remain for device
-  continuity but cannot authenticate.
+- Logout calls `POST /api/v1/auth/logout` to retire the credential, signs out of
+  Firebase, clears Room, the entitlement cache and the local seller session, and
+  removes the encrypted device secret last. Revocation is best effort so an
+  offline sign-out still completes locally. The opaque installation ID may remain
+  for device continuity but cannot authenticate. One implementation
+  (`SessionLogoutManager`) serves every account state; the settings screen
+  delegates to it rather than repeating the sequence.
 - The Worker verifies Firebase proof, legal evidence, device admission,
   restrictions, and session credentials exactly as documented in the versioned
   auth contract.

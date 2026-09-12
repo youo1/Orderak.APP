@@ -119,6 +119,7 @@ for returning sellers.
 | `GET` | `/api/v1/auth/passkeys` | Seller device headers | List the seller's Passkeys without returning credential IDs or public keys. |
 | `PATCH` | `/api/v1/auth/passkeys/{id}` | Seller device headers + recent-auth token | Rename a Passkey. |
 | `DELETE` | `/api/v1/auth/passkeys/{id}` | Seller device headers + recent-auth token | Revoke a Passkey. |
+| `POST` | `/api/v1/auth/logout` | Seller device headers | Retire the calling device's credential and revoke any outstanding recent-auth proof. Called by the Android logout sequence before local teardown (auth contract v8, guarantee 10). Answers `401 auth` when the credential is already gone, which a client treats as success. |
 | `POST` | `/api/v1/account/email/verification/resend` | Seller device headers + recent-auth token | Send a non-blocking, single-use email verification link; maximum three resends per hour. |
 | `GET` | `/verify-email?token=…` | Single-use token | Verify the private account email. The email is not an account-recovery method in V2. |
 | `GET` | `/api/v1/geo/cities?input=الق&language=ar` | Onboarding token; session/IP rate limits | Return at most ten static-catalogue city matches. The Worker derives the country from the verified onboarding session and ignores client country parameters. A blank `input` returns the most populated cities for the phone country. |
@@ -454,6 +455,17 @@ its effective limit, an equal-size mirror update (editing existing products) or
 a smaller mirror (deleting products) is accepted. A mirror that increases the
 current count is rejected with `409 PLAN_LIMIT_REACHED` until the count is
 below the limit. Existing product rows are never deleted by the policy engine.
+
+The status a plan limit answers with depends on the kind of limit, and on
+nothing else. A structural cap such as `max_products` or `max_categories` is a
+conflict with the plan's shape and answers `409`. A limit that resets —
+`max_orders_per_month`, `max_ai_requests_per_month` — is a rate and answers
+`429` with `Retry-After` set to the UTC calendar-month boundary the quota is
+actually counted on. Until 2026-09-12 the same monthly condition answered `409`
+through the legacy plan model and `429` through the entitlements engine, so the
+status depended on `ENTITLEMENTS_ENABLED`; both paths read one rule now. The
+`code` is `plan_limit_reached` either way and has always been the stable
+identifier to branch on.
 
 Existing stock changes only when `stock_dirty=true` and
 `expected_stock_version` matches. A stale explicit edit returns `409` with
@@ -1271,6 +1283,16 @@ use RFC 9457 `code: "plan_limit_reached"` and add the stable v1
 `code: "PLAN_LIMIT_REACHED"`, entitlement key, limit, usage, remaining value,
 reset time, plan revision, upgrade targets, and request ID.
 
+Feature entitlements are enforced by the API and not only by the client.
+`PATCH /api/v1/customers/{customer_key}` requires
+`customers_crm.editable_customer_profiles` and answers
+`403 plan_feature_unavailable` without it, carrying `entitlement_key`. The check
+runs before the customer is looked up, so the refusal is identical for a key the
+store holds and one it does not — a plan boundary must not become a way to
+enumerate customers. The entitlement is resolved through the same function that
+fills the snapshot the client gates on, so the two cannot disagree about what a
+plan includes.
+
 Entitlement snapshots use `schema_version: 1` and a strong `ETag` derived from
 the effective revision, subscription lifecycle, pending revision, and all
 client-visible entitlement values including usage. Authenticated clients send
@@ -1422,7 +1444,24 @@ registry of `enforced`, `display_only`, and `planned` controls.
 
 `GET /api/v1/config`, `/api/v1/entitlements`, and authenticated sync responses now
 include `governance`. Android sends `x-orderak-version-code`; the response
-contains the effective version policy and governed feature decisions. Runtime
+contains the effective version policy and governed feature decisions. All of it
+is described by the `Governance`, `AppVersionPolicy` and `GovernedFeature`
+schemas in the seller contract, and the `config` block carried on
+`GET /api/v1/orders` by `ClientConfig`.
+
+The version policy is enforced, not only reported. A `version.status` of
+`force_update`, `blocked` or `maintenance` refuses credentialed non-GET
+requests with `403 client_version_refused`, carrying the decision as
+`version_status` and the whole policy as `version`. Two things are
+deliberately exempt: reads, so a blocked seller can still see their own
+account; and the pre-authentication surface — register, phone completion,
+onboarding, the plan catalogue — which sends no device headers at all, and
+gating it would close sign-in for every seller the moment a policy row
+existed.
+
+`x-orderak-version-code` is validated rather than coerced: a malformed value
+answers `400 invalid_version_code`, and an absent one no longer satisfies a
+configured minimum. An unknown version is not evidence of compliance. Runtime
 precedence is environment gate, emergency version rule, account/trust state,
 plan entitlement, store override, country/app-version targeting, stable HMAC
 percentage bucket, then global default.

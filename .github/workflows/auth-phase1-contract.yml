@@ -60,3 +60,21 @@ jobs:
         run: |
           pnpm install --frozen-lockfile
           pnpm test -- --run test/firebase-auth.spec.ts test/identity-v2.spec.ts test/api-versioning.spec.ts
+
+      # The two cross-layer checks run last because both need the workspace
+      # installed, and they run HERE rather than in backend-ci or android-ci
+      # because neither of those jobs can see both halves of the boundary.
+      #
+      # The first compares the error codes the Worker can emit against what
+      # BackendErrors.kt answers; the second compares the Android response DTOs
+      # against the OpenAPI schemas describing the same payloads, in both
+      # directions. Between them they close the gap that let "governance" — the
+      # block deciding whether the app may sell — go undocumented on both routes
+      # that carry it while every existing contract gate stayed green.
+      - name: Verify the client answers every backend error code
+        run: node tooling/repository/extract-backend-error-codes.mjs
+
+      - name: Verify Android DTOs against the seller contract
+        run: |
+          pnpm --filter @orderak/openapi run bundle
+          node tooling/repository/verify-dto-schema-parity.mjs

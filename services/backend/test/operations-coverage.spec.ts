@@ -102,3 +102,24 @@ describe("seller operations coverage", () => {
 		expect(unauthenticated.status).toBe(401);
 	});
 });
+
+describe("announcement read receipts", () => {
+	it("refuses a read receipt for an announcement the seller cannot see", async () => {
+		// The route inserted a receipt for any integer id, with no check that the
+		// announcement existed, was active, was in date, or targeted this plan —
+		// so read-rate reporting counted rows nobody could have read.
+		const seller = await registerStore({ phone: "+201500009001" });
+		await env.orderak_db.prepare(
+			"INSERT INTO announcements(id,title_i18n,body_i18n,target_plan,active) VALUES(4242,?,?, 'all', 0)",
+		).bind(JSON.stringify({ en: "Retired" }), JSON.stringify({ en: "Retired" })).run();
+
+		for (const id of [4242, 999999]) {
+			const res = await SELF.fetch(`${BASE}/api/v1/announcements/${id}/read`, {
+				method: "POST", headers: authHeaders(seller), body: "{}",
+			});
+			expect(res.status).toBe(404);
+		}
+		const receipts = await env.orderak_db.prepare("SELECT COUNT(*) AS c FROM announcement_reads").first<{ c: number }>();
+		expect(receipts!.c).toBe(0);
+	});
+});

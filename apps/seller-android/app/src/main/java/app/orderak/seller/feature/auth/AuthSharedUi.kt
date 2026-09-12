@@ -306,6 +306,9 @@ fun authErrorText(error: AuthError): String = stringResource(
         AuthError.PASSKEY_UNAVAILABLE -> R.string.auth_passkey_unavailable
         AuthError.PASSKEY_FAILED -> R.string.auth_passkey_failed
         AuthError.SERVICE_UNAVAILABLE -> R.string.error_service_unavailable
+        // Reuses the restriction surface's own wording rather than inventing a
+        // second phrasing for the same state in four locales.
+        AuthError.ACCOUNT_RESTRICTED -> R.string.restricted_body
         AuthError.GENERIC -> R.string.error_generic
     },
 )

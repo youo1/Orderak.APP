@@ -14,7 +14,7 @@
 
 import { esc, jsonResponse, logError, checkRateLimit } from "../../platform/http/shared";
 import { publicSiteUrl, storeUrl, newUuid } from "../identity/identity";
-import { requireTenantWrite, resolveTenantContextForStore, TenantWriteFencedError } from "../../platform/tenancy/tenant-routing";
+import { requireTenantWrite, resolveTenantContextForStore, tenantUnavailableResponse } from "../../platform/tenancy/tenant-routing";
 import { getPlanLimit, limitReached } from "../commerce/plan-limits";
 import type { Theme } from "../design/theme";
 import { designSystemCss, designSystemFontPreload, loadActiveDesignSystem } from "../design/design-system";
@@ -123,6 +123,62 @@ input,select,textarea{width:100%;padding:12px;margin:4px 0 12px;border:1px solid
 .foot{text-align:center;color:#999;font-size:12px;margin:20px 0}
 .foot a{color:var(--g);text-decoration:none;font-weight:600}`;
 
+/**
+ * Serialise a value for interpolation inside a `<script>` element.
+ *
+ * `JSON.stringify` alone is not safe here and this page proved it. Inside a
+ * script element the HTML tokenizer does not decode entities, but it does still
+ * look for the closing tag — so a seller-controlled product name containing
+ * `</script>` ended that element, and everything after it was parsed as markup.
+ * `name` is capped at 80 characters and `description` at 500; a payload needs
+ * about 35.
+ *
+ * Escaping `<` as its JSON unicode escape closes that off without changing what
+ * anything reads: `<` is the same character to every JSON parser, and it is
+ * no longer a character sequence the tokenizer can act on. U+2028 and U+2029 are
+ * escaped alongside it because they terminate a line in JavaScript source but
+ * not in JSON, which breaks the two blocks below that are real script rather
+ * than an `application/ld+json` data block.
+ */
+function jsonInScript(value: unknown): string {
+	return JSON.stringify(value)
+		.replace(/</g, "\\u003c")
+		.replace(/\u2028/g, "\\u2028")
+		.replace(/\u2029/g, "\\u2029");
+}
+
+/**
+ * The storefront's content security policy.
+ *
+ * Deliberately not a nonce policy. This page carries inline `onclick` handlers
+ * on every quantity button and an inline order script, so `script-src` cannot
+ * drop `unsafe-inline` without rewriting both — and a policy that breaks the
+ * order form protects nothing, because the page stops selling.
+ *
+ * What it does buy, even with `unsafe-inline`, is the difference between script
+ * running and script being useful: `connect-src 'self'` means injected script
+ * cannot post a buyer's phone number or the seller's catalogue to another
+ * origin, `default-src 'none'` and `object-src` leave nothing else to load, and
+ * `base-uri 'none'` stops a `<base>` tag repointing every relative URL on the
+ * page. The escaping above is the fix; this is what is left standing if another
+ * injection point is ever found.
+ *
+ * `img-src` admits any https host because `logo_url`, `cover_url` and
+ * `image_url` are seller-supplied and validated only for scheme. `font-src` is
+ * self only — the design system serves its own woff2 from /static/fonts.
+ */
+const STOREFRONT_CSP = [
+	"default-src 'none'",
+	"img-src 'self' https: data:",
+	"style-src 'self' 'unsafe-inline'",
+	"script-src 'unsafe-inline'",
+	"font-src 'self'",
+	"connect-src 'self'",
+	"form-action 'none'",
+	"base-uri 'none'",
+	"frame-ancestors 'self'",
+].join("; ");
+
 function pageShell(head: string, body: string, theme: Theme, generatedCss: string, lang: Locale, siteUrl: string, cacheSeconds = 0): Response {
 	const html = `<!doctype html>
 <html lang="${lang}" dir="${dirFor(lang)}"><head>
@@ -135,6 +191,7 @@ ${body}
 	const headers: Record<string, string> = {
 		"content-type": "text/html; charset=utf-8",
 		"content-language": lang,
+		"content-security-policy": STOREFRONT_CSP,
 		vary: "Accept-Language",
 	};
 	// Anonymous listing pages can be edge-cached briefly — a viral store link
@@ -201,7 +258,7 @@ function productCard(store: Store, p: Record<string, unknown>, linkToPage: boole
 // store's public_identifier root — codes only, never UUIDs.
 function orderForm(store: Store, lang: Locale, currency: Currency): string {
 	const postUrl = "/" + esc(store.public_identifier);
-	const js = (key: string) => JSON.stringify(t(lang, key));
+	const js = (key: string) => jsonInScript(t(lang, key));
 	const numberLocale = lang === "ar" ? "ar-EG" : "en-EG";
 	// The browser script below works in minor units and needs the divisor for
 	// the currency being displayed. Injected rather than written as 100: KWD,
@@ -238,7 +295,7 @@ function orderForm(store: Store, lang: Locale, currency: Currency): string {
 </form>
 <div class="ok" id="ok" role="status" aria-live="polite"></div>
 <script>
-var POST_URL=${JSON.stringify(postUrl)};
+var POST_URL=${jsonInScript(postUrl)};
 var qty={};
 var orderKey=(self.crypto&&crypto.randomUUID)?crypto.randomUUID():String(Date.now())+'-'+Math.random().toString(16).slice(2);
 function chg(code,d,max){
@@ -401,7 +458,7 @@ export async function renderProductPage(env: Env, store: Store, product: Record<
 ${product.description ? `<div class="desc">${esc(product.description)}</div>` : ""}
 ${card}${soldOut}
 ${inStock ? orderForm(store, lang, productCurrency) : ""}
-<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>`;
+<script type="application/ld+json">${jsonInScript(jsonLd)}</script>`;
 
 	const revision = await loadActiveDesignSystem(env);
 	const theme = revision.legacyTheme;
@@ -599,7 +656,7 @@ export async function createOrder(env: Env, store: Store, input: CreateOrderInpu
 		const quota = env.ENTITLEMENTS_ENABLED === "true"
 			? await reserveUsage(env, String(store.id), "max_orders_per_month", 1, idempotencyKey)
 			: null;
-		if (quota && !quota.allowed) return fail(entitlementLimitReached(quota.snapshot, "max_orders_per_month", 429));
+		if (quota && !quota.allowed) return fail(entitlementLimitReached(quota.snapshot, "max_orders_per_month"));
 		quotaReservationId = quota?.reservation_id ?? null;
 
 		// Per-store human-friendly order number. MAX+1 races under concurrency,
@@ -744,9 +801,8 @@ export async function createOrder(env: Env, store: Store, input: CreateOrderInpu
 		return { ok: true, order: { orderId, orderNo, totalMinor: total, currency: orderCurrency, replayed: false } };
 	} catch (e) {
 		if (quotaReservationId) await voidUsageReservation(env, quotaReservationId);
-		if (e instanceof TenantWriteFencedError) {
-			return fail(jsonResponse({ error: "tenant_write_fenced", retryable: true }, 503, { "retry-after": String(e.retryAfterSeconds) }));
-		}
+		const unavailable = tenantUnavailableResponse(e);
+		if (unavailable) return fail(unavailable);
 		await logError(env, input.logContext, e);
 		return fail(jsonResponse({ error: "server" }, 500));
 	}

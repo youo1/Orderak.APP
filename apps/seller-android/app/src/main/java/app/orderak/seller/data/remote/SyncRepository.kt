@@ -18,6 +18,9 @@ import app.orderak.seller.data.billing.EntitlementRefreshResult
 import app.orderak.seller.domain.OrderStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -26,6 +29,18 @@ import java.util.Locale
 import java.util.TimeZone
 import javax.inject.Inject
 import javax.inject.Singleton
+
+/**
+ * A catalogue deletion the server wants confirmed before it will apply it.
+ *
+ * [deleting] and [of] are the server's own counts, echoed to the seller so the
+ * question names real numbers rather than asking them to trust a vague warning.
+ */
+data class PendingBulkDeletion(
+    val catalogHash: Int,
+    val deleting: Int,
+    val of: Int,
+)
 
 /**
  * Full sync cycle (Plan: Stage 3/5 backend link):
@@ -59,6 +74,39 @@ class SyncRepository @Inject constructor(
      * cold start, which is harmless.
      */
     private var lastPushedProductsHash: Int? = null
+
+    /**
+     * A catalogue push the server held back because it would delete most of the
+     * store, waiting on the seller to say they meant it.
+     *
+     * [catalogHash] pins the confirmation to the exact catalogue that was
+     * refused: a seller who confirms deleting 10 of 12 products has agreed to
+     * that deletion and not to whatever the catalogue looks like after they
+     * carry on editing. If it changes, the confirmation lapses and the server is
+     * asked again — which is the safe direction.
+     *
+     * Null when nothing is waiting. Held in memory because it is a question
+     * about the current session, and a stale answer surviving a restart would be
+     * a confirmation the seller does not remember giving.
+     */
+    private val _pendingBulkDeletion = MutableStateFlow<PendingBulkDeletion?>(null)
+    val pendingBulkDeletion: StateFlow<PendingBulkDeletion?> = _pendingBulkDeletion.asStateFlow()
+
+    /**
+     * Record that the seller has agreed to the deletion the server queried, and
+     * push again immediately so they see the result while they are still looking
+     * at the screen that asked.
+     */
+    suspend fun confirmBulkDeletion(): Boolean {
+        if (_pendingBulkDeletion.value == null) return false
+        // The hash the confirmation is pinned to is what makes the retry send
+        // confirm_deletion; doSync reads it back on the way past.
+        lastPushedProductsHash = null
+        return syncNow()
+    }
+
+    /** Withdraw a pending confirmation without pushing. */
+    fun cancelBulkDeletion() { _pendingBulkDeletion.value = null }
 
     /**
      * One sync at a time. The one-time and periodic WorkManager queues have
@@ -143,6 +191,12 @@ class SyncRepository @Inject constructor(
                 BackendConfig(
                     plan_id = c.plan_id,
                     plan_name = c.plan_name,
+                    // The paid period, carried rather than defaulted. Without
+                    // these two the fallback config claimed an active
+                    // subscription with no end date, which the period gate reads
+                    // as "not expired" for every seller it is ever applied to.
+                    subscription_status = c.subscription_status,
+                    current_period_end = c.current_period_end,
                     ads_enabled = c.ads_enabled,
                     limits = c.limits,
                     features = c.features,
@@ -268,28 +322,51 @@ class SyncRepository @Inject constructor(
         val hash = dtos.hashCode()
         var pushOk = true
         if (hash != lastPushedProductsHash) {
+            // A push the seller has confirmed may delete most of the catalogue;
+            // one they have not may not. See [pendingBulkDeletion].
+            val confirmed = _pendingBulkDeletion.value?.takeIf { it.catalogHash == hash } != null
             val push = api.syncProducts(
-                ProductsSyncReq(phone = phone, secret = secret, products = dtos, baseline_version = baseline),
+                phone, secret,
+                ProductsSyncReq(
+                    products = dtos,
+                    baseline_version = baseline,
+                    confirm_deletion = confirmed,
+                ),
             )
-            pushOk = push.ok
-            // The server refused because this device is behind. Drop the baseline
-            // so the next sync downloads before it tries again; retrying with the
-            // same stale number would fail identically, forever.
-            if (!push.ok && push.error == "stale_catalog") {
-                sessionStore.clearCatalogBaseline()
-                lastPushedProductsHash = null
+            // One decision, read once. The baseline writes below used to be two
+            // independent statements that contradicted each other; see
+            // CatalogPushDecision for what that cost.
+            when (val decision = decideCatalogPush(push)) {
+                is CatalogPushDecision.Accepted -> {
+                    pushOk = push.ok
+                    decision.catalogVersion?.let { sessionStore.saveCatalogBaseline(phone, it) }
+                    if (push.ok) lastPushedProductsHash = hash
+                    _pendingBulkDeletion.value = null
+                }
+                is CatalogPushDecision.Redownload -> {
+                    pushOk = false
+                    sessionStore.clearCatalogBaseline()
+                    lastPushedProductsHash = null
+                    _pendingBulkDeletion.value = null
+                }
+                is CatalogPushDecision.ConfirmDeletion -> {
+                    pushOk = false
+                    _pendingBulkDeletion.value = PendingBulkDeletion(
+                        catalogHash = hash,
+                        deleting = decision.deleting,
+                        of = decision.of,
+                    )
+                }
+                is CatalogPushDecision.Failed -> {
+                    pushOk = false
+                    _pendingBulkDeletion.value = null
+                }
             }
-            // An accepted push moves the server's version, so the baseline this
-            // device holds is spent. Take the new one rather than re-downloading.
-            push.catalog_version?.let { sessionStore.saveCatalogBaseline(phone, it) }
             if (push.products.isNotEmpty()) {
                 // A batch may partially apply when only some compare-and-set
                 // stock writes are stale. Accept authoritative state for the
                 // successful rows while preserving local intent for conflicts.
                 db.productDao().applySync(push.products, push.conflicts.toSet())
-            }
-            if (push.ok) {
-                lastPushedProductsHash = hash
             }
         }
 

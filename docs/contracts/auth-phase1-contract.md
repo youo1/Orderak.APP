@@ -2,13 +2,13 @@
 status: current
 generated: false
 owner: security
-last_verified: 2026-08-21
+last_verified: 2026-09-11
 applies_to: [production, staging]
 authoritative_for: [auth-contract]
 ---
 # Versioned Seller Authentication Contract
 
-**Contract version:** 7
+**Contract version:** 8
 **Owner approval required:** Ayman Mohamed Abdellatif  
 **Protected since:** 13 July 2026
 
@@ -16,6 +16,20 @@ authoritative_for: [auth-contract]
 class-name freezing toward executable security invariants and an explicit
 Android platform profile. The active provider and runtime behavior below did
 not change.
+
+**Approved evolution:** 11 September 2026 — version 8 extends logout, and only
+logout. Guarantee 10 now requires the device credential to be retired at the
+server and removed from the handset, where version 7 required neither. Provider,
+OTP state, timeouts, consent, verification, throttling and recovery behavior are
+unchanged.
+
+The reason for the change: the client never called `POST /api/v1/auth/logout`.
+The route existed and revoked both the device credential and any outstanding
+step-up proof, and nothing invoked it — so signing out tore down local state and
+left a credential valid on the server for as long as the account existed. The
+handset kept it too, which had a second consequence: when a different seller
+signed in on that phone, `getOrCreateSecret()` offered the previous seller's
+secret for provisioning, and one value became valid for two accounts at once.
 
 This document versions the production Firebase Phone Authentication behavior
 that has been verified end to end. It is an architecture contract, not a
@@ -28,8 +42,9 @@ The long-lived outcomes are defined in
 Android-specific provider, timing, storage, and UI choices are recorded in
 [`platforms/android-auth-profile.md`](../platforms/android-auth-profile.md). Class
 names and source layout may be refactored when the executable evidence remains
-green; provider, OTP state, timeouts, consent, verification, logout, throttling,
-and recovery behavior remain unchanged in version 7.
+green; provider, OTP state, timeouts, consent, verification, throttling, and
+recovery behavior remain unchanged in version 8. Logout behavior changed in
+version 8 and is specified in guarantee 10.
 
 ## Protected guarantees
 
@@ -64,7 +79,20 @@ and recovery behavior remain unchanged in version 7.
    primary credential and revokes previous devices. At higher caps, existing
    authorized devices remain valid after a downgrade, new devices are blocked
    once the cap is reached, and a verified new device is added below the cap.
-10. Logout signs out of Firebase before clearing the local database and session.
+10. Logout retires the credential, then signs out of Firebase before clearing
+    the local database and session, and removes the device secret last.
+    The order is load-bearing at both ends: revocation authenticates with the
+    credential the middle of the sequence destroys, and the stored secret is
+    what it authenticates with. Firebase sign-out still precedes the local
+    database and session, which is the version 7 ordering and is unchanged.
+    Revocation is best effort — a seller with no network is signed out locally
+    regardless, because the local teardown is what protects the handset in
+    front of them. The residual risk is accepted and stated rather than hidden:
+    an offline sign-out leaves a credential valid at the server until the next
+    sign-in for that account replaces it. Closing that fully requires a
+    server-side lifetime, which a bearer device secret does not have.
+    Exactly one implementation of this sequence exists and every account state
+    routes through it.
 11. Firebase test-number configuration remains console-side. Production uses an
     explicit SMS region policy for the approved all-country onboarding scope,
     with Blaze billing, quota/cost alerts, and current regional deliverability

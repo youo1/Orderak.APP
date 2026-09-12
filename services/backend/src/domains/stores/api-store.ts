@@ -28,7 +28,7 @@ import { ensureOrganizationForStore, entitlementLimitReached, resolveEntitlement
 import { provisionDeviceSecret } from "../identity/seller-session";
 import { revokeRecentAuthProofsStatement } from "../identity/auth-v2";
 import { auditDb } from "../admin/admin-auth";
-import { requireTenantWrite, resolveTenantContextForStore, TenantWriteFencedError } from "../../platform/tenancy/tenant-routing";
+import { requireTenantWrite, resolveTenantContextForStore, tenantUnavailableResponse } from "../../platform/tenancy/tenant-routing";
 import {
 	newUuid,
 	newResourceCode,
@@ -288,9 +288,8 @@ export async function handleStoreRoutes(
 		try {
 			requireTenantWrite(await resolveTenantContextForStore(env, String(store.id)));
 		} catch (error) {
-			if (error instanceof TenantWriteFencedError) {
-				return jsonResponse({ error: "tenant_write_fenced", retryable: true }, 503, { "retry-after": String(error.retryAfterSeconds) });
-			}
+			const unavailable = tenantUnavailableResponse(error);
+			if (unavailable) return unavailable;
 			throw error;
 		}
 	}
@@ -397,6 +396,36 @@ async function handleRegister(request: Request, env: Env, url: URL): Promise<Res
 		// Existing store: only the owner (matching device secret) may update it.
 		if (!(await authSeller(env, phone, secret))) {
 			return jsonResponse({ error: "auth" }, 401);
+		}
+
+		// The account-restriction and tenant-write fences are applied here rather
+		// than inherited.
+		//
+		// Both live in the credential middleware, which engages only when the
+		// x-orderak-phone and x-orderak-secret HEADERS are present. This route
+		// reads its credentials from the body, so neither fence has ever run for
+		// it — a suspended or banned seller could still rename their store,
+		// change its slug and public_identifier, and change the instapay and
+		// vfcash payout details the storefront shows to buyers. That is a write
+		// every other credentialed route refuses from the same account.
+		if (String(store.status ?? "active") !== "active") {
+			return jsonResponse({ error: "account_restricted", status: store.status }, 403);
+		}
+
+		// Repair before fencing, not after, and regardless of the entitlements
+		// flag. Every write that goes through resolveTenantContextForStore() needs a row
+		// in organization_stores, and a seller missing one got a 500 on all of
+		// them. This is the idempotent creator for exactly that row, so running
+		// it here means the next register both repairs the account and then
+		// enforces against the repaired state. Ordering it after the fence would
+		// make the fence block the call that fixes it.
+		await ensureOrganizationForStore(env, String(store.id), storeName, lang);
+		try {
+			requireTenantWrite(await resolveTenantContextForStore(env, String(store.id)));
+		} catch (error) {
+			const unavailable = tenantUnavailableResponse(error);
+			if (unavailable) return unavailable;
+			throw error;
 		}
 	} else if (!env.FIREBASE_WEB_API_KEY) {
 		// Creating a NEW store claims a phone number as public identity, which
@@ -536,10 +565,35 @@ async function handleRegister(request: Request, env: Env, url: URL): Promise<Res
 	const countryCode = explicitIso !== "XX" ? explicitIso : String(store.country_code ?? "") || countryIso;
 	const publicId = buildPublicIdentifier(countryCode, newSlug, storeCode);
 
+	// `secret` is deliberately NOT in this UPDATE.
+	//
+	// It used to be, bound to whatever secret the caller presented — and the
+	// caller here is any authorized device, not necessarily the one whose hash
+	// `sellers.secret` currently holds. authSeller() accepts a `seller_devices`
+	// row just as readily, so a second phone re-registering overwrote the first
+	// phone's credential with its own.
+	//
+	// That is not a hypothetical ordering: SyncRepository re-registers whenever
+	// its shop-config key changes, and that key lives in a process-scoped field,
+	// so the first sync after any cold start on any device lands here. The
+	// sequence was: device B signs in, provisionDeviceSecret() correctly files
+	// secret_B in seller_devices, device B syncs, and this statement moved
+	// secret_B into sellers.secret — leaving secret_A stored nowhere. Device A
+	// was signed out with no event, no error and nothing to explain it, and
+	// device B then authenticated through two rows, so it also counted twice
+	// against max_concurrent_devices.
+	//
+	// Nothing is lost by dropping it. A caller only reaches this line after
+	// authSeller() succeeded, so their credential already exists and rewriting
+	// it is a no-op for the primary device and destructive for every other one.
+	// Provisioning a credential is provisionDeviceSecret()'s job — the single
+	// sink the plan caps and the single-device recovery rule are enforced in —
+	// and the pbkdf2/plaintext upgrade this write used to double as is already
+	// handled by verifySeller() on each successful authentication.
 	try {
 		await env.orderak_db
 			.prepare(
-				`UPDATE sellers SET store_name = ?, instapay = ?, vfcash = ?, slug = ?, secret = ?,
+				`UPDATE sellers SET store_name = ?, instapay = ?, vfcash = ?, slug = ?,
 				   store_code = ?, country_code = ?, public_identifier = ?, updated_at = datetime('now')
 				 WHERE id = ?`,
 			)
@@ -548,7 +602,6 @@ async function handleRegister(request: Request, env: Env, url: URL): Promise<Res
 				body.instapay ?? store.instapay,
 				body.vfcash ?? store.vfcash,
 				newSlug,
-				secretHash,
 				storeCode,
 				countryCode,
 				publicId,
@@ -559,7 +612,6 @@ async function handleRegister(request: Request, env: Env, url: URL): Promise<Res
 		return jsonResponse({ error: "slug_taken", message: t(lang, "slug.taken") }, 409);
 	}
 
-	if (env.ENTITLEMENTS_ENABLED === "true") await ensureOrganizationForStore(env, String(store.id), storeName, lang);
 	if (firebaseIdentity) await syncVerifiedFirebaseIdentity(env, String(store.id), firebaseIdentity.uid, phone);
 	return jsonResponse({
 		ok: true,
@@ -743,16 +795,24 @@ async function createCategory(request: Request, env: Env, store: Row): Promise<R
 	const sortOrder = Math.max(0, Math.floor(Number(body.sort_order) || 0));
 	const id = newUuid();
 	const code = await uniqueResourceCode(env, "c");
+	// `c.store_id = ?` is not redundant with the organization lookup beside it.
+	//
+	// A store with no `organization_stores` row makes the inner scalar subquery
+	// NULL, so `organization_id = NULL` matches nothing, the IN list is empty,
+	// the COUNT is 0, and the limit was not enforced at all — the one case where
+	// a seller could add categories without bound. An organization always
+	// contains its own store, so naming it explicitly changes nothing when the
+	// row exists and restores the floor when it does not.
 	const insert = (candidateSlug: string | null) => env.ENTITLEMENTS_ENABLED === "true"
 		? env.orderak_db.prepare(
 			`INSERT INTO categories (id, store_id, category_code, name, slug, sort_order)
 			 SELECT ?,?,?,?,?,? WHERE ? IS NULL OR (
 			   SELECT COUNT(*) FROM categories c
-			   WHERE c.store_id IN (SELECT store_id FROM organization_stores WHERE organization_id=(
+			   WHERE c.store_id = ? OR c.store_id IN (SELECT store_id FROM organization_stores WHERE organization_id=(
 			     SELECT organization_id FROM organization_stores WHERE store_id=?
 			   ))
 			 ) < ?`,
-		).bind(id, store.id, code, name, candidateSlug, sortOrder, limit, store.id, limit)
+		).bind(id, store.id, code, name, candidateSlug, sortOrder, limit, store.id, store.id, limit)
 		: env.orderak_db.prepare(
 			`INSERT INTO categories (id, store_id, category_code, name, slug, sort_order)
 			 SELECT ?,?,?,?,?,? WHERE ? IS NULL OR (SELECT COUNT(*) FROM categories WHERE store_id=?) < ?`,
@@ -1430,6 +1490,14 @@ async function restoreFirebaseSession(request: Request, env: Env): Promise<Respo
 		}
 		return jsonResponse({ ok: true, exists: false });
 	}
+	// The same refusal completePhoneAuth() makes (auth-v2.ts). These are two
+	// entry points to one device-secret provisioning, and only one of them
+	// checked: a suspended or banned account could still be handed a working
+	// credential here, then be refused by every route that used it.
+	if (String(seller.status ?? "active") !== "active") {
+		return jsonResponse({ error: "account_restricted", status: seller.status }, 403);
+	}
+
 	await syncVerifiedFirebaseIdentity(env, String(seller.id), firebaseIdentity.uid, verifiedPhone);
 	seller.firebase_uid = firebaseIdentity.uid;
 
