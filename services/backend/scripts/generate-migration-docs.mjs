@@ -265,6 +265,12 @@ const descriptions = {
     "Not an R2 lifecycle rule, which deletes by age and cannot tell a live product photo from a superseded one: any rule short enough to reclaim orphans would also delete the logo of a store that has not changed it in a while.",
     "Additive - one CREATE TABLE and two CREATE INDEX - so the running Worker is unaffected in the window between migration and deploy. Rows exist only from this migration forward; `reclaimOrphanedMedia()` adopts older objects from an R2 listing, carrying each object's real upload time so the 30-day grace is measured from when it was uploaded rather than when it was adopted. An object with no row is never deleted, only adopted, so an incomplete record means a missed reclamation and never a deleted photo.",
   ],
+  "056_subscription_idempotency.sql": [
+    "Adds the unique index that `subscribe()` had always assumed. It read `SELECT * FROM subscriptions WHERE idempotency_key = ? AND seller_id = ?`, returned the row if it found one and inserted if it did not - and nothing underneath enforced the rule. 002 declared `idempotency_key TEXT`, 009 rebuilt the table and declared it the same way, and no UNIQUE constraint on `subscriptions` existed in any of the fifty-five migrations before this one.",
+    "Two requests carrying one key both saw no row and both inserted. Because `createOrReplaceSubscription` cancels a seller's prior active rows before inserting, the loser of that race could cancel the winner, so which row the seller ended up on depended on how two transactions interleaved. The charge itself was never exposed - the gateway takes the same idempotency key and dedupes on it - what was exposed was the record of the charge.",
+    "Partial, on `idempotency_key IS NOT NULL`. Rows written before `subscribe()` generated a fallback key have NULL there, and SQLite treats NULLs as distinct in a unique index anyway; stating it makes the intent explicit rather than inherited, and matches how 026 indexed `orders(store_id, idempotency_key)`.",
+    "Dedupes before it indexes. A duplicate pair can already exist - that is the defect - and the index cannot be created while one does. The older rows of any duplicate group are marked `superseded` and their key cleared, which takes them out of the index without deleting a record of money; the newest row of each group keeps its key, since that is the one the cancel-then-insert leaves active. On a database that never hit the race this updates nothing.",
+  ],
 };
 
 function anchor(name) {
