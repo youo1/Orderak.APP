@@ -15,6 +15,8 @@
     "openapi:check": "pnpm --filter @orderak/openapi run check",
     "openapi:bundle": "pnpm --filter @orderak/openapi run bundle",
     "verify:deployment-map": "node tooling/repository/verify-deployment-map.mjs",
+    "verify:certificate-pins": "node tooling/repository/verify-certificate-pins.mjs",
+    "verify:certificate-pins:live": "node tooling/repository/verify-certificate-pins.mjs --live",
     "verify:contract-guards": "node tooling/repository/verify-contract-guards.mjs",
 		"verify:error-codes": "node tooling/repository/extract-backend-error-codes.mjs",
 		"verify:dto-parity": "node tooling/repository/verify-dto-schema-parity.mjs",
