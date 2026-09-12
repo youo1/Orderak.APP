@@ -246,6 +246,65 @@ async function fulfillDeletion(env: Env, req: DeletionRequest): Promise<void> {
 				.bind(sId, sId),
 		);
 
+		// --- The buyers' data, which is not the seller's to keep ---
+		//
+		// customers holds phone numbers, names, alternate contacts and free-text
+		// notes about people who bought from this store and never agreed to
+		// anything. It was in neither the deletion batch nor a retention rule, so
+		// erasing the seller left their customer list behind in full — the largest
+		// store of third-party personal data attached to an account.
+		stmts.push(env.orderak_db.prepare("DELETE FROM customers WHERE store_id = ?").bind(sId));
+
+		// Moderation records keyed to this store. The buyer phone is hashed, but a
+		// hash of a phone number is still a pseudonym for a person, and last4 is
+		// not hashed at all. Store-scoped rows only: both tables allow a NULL
+		// store_id for a platform-wide restriction, which is not this seller's to
+		// remove and is aged out by retention instead.
+		stmts.push(env.orderak_db.prepare("DELETE FROM buyer_privacy_requests WHERE store_id = ?").bind(sId));
+		stmts.push(env.orderak_db.prepare("DELETE FROM buyer_restrictions WHERE store_id = ?").bind(sId));
+
+		// --- Phone-change challenges ---
+		//
+		// Each row carries both the phone the account had and the one it was moving
+		// to, so a challenge outlives the account it was for and names it twice.
+		stmts.push(env.orderak_db.prepare("DELETE FROM phone_change_challenges WHERE seller_id = ?").bind(sId));
+
+		// --- Google Play ---
+		//
+		// Purchase tokens, encrypted and hashed, plus order ids and region codes.
+		// These hang off the organization rather than the seller, which is why they
+		// were missed: every other statement in this batch keys on seller_id, and
+		// nothing here does.
+		//
+		// Children before parents. play_purchases references
+		// organization_subscriptions, which this batch deliberately does not remove
+		// — an organization can outlive one of its stores — so the token rows go
+		// and the subscription record of what was bought stays.
+		// ownedOrganizations is a subquery, not a placeholder list: each statement
+		// below binds one parameter — the store id — however many organizations it
+		// matches, so D1's 100-parameter cap is not in play. The guard flags every
+		// `IN (${...})` because it cannot tell the two apart, so each site says so.
+		const ownedOrganizations = "SELECT id FROM organizations WHERE owner_store_id = ?";
+		// play_billing_events is Google's notification log, keyed by their message
+		// id, with no organization on it — so it is reached through the token hash
+		// it shares with play_purchases, and must go before play_purchases does or
+		// there is nothing left to join to.
+		// D1-BOUND: subquery, one bound parameter.
+		stmts.push(env.orderak_db.prepare(
+			`DELETE FROM play_billing_events WHERE purchase_token_hash IN (
+			   SELECT purchase_token_hash FROM play_purchases
+			    WHERE organization_id IN (${ownedOrganizations}))`,
+		).bind(sId));
+		// D1-BOUND: subquery, one bound parameter.
+		stmts.push(env.orderak_db.prepare(
+			`DELETE FROM play_verification_jobs
+			  WHERE seller_id = ? OR organization_id IN (${ownedOrganizations})`,
+		).bind(sId, sId));
+		// D1-BOUND: subquery, one bound parameter.
+		stmts.push(env.orderak_db.prepare(
+			`DELETE FROM play_purchases WHERE organization_id IN (${ownedOrganizations})`,
+		).bind(sId));
+
 		// --- Support ---
 		// Children first. support_messages carries
 		//   FOREIGN KEY (ticket_id) REFERENCES support_tickets(id)

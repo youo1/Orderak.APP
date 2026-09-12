@@ -143,6 +143,118 @@ for (const name of files) {
 	);
 }
 
+/* ---------------------------------------------------------------------------
+ * 5. Applied migrations are immutable, and every declared directory is guarded.
+ *
+ * The checks above are a filename lint. Nothing read a migration's contents, so
+ * editing one that had already been applied passed silently — and that is not a
+ * hypothetical edit: generate-legal-migration.mjs defaulted its output to an
+ * applied filename and overwrote it. wrangler matches applied state by name, so
+ * the edited content would never have reached a database while the repository
+ * asserted a history no environment had. 039b and 041 exist to repair exactly
+ * that kind of divergence, discovered late.
+ *
+ * migrations.lock records a hash per file, in sha256sum format. Changing an applied migration
+ * now needs `--update-lock`, which puts the change in the diff where a reviewer
+ * sees it, rather than nowhere.
+ *
+ * The directory list comes from the wrangler configs rather than being
+ * hardcoded. It was one path, `migrations/`, while wrangler.jsonc declares
+ * geo-migrations/ as well and both deploy workflows apply it — so a whole
+ * migration directory was unguarded by the checks above, too.
+ * ------------------------------------------------------------------------- */
+import crypto from "node:crypto";
+import { loadJsonc } from "../../../tooling/lib/jsonc.mjs";
+
+/** Every migrations_dir any wrangler config declares, plus the default. */
+function declaredMigrationDirectories() {
+	const dirs = new Set(["migrations"]);
+	for (const config of ["wrangler.jsonc", "wrangler.admin.jsonc"]) {
+		const file = path.join(here, "..", config);
+		if (!fs.existsSync(file)) continue;
+		const parsed = loadJsonc(file);
+		const scopes = [parsed, ...Object.values(parsed.env ?? {})];
+		for (const scope of scopes) {
+			for (const database of scope.d1_databases ?? []) {
+				if (database.migrations_dir) dirs.add(database.migrations_dir);
+			}
+		}
+	}
+	return [...dirs].sort();
+}
+
+/**
+ * sha256sum format — "<hash>  <path>" per line — rather than JSON.
+ *
+ * JSON put each digest as the value of a key named after its file, and two of
+ * those filenames contain the word "key" (043_audit_signing_key_version.sql,
+ * whose entire body adds an INTEGER column). gitleaks' generic-api-key rule
+ * reads the key beside a high-entropy value, so the lock file failed the secret
+ * scan on its own contents.
+ *
+ * The fix is the format, not an exemption. Every value here is the digest of a
+ * tracked file that anyone holding the repo can recompute, so allowlisting the
+ * path would have told the scanner to stop looking at a file for all rules —
+ * and .gitleaks.toml says an exemption added speculatively is one nobody
+ * revisits. In this shape the scanner finds nothing to object to, and
+ * `sha256sum -c migrations.lock` verifies it without this script.
+ */
+const lockPath = path.join(here, "..", "migrations.lock");
+const updateLock = process.argv.includes("--update-lock");
+
+const actual = {};
+for (const dir of declaredMigrationDirectories()) {
+	const full = path.join(here, "..", dir);
+	if (!fs.existsSync(full)) {
+		fail(`${dir} is declared as a migrations_dir but does not exist`);
+		continue;
+	}
+	for (const name of fs.readdirSync(full).filter((n) => n.endsWith(".sql")).sort()) {
+		const body = fs.readFileSync(path.join(full, name));
+		actual[`${dir}/${name}`] = crypto.createHash("sha256").update(body).digest("hex");
+	}
+}
+
+/** "<hash>  <path>" lines, the shape sha256sum reads and writes. */
+function serializeLock(entries) {
+	return Object.keys(entries).sort().map((key) => `${entries[key]}  ${key}\n`).join("");
+}
+
+function parseLock(text) {
+	const entries = {};
+	for (const line of text.split("\n")) {
+		const match = /^([a-f0-9]{64}) {2}(.+)$/.exec(line.trimEnd());
+		if (match) entries[match[2]] = match[1];
+	}
+	return entries;
+}
+
+if (updateLock) {
+	fs.writeFileSync(lockPath, serializeLock(actual), "utf8");
+	console.log(`Wrote ${path.relative(process.cwd(), lockPath)} with ${Object.keys(actual).length} migrations.`);
+} else if (!fs.existsSync(lockPath)) {
+	fail("migrations.lock is missing — run `pnpm run verify:migrations -- --update-lock`");
+} else {
+	const locked = parseLock(fs.readFileSync(lockPath, "utf8"));
+	for (const [key, hash] of Object.entries(actual)) {
+		if (!(key in locked)) {
+			fail(`${key} is not in migrations.lock — run \`pnpm run verify:migrations -- --update-lock\``);
+		} else if (locked[key] !== hash) {
+			fail(
+				`${key} has changed since it was locked.\n` +
+				"      An applied migration is immutable: editing it changes the repository's\n" +
+				"      account of the schema without changing any database, because wrangler\n" +
+				"      matches applied state by filename. Write a new migration instead.\n" +
+				"      If this file has genuinely never been applied anywhere, re-lock it with\n" +
+				"      `pnpm run verify:migrations -- --update-lock` so the change is reviewable.",
+			);
+		}
+	}
+	for (const key of Object.keys(locked)) {
+		if (!(key in actual)) fail(`${key} is locked but no longer exists — migrations are not deleted`);
+	}
+}
+
 const highest = Math.max(...[...byPrefix.keys()].map(Number).filter(Number.isFinite));
 const expectedNext = String(highest + 1).padStart(3, "0");
 
