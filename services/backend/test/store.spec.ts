@@ -267,6 +267,62 @@ describe("POST /api/v1/account/deletion-request", () => {
 		).bind(r.phone).first()).toMatchObject({ phone: r.phone });
 	});
 
+	it("completes for a seller who has ever opened a support ticket", async () => {
+		// The erasure batch deleted support_tickets and never support_messages,
+		// whose FOREIGN KEY (ticket_id) REFERENCES support_tickets(id) has no
+		// ON DELETE (003_admin.sql:121-128). D1 enforces foreign keys, so the
+		// constraint aborted the whole batch — including the statement that marks
+		// the request completed. status stayed 'verified', the next run re-selected
+		// the same row, and it failed again. Forever: the 90-day statutory deadline
+		// could never be met for any seller who had ever contacted support, and the
+		// only signal was a deletion_backlog line.
+		const r = await registerStore();
+		const seller = await env.orderak_db.prepare("SELECT id FROM sellers WHERE phone=?")
+			.bind(r.phone).first<{ id: string }>();
+		await env.orderak_db.prepare("UPDATE sellers SET firebase_uid='firebase-support-test' WHERE id=?")
+			.bind(seller!.id).run();
+
+		const ticket = await env.orderak_db.prepare(
+			"INSERT INTO support_tickets(seller_id,subject) VALUES(?,?) RETURNING id",
+		).bind(seller!.id, "Cannot upload product photos").first<{ id: number }>();
+		await env.orderak_db.prepare(
+			"INSERT INTO support_messages(ticket_id,sender,body) VALUES(?,'seller',?)",
+		).bind(ticket!.id, "The upload button does nothing on my phone.").run();
+
+		await SELF.fetch(`${BASE}/api/v1/account/deletion-request`, {
+			method: "POST", headers: authHeaders(r), body: "{}",
+		});
+		const deletion = await env.orderak_db.prepare(
+			"SELECT id FROM deletion_requests WHERE phone_e164=?",
+		).bind(r.phone).first<{ id: string }>();
+		await env.orderak_db.prepare(
+			"UPDATE deletion_requests SET deadline_at=datetime('now','-1 minute') WHERE id=?",
+		).bind(deletion!.id).run();
+
+		vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+			const url = String(input);
+			if (url === "https://oauth2.googleapis.com/token") {
+				return Response.json({ access_token: "firebase-admin-test-token" });
+			}
+			if (url.endsWith("/accounts:delete")) return Response.json({});
+			throw new Error(`Unexpected deletion fetch: ${url}`);
+		}));
+
+		expect(await processDeletionRequests(await deletionTestEnv())).toBe(1);
+		expect(await env.orderak_db.prepare(
+			"SELECT status FROM deletion_requests WHERE id=?",
+		).bind(deletion!.id).first()).toMatchObject({ status: "completed" });
+		// The conversation body is the seller's own words and a support agent's;
+		// leaving it behind is the part that makes this a privacy defect and not
+		// just a stuck job.
+		expect(await env.orderak_db.prepare(
+			"SELECT COUNT(*) AS c FROM support_messages WHERE ticket_id=?",
+		).bind(ticket!.id).first<{ c: number }>()).toMatchObject({ c: 0 });
+		expect(await env.orderak_db.prepare(
+			"SELECT COUNT(*) AS c FROM support_tickets WHERE seller_id=?",
+		).bind(seller!.id).first<{ c: number }>()).toMatchObject({ c: 0 });
+	});
+
 	it("deletes private birth-year data when a due account deletion completes", async () => {
 		const r = await registerStore();
 		const seller = await env.orderak_db.prepare(

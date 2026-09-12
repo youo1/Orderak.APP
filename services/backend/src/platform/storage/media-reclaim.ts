@@ -30,8 +30,17 @@
 
 /** How long an object must have existed before it can be considered orphaned. */
 const GRACE_DAYS = 30;
-/** Rows examined per run. Bounds both the D1 work and the R2 delete batch. */
+/** Rows examined per run. Bounds the D1 read and the total R2 work. */
 const SWEEP_LIMIT = 500;
+/**
+ * Keys per DELETE statement.
+ *
+ * D1 allows at most 100 bound parameters per statement, so this is a hard
+ * correctness bound and not a tuning knob — SWEEP_LIMIT may change freely, this
+ * may not rise above 100. 90 matches api-store.ts:1314, which chunks the same
+ * `IN (...)` pattern for the same reason.
+ */
+const DELETE_CHUNK = 90;
 /** Objects adopted from the bucket per run, when backfilling history. */
 const ADOPT_LIMIT = 1_000;
 
@@ -155,13 +164,28 @@ export async function reclaimOrphanedMedia(env: PublicWorkerEnv): Promise<number
 	}
 
 	const keys = orphans.map((row) => row.key);
-	// R2 first, D1 second. If the delete succeeds and the row removal fails, the
-	// next run re-reads a row whose object is already gone and deletes nothing —
-	// harmless. The other order would drop the record of an object still in the
-	// bucket, which is how an orphan becomes permanently unreachable.
-	await env.orderak_media.delete(keys);
-	const placeholders = keys.map(() => "?").join(",");
-	await env.orderak_db.prepare(`DELETE FROM media_objects WHERE key IN (${placeholders})`).bind(...keys).run();
+	// Chunked, because D1 caps a statement at 100 bound parameters.
+	//
+	// This bound one `key IN (...)` per sweep, so the first batch that actually
+	// reached SWEEP_LIMIT threw `too many SQL variables` — after the R2 delete
+	// below had already destroyed the objects. The rows survived, stayed past the
+	// grace window, and the same batch was re-selected every night: the R2 delete
+	// became a no-op and D1 threw again, permanently. api-store.ts:1314 chunks
+	// the identical pattern at 90; this is the same number for the same reason.
+	//
+	// Deleting per chunk rather than all of R2 up front also bounds what a
+	// mid-sweep failure can strand: at most one chunk's objects are gone with
+	// their rows still present, and those rows simply re-select next run and find
+	// nothing to delete. R2 stays first within a chunk — the other order drops
+	// the record of an object still in the bucket, which is how an orphan becomes
+	// permanently unreachable.
+	for (let offset = 0; offset < keys.length; offset += DELETE_CHUNK) {
+		const chunk = keys.slice(offset, offset + DELETE_CHUNK);
+		await env.orderak_media.delete(chunk);
+		await env.orderak_db.prepare(
+			`DELETE FROM media_objects WHERE key IN (${chunk.map(() => "?").join(",")})`,
+		).bind(...chunk).run();
+	}
 
 	console.log(JSON.stringify({ signal: "media_reclaim_completed", adopted, deleted: keys.length }));
 	return keys.length;
