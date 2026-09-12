@@ -55,6 +55,16 @@ jobs:
         working-directory: apps/seller-android
         run: bash ./gradlew :app:lintStagingDebug --stacktrace
 
+      # Offline half of the pin guard: expiration and backup-pin count. The live
+      # chain check runs on a schedule in infra-drift.yml instead, because a
+      # network call a developer can make pass by re-running it is not a gate.
+      #
+      # This fails 90 days before the pin set lapses, which is the window a Play
+      # release needs to reach installed devices. See
+      # docs/runbooks/certificate-pinning.md.
+      - name: Verify Android certificate pin set
+        run: node tooling/repository/verify-certificate-pins.mjs
+
   screenshot-test:
     runs-on: ubuntu-latest
     timeout-minutes: 30
