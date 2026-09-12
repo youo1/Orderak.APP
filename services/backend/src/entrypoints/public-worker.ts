@@ -24,7 +24,7 @@ import { publicDesignSystemCss, publicDesignSystemResponse } from "../domains/ad
 import { designSystemCss, designSystemFontPreload, loadActiveDesignSystem } from "../domains/design/design-system";
 import { createOrder } from "../domains/catalog/catalog";
 import { publicSiteUrl } from "../domains/identity/identity";
-import { authSeller, logError, jsonResponse, methodNotAllowed, corsHeaders, allowedCorsOrigin, readCreds, checkRateLimit, recordDeviceMetadata, enforceRequestBodyLimit, type AuthenticatedSeller } from "../platform/http/shared";
+import { authSeller, logError, jsonResponse, methodNotAllowed, corsHeaders, allowedCorsOrigin, readCreds, checkRateLimit, recordDeviceMetadata, enforceRequestBodyLimit, type AuthenticatedSeller, clientIpOf } from "../platform/http/shared";
 import { getPlanLimit } from "../domains/commerce/plan-limits";
 import { handleStoreRoutes } from "../domains/stores/api-store";
 import { serveMedia } from "../platform/storage/media";
@@ -375,7 +375,7 @@ app.use("/api/v1/*", async (c, next) => {
 	let authenticatedSeller: AuthenticatedSeller | null | undefined;
 
 	if (supplied.phone && supplied.secret) {
-		const account = await authSeller(c.env, supplied.phone, supplied.secret);
+		const account = await authSeller(c.env, supplied.phone, supplied.secret, clientIpOf(c.req.raw));
 		authenticatedSeller = account;
 		if (account && c.req.header("x-orderak-device-id")) {
 			await recordDeviceMetadata(c.env, account, supplied.secret, {
@@ -587,7 +587,7 @@ async function handleApi(
 
 			// Authenticated: the AI proxy is never open to the public (cost + abuse).
 			const { phone, secret } = readCreds(request, url);
-			const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret);
+			const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret, clientIpOf(request));
 			if (!seller) return jsonResponse({ error: "auth" }, 401);
 
 			// Abuse guard: 20 requests / minute per seller.
@@ -660,7 +660,7 @@ async function handleApi(
 		// correct only until the first fix landed in one of them.
 		if (request.method === "POST" && url.pathname === "/api/v1/orders") {
 			const { phone, secret } = readCreds(request, url);
-			const store = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret);
+			const store = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret, clientIpOf(request));
 			if (!store) return jsonResponse({ error: "auth" }, 401);
 			let body: Record<string, unknown>;
 			try {
@@ -731,7 +731,7 @@ async function handleApi(
 			// Credentials come from headers only — never the query string (log hygiene).
 			const { phone, secret } = readCreds(request, url);
 			const since = Number(url.searchParams.get("since")) || 0;
-			const store = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret);
+			const store = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret, clientIpOf(request));
 			if (!store) return jsonResponse({ error: "auth" }, 401);
 			const { results: orderRows } = (await env.orderak_db
 				.prepare(
@@ -747,6 +747,8 @@ async function handleApi(
 			// product and keep stock in step (see SyncRepository.insertRemoteOrder).
 			const itemsByOrder = new Map<unknown, Record<string, unknown>[]>();
 			if (orders.length) {
+				// D1-BOUND: orders is orderRows.slice(0, 50) directly above, so this
+				// IN list is at most 50 parameters — inside D1's cap of 100.
 				const marks = orders.map(() => "?").join(",");
 				const { results: items } = (await env.orderak_db
 					.prepare(
@@ -795,7 +797,7 @@ async function handleApi(
 		// here regardless of what its enum believes.
 		if (request.method === "PATCH" && url.pathname.startsWith("/api/v1/orders/") && url.pathname.endsWith("/status")) {
 			const { phone, secret } = readCreds(request, url);
-			const store = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret);
+			const store = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret, clientIpOf(request));
 			if (!store) return jsonResponse({ error: "auth" }, 401);
 
 			// Addressed by order_no, not by the UUID primary key. The Android app

@@ -1,7 +1,7 @@
 // ============================================================
 // Admin routes + panel — project control center.
 // ============================================================
-import { jsonResponse } from "../../platform/http/shared";
+import { jsonResponse, D1_IN_CHUNK } from "../../platform/http/shared";
 import { Hono } from "hono";
 import { storeUrl } from "../identity/identity";
 import { pickLocale } from "../../platform/localization/i18n";
@@ -162,11 +162,13 @@ async function listPlans(env: AdminWorkerEnv): Promise<Response> {
 	// (listPublicPlans in billing.ts) was fixed for this and this one was not, so
 	// the admin list stayed at N+1 while the seller-facing list did not.
 	const featuresByPlan = new Map<unknown, Record<string,unknown>[]>();
-	if (planRows.length) {
-		const marks = planRows.map(() => "?").join(",");
+	// Chunked: `plans` is small today, but nothing constrains it to stay small,
+	// and an unbounded IN list is the defect that wedged the media sweep.
+	for (let offset = 0; offset < planRows.length; offset += D1_IN_CHUNK) {
+		const chunk = planRows.slice(offset, offset + D1_IN_CHUNK);
 		const {results:features} = await env.orderak_db
-			.prepare(`SELECT id,plan_id,feature_key,name,description,enabled FROM plan_features WHERE plan_id IN (${marks})`)
-			.bind(...planRows.map((plan) => plan.id))
+			.prepare(`SELECT id,plan_id,feature_key,name,description,enabled FROM plan_features WHERE plan_id IN (${chunk.map(() => "?").join(",")})`)
+			.bind(...chunk.map((plan) => plan.id))
 			.all();
 		for (const feature of features as Record<string,unknown>[]) {
 			const {plan_id, ...rest} = feature;

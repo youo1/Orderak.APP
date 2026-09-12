@@ -17,7 +17,7 @@
 // public_identifier and categories/products by their immutable codes.
 // ============================================================
 
-import { jsonResponse, methodNotAllowed, readCreds, authSeller, hashSecret, checkRateLimit, revokeSellerCredential, type AuthenticatedSeller } from "../../platform/http/shared";
+import { jsonResponse, methodNotAllowed, readCreds, authSeller, hashSecret, checkRateLimit, revokeSellerCredential, type AuthenticatedSeller, clientIpOf } from "../../platform/http/shared";
 import { uploadMedia } from "../../platform/storage/media";
 import { verifyFirebaseToken } from "../../platform/auth/local-jwt";
 import { t, pickLocale } from "../../platform/localization/i18n";
@@ -278,7 +278,7 @@ export async function handleStoreRoutes(
 	if (!isStoreRoute) return null;
 
 	const { phone, secret } = readCreds(request, url);
-	const store = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret);
+	const store = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret, clientIpOf(request));
 	if (!store) return jsonResponse({ error: "auth" }, 401);
 	const tenantMutation = method !== "GET" && (
 		p === "/api/v1/store" || p === "/api/v1/categories" || p.startsWith("/api/v1/categories/")
@@ -394,7 +394,7 @@ async function handleRegister(request: Request, env: Env, url: URL): Promise<Res
 	let store = (await env.orderak_db.prepare("SELECT * FROM sellers WHERE phone = ?").bind(phone).first()) as Row | null;
 	if (store) {
 		// Existing store: only the owner (matching device secret) may update it.
-		if (!(await authSeller(env, phone, secret))) {
+		if (!(await authSeller(env, phone, secret, clientIpOf(request)))) {
 			return jsonResponse({ error: "auth" }, 401);
 		}
 
@@ -1503,7 +1503,7 @@ async function restoreFirebaseSession(request: Request, env: Env): Promise<Respo
 
 	// Logging back into an already-authorized device is available on every plan.
 	// Only adding a genuinely new device is a paid feature.
-	if (await authSeller(env, verifiedPhone, deviceSecret)) {
+	if (await authSeller(env, verifiedPhone, deviceSecret, clientIpOf(request))) {
 		return jsonResponse({ ok: true, exists: true, store: fullStore(env, seller) });
 	}
 	const provisioned = await provisionDeviceSecret(env, seller, verifiedPhone, deviceSecret);
@@ -1513,7 +1513,7 @@ async function restoreFirebaseSession(request: Request, env: Env): Promise<Respo
 
 async function logoutSeller(request: Request, env: Env, url: URL): Promise<Response> {
 	const { phone, secret } = readCreds(request, url);
-	const seller = await authSeller(env, phone, secret);
+	const seller = await authSeller(env, phone, secret, clientIpOf(request));
 	if (!seller) return jsonResponse({ error: "auth" }, 401);
 	const revoked = await revokeSellerCredential(env, String(seller.id), secret);
 	// The credential this proof was issued against no longer exists, so neither

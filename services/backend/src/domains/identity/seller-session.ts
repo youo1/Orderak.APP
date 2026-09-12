@@ -50,7 +50,15 @@ export async function provisionDeviceSecret(
 			response: jsonResponse({ error: "weak_device_secret", min_length: MIN_DEVICE_SECRET_LENGTH }, 400),
 		};
 	}
-	if (await authSeller(env, phone, deviceSecret)) return { ok: true };
+	// null address: not a throttled authentication gate.
+	//
+	// The seller is already authenticated by the time provisioning runs — this
+	// asks the narrower question "is this exact secret already on file?", so that
+	// re-sending a provision request is idempotent rather than a second device.
+	// Charging it to the failure counter would let a seller's own retry count
+	// against them, and refusing it on a throttle would break the idempotency the
+	// check exists to provide.
+	if (await authSeller(env, phone, deviceSecret, null)) return { ok: true };
 
 	const secretHash = await hashSecret(deviceSecret);
 	const sellerId = String(seller.id);

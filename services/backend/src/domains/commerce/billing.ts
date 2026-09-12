@@ -6,16 +6,7 @@
 // ============================================================
 
 import { planComparison } from "./plans";
-import {
-	jsonResponse,
-	authSeller,
-	readCreds,
-	ensureReferralCode,
-	checkRateLimit,
-	audit,
-	applyDiscount,
-	type AuthenticatedSeller,
-} from "../../platform/http/shared";
+import { jsonResponse, authSeller, readCreds, ensureReferralCode, checkRateLimit, audit, applyDiscount, type AuthenticatedSeller, clientIpOf } from "../../platform/http/shared";
 import { getGateway, type CheckoutRequest, type CheckoutResult } from "./payments";
 import { runtimeControlEnabled } from "../../platform/config/runtime-config";
 
@@ -276,7 +267,7 @@ async function listPublicPlans(env: Env): Promise<Response> {
 async function subscribe(request: Request, env: Env, url: URL, authenticatedSeller?: AuthenticatedSeller | null): Promise<Response> {
 	const body = (await request.json().catch(() => ({}))) as Body;
 	const { phone, secret } = readCreds(request, url, body);
-	const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret);
+	const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret, clientIpOf(request));
 	if (!seller) return jsonResponse({ error: "auth" }, 401);
 
 	const planId = String(body.plan_id ?? "").trim();
@@ -507,7 +498,7 @@ async function createOrReplaceSubscription(
 
 async function subscriptionStatus(request: Request, env: Env, url: URL, authenticatedSeller?: AuthenticatedSeller | null): Promise<Response> {
 	const { phone, secret } = readCreds(request, url);
-	const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret);
+	const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret, clientIpOf(request));
 	if (!seller) return jsonResponse({ error: "auth" }, 401);
 
 	let sub = (await env.orderak_db
@@ -549,7 +540,7 @@ async function subscriptionStatus(request: Request, env: Env, url: URL, authenti
 async function cancelSubscription(request: Request, env: Env, url: URL, authenticatedSeller?: AuthenticatedSeller | null): Promise<Response> {
 	const body = (await request.json().catch(() => ({}))) as Body;
 	const { phone, secret } = readCreds(request, url, body);
-	const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret);
+	const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret, clientIpOf(request));
 	if (!seller) return jsonResponse({ error: "auth" }, 401);
 
 	const sub = (await env.orderak_db
@@ -614,7 +605,7 @@ async function couponValidate(request: Request, env: Env, url: URL): Promise<Res
 async function couponApply(request: Request, env: Env, url: URL, authenticatedSeller?: AuthenticatedSeller | null): Promise<Response> {
 	const body = (await request.json().catch(() => ({}))) as Body;
 	const { phone, secret } = readCreds(request, url, body);
-	const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret);
+	const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret, clientIpOf(request));
 	if (!seller) return jsonResponse({ error: "auth" }, 401);
 
 	// Rate-limit: 5 apply attempts / minute per seller.
@@ -642,7 +633,7 @@ async function couponApply(request: Request, env: Env, url: URL, authenticatedSe
 async function referralApply(request: Request, env: Env, url: URL, authenticatedSeller?: AuthenticatedSeller | null): Promise<Response> {
 	const body = (await request.json().catch(() => ({}))) as Body;
 	const { phone, secret } = readCreds(request, url, body);
-	const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret);
+	const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret, clientIpOf(request));
 	if (!seller) return jsonResponse({ error: "auth" }, 401);
 
 	const code = String(body.code ?? "").trim().toUpperCase();
@@ -679,7 +670,7 @@ async function referralApply(request: Request, env: Env, url: URL, authenticated
 
 async function referralStats(request: Request, env: Env, url: URL, authenticatedSeller?: AuthenticatedSeller | null): Promise<Response> {
 	const { phone, secret } = readCreds(request, url);
-	const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret);
+	const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret, clientIpOf(request));
 	if (!seller) return jsonResponse({ error: "auth" }, 401);
 
 	const code = await ensureReferralCode(env, seller);

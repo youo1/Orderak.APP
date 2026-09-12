@@ -91,6 +91,14 @@ jobs:
         working-directory: services/backend
         run: pnpm run verify:architecture
 
+      # D1 rejects a statement with more than 100 bound parameters. Two queries
+      # shipped past that — the media sweep destroyed R2 objects and then wedged
+      # permanently on the D1 delete, and the entitlement editor failed on an
+      # ordinary plan-revision save — in a codebase that already chunked the same
+      # pattern elsewhere with a comment explaining why.
+      - name: Verify D1 parameter bounds
+        run: node tooling/repository/verify-d1-parameter-bounds.mjs
+
       - name: Verify repository and deployment map
         run: node tooling/repository/verify-deployment-map.mjs
 

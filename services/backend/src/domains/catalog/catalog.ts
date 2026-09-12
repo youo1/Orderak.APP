@@ -742,6 +742,10 @@ export async function createOrder(env: Env, store: Store, input: CreateOrderInpu
 
 		const codes = rawItems.map((i) => String(i.product_code));
 		if (new Set(codes).size !== codes.length) return fail(jsonResponse({ error: "duplicate_products" }, 400));
+		// D1-BOUND: rawItems.length <= 50 is enforced above, so this IN list is at
+		// most 50 parameters plus the store id — inside D1's cap of 100. Stated here
+		// because the bound that makes this safe lives in a different check, and a
+		// later relaxation of that limit would silently break this query.
 		const marks = codes.map(() => "?").join(",");
 		const { results: products } = (await db
 			.prepare(

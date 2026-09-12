@@ -28,19 +28,12 @@
 //   staging before it is allowed to act.
 // ============================================================
 
+import { D1_IN_CHUNK } from "../http/shared";
+
 /** How long an object must have existed before it can be considered orphaned. */
 const GRACE_DAYS = 30;
 /** Rows examined per run. Bounds the D1 read and the total R2 work. */
 const SWEEP_LIMIT = 500;
-/**
- * Keys per DELETE statement.
- *
- * D1 allows at most 100 bound parameters per statement, so this is a hard
- * correctness bound and not a tuning knob — SWEEP_LIMIT may change freely, this
- * may not rise above 100. 90 matches api-store.ts:1314, which chunks the same
- * `IN (...)` pattern for the same reason.
- */
-const DELETE_CHUNK = 90;
 /** Objects adopted from the bucket per run, when backfilling history. */
 const ADOPT_LIMIT = 1_000;
 
@@ -179,8 +172,8 @@ export async function reclaimOrphanedMedia(env: PublicWorkerEnv): Promise<number
 	// nothing to delete. R2 stays first within a chunk — the other order drops
 	// the record of an object still in the bucket, which is how an orphan becomes
 	// permanently unreachable.
-	for (let offset = 0; offset < keys.length; offset += DELETE_CHUNK) {
-		const chunk = keys.slice(offset, offset + DELETE_CHUNK);
+	for (let offset = 0; offset < keys.length; offset += D1_IN_CHUNK) {
+		const chunk = keys.slice(offset, offset + D1_IN_CHUNK);
 		await env.orderak_media.delete(chunk);
 		await env.orderak_db.prepare(
 			`DELETE FROM media_objects WHERE key IN (${chunk.map(() => "?").join(",")})`,

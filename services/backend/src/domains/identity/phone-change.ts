@@ -1,7 +1,7 @@
 import { verifyFirebasePhone } from "../stores/api-store";
 import { revokeRecentAuthProofsStatement } from "./auth-v2";
 import { playAccountHash, validE164 } from "./identity";
-import { authSeller, hashSecret, jsonResponse, methodNotAllowed, readCreds } from "../../platform/http/shared";
+import { authSeller, hashSecret, jsonResponse, methodNotAllowed, readCreds, clientIpOf } from "../../platform/http/shared";
 
 type Body = Record<string, unknown>;
 const CHALLENGE_TTL_SECONDS = 600;
@@ -34,7 +34,7 @@ export async function handlePhoneChangeRoutes(request: Request, env: Env, url: U
 	}
 
 	const { phone, secret } = readCreds(request, url);
-	const seller = await authSeller(env, phone, secret);
+	const seller = await authSeller(env, phone, secret, clientIpOf(request));
 	if (!seller) return jsonResponse({ error: "auth" }, 401);
 	if (seller.status && seller.status !== "active") {
 		return jsonResponse({ error: "account_restricted", status: seller.status }, 403);
