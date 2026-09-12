@@ -33,6 +33,29 @@ async function seedProduct(r: Registered): Promise<string> {
 	return ((await res.json()) as { products: { product_code: string }[] }).products[0].product_code;
 }
 
+/**
+ * Put a store on a paid plan.
+ *
+ * Editing a customer is a paid entitlement — customers_crm.editable_customer_profiles
+ * is in LEGACY_PAID_ONLY_KEYS, which legacySnapshot resolves as available only
+ * when the seller has an active subscription. The API enforces that now; it did
+ * not before, which is why these tests passed on a free store and why the free
+ * case below is worth asserting rather than assuming.
+ */
+async function grantPaidPlan(r: Registered): Promise<void> {
+	// The plan row is inserted here rather than relied on from migration 002:
+	// createSchema() DELETEs every clearable table after applying the migrations,
+	// so the reference data they seed is wiped and never restored. A subscription
+	// joined to a plan that is not there resolves to no plan at all.
+	const storeId = await storeIdOf(r);
+	await env.orderak_db.prepare(
+		"INSERT OR IGNORE INTO plans(id,name,price_minor,active) VALUES('starter','Starter',9900,1)",
+	).run();
+	await env.orderak_db.prepare(
+		"INSERT INTO subscriptions(seller_id,plan_id,status) VALUES(?,'starter','active')",
+	).bind(storeId).run();
+}
+
 let orderSeq = 0;
 async function order(r: Registered, code: string, buyerPhone: string, buyerName?: string): Promise<Response> {
 	orderSeq += 1;
@@ -157,6 +180,7 @@ describe("customers created by orders", () => {
 		const r = await registerStore({ phone: "+201500004004", country_iso: "EG" });
 		const code = await seedProduct(r);
 		await order(r, code, "01012345678", "Mariam");
+		await grantPaidPlan(r);
 
 		const key = "+201012345678";
 		await SELF.fetch(`${BASE}/api/v1/customers/${encodeURIComponent(key)}`, {
@@ -207,6 +231,7 @@ describe("editing a customer", () => {
 		const r = await registerStore({ phone, country_iso: "EG" });
 		const code = await seedProduct(r);
 		await order(r, code, "01012345678", "Mariam");
+		await grantPaidPlan(r);
 		return r;
 	}
 
@@ -269,6 +294,47 @@ describe("editing a customer", () => {
 		expect(res.status).toBe(404);
 	});
 
+	it("refuses a free-plan seller, because the edit is a paid entitlement", async () => {
+		// The catalogue has sold customers_crm.editable_customer_profiles at paid1
+		// since migration 025 and the app gates its editor on it. The API did not,
+		// so the rule held only where the client chose to honour it — which is the
+		// wrong way round for something a plan is sold on.
+		//
+		// Deliberately NOT calling grantPaidPlan: this store is on free.
+		const r = await registerStore({ phone: "+201500004016", country_iso: "EG" });
+		const code = await seedProduct(r);
+		await order(r, code, "01012345678", "Mariam");
+
+		const res = await SELF.fetch(`${BASE}/api/v1/customers/${encodeURIComponent(key)}`, {
+			method: "PATCH", headers: authHeaders(r), body: JSON.stringify({ name: "Mariam Hassan" }),
+		});
+		expect(res.status).toBe(403);
+		expect(await res.json()).toMatchObject({
+			code: "plan_feature_unavailable",
+			entitlement_key: "customers_crm.editable_customer_profiles",
+		});
+
+		// And the refusal is a refusal: nothing was written.
+		expect((await listCustomers(r))[0].name).toBe("Mariam");
+	});
+
+	it("checks the plan before it checks the payload, so the refusal cannot probe for keys", async () => {
+		// A free seller PATCHing a customer that does not exist must not be able
+		// to tell that apart from one that does. Ordering the entitlement check
+		// first is what makes both answer 403.
+		const r = await registerStore({ phone: "+201500004017", country_iso: "EG" });
+		const code = await seedProduct(r);
+		await order(r, code, "01012345678", "Mariam");
+
+		const present = await SELF.fetch(`${BASE}/api/v1/customers/${encodeURIComponent(key)}`, {
+			method: "PATCH", headers: authHeaders(r), body: JSON.stringify({ name: "X" }),
+		});
+		const absent = await SELF.fetch(`${BASE}/api/v1/customers/${encodeURIComponent("+201099999999")}`, {
+			method: "PATCH", headers: authHeaders(r), body: JSON.stringify({ name: "X" }),
+		});
+		expect([present.status, absent.status]).toEqual([403, 403]);
+	});
+
 	it("refuses an unauthenticated caller", async () => {
 		const res = await SELF.fetch(`${BASE}/api/v1/customers`, {
 			headers: { "x-orderak-phone": "+201500004015", "x-orderak-secret": "wrong" },
@@ -283,6 +349,10 @@ describe("customers are scoped to their store", () => {
 		const b = await registerStore({ phone: "+201500004021", country_iso: "EG" });
 		const codeA = await seedProduct(a);
 		await order(a, codeA, "01012345678", "Mariam");
+		// b is deliberately entitled to edit. Without this the 404 below would be
+		// a 403 from the plan gate, and the test would pass while proving nothing
+		// about ownership — which is the thing it exists to prove.
+		await grantPaidPlan(b);
 
 		expect(await listCustomers(b)).toHaveLength(0);
 

@@ -417,6 +417,33 @@
               }
             }
           },
+          "404": {
+            "description": "No theme file with that name",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/not_found",
+                      "title": "Not Found",
+                      "status": 404,
+                      "code": "not_found",
+                      "detail": "Not Found",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limited",
             "headers": {
@@ -473,33 +500,6 @@
                       "detail": "The request could not be completed.",
                       "request_id": "018f-example",
                       "retryable": true
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No theme file with that name",
-            "headers": {
-              "X-Request-ID": {
-                "$ref": "./components/common.json#/headers/RequestId"
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "./components/common.json#/schemas/Problem"
-                },
-                "examples": {
-                  "default": {
-                    "value": {
-                      "type": "https://developers.orderak.app/problems/not_found",
-                      "title": "Not Found",
-                      "status": 404,
-                      "code": "not_found",
-                      "detail": "Not Found",
-                      "request_id": "018f-example"
                     }
                   }
                 }
@@ -8667,94 +8667,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "ok",
-                    "plan_id",
-                    "limits",
-                    "entitlements"
-                  ],
-                  "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        true
-                      ]
-                    },
-                    "plan_id": {
-                      "type": "string"
-                    },
-                    "plan_name": {
-                      "type": "string"
-                    },
-                    "ads_enabled": {
-                      "type": "boolean"
-                    },
-                    "current_period_end": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "format": "date-time"
-                    },
-                    "limits": {
-                      "type": "object",
-                      "description": "Flat limits, retained for builds that predate the entitlement map. Null means unlimited.",
-                      "properties": {
-                        "max_categories": {
-                          "type": [
-                            "integer",
-                            "null"
-                          ]
-                        },
-                        "max_products": {
-                          "type": [
-                            "integer",
-                            "null"
-                          ]
-                        },
-                        "max_orders_per_month": {
-                          "type": [
-                            "integer",
-                            "null"
-                          ]
-                        },
-                        "max_ai_requests_per_month": {
-                          "type": [
-                            "integer",
-                            "null"
-                          ]
-                        },
-                        "max_team_members": {
-                          "type": [
-                            "integer",
-                            "null"
-                          ]
-                        },
-                        "max_concurrent_devices": {
-                          "type": [
-                            "integer",
-                            "null"
-                          ]
-                        }
-                      }
-                    },
-                    "features": {
-                      "type": "object",
-                      "description": "Flat feature booleans, retained for the same reason as limits.",
-                      "additionalProperties": {
-                        "type": "boolean"
-                      }
-                    },
-                    "entitlements": {
-                      "$ref": "#/components/schemas/EntitlementMap"
-                    },
-                    "governance": {
-                      "type": "object",
-                      "description": "Admin-governed version policy and feature flags, evaluated for this caller.",
-                      "additionalProperties": true
-                    }
-                  }
+                  "$ref": "#/components/schemas/ClientConfig"
                 },
                 "examples": {
                   "free_plan": {
@@ -10254,6 +10167,17 @@
               }
             }
           },
+          "304": {
+            "description": "The snapshot has not changed since the validator was issued.",
+            "headers": {
+              "ETag": {
+                "description": "Unchanged validator.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Validation failure",
             "headers": {
@@ -10396,17 +10320,6 @@
                       "retryable": true
                     }
                   }
-                }
-              }
-            }
-          },
-          "304": {
-            "description": "The snapshot has not changed since the validator was issued.",
-            "headers": {
-              "ETag": {
-                "description": "Unchanged validator.",
-                "schema": {
-                  "type": "string"
                 }
               }
             }
@@ -11873,13 +11786,18 @@
                     },
                     "next_since": {
                       "type": "integer"
+                    },
+                    "config": {
+                      "$ref": "#/components/schemas/ClientConfig",
+                      "description": "Plan, entitlement and governance state, piggybacked so the client does not spend a separate authenticated request on GET /api/v1/config every sync. Always present."
                     }
                   },
                   "required": [
                     "ok",
                     "orders",
                     "has_more",
-                    "next_since"
+                    "next_since",
+                    "config"
                   ]
                 },
                 "examples": {
@@ -11915,7 +11833,57 @@
                         }
                       ],
                       "has_more": false,
-                      "next_since": 12
+                      "next_since": 12,
+                      "config": {
+                        "ok": true,
+                        "plan_id": "free",
+                        "plan_name": "Free",
+                        "subscription_status": "active",
+                        "current_period_end": null,
+                        "ads_enabled": true,
+                        "limits": {
+                          "max_categories": 5,
+                          "max_products": 20,
+                          "max_orders_per_month": 50,
+                          "max_ai_requests_per_month": 20,
+                          "max_team_members": 1,
+                          "max_concurrent_devices": 1
+                        },
+                        "features": {
+                          "custom_domain": false,
+                          "analytics": false,
+                          "priority_support": false,
+                          "ai_assistant": true,
+                          "multi_device": false
+                        },
+                        "entitlements": {},
+                        "governance": {
+                          "schema_version": 1,
+                          "server_time": "2026-08-21T10:00:00.000Z",
+                          "version": {
+                            "status": "ok",
+                            "policy_id": null
+                          },
+                          "features": {
+                            "ai_assistant": {
+                              "enabled": true,
+                              "source": "default"
+                            },
+                            "billing": {
+                              "enabled": false,
+                              "source": "default"
+                            },
+                            "first_party_ads": {
+                              "enabled": true,
+                              "source": "default"
+                            },
+                            "referrals": {
+                              "enabled": true,
+                              "source": "default"
+                            }
+                          }
+                        }
+                      }
                     }
                   }
                 }
@@ -15695,6 +15663,33 @@
               }
             }
           },
+          "404": {
+            "description": "No ticket with that id for this store",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/not_found",
+                      "title": "Not Found",
+                      "status": 404,
+                      "code": "not_found",
+                      "detail": "Not Found",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limited",
             "headers": {
@@ -15751,33 +15746,6 @@
                       "detail": "The request could not be completed.",
                       "request_id": "018f-example",
                       "retryable": true
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No ticket with that id for this store",
-            "headers": {
-              "X-Request-ID": {
-                "$ref": "./components/common.json#/headers/RequestId"
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "./components/common.json#/schemas/Problem"
-                },
-                "examples": {
-                  "default": {
-                    "value": {
-                      "type": "https://developers.orderak.app/problems/not_found",
-                      "title": "Not Found",
-                      "status": 404,
-                      "code": "not_found",
-                      "detail": "Not Found",
-                      "request_id": "018f-example"
                     }
                   }
                 }
@@ -15969,6 +15937,33 @@
               }
             }
           },
+          "404": {
+            "description": "No ticket with that id for this store",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/not_found",
+                      "title": "Not Found",
+                      "status": 404,
+                      "code": "not_found",
+                      "detail": "Not Found",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limited",
             "headers": {
@@ -16025,33 +16020,6 @@
                       "detail": "The request could not be completed.",
                       "request_id": "018f-example",
                       "retryable": true
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No ticket with that id for this store",
-            "headers": {
-              "X-Request-ID": {
-                "$ref": "./components/common.json#/headers/RequestId"
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "./components/common.json#/schemas/Problem"
-                },
-                "examples": {
-                  "default": {
-                    "value": {
-                      "type": "https://developers.orderak.app/problems/not_found",
-                      "title": "Not Found",
-                      "status": 404,
-                      "code": "not_found",
-                      "detail": "Not Found",
-                      "request_id": "018f-example"
                     }
                   }
                 }
@@ -16993,6 +16961,33 @@
               }
             }
           },
+          "404": {
+            "description": "No such customer for this store",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/not-found",
+                      "title": "Not found",
+                      "status": 404,
+                      "code": "auth",
+                      "request_id": "018f-example",
+                      "detail": "This store has no customer with that key."
+                    }
+                  }
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limited",
             "headers": {
@@ -17049,33 +17044,6 @@
                       "detail": "The request could not be completed.",
                       "request_id": "018f-example",
                       "retryable": true
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No such customer for this store",
-            "headers": {
-              "X-Request-ID": {
-                "$ref": "./components/common.json#/headers/RequestId"
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "./components/common.json#/schemas/Problem"
-                },
-                "examples": {
-                  "default": {
-                    "value": {
-                      "type": "https://developers.orderak.app/problems/not-found",
-                      "title": "Not found",
-                      "status": 404,
-                      "code": "auth",
-                      "request_id": "018f-example",
-                      "detail": "This store has no customer with that key."
                     }
                   }
                 }
@@ -17300,6 +17268,33 @@
               }
             }
           },
+          "404": {
+            "description": "No such customer for this store",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/not-found",
+                      "title": "Not found",
+                      "status": 404,
+                      "code": "auth",
+                      "request_id": "018f-example",
+                      "detail": "This store has no customer with that key."
+                    }
+                  }
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limited",
             "headers": {
@@ -17356,33 +17351,6 @@
                       "detail": "The request could not be completed.",
                       "request_id": "018f-example",
                       "retryable": true
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No such customer for this store",
-            "headers": {
-              "X-Request-ID": {
-                "$ref": "./components/common.json#/headers/RequestId"
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "./components/common.json#/schemas/Problem"
-                },
-                "examples": {
-                  "default": {
-                    "value": {
-                      "type": "https://developers.orderak.app/problems/not-found",
-                      "title": "Not found",
-                      "status": 404,
-                      "code": "auth",
-                      "request_id": "018f-example",
-                      "detail": "This store has no customer with that key."
                     }
                   }
                 }
@@ -17815,6 +17783,9 @@
           "etag": {
             "type": "string",
             "description": "Covers the snapshot and the governance decisions, and deliberately not the server clock — a validator that changed every second could never match, so the 304 path would exist and be unreachable."
+          },
+          "governance": {
+            "$ref": "#/components/schemas/Governance"
           }
         }
       },
@@ -17897,6 +17868,249 @@
             "format": "date-time"
           }
         }
+      },
+      "AppVersionPolicy": {
+        "type": "object",
+        "description": "What the server's app-version policy says about the calling client. `status` `force_update`, `blocked` and `maintenance` are blocking: since 2026-09-12 the API itself refuses credentialed writes from a client in one of those states with 403 client_version_refused, rather than only reporting the decision.",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "warning",
+              "force_update",
+              "blocked",
+              "maintenance"
+            ]
+          },
+          "policy_id": {
+            "type": [
+              "integer",
+              "string",
+              "null"
+            ]
+          },
+          "minimum_version_code": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "recommended_version_code": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "enforce_after": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "store_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "warning_message": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Localized message keyed by locale."
+          },
+          "blocking_message": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Localized message keyed by locale."
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "GovernedFeature": {
+        "type": "object",
+        "description": "One platform-wide feature flag as resolved for this caller. Distinct from a plan entitlement: a flag is on or off for everyone matching its rules, and no plan change opens one.",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": "string",
+            "description": "Which rule decided: the flag default, a targeting rule, or a per-store override."
+          }
+        },
+        "required": [
+          "enabled"
+        ]
+      },
+      "Governance": {
+        "type": "object",
+        "description": "Admin-governed state that is not part of the plan: the app-version policy and the platform feature flags. Load-bearing on the client — `features.billing` decides whether the app may offer an upgrade at all, `features.first_party_ads` decides whether the advert slot renders, and `version` drives the update and maintenance screens. Sent on GET /api/v1/config, GET /api/v1/entitlements, and inside the `config` block piggybacked onto GET /api/v1/orders.",
+        "properties": {
+          "schema_version": {
+            "type": "integer"
+          },
+          "server_time": {
+            "type": "string",
+            "description": "Stamped fresh per call, and deliberately excluded from the ETag material on /api/v1/entitlements — hashing it would make every validator unique and the 304 path unreachable."
+          },
+          "version": {
+            "$ref": "#/components/schemas/AppVersionPolicy"
+          },
+          "features": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/GovernedFeature"
+            },
+            "description": "Keyed by flag: ai_assistant, billing, first_party_ads, referrals."
+          }
+        },
+        "required": [
+          "schema_version",
+          "version",
+          "features"
+        ]
+      },
+      "PlanLimits": {
+        "type": "object",
+        "description": "Flat plan limits. `null` means unlimited and is never the same as 0.",
+        "properties": {
+          "max_categories": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "max_products": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "max_orders_per_month": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "max_ai_requests_per_month": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "max_team_members": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "max_concurrent_devices": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        }
+      },
+      "PlanFeatures": {
+        "type": "object",
+        "properties": {
+          "custom_domain": {
+            "type": "boolean"
+          },
+          "analytics": {
+            "type": "boolean"
+          },
+          "priority_support": {
+            "type": "boolean"
+          },
+          "ai_assistant": {
+            "type": "boolean"
+          },
+          "multi_device": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ClientConfig": {
+        "type": "object",
+        "description": "Plan state plus governance, as the Android client consumes it. Returned whole by GET /api/v1/config and piggybacked onto GET /api/v1/orders, which is where the app actually reads it — the client polls orders on every sync and spends no separate request on /api/v1/config. Both the flat limits/features blocks and the keyed `entitlements` map are sent: older installed builds read the flat blocks, and every gate and usage meter reads the map.",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "plan_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "plan_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "plan_revision_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "plan_version": {
+            "type": "integer"
+          },
+          "subscription_status": {
+            "type": "string"
+          },
+          "current_period_end": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The authoritative end of the paid period. The client refuses to extend paid access beyond it, so omitting it is read as 'no expiry'."
+          },
+          "pending_revision_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pending_effective_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ads_enabled": {
+            "type": "boolean"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/PlanLimits"
+          },
+          "features": {
+            "$ref": "#/components/schemas/PlanFeatures"
+          },
+          "entitlements": {
+            "$ref": "#/components/schemas/EntitlementMap"
+          },
+          "governance": {
+            "$ref": "#/components/schemas/Governance"
+          }
+        },
+        "required": [
+          "ok"
+        ]
       }
     },
     "securitySchemes": {

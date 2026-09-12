@@ -82,6 +82,8 @@ fun OrderDetailsScreen(
     val context = LocalContext.current
     val entitlementManager = viewModel.entitlementManager
     var confirmCancel by rememberSaveable { mutableStateOf(false) }
+    var confirmDiscard by rememberSaveable { mutableStateOf(false) }
+    val refusalCode by viewModel.refusalCode.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val statusFailedMessage = stringResource(R.string.order_status_update_failed)
 
@@ -175,7 +177,12 @@ fun OrderDetailsScreen(
             // Above the order, not below it. A seller who opens this screen to
             // check whether the order is safe should not have to scroll to find
             // out that it is not.
-            if (order.livesOnlyOnThisPhone) LocalOnlyOrderBanner()
+            if (order.livesOnlyOnThisPhone) {
+                LocalOnlyOrderBanner(
+                    refusalCode = refusalCode,
+                    onDiscard = refusalCode?.let { { confirmDiscard = true } },
+                )
+            }
 
             Card {
                 Column(Modifier.fillMaxWidth().padding(12.dp)) {
@@ -318,6 +325,30 @@ fun OrderDetailsScreen(
             }
             Spacer(Modifier.height(24.dp))
         }
+    }
+
+    if (confirmDiscard) {
+        AlertDialog(
+            onDismissRequest = { confirmDiscard = false },
+            title = { Text(stringResource(R.string.order_refused_discard)) },
+            text = { Text(stringResource(R.string.order_refused_discard_confirm)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDiscard = false
+                    viewModel.discardRefused(onDone = onBack)
+                }) {
+                    Text(
+                        stringResource(R.string.order_refused_discard),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDiscard = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
+        )
     }
 
     if (confirmCancel) {

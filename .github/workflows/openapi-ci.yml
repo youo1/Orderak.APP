@@ -44,6 +44,32 @@ jobs:
           go install github.com/oasdiff/oasdiff@v1.17.0
           echo "$GOBIN" >> "$GITHUB_PATH"
           "$GOBIN/oasdiff" --version
+      # WHY THE CHANGELOG SURVIVES A CRASH AND THE BREAKING GATE DOES NOT
+      #
+      # `oasdiff changelog` is informational: it prints what changed between the
+      # base branch's contract and this one. `oasdiff breaking` is the gate, and
+      # it is untouched below — it still fails the job on any finding at WARN or
+      # above, and it is the one that decides whether a change may land.
+      #
+      # oasdiff v1.17.0 segfaults on a class of diff this repository can produce.
+      # `ResponsePropertyMaxIncreasedCheck` reads `p.propertyDiff.MaxDiff`
+      # without checking `p.propertyDiff` first
+      # (checker/check_response_property_max_increased.go:38), and the walker
+      # hands it nil when it recurses into an `additionalProperties` map inside a
+      # modified response schema. Still unguarded on oasdiff main as of
+      # 2026-09-12, so pinning forward does not help.
+      #
+      # That is not an exotic shape here. `EntitlementMap` is
+      # `additionalProperties: { $ref: Entitlement }` and hangs off
+      # `EntitlementSnapshot`, so the moment ANY response referencing that
+      # snapshot is modified — which is most entitlement work — the walker
+      # reaches it and the process dies. The alternative to this block is that a
+      # contract Redocly, Spectral, the example checker and 100% route coverage
+      # all accept cannot merge, because a changelog generator crashed on it.
+      #
+      # A crash is tolerated with a loud warning. Every other non-zero exit still
+      # fails: a real finding from the changelog is a real finding, and this must
+      # not become a way to ignore one.
       - name: Draft changelog or stable breaking-change gate
         shell: bash
         env:
@@ -56,7 +82,28 @@ jobs:
           for spec in seller-v1 admin-v1 integrations-v1; do
             BASE_SPEC="${BASE_DIR}/contracts/openapi/src/${spec}.json"
             if [[ -f "$BASE_SPEC" ]]; then
-              oasdiff changelog --format githubactions "$BASE_SPEC" "contracts/openapi/src/${spec}.json"
+              set +e
+              changelog="$(oasdiff changelog --format githubactions "$BASE_SPEC" "contracts/openapi/src/${spec}.json" 2>&1)"
+              status=$?
+              set -e
+              printf '%s\n' "$changelog"
+              if [ "$status" -ne 0 ]; then
+                if printf '%s' "$changelog" | grep -q 'panic: runtime error'; then
+                  echo "::warning title=oasdiff crashed::oasdiff v1.17.0 panicked generating the ${spec} changelog. Upstream nil dereference in ResponsePropertyMaxIncreasedCheck; the breaking-change gate below is unaffected."
+                  {
+                    echo "### oasdiff crashed generating the \`${spec}\` changelog"
+                    echo
+                    echo "Upstream nil dereference in \`ResponsePropertyMaxIncreasedCheck\`, reached by"
+                    echo "recursing into an \`additionalProperties\` map inside a modified response schema."
+                    echo "The changelog for this specification is unavailable for this run."
+                    echo
+                    echo "This does **not** affect the breaking-change gate, which runs separately and"
+                    echo "still fails on any finding once a specification is marked \`x-stability: stable\`."
+                  } >> "$GITHUB_STEP_SUMMARY"
+                else
+                  exit "$status"
+                fi
+              fi
               if grep -q '"x-stability": "stable"' "contracts/openapi/src/${spec}.json"; then
                 oasdiff breaking --fail-on WARN --format githubactions "$BASE_SPEC" "contracts/openapi/src/${spec}.json"
               fi
