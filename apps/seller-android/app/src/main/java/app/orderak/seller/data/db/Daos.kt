@@ -30,7 +30,27 @@ interface ProductDao {
     @Query("UPDATE products SET stock = stock - :qty, syncedStockVersion = CASE WHEN syncedStockVersion IS NULL THEN NULL ELSE syncedStockVersion + 1 END WHERE id = :id")
     suspend fun decrementStock(id: Long, qty: Int)
 
-    @Query("UPDATE products SET stock = stock + :qty WHERE id = :id")
+    /**
+     * Give stock back, and predict the server's version bump the same way
+     * [decrementStock] does.
+     *
+     * The asymmetry this fixes was invisible and self-healing, which is why it
+     * survived: the server bumps `stock_version` on BOTH halves of the ledger —
+     * trg_order_items_claim_stock on the claim and
+     * trg_orders_release_stock_on_cancel on the release (migration 052) — while
+     * this side predicted only the claim. After a cancellation the device's
+     * `syncedStockVersion` was one behind, so the seller's next stock edit was
+     * refused as `stale_stock`, rebased, and succeeded on the sync after that.
+     * One wasted cycle and a 409 in the logs that looked like a real conflict.
+     *
+     * Predicting both keeps the two sides in step. Which of the two behaviours
+     * is chosen matters less than that they are the same behaviour.
+     */
+    @Query(
+        "UPDATE products SET stock = stock + :qty, " +
+            "syncedStockVersion = CASE WHEN syncedStockVersion IS NULL THEN NULL " +
+            "ELSE syncedStockVersion + 1 END WHERE id = :id"
+    )
     suspend fun restoreStock(id: Long, qty: Int)
 
     @Query("SELECT * FROM products")
@@ -194,6 +214,28 @@ interface OrderDao {
 
     @Query("SELECT COUNT(*) FROM orders WHERE remoteId = :remoteId")
     suspend fun countByRemoteId(remoteId: Long): Int
+
+    /**
+     * Remove an order this device recorded and the server never accepted.
+     *
+     * Scoped in SQL to `remoteId IS NULL`, not merely checked by the caller: an
+     * order the server holds must never be deleted here, because deleting it
+     * locally would not delete it there and the next pull would bring it
+     * straight back — with its stock claimed twice. The guard belongs in the
+     * statement so no future caller can forget it.
+     *
+     * order_items and payments have no foreign key to cascade through, so they
+     * are deleted explicitly. All three run in one transaction from
+     * OrderRepository.discardLocalOnlyOrder, which also returns the stock.
+     */
+    @Query("DELETE FROM orders WHERE id = :id AND remoteId IS NULL")
+    suspend fun deleteLocalOnly(id: Long): Int
+
+    @Query("DELETE FROM order_items WHERE orderId = :orderId")
+    suspend fun deleteItemsOf(orderId: Long)
+
+    @Query("DELETE FROM payments WHERE orderId = :orderId")
+    suspend fun deletePaymentsOf(orderId: Long)
 }
 
 @Dao

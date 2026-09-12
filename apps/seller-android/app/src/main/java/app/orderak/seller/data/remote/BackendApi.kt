@@ -188,6 +188,16 @@ data class ProductsSyncRes(
     val conflicts: List<Long> = emptyList(),
     /** Present on catalog_baseline_required and stale_catalog: download again. */
     val catalog_version: Long? = null,
+    /**
+     * Present on bulk_deletion_unconfirmed: how many products this push would
+     * delete, and out of how many the store currently holds.
+     *
+     * Read rather than ignored because the confirmation the server is asking
+     * for has to be put to the seller, and a prompt that cannot name the numbers
+     * is a prompt people click through. See SyncRepository.pendingBulkDeletion.
+     */
+    val deleting: Int? = null,
+    val of: Int? = null,
     @SerialName("code") val error: String? = null,
 )
 
@@ -342,24 +352,6 @@ data class StoreDto(
 @Serializable
 data class StoreRes(val ok: Boolean = false, val store: StoreDto? = null, @SerialName("code") val error: String? = null)
 
-@Serializable
-data class RestoreSessionReq(
-    val id_token: String,
-    val phone: String,
-    val device_secret: String,
-    val terms_accepted: Boolean,
-    val marketing_consent: Boolean,
-    val app_version: String,
-)
-
-@Serializable
-data class RestoreSessionRes(
-    val ok: Boolean = false,
-    val exists: Boolean = false,
-    val store: StoreDto? = null,
-    @SerialName("code") val error: String? = null,
-)
-
 // ---- Auth & onboarding V2 ----
 
 @Serializable
@@ -466,31 +458,6 @@ data class PasskeysRes(
 
 @Serializable
 data class PasskeyLabelReq(val label: String)
-
-@Serializable
-data class GeoCityDto(
-    val geoname_id: Long,
-    val name: String,
-    val ascii_name: String,
-    val country_iso: String,
-    val admin1_code: String? = null,
-    val population: Long = 0,
-)
-
-@Serializable
-data class GeoAttributionDto(
-    val name: String = "GeoNames",
-    val url: String = "https://www.geonames.org/",
-    val license: String = "CC BY 4.0",
-)
-
-@Serializable
-data class GeoCitiesRes(
-    val ok: Boolean = false,
-    val cities: List<GeoCityDto> = emptyList(),
-    val attribution: GeoAttributionDto? = null,
-    @SerialName("code") val error: String? = null,
-)
 
 @Serializable
 data class CityCatalogSuggestionDto(
@@ -710,6 +677,20 @@ data class ConfigRes(
     val ok: Boolean = false,
     val plan_id: String? = null,
     val plan_name: String? = null,
+    /**
+     * The authoritative end of the paid period, and the state it is in.
+     *
+     * Both were on the wire and in the contract, and neither was declared here.
+     * So the fallback that builds a BackendConfig from this response produced
+     * one with `subscription_status = "active"` and `current_period_end = null`
+     * — the defaults — and isAuthoritativePeriodExpired returns false for
+     * exactly that pair. A seller whose paid period had ended kept every paid
+     * feature, on the one path where the app has no snapshot to check against.
+     *
+     * The gate is documented as never failing open. On this path it did.
+     */
+    val subscription_status: String = "active",
+    val current_period_end: String? = null,
     val ads_enabled: Boolean = true,
     val limits: ConfigLimits? = null,
     val features: ConfigFeatures? = null,
@@ -960,9 +941,6 @@ class BackendApi @Inject constructor(
     suspend fun register(req: RegisterReq): RegisterRes =
         apiCall({ RegisterRes(error = it) }) { postRaw("/api/v1/register", json.encodeToString(req)) }
 
-    suspend fun restoreSession(req: RestoreSessionReq): RestoreSessionRes =
-        apiCall({ RestoreSessionRes(error = it) }) { postRaw("/api/v1/auth/session", json.encodeToString(req)) }
-
     suspend fun completePhoneAuth(req: PhoneCompleteReq): AuthCompleteRes =
         apiCall({ AuthCompleteRes(error = it) }) {
             postRaw("/api/v1/auth/phone/complete", json.encodeToString(req))
@@ -1076,15 +1054,6 @@ class BackendApi @Inject constructor(
             creds(phone, secret) + ("x-orderak-recent-auth" to recentAuthToken),
         )
     }
-
-    suspend fun searchCities(countryIso: String, language: String, query: String): GeoCitiesRes =
-        apiCall({ GeoCitiesRes(error = it) }) {
-            getRaw(
-                "/api/v1/geo/cities?country=${java.net.URLEncoder.encode(countryIso, "UTF-8")}" +
-                    "&lang=${java.net.URLEncoder.encode(language, "UTF-8")}" +
-                    "&q=${java.net.URLEncoder.encode(query, "UTF-8")}",
-            )
-        }
 
     suspend fun searchCityCatalog(
         onboardingToken: String,
@@ -1257,9 +1226,6 @@ class BackendApi @Inject constructor(
         apiCall({ ChatRes(error = it) }) {
             postRaw("/api/v1/chat", json.encodeToString(ChatReq(message)), creds(phone, secret))
         }
-
-    suspend fun getConfig(phone: String, secret: String): ConfigRes =
-        apiCall({ ConfigRes(error = it) }) { getRaw("/api/v1/config", creds(phone, secret)) }
 
     suspend fun fetchEntitlements(phone: String, secret: String, etag: String? = null): EntitlementFetchResult = try {
         val headers = creds(phone, secret).toMutableMap().apply {

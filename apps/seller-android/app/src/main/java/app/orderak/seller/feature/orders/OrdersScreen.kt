@@ -60,6 +60,7 @@ fun OrdersScreen(
 ) {
     val orders by viewModel.orders.collectAsStateWithLifecycle()
     val filter by viewModel.filter.collectAsStateWithLifecycle()
+    val refusedPushes by viewModel.refusedPushes.collectAsStateWithLifecycle()
 
     Box(Modifier.fillMaxSize()) {
         if (orders.isEmpty() && filter == null) {
@@ -100,7 +101,9 @@ fun OrdersScreen(
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(orders, key = { it.id }) { o -> OrderCard(o, onClick = { onOpen(o.id) }) }
+                        items(orders, key = { it.id }) { o ->
+                            OrderCard(o, refused = o.id in refusedPushes, onClick = { onOpen(o.id) })
+                        }
                         item { Spacer(Modifier.height(80.dp)) }
                     }
                 }
@@ -114,7 +117,7 @@ fun OrdersScreen(
 }
 
 @Composable
-fun OrderCard(o: OrderEntity, onClick: () -> Unit) {
+fun OrderCard(o: OrderEntity, refused: Boolean = false, onClick: () -> Unit) {
     // Key the formatter by the current app locale. A global formatter would
     // keep displaying the previous language after an in-app locale switch.
     val locale = LocalConfiguration.current.locales[0]
@@ -150,7 +153,9 @@ fun OrderCard(o: OrderEntity, onClick: () -> Unit) {
                 // ones it has, and nothing else on the row tells them apart.
                 if (o.livesOnlyOnThisPhone) {
                     Spacer(Modifier.height(4.dp))
-                    LocalOnlyOrderChip()
+                    // Danger rather than warning when the server refused it:
+                    // that one needs the seller and will not clear itself.
+                    LocalOnlyOrderChip(refused = refused)
                 }
             }
         },

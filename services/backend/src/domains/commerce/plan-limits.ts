@@ -1,5 +1,5 @@
 import { jsonResponse } from "../../platform/http/shared";
-import { getIntegerEntitlement } from "./entitlements";
+import { getIntegerEntitlement, planLimitRetryAfterSeconds, planLimitStatus } from "./entitlements";
 
 export type PlanLimitKey =
 	| "max_categories"
@@ -37,6 +37,7 @@ export async function getPlanLimit(env: Env, sellerId: string, key: PlanLimitKey
 	return row ? (row.value == null ? null : Number(row.value)) : FREE_LIMITS[key];
 }
 export function limitReached(key: PlanLimitKey, limit: number, used?: number): Response {
+	const status = planLimitStatus(key);
 	return jsonResponse({
 		error: "plan_limit_reached",
 		code: "PLAN_LIMIT_REACHED",
@@ -46,5 +47,5 @@ export function limitReached(key: PlanLimitKey, limit: number, used?: number): R
 		used: used ?? null,
 		remaining: 0,
 		message: `Your plan allows up to ${limit} ${key.replace("max_", "").replace("_per_month", " per month")}.`,
-	}, 409);
+	}, status, status === 429 ? { "retry-after": String(planLimitRetryAfterSeconds()) } : {});
 }

@@ -391,7 +391,13 @@ describe("POST /api/v1/orders", () => {
 			idempotency_key: key("limit-3"), buyer_phone: "01000000000",
 			items: [{ product_code: code, qty: 1 }],
 		});
-		expect(refused.status).toBe(409);
+		// 429, not 409: a monthly allowance is a rate, and both engines answer the
+		// same way now. It used to be 409 through limitReached() and 429 through
+		// entitlementLimitReached() for the identical condition, so the status
+		// depended on ENTITLEMENTS_ENABLED — which staging and production sit on
+		// opposite sides of.
+		expect(refused.status).toBe(429);
+		expect(refused.headers.get("retry-after")).toMatch(/^\d+$/);
 		expect(await refused.json()).toMatchObject({ code: "plan_limit_reached", limit: 2 });
 	});
 

@@ -18,7 +18,7 @@ import { handleBillingRoutes } from "../domains/commerce/billing";
 import { handleAdsRoutes } from "../domains/commerce/ads";
 import { handleInboundEmail } from "../integrations/email/inbound";
 import { markQueuedEmailDeadLetter, processQueuedEmail, type QueuedEmailMessage } from "../integrations/email/emailQueue";
-import { handleConfigRoute, loadClientConfig } from "../platform/config/config";
+import { handleConfigRoute, loadClientConfig, versionGateRefusal } from "../platform/config/config";
 import { landingPageHtml } from "../landing";
 import { publicDesignSystemCss, publicDesignSystemResponse } from "../domains/admin/admin-theme";
 import { designSystemCss, designSystemFontPreload, loadActiveDesignSystem } from "../domains/design/design-system";
@@ -69,6 +69,15 @@ function validateSellerCompatibilityHeaders(request: Request): Response | null {
 	const requestId = request.headers.get("x-request-id");
 	if (requestId !== null && requestId.length > 128) {
 		return jsonResponse({ error: "invalid_request_id" }, 400);
+	}
+	// Validated rather than coerced. `Math.max(0, Number(header))` produced NaN
+	// for a garbage value, NaN failed every comparison in versionDecision, and
+	// the caller resolved to "ok" — so the one header the version policy is
+	// evaluated against was the one header nothing checked. Refusing a malformed
+	// value here means the policy only ever sees an absent code or a real one.
+	const versionCode = request.headers.get("x-orderak-version-code");
+	if (versionCode !== null && !/^\d{1,9}$/.test(versionCode)) {
+		return jsonResponse({ error: "invalid_version_code" }, 400);
 	}
 	return null;
 }
@@ -253,7 +262,7 @@ app.use("*", async (c, next) => {
 app.use("*", async (c, next) => {
 	await next();
 
-	const origin = allowedCorsOrigin(c.req.raw);
+	const origin = allowedCorsOrigin(c.req.raw, c.env);
 	if (!origin) return;
 	// A handler that set its own policy keeps it — the same rule hardenPublic()
 	// follows. /api/v1/theme answers `*` on purpose: it serves public design
@@ -286,7 +295,7 @@ app.use("*", async (c, next) => {
 	await next();
 });
 
-app.options("*", (c) => new Response(null, { headers: corsHeaders(c.req.raw) }));
+app.options("*", (c) => new Response(null, { headers: corsHeaders(c.req.raw, c.env) }));
 
 app.get("/.well-known/assetlinks.json", (c) => assetLinksResponse(c.env));
 
@@ -394,6 +403,21 @@ app.use("/api/v1/*", async (c, next) => {
 	}
 
 	c.set("seller", authenticatedSeller);
+	await next();
+});
+
+// Client version policy, enforced rather than merely reported.
+//
+// `governance.version` has always carried a decision — force_update, blocked,
+// maintenance — and no route acted on it, so the kill switch was a notice the
+// client could decline to read. It is applied here, after authentication and
+// only to writes, for the reasons set out on versionGateRefusal.
+app.use("/api/v1/*", async (c, next) => {
+	const seller = c.get("seller");
+	if (seller && c.req.method !== "GET" && c.req.method !== "HEAD") {
+		const refusal = await versionGateRefusal(c.env, c.req.raw, seller as Record<string, unknown>);
+		if (refusal) return refusal;
+	}
 	await next();
 });
 
@@ -581,7 +605,7 @@ async function handleApi(
 			const reservation = env.ENTITLEMENTS_ENABLED === "true"
 				? await reserveUsage(env, String(seller.id), "max_ai_requests_per_month", 1, requestId)
 				: null;
-			if (reservation && !reservation.allowed) return entitlementLimitReached(reservation.snapshot, "max_ai_requests_per_month", 429);
+			if (reservation && !reservation.allowed) return entitlementLimitReached(reservation.snapshot, "max_ai_requests_per_month");
 			if (!reservation) {
 				const aiLimit = await getPlanLimit(env, String(seller.id), "max_ai_requests_per_month");
 				if (aiLimit !== null) {
@@ -670,9 +694,18 @@ async function handleApi(
 			if (!result.ok) return result.response;
 			// order_no, not the UUID: the app stores it as remoteId and addresses
 			// the status route by it, and it is the number the seller reads aloud.
+			//
+			// `total` is a Money object. It was a bare `total_minor` beside a
+			// separate `currency` — the only money field on the seller API that
+			// was not the {amount_minor, currency} pair ADR-009 requires, and
+			// the ADR's whole point is that a caller must not have to know which
+			// shape a given endpoint chose. The two old keys are still sent
+			// alongside it, because an installed build reads them and a response
+			// that dropped them would break every app already in the field.
 			return jsonResponse({
 				ok: true,
 				order_no: result.order.orderNo,
+				total: { amount_minor: result.order.totalMinor, currency: result.order.currency },
 				total_minor: result.order.totalMinor,
 				currency: result.order.currency,
 				replayed: result.order.replayed,

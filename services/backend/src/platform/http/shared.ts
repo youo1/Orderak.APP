@@ -10,20 +10,45 @@ const ALLOWED_CORS_ORIGINS = new Set([
 	"https://www.orderak.app",
 	"https://api.orderak.app",
 	"https://admin.orderak.app",
+	"https://staging.orderak.app",
+	"https://api.staging.orderak.app",
+]);
+
+/**
+ * Origins allowed only where a developer is actually running one.
+ *
+ * These four shipped in the production allowlist. The practical risk was low —
+ * seller routes authenticate with headers rather than cookies, so a page on
+ * localhost cannot ride an existing session — but "low risk" is not the same as
+ * "meant to be there", and an allowlist that grants a production API to
+ * anything running on the visitor's own machine is dev configuration that
+ * reached production.
+ *
+ * Gated on DEPLOYMENT_ENVIRONMENT rather than deleted, because `wrangler dev`
+ * and the admin web app's local server genuinely need them.
+ */
+const LOCAL_CORS_ORIGINS = new Set([
 	"http://localhost:3000",
 	"http://localhost:5173",
 	"http://127.0.0.1:3000",
 	"http://127.0.0.1:5173",
 ]);
 
-export function corsHeaders(request?: Request): HeadersInit {
+export function corsHeaders(request?: Request, env?: Env): HeadersInit {
 	const headers: Record<string, string> = {
-		"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+		// PATCH was missing too: the seller API PATCHes order status, passkey
+		// labels and customer records, and a browser client would have been
+		// refused at the preflight for all three.
+		"Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 		"Access-Control-Allow-Headers":
-			"Content-Type, Authorization, X-Request-ID, x-orderak-phone, x-orderak-secret, x-orderak-recent-auth, x-orderak-device-id, x-orderak-device-label, x-orderak-platform, x-orderak-app-version, x-admin-key, x-idempotency-key, idempotency-key",
+			// x-orderak-version-code is sent on every credentialed seller call
+			// (BackendApi.creds) and was absent from this list, so a browser
+			// client sending it would fail the preflight for a header the
+			// server's own version policy depends on reading.
+			"Content-Type, Authorization, X-Request-ID, If-None-Match, x-lang, x-orderak-phone, x-orderak-secret, x-orderak-recent-auth, x-orderak-device-id, x-orderak-device-label, x-orderak-platform, x-orderak-app-version, x-orderak-version-code, x-admin-key, x-idempotency-key, idempotency-key",
 		"Access-Control-Expose-Headers": "X-Request-ID, Retry-After, ETag, Allow",
 	};
-	const allowOrigin = allowedCorsOrigin(request);
+	const allowOrigin = allowedCorsOrigin(request, env);
 	if (allowOrigin) {
 		headers["Access-Control-Allow-Origin"] = allowOrigin;
 		headers.Vary = "Origin";
@@ -46,9 +71,14 @@ export function corsHeaders(request?: Request): HeadersInit {
  * response including the ones built with `new Response` and the ones served
  * from the edge cache.
  */
-export function allowedCorsOrigin(request?: Request): string {
+export function allowedCorsOrigin(request?: Request, env?: Env): string {
 	const origin = request?.headers.get("origin") ?? "";
-	return ALLOWED_CORS_ORIGINS.has(origin) ? origin : "";
+	if (ALLOWED_CORS_ORIGINS.has(origin)) return origin;
+	// Absent env means a caller that cannot tell us the environment, and the
+	// safe reading of "I do not know" is "not a development machine".
+	const environment = String(env?.DEPLOYMENT_ENVIRONMENT ?? "production");
+	if (environment !== "production" && LOCAL_CORS_ORIGINS.has(origin)) return origin;
+	return "";
 }
 
 export function jsonResponse(data: unknown, status = 200, extraHeaders: HeadersInit = {}): Response {

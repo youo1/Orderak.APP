@@ -624,6 +624,34 @@ export async function isEntitlementEnabled(env: Env, storeId: string, key: strin
 	return (await resolveEntitlements(env, storeId)).entitlements[key]?.available === true;
 }
 
+/** Catalogue keys the API itself gates on, named rather than written inline. */
+export const EDITABLE_CUSTOMER_PROFILES = "customers_crm.editable_customer_profiles";
+
+/**
+ * Whether a store may use a catalogue feature, decided the way the client
+ * decides it.
+ *
+ * Resolved through resolveEntitlementsForClient, not resolveEntitlements,
+ * because the snapshot the app gates on comes from the former — it is the one
+ * that answers under either engine. A server gate reading the other function
+ * could refuse a feature the seller's own app is showing as available, which is
+ * a worse failure than the missing check it replaces.
+ *
+ * The three conditions mirror EntitlementManager.isEntitlementAvailable on the
+ * device: built, included in the plan, and not requiring a bespoke arrangement.
+ * Fails closed — an unresolvable snapshot is not permission.
+ */
+export async function entitlementAllows(env: Env, storeId: string, key: string): Promise<boolean> {
+	try {
+		const item = (await resolveEntitlementsForClient(env, storeId)).entitlements[key];
+		return item?.implementation_status === "implemented"
+			&& item.available === true
+			&& item.custom_required !== true;
+	} catch {
+		return false;
+	}
+}
+
 export function entitlementDenied(
 	snapshot: EntitlementSnapshot,
 	key: string,
@@ -641,8 +669,62 @@ export function entitlementDenied(
 	}, status);
 }
 
-export function entitlementLimitReached(snapshot: EntitlementSnapshot, key: string, status = 409): Response {
+
+/**
+ * The HTTP status a plan limit answers with, decided by the KIND of limit.
+ *
+ * Two things were wrong. A limit that resets — a monthly order or AI allowance —
+ * is a rate, and a rate says 429 with Retry-After; a structural cap like
+ * max_products is a conflict with the plan's shape, which is 409. That
+ * distinction is worth making.
+ *
+ * What is not defensible is making it differently on each side of a flag. The
+ * same condition, exceeding the monthly order allowance, answered 409 through
+ * limitReached() under the legacy plan model and 429 through this function
+ * under the entitlements engine — and staging and production sit on opposite
+ * sides of ENTITLEMENTS_ENABLED. I-4 says flipping that flag must produce no
+ * client-visible difference, and a status code is client-visible. Both helpers
+ * read this one rule now, so the engine cannot be the thing that decides.
+ *
+ * It lives here rather than in plan-limits.ts because that module already
+ * imports this one, and the reverse edge would be a cycle.
+ */
+export function planLimitStatus(key: string): 409 | 429 {
+	return key.endsWith("_per_month") ? 429 : 409;
+}
+
+/**
+ * Seconds until a resetting allowance refills.
+ *
+ * Falls back to the UTC calendar-month boundary, which is the boundary the
+ * quotas are actually counted on (`datetime('now','start of month')` in
+ * catalog.ts and reserveUsage) — so a snapshot with no reset_at still produces
+ * an honest Retry-After rather than a guessed one.
+ */
+export function planLimitRetryAfterSeconds(resetAt?: string | null): number {
+	if (resetAt) {
+		const at = Date.parse(resetAt.includes("T") ? resetAt : `${resetAt.replace(" ", "T")}Z`);
+		if (Number.isFinite(at)) return Math.max(1, Math.ceil((at - Date.now()) / 1000));
+	}
+	const now = new Date();
+	const next = Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1);
+	return Math.max(1, Math.ceil((next - now.getTime()) / 1000));
+}
+
+/**
+ * `status` is no longer a parameter callers choose.
+ *
+ * It used to be, and two call sites passed 429 while the legacy helper answered
+ * 409 for the identical condition — so exceeding the monthly order allowance
+ * had a different status depending only on which engine was enabled. The kind
+ * of limit decides now; see planLimitStatus.
+ */
+export function entitlementLimitReached(snapshot: EntitlementSnapshot, key: string): Response {
 	const item = snapshot.entitlements[key];
+	const status = planLimitStatus(key);
+	const extra: Record<string, string> = status === 429
+		? { "retry-after": String(planLimitRetryAfterSeconds(item?.reset_at)) }
+		: {};
 	return jsonResponse({
 		error: "plan_limit_reached",
 		code: "PLAN_LIMIT_REACHED",
@@ -656,8 +738,9 @@ export function entitlementLimitReached(snapshot: EntitlementSnapshot, key: stri
 		reset_at: item?.reset_at ?? null,
 		upgrade_plan_keys: snapshot.plan_key === "free" ? ["paid1", "paid2", "paid3"] : ["paid2", "paid3"],
 		request_id: uuid(),
-	}, status);
+	}, status, extra);
 }
+
 
 export interface UsageReservationResult {
 	allowed: boolean;
