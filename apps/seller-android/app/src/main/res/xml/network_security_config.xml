@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Transport policy for the seller app.
+
+     WHY THIS EXISTS
+       The seller credential is a long-lived device secret sent as
+       `x-orderak-secret` on every request. It has no expiry and no rotation, so
+       a single successful interception yields an indefinitely valid credential.
+       That design is defensible on its own terms — shared.ts argues correctly
+       that stretching a 122-bit random token buys nothing — but it does mean the
+       transport is the only thing standing between an attacker and permanent
+       account access. Pinning is the control that matches that threat.
+
+       Declaring the base config also makes the cleartext policy explicit rather
+       than inherited. targetSdk 36 already defaults it off; stating it means a
+       future targetSdk change cannot quietly re-enable it.
+
+     WHY THE ROOTS AND NOT THE LEAF OR THE INTERMEDIATE
+       The leaf rotates roughly every 90 days, so pinning it would brick the app
+       four times a year. The intermediate (Google Trust Services WE1 today)
+       rotates less often but is still operational infrastructure Cloudflare
+       replaces without notice. The roots below are the stable anchors — GTS
+       Root R4 terminates the live chain for orderak.app and staging.orderak.app,
+       and GTS Root R1 is Google's other widely deployed root, included as the
+       backup pin RFC 7469 requires so a single rotation cannot lock everyone out.
+
+       Both values were computed from the live chains rather than copied:
+         openssl s_client -connect orderak.app:443 -servername orderak.app -showcerts
+         openssl x509 -pubkey -noout | openssl pkey -pubin -outform der \
+           | openssl dgst -sha256 -binary | openssl enc -base64
+       Both match Google Trust Services' published SPKI pins.
+
+     THE RISK THIS CARRIES, STATED PLAINLY
+       orderak.app is fronted by Cloudflare, and Cloudflare chooses the CA. It
+       uses Google Trust Services today; it can move to Let's Encrypt or DigiCert
+       without telling anyone. If that happens while a pinned build is in the
+       field, every request fails and the only remedy is a Play release — which
+       users in Egypt on low-end devices may not take promptly.
+
+       `expiration` is the safety valve and is not optional. After that date
+       Android ignores this pin set entirely and falls back to normal CA
+       validation, so the failure mode is "pinning stops protecting" rather than
+       "the app stops working". Renewing it is a deliberate act: re-run the
+       commands above, confirm the chain still terminates at one of these roots,
+       and move the date. See docs/runbooks/certificate-pinning.md.
+
+     The mock flavour is unaffected: app/src/mock/AndroidManifest.xml scopes
+     `usesCleartextTraffic="true"` to itself for the 10.0.2.2 emulator host, and
+     the domain-config below only covers orderak.app. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <domain-config>
+        <domain includeSubdomains="true">orderak.app</domain>
+        <pin-set expiration="2027-06-30">
+            <!-- GTS Root R4 — terminates the current orderak.app chain
+                 (leaf CN=orderak.app -> GTS WE1 -> GTS Root R4). -->
+            <pin digest="SHA-256">mEflZT5enoR1FuXLgYYGqnVEoZvmf9c2bVBpiOjYQ0c=</pin>
+            <!-- GTS Root R1 — backup pin. Not in today's chain; present so a
+                 rotation within Google Trust Services does not require a release. -->
+            <pin digest="SHA-256">hxqRlPTu1bMS/0DITB1SSu0vd4u/8l8TjPgfaAp63Gc=</pin>
+        </pin-set>
+    </domain-config>
+</network-security-config>

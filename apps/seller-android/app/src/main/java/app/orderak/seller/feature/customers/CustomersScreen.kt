@@ -38,8 +38,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import app.orderak.seller.R
-import app.orderak.seller.core.money.DEFAULT_CURRENCY
-import app.orderak.seller.core.money.formatAmount
+import app.orderak.seller.core.money.formatAmountLabel
 import app.orderak.seller.core.text.SearchText
 import app.orderak.seller.core.ui.FullScreenEmpty
 import app.orderak.seller.core.ui.SearchField
@@ -132,10 +131,12 @@ private fun CustomerList(
                 modifier = Modifier.clickable { onOpen(c.customerKey) },
                 trailing = {
                     Text(
-                        stringResource(
-                            R.string.currency_egp,
-                            formatAmount(c.totalMinor, DEFAULT_CURRENCY, locale),
-                        ),
+                        // A lifetime total exists only within one currency. With
+                        // more than one there is no such number, and an em dash
+                        // says so rather than a sum of unlike minor units
+                        // labelled with whichever currency the screen assumed.
+                        if (c.currencyCount > 1 || c.currency == null) "—"
+                        else formatAmountLabel(c.totalMinor, c.currency, locale),
                         style = MaterialTheme.typography.titleMedium,
                     )
                 },

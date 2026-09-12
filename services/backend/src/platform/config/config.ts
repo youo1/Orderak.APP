@@ -7,7 +7,7 @@
 // in-app enforcement (product limits, category limits, etc.)
 // ============================================================
 
-import { jsonResponse, authSeller, type AuthenticatedSeller } from "../http/shared";
+import { jsonResponse, authSeller, clientIpOf, type AuthenticatedSeller } from "../http/shared";
 import { keyedHash, sha256Hex } from "../../domains/identity/auth";
 import { FREE_LIMITS } from "../../domains/commerce/plan-limits";
 import { LEGACY_LIMIT_KEYS } from "../../domains/commerce/legacy-entitlements";
@@ -278,7 +278,7 @@ export async function handleConfigRoute(
 
 	const phone = request.headers.get("x-orderak-phone") ?? "";
 	const secret = request.headers.get("x-orderak-secret") ?? "";
-	const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret);
+	const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret, clientIpOf(request));
 	if (!seller) return jsonResponse({ error: "auth" }, 401);
 	if (url.pathname === "/api/v1/entitlements") {
 		// This used to answer 503 whenever ENTITLEMENTS_ENABLED was false, which is

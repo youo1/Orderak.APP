@@ -51,6 +51,19 @@
 		// both environments — unlike the feature flags above, where staging
 		// leads.
 		"MEDIA_RECLAIM_ENABLED": "false",
+		// Bot challenge on storefront order creation — the one unauthenticated
+		// write path. "false" until a site key and TURNSTILE_SECRET exist, because
+		// an enabled challenge with no secret fails CLOSED and would refuse every
+		// order on every storefront. The flag is the difference between "not
+		// configured" and "configured and broken", and on a page that takes money
+		// those must not look the same.
+		//
+		// To turn on: create a Turnstile widget for orderak.app, put the site key
+		// below, `wrangler secret put TURNSTILE_SECRET`, then flip this — in that
+		// order. The site key is public and belongs in the config; the secret never
+		// does.
+		"TURNSTILE_ENABLED": "false",
+		"TURNSTILE_SITE_KEY": "",
 		"AI_MONTHLY_BUDGET_MICRO_USD": "0",
 		"GOOGLE_PLAY_PACKAGE_NAME": "app.orderak.seller",
 		// Package the /.well-known/assetlinks.json statement vouches for. This
@@ -203,6 +216,11 @@
 				// See the production comment: closed here too, and this is the
 				// environment where it opens first once a dry run has been read.
 				"MEDIA_RECLAIM_ENABLED": "false",
+				// See the production comment. Staging is where this opens first:
+				// it has its own Turnstile widget and its own secret, and a
+				// challenge that refuses staging orders costs nothing real.
+				"TURNSTILE_ENABLED": "false",
+				"TURNSTILE_SITE_KEY": "",
 				"AI_MONTHLY_BUDGET_MICRO_USD": "0",
 				// Staging has its own Play Console entry. The staging Android
 				// flavour applies applicationIdSuffix = ".staging", so a staging

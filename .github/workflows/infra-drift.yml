@@ -100,3 +100,35 @@ jobs:
             exit 0
           fi
           node scripts/queue-backlog-report.mjs --hours 24
+
+      # The Cloudflare-changed-CA case, which is the one that takes the installed
+      # app offline. orderak.app is Cloudflare-fronted and Cloudflare chooses the
+      # certificate authority; the seller app pins to Google Trust Services roots.
+      # If that chain moves, every pinned build in the field starts failing every
+      # request and the only remedy is a Play release — so this needs to be caught
+      # on a schedule, not on the next time somebody happens to look.
+      #
+      # Deliberately NOT continue-on-error, and the script does not treat a failed
+      # connection as a pass: "could not reach orderak.app" and "orderak.app
+      # changed CA" must not produce the same green tick.
+      # See docs/runbooks/certificate-pinning.md.
+      - name: Verify the live chain still matches the Android pin set
+        run: node tooling/repository/verify-certificate-pins.mjs --live
+
+      # Two application controls document a WAF rule as the other half of their
+      # design: the auth-failure throttle (keyed on the phone alone, and store
+      # phones are published on the storefront) and the storefront order limit
+      # (keyed on store AND IP, so it resets when the IP rotates). Neither works
+      # properly without the rule, and a control that lives only in a dashboard
+      # is one console session away from not existing.
+      #
+      # THIS WILL FAIL UNTIL THE RULES AND THE CONFIGURATION EXIST, on purpose —
+      # that is the forcing function. The script names exactly one condition per
+      # exit (not configured / no permission / rule missing / rule disabled) so
+      # "I could not look" never reads as "the rule is gone".
+      # See docs/runbooks/waf-rate-rules.md.
+      - name: Verify WAF rate-limiting rules
+        working-directory: services/backend
+        env:
+          CLOUDFLARE_ZONE_ID: ${{ vars.CLOUDFLARE_ZONE_ID }}
+        run: node scripts/verify-waf-rules.mjs

@@ -40,18 +40,24 @@ import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadJsonc } from "../../../tooling/lib/jsonc.mjs";
+import { parseEnvironment, databaseFor } from "./_wrangler-args.mjs";
 
 const backendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
 const remote = args.includes("--remote");
-const envIndex = args.indexOf("--env");
-const environment = envIndex >= 0 ? args[envIndex + 1] : null;
-
-const SAFE = /^[A-Za-z0-9_.-]+$/;
-if (environment !== null && !SAFE.test(environment)) {
-	console.error(`Refusing an environment name that is not a plain identifier: ${environment}`);
+let environment;
+try {
+	environment = parseEnvironment(args);
+} catch (error) {
+	console.error(error.message);
 	process.exit(2);
 }
+
+// Derived, not hardcoded. This script forwarded --env to the secrets lookup and
+// then queried the literal "orderak-db" anyway, so the invocation its own usage
+// line advertises — `--remote --env staging` — checked staging's secrets against
+// production's plans, mappings and settings and reported "No blockers".
+const database = databaseFor(environment);
 
 /** Every credential google-play.ts reads at runtime, and what breaks without it. */
 const REQUIRED_SECRETS = [
@@ -90,7 +96,7 @@ function wrangler(command) {
 }
 
 function d1(sql) {
-	const argv = ["d1", "execute", "orderak-db", remote ? "--remote" : "--local", "--json", "--command", sql];
+	const argv = ["d1", "execute", database, remote ? "--remote" : "--local", "--json", "--command", sql];
 	if (environment) argv.push("--env", environment);
 	const out = wrangler(argv);
 	const parsed = JSON.parse(out.slice(out.indexOf("[")));

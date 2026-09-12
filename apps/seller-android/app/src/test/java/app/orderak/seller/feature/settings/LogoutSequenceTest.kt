@@ -16,12 +16,13 @@ class LogoutSequenceTest {
             revokeCredential = { throw java.io.IOException("offline") },
             signOutProvider = { events += "provider" },
             clearBusinessData = { events += "database" },
+            clearStoredImages = { events += "images" },
             clearEntitlements = { events += "entitlements" },
             clearSession = { events += "session" },
             clearDeviceSecret = { events += "secret" },
         )
 
-        assertEquals(listOf("provider", "database", "entitlements", "session", "secret"), events)
+        assertEquals(listOf("provider", "database", "images", "entitlements", "session", "secret"), events)
     }
 
     @Test
@@ -32,6 +33,7 @@ class LogoutSequenceTest {
             revokeCredential = { events += "revoke" },
             signOutProvider = { events += "provider" },
             clearBusinessData = { events += "database" },
+            clearStoredImages = { events += "images" },
             clearEntitlements = { events += "entitlements" },
             clearSession = { events += "session" },
             clearDeviceSecret = { events += "secret" },
@@ -43,7 +45,7 @@ class LogoutSequenceTest {
         // with — so one must run first and the other last. Firebase sign-out
         // still precedes the database and session, which is the v7 ordering.
         assertEquals(
-            listOf("revoke", "provider", "database", "entitlements", "session", "secret"),
+            listOf("revoke", "provider", "database", "images", "entitlements", "session", "secret"),
             events,
         )
     }

@@ -108,7 +108,13 @@ function ExportDownload({ row }: { row: Row }) {
       headers.set('x-admin-action-authorization', authorization.authorization_id);
     }
     const result = await api<{ download_url: string }>(`/api/admin/v1/exports/${encodeURIComponent(String(row.id))}/download`, { method: 'POST', headers, body: JSON.stringify({ acknowledgement: 'admin_ui_download' }) });
-    window.location.assign(result.download_url);
+    // Same-origin only. This navigates the console to a URL the response body
+    // supplied, so it is worth one check: the artifact is served from this
+    // origin behind the one-use cookie, and anything else — an absolute URL to
+    // somewhere else, or a `javascript:` scheme — is not a download.
+    const target = new URL(result.download_url, window.location.origin);
+    if (target.origin !== window.location.origin) throw new Error('Refusing an off-origin download URL.');
+    window.location.assign(target.href);
   }, onSuccess: () => setFreshOpen(false) });
   if (!completed) return <p className="muted">Download becomes available once this private artifact completes. Tokens are one-use and expire in five minutes.</p>;
   return <><button className="button primary" onClick={() => sensitive ? setFreshOpen(true) : mutation.mutate()} disabled={mutation.isPending}><Download size={16} /> Download once</button>{mutation.error && <p className="error-text">{mutation.error.message}</p>}{freshOpen && <div className="modal-backdrop"><section className="modal compact" role="dialog" aria-modal="true" aria-label="Authorize sensitive export"><header><div><p className="eyebrow">FRESH OWNER AUTH</p><h2>Authorize sensitive download</h2><p>Password and a current TOTP are required. This authorization is bound to this export type and consumed once.</p></div><button className="icon-button" onClick={() => setFreshOpen(false)} aria-label="Close"><X size={18} /></button></header><div className="form-grid"><label className="field"><span>Owner password</span><input type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} /></label><label className="field"><span>Current TOTP</span><input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={totpCode} onChange={event => setTotpCode(event.target.value.replace(/\D/g, '').slice(0, 6))} /></label></div>{mutation.error && <p className="error-text">{mutation.error.message}</p>}<footer><button className="button" onClick={() => setFreshOpen(false)}>Cancel</button><button className="button primary" disabled={password.length < 12 || totpCode.length !== 6 || mutation.isPending} onClick={() => mutation.mutate()}>{mutation.isPending ? 'Authorizing…' : 'Authorize and download'}</button></footer></section></div>}</>;

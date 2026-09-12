@@ -212,8 +212,8 @@ describe("POST /api/v1/auth/session", () => {
 		const response = await restore({ device_secret: "replacement-device-0000-1111" });
 		expect(response.status).toBe(200);
 		expect(await response.json()).toMatchObject({ ok: true, exists: true });
-		expect(await authSeller(testEnv, PHONE, "replacement-device-0000-1111")).not.toBeNull();
-		expect(await authSeller(testEnv, PHONE, "device-secret-0000-1111-2222")).toBeNull();
+		expect(await authSeller(testEnv, PHONE, "replacement-device-0000-1111", "203.0.113.1")).not.toBeNull();
+		expect(await authSeller(testEnv, PHONE, "device-secret-0000-1111-2222", "203.0.113.1")).toBeNull();
 		const devices = await env.orderak_db.prepare(
 			"SELECT COUNT(*) AS count FROM seller_devices WHERE seller_id=(SELECT id FROM sellers WHERE phone=?)",
 		).bind(PHONE).first<{ count: number }>();
@@ -230,8 +230,8 @@ describe("POST /api/v1/auth/session", () => {
 
 		const response = await restore({ device_secret: "second-device-0000-1111-2222" });
 		expect(response.status).toBe(200);
-		expect(await authSeller(testEnv, PHONE, "device-secret-0000-1111-2222")).not.toBeNull();
-		expect(await authSeller(testEnv, PHONE, "second-device-0000-1111-2222")).not.toBeNull();
+		expect(await authSeller(testEnv, PHONE, "device-secret-0000-1111-2222", "203.0.113.1")).not.toBeNull();
+		expect(await authSeller(testEnv, PHONE, "second-device-0000-1111-2222", "203.0.113.1")).not.toBeNull();
 	});
 });
 
@@ -283,7 +283,7 @@ describe("device secret strength", () => {
 		expect(response.status).toBe(400);
 		expect(await response.json()).toMatchObject({ code: "weak_device_secret", min_length: 20 });
 		// The account keeps the credential it already had.
-		expect(await authSeller(testEnv, PHONE, "device-secret-0000-1111-2222")).not.toBeNull();
+		expect(await authSeller(testEnv, PHONE, "device-secret-0000-1111-2222", "203.0.113.1")).not.toBeNull();
 	});
 });
 

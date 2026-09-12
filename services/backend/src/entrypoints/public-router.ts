@@ -211,9 +211,18 @@ async function renderContentPage(env: PublicWorkerEnv, slug: string, lang: Local
 	return new Response(html, {
 		headers: {
 			"content-type": "text/html; charset=utf-8",
+			// script-src is stated rather than inherited from default-src.
+			//
+			// `default-src 'none'` already covers scripts, so this changes nothing
+			// today — which is the point. body_html comes out of
+			// content_page_versions and is emitted raw, so the one directive that
+			// contains that is worth reading at the top of the header instead of
+			// being a consequence of another one. Someone widening default-src for
+			// an image or a font then has to widen scripts deliberately.
 			"content-security-policy":
-				"default-src 'none'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; "
-				+ "font-src 'self'; form-action 'none'; base-uri 'none'; frame-ancestors 'self'",
+				"default-src 'none'; script-src 'none'; img-src 'self' https: data:; "
+				+ "style-src 'self' 'unsafe-inline'; font-src 'self'; form-action 'none'; "
+				+ "base-uri 'none'; frame-ancestors 'self'",
 		},
 	});
 }

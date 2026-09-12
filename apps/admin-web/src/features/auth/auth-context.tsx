@@ -1,5 +1,6 @@
 /* eslint-disable react/only-export-components */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { api, setCsrfToken } from '../../shared/api/client';
 import type { AdminIdentity, AdminSessionResponse } from '../../../../../contracts/typescript/admin';
 
@@ -36,6 +37,7 @@ function applySession(payload: SessionPayload, setAdmin: (value: AdminUser | nul
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [admin, setAdmin] = useState<AdminUser | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -112,8 +114,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     try { await api('/api/admin/v1/auth/logout', { method: 'POST' }); } finally {
       setAdmin(null); setPermissions([]); setCsrfToken(''); setLoginState('credentials');
+      // The React Query cache outlives the session unless it is told not to.
+      //
+      // staleTime is 30s, so without this the next administrator to sign in on
+      // the same browser was served the previous one's rows from cache while
+      // their own requests were in flight — sellers, exports, audit entries,
+      // whatever the last session had open. Their permissions are re-read from
+      // the server, so the UI would be correct and the data would not.
+      queryClient.clear();
     }
-  }, []);
+  }, [queryClient]);
 
   // Membership only. The server sends the fully expanded permission set, so
   // every rule about what implies what — project:view granting the internal

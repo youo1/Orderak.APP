@@ -13,6 +13,12 @@
 // ============================================================
 
 import { esc, jsonResponse, logError, checkRateLimit } from "../../platform/http/shared";
+import {
+	TURNSTILE_SCRIPT_ORIGIN,
+	turnstileEnabled,
+	turnstileSiteKey,
+	verifyTurnstile,
+} from "../../platform/http/turnstile";
 import { publicSiteUrl, storeUrl, newUuid } from "../identity/identity";
 import { requireTenantWrite, resolveTenantContextForStore, tenantUnavailableResponse } from "../../platform/tenancy/tenant-routing";
 import { getPlanLimit, limitReached } from "../commerce/plan-limits";
@@ -230,6 +236,36 @@ async function scriptSrcDirective(html: string): Promise<string> {
 	return sources.length ? `script-src ${sources.join(" ")}` : "script-src 'none'";
 }
 
+/**
+ * The full storefront policy for one rendered page.
+ *
+ * The Turnstile allowances are derived from the markup rather than passed in,
+ * for the same reason the script hashes are: the header and the page it
+ * describes are computed from one input, so a widget that is rendered can never
+ * be a widget the policy forgot to permit — or the reverse, a permanently
+ * widened policy on every page that has no widget at all.
+ *
+ * Turnstile needs three: `script-src` for the loader, `frame-src` because the
+ * challenge renders in an iframe, and `connect-src` for the widget's own calls.
+ */
+async function storefrontCsp(html: string): Promise<string> {
+	const directives = [...STOREFRONT_CSP_BASE];
+	const scriptSources = [await scriptSrcDirective(html)];
+	// The widget element specifically. A looser `includes("cf-turnstile")` also
+	// matched the client script's own [name="cf-turnstile-response"] lookup, which
+	// would have added the Turnstile allowances to every page whether or not one
+	// was rendered — a permanently widened policy that no test would have noticed.
+	if (html.includes('class="cf-turnstile"')) {
+		scriptSources.push(TURNSTILE_SCRIPT_ORIGIN);
+		directives.push(`frame-src ${TURNSTILE_SCRIPT_ORIGIN}`);
+		// Replace rather than append: a second connect-src would be ignored, and
+		// silently ignored is how a widget fails with nothing in the console.
+		const index = directives.indexOf("connect-src 'self'");
+		if (index >= 0) directives[index] = `connect-src 'self' ${TURNSTILE_SCRIPT_ORIGIN}`;
+	}
+	return [...directives, scriptSources.join(" ")].join("; ");
+}
+
 async function pageShell(head: string, body: string, theme: Theme, generatedCss: string, lang: Locale, siteUrl: string, cacheSeconds = 0): Promise<Response> {
 	const html = `<!doctype html>
 <html lang="${lang}" dir="${dirFor(lang)}"><head>
@@ -242,7 +278,7 @@ ${body}
 	const headers: Record<string, string> = {
 		"content-type": "text/html; charset=utf-8",
 		"content-language": lang,
-		"content-security-policy": [...STOREFRONT_CSP_BASE, await scriptSrcDirective(html)].join("; "),
+		"content-security-policy": await storefrontCsp(html),
 		vary: "Accept-Language",
 	};
 	// Anonymous listing pages can be edge-cached briefly — a viral store link
@@ -319,7 +355,7 @@ function productCard(store: Store, p: Record<string, unknown>, linkToPage: boole
 //
 // Explanatory comments belong here and not in the template literal below: this
 // script ships to every buyer on every page view, on metered mobile data.
-function orderForm(store: Store, lang: Locale, currency: Currency): string {
+function orderForm(store: Store, lang: Locale, currency: Currency, turnstileKey = ""): string {
 	const postUrl = "/" + esc(store.public_identifier);
 	const js = (key: string) => jsonInScript(t(lang, key));
 	const numberLocale = lang === "ar" ? "ar-EG" : "en-EG";
@@ -354,8 +390,10 @@ function orderForm(store: Store, lang: Locale, currency: Currency): string {
 	<label for="pay">${esc(t(lang, "catalog.payment"))}</label>
 	<select id="pay" name="payment">${paymentOptions}</select>
 	<div id="form_error" class="form-error" role="alert" aria-live="assertive"></div>
+	${turnstileKey ? `<div class="cf-turnstile" data-sitekey="${esc(turnstileKey)}" data-language="${lang}"></div>` : ""}
 	<button class="btn" type="submit">${esc(t(lang, "catalog.submit"))}</button>
 </form>
+${turnstileKey ? '<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>' : ""}
 <div class="ok" id="ok" role="status" aria-live="polite"></div>
 <script>
 var POST_URL=${jsonInScript(postUrl)};
@@ -376,10 +414,12 @@ async function send(e){
 	var btn=document.querySelector('.btn');btn.disabled=true;btn.textContent=${js("catalog.wait")};
 	var r,d;
 	try{
+		${turnstileKey ? `var tsEl=document.querySelector('[name="cf-turnstile-response"]');` : ""}
 		r=await fetch(POST_URL,{method:'POST',headers:{'content-type':'application/json','idempotency-key':orderKey},
 			body:JSON.stringify({items:items,buyer_phone:document.getElementById('phone').value,
 			buyer_name:document.getElementById('cname').value,note:document.getElementById('note').value,
-			pay_method:document.getElementById('pay').value})});
+			pay_method:document.getElementById('pay').value${turnstileKey ? `,
+			'cf-turnstile-response':tsEl?tsEl.value:''` : ""}})});
 		d=await r.json();
 	}catch(_){error.textContent=${js("catalog.network_error")};btn.disabled=false;btn.textContent=${js("catalog.submit")};return false}
 	btn.disabled=false;btn.textContent=${js("catalog.submit")};
@@ -431,6 +471,9 @@ async function availableProducts(env: Env, storeId: string, lang: Locale, catego
 // ---- Store page ------------------------------------------------------------
 
 export async function renderStorePage(env: Env, store: Store, lang: Locale): Promise<Response> {
+	// "" when the challenge is off, which is what keeps the widget, its script
+	// host in the CSP, and the server-side verification in step with each other.
+	const turnstileKey = turnstileEnabled(env) ? turnstileSiteKey(env) : "";
 	const pid = String(store.public_identifier);
 	const { results: cats } = (await env.orderak_db
 		.prepare("SELECT category_code, name FROM categories WHERE store_id = ? ORDER BY sort_order, name")
@@ -448,7 +491,7 @@ export async function renderStorePage(env: Env, store: Store, lang: Locale): Pro
 	const cards = products.map((p) => productCard(store, p, true, lang)).join("");
 	const body = `${storeHeader(store, lang)}${chips}${
 		cards || `<p style='text-align:center'>${esc(t(lang, "catalog.empty"))}</p>`
-	}${products.length ? orderForm(store, lang, pageCurrency(products)) : ""}`;
+	}${products.length ? orderForm(store, lang, pageCurrency(products), turnstileKey) : ""}`;
 
 	const revision = await loadActiveDesignSystem(env);
 	const theme = revision.legacyTheme;
@@ -467,6 +510,9 @@ export async function renderStorePage(env: Env, store: Store, lang: Locale): Pro
 // ---- Category page ---------------------------------------------------------
 
 export async function renderCategoryPage(env: Env, store: Store, category: Record<string, unknown>, lang: Locale): Promise<Response> {
+	// "" when the challenge is off, which is what keeps the widget, its script
+	// host in the CSP, and the server-side verification in step with each other.
+	const turnstileKey = turnstileEnabled(env) ? turnstileSiteKey(env) : "";
 	const pid = String(store.public_identifier);
 	const products = await availableProducts(env, String(store.id), lang, String(category.id));
 	const cards = products.map((p) => productCard(store, p, true, lang)).join("");
@@ -474,7 +520,7 @@ export async function renderCategoryPage(env: Env, store: Store, category: Recor
 <div class="crumb"><a href="/${pid}">${esc(store.store_name)}</a> / ${esc(category.name)}</div>
 <div class="sec">${esc(category.name)}</div>
 ${cards || `<p style='text-align:center'>${esc(t(lang, "catalog.category_empty"))}</p>`}
-${products.length ? orderForm(store, lang, pageCurrency(products)) : ""}`;
+${products.length ? orderForm(store, lang, pageCurrency(products), turnstileKey) : ""}`;
 
 	const revision = await loadActiveDesignSystem(env);
 	const theme = revision.legacyTheme;
@@ -493,6 +539,9 @@ ${products.length ? orderForm(store, lang, pageCurrency(products)) : ""}`;
 // ---- Product page ----------------------------------------------------------
 
 export async function renderProductPage(env: Env, store: Store, product: Record<string, unknown>, lang: Locale): Promise<Response> {
+	// "" when the challenge is off, which is what keeps the widget, its script
+	// host in the CSP, and the server-side verification in step with each other.
+	const turnstileKey = turnstileEnabled(env) ? turnstileSiteKey(env) : "";
 	const translated = await env.orderak_db.prepare(
 		`SELECT name, description FROM product_translations
 		 WHERE product_id=? AND lang=? AND source_name=? AND source_description=?
@@ -529,7 +578,7 @@ export async function renderProductPage(env: Env, store: Store, product: Record<
 <div class="sec">${esc(product.name)}</div>
 ${product.description ? `<div class="desc">${esc(product.description)}</div>` : ""}
 ${card}${soldOut}
-${inStock ? orderForm(store, lang, productCurrency) : ""}
+${inStock ? orderForm(store, lang, productCurrency, turnstileKey) : ""}
 <script type="application/ld+json">${jsonInScript(jsonLd)}</script>`;
 
 	const revision = await loadActiveDesignSystem(env);
@@ -595,6 +644,14 @@ export interface CreateOrderInput {
 	 * catching up on a busy afternoon.
 	 */
 	clientIp: string | null;
+	/**
+	 * Turnstile token from the storefront widget, when the challenge is enabled.
+	 *
+	 * null for the seller's own manual orders: those are already authenticated,
+	 * and putting a bot challenge in front of the account owner writing their own
+	 * order would be a control aimed at the wrong party.
+	 */
+	turnstileToken: string | null;
 	logContext: string;
 }
 
@@ -636,6 +693,18 @@ export async function createOrder(env: Env, store: Store, input: CreateOrderInpu
 		const replay = await existingOrder();
 		if (replay) return { ok: true, order: replay };
 
+		// Before the rate limit, so a bot burns its challenge rather than the
+		// store's per-minute allowance. The rate limit is keyed on store *and* IP,
+		// so rotating the IP resets it; this is the control that does not reset.
+		if (input.clientIp !== null) {
+			const challenge = await verifyTurnstile(env, input.turnstileToken ?? "", input.clientIp);
+			if (!challenge.ok) {
+				return fail(jsonResponse({
+					error: challenge.reason === "misconfigured" ? "verification_unavailable" : "verification_failed",
+				}, challenge.reason === "misconfigured" ? 503 : 403));
+			}
+		}
+
 		if (input.clientIp !== null
 			&& !(await checkRateLimit(env, `order:${store.id}:${input.clientIp}`, 5, 60))) {
 			return fail(jsonResponse({ error: "rate_limited" }, 429));
@@ -673,6 +742,10 @@ export async function createOrder(env: Env, store: Store, input: CreateOrderInpu
 
 		const codes = rawItems.map((i) => String(i.product_code));
 		if (new Set(codes).size !== codes.length) return fail(jsonResponse({ error: "duplicate_products" }, 400));
+		// D1-BOUND: rawItems.length <= 50 is enforced above, so this IN list is at
+		// most 50 parameters plus the store id — inside D1's cap of 100. Stated here
+		// because the bound that makes this safe lives in a different check, and a
+		// later relaxation of that limit would silently break this query.
 		const marks = codes.map(() => "?").join(",");
 		const { results: products } = (await db
 			.prepare(
@@ -905,6 +978,7 @@ export async function handleCatalogOrder(request: Request, env: Env, store: Stor
 		note: String(body.note ?? "") || null,
 		origin: "storefront",
 		clientIp: request.headers.get("cf-connecting-ip") ?? "noip",
+		turnstileToken: String(body["cf-turnstile-response"] ?? body.turnstile_token ?? "") || null,
 		logContext: "catalog_order",
 	});
 	if (!result.ok) return result.response;

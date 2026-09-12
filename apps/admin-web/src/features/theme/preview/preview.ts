@@ -22,6 +22,24 @@ function apply(snapshot: Snapshot) {
   render(snapshot);
 }
 
+/**
+ * Escape a snapshot value before it goes into markup.
+ *
+ * Everything else in the preview template is literal: the snapshot reaches the
+ * page as CSS custom properties, which cannot carry markup. The footer is the
+ * one place a value is written into HTML, and typography.family is a string the
+ * theme editor supplies — so it is the one place that needs this.
+ *
+ * The frame is sandboxed and same-origin-checked in both directions, so this is
+ * defence in depth rather than the only thing standing in the way. It is also
+ * four lines.
+ */
+function esc(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character] as string
+  ));
+}
+
 function render(snapshot: Snapshot) {
   root.innerHTML = `
     <header><div class="logo">O</div><div><strong>Orderak</strong><span>Admin sample</span></div><nav><button>Dashboard</button><button>Orders</button></nav></header>
@@ -39,7 +57,7 @@ function render(snapshot: Snapshot) {
       <section class="status-grid"><div class="info">Information state</div><div class="success">Success state</div><div class="warning">Warning state</div><div class="error">Error state</div></section>
       <dialog id="sample-dialog"><h2>Publish revision?</h2><p>This portal stays inside the isolated preview document.</p><button class="primary" id="close-dialog">Confirm</button></dialog>
       <button id="open-dialog" class="floating">Open dialog</button>
-      <footer>${snapshot.typography.family} · ${snapshot.spacing.values.join('/')} · 48dp targets</footer>
+      <footer>${esc(snapshot.typography.family)} · ${esc(snapshot.spacing.values.join('/'))} · 48dp targets</footer>
     </main>`;
   const mode = root.querySelector<HTMLSelectElement>('#mode')!;
   const contrast = root.querySelector<HTMLSelectElement>('#contrast')!;

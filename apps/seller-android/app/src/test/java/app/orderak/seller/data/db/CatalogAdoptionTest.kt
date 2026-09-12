@@ -14,7 +14,7 @@ import org.junit.Test
  */
 class CatalogAdoptionTest {
     private fun server(name: String, uuid: String?, code: String?) = ProductEntity(
-        name = name, priceMinor = 1500, stock = 4,
+        name = name, priceMinor = 1500, currency = "EGP", stock = 4,
         productCode = code, remoteUuid = uuid, createdAt = 1_000L,
     )
 
@@ -32,7 +32,7 @@ class CatalogAdoptionTest {
     @Test
     fun `a product already held here updates that row, whatever its id`() {
         val local = ProductEntity(
-            id = 42, name = "Cola", priceMinor = 1000, stock = 1,
+            id = 42, name = "Cola", priceMinor = 1000, currency = "EGP", stock = 1,
             productCode = "p-COLA01", remoteUuid = "uuid-cola", createdAt = 7L,
         )
 
@@ -46,7 +46,7 @@ class CatalogAdoptionTest {
     @Test
     fun `the fields that belong to this device survive the download`() {
         val local = ProductEntity(
-            id = 42, name = "Cola", priceMinor = 1000, stock = 1,
+            id = 42, name = "Cola", priceMinor = 1000, currency = "EGP", stock = 1,
             imagePath = "/data/user/0/app/files/cola.jpg",
             productCode = "p-COLA01", remoteUuid = "uuid-cola",
             categoryId = 9, createdAt = 7L,
@@ -68,7 +68,7 @@ class CatalogAdoptionTest {
         // Rows adopted before the server sent remote_uuid down carry only the
         // public code. The next download is what completes them.
         val local = ProductEntity(
-            id = 3, name = "Cola", priceMinor = 1500, stock = 4,
+            id = 3, name = "Cola", priceMinor = 1500, currency = "EGP", stock = 4,
             productCode = "p-COLA01", remoteUuid = null, createdAt = 7L,
         )
         assertNull(local.remoteUuid)
