@@ -23,6 +23,7 @@
     "verify:built-site": "node tooling/repository/verify-built-site.mjs site",
     "verify:doc-links": "node tooling/repository/verify-doc-links.mjs",
     "verify:d1-bounds": "node tooling/repository/verify-d1-parameter-bounds.mjs",
+    "verify:billing-entitlement-path": "node tooling/repository/verify-billing-entitlement-path.mjs",
   "verify:implementation": "node --test tooling/ux/implementation-audit.test.mjs && node tooling/ux/verify-implementation-status.mjs"
   },
   "devDependencies": {
