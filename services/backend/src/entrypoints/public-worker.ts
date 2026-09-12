@@ -697,6 +697,11 @@ async function handleApi(
 				// Five a minute would only punish a seller catching up after a busy
 				// afternoon, which is the case this route exists to serve.
 				clientIp: null,
+				// No bot challenge either, for the same reason and by the same
+				// switch: clientIp === null is what marks this as the authenticated
+				// seller path. Putting a Turnstile in front of the account owner
+				// writing their own order aims the control at the wrong party.
+				turnstileToken: null,
 				logContext: "seller_order_create",
 			});
 			if (!result.ok) return result.response;
