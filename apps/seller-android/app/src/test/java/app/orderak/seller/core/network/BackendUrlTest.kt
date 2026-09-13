@@ -22,7 +22,6 @@ class BackendUrlTest {
         val expected = when (BuildConfig.DEPLOYMENT_ENVIRONMENT) {
             "staging" -> "https://api.staging.orderak.app"
             "production" -> "https://api.orderak.app"
-            "mock" -> "http://10.0.2.2:4010"
             else -> error("Unknown deployment environment")
         }
         assertEquals(expected, BuildConfig.API_BASE_URL)

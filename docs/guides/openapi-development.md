@@ -31,8 +31,9 @@ content-hashed theme CSS are intentionally outside these contracts.
 3. Add success, empty/pagination, validation, authentication, rate-limit, and
    retryable examples where applicable.
 4. Run `pnpm run openapi:check` from the repository root.
-5. Run `pnpm run mock:seller-v1`; Android Emulator uses
-   `http://10.0.2.2:4010` through the non-releasable `mockDebug` variant.
+5. Run `pnpm run mock:seller-v1` to exercise the contract against Prism. No
+   Android variant points at it; the `mockDebug` variant that did was removed
+   on 2026-09-13 (see `docs/guides/setup.md`, §3.5).
 6. Implement Android DTOs and Worker routes, then rerun Worker, Android, and
    route/spec coverage tests.
 7. Delete replaced pre-release routes; tests require `404`, not redirects.
@@ -51,7 +52,7 @@ From the repository root:
 pnpm install --frozen-lockfile
 pnpm run openapi:check
 pnpm run mock:seller-v1
-.\apps\seller-android\gradlew.bat -p apps/seller-android testMockDebugUnitTest verifySellerApiContract verifyAuthPhase1Contract
+.\apps\seller-android\gradlew.bat -p apps/seller-android testStagingDebugUnitTest verifySellerApiContract verifyAuthPhase1Contract
 pnpm --filter ./services/backend test -- --run
 ```
 

@@ -13,11 +13,11 @@ import javax.inject.Singleton
 /**
  * [CrashReporter] backed by Firebase Crashlytics.
  *
- * Collection is off in `debug` and in the `mock` flavour, set through the
- * `crashlyticsCollectionEnabled` manifest placeholder. The SDK still accepts
- * these calls there and discards them, so nothing needs a build-type branch —
- * the flavour decides whether anything is sent, and this class does not have to
- * know which flavour it is in.
+ * Collection is off in `debug`, set through the `crashlyticsCollectionEnabled`
+ * manifest placeholder. The SDK still accepts these calls there and discards
+ * them, so nothing needs a build-type branch — the variant decides whether
+ * anything is sent, and this class does not have to know which variant it is
+ * in.
  *
  * Every call is wrapped. A crash reporter that can itself crash the app is worse
  * than no crash reporter: this runs on the request path of every backend call,
