@@ -12891,14 +12891,16 @@
                   "name": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 80
+                    "maxLength": 80,
+                    "pattern": "^[^\\u0000-\\u001F]+$"
                   },
                   "description": {
                     "type": [
                       "string",
                       "null"
                     ],
-                    "maxLength": 500
+                    "maxLength": 500,
+                    "pattern": "^[^\\u0000-\\u001F]*$"
                   },
                   "price": {
                     "type": "object",
@@ -12930,7 +12932,8 @@
                       "string",
                       "null"
                     ],
-                    "maxLength": 500
+                    "maxLength": 500,
+                    "pattern": "^[^\\u0000-\\u001F]*$"
                   },
                   "category_code": {
                     "type": [
@@ -12968,7 +12971,8 @@
                       "null"
                     ],
                     "maxLength": 100,
-                    "description": "Caller-chosen retry key, unique per store. Repeating it returns the product already created."
+                    "description": "Caller-chosen retry key, unique per store. Repeating it returns the product already created.",
+                    "pattern": "^[^\\u0000-\\u001F]*$"
                   }
                 }
               },
@@ -17800,14 +17804,16 @@
                   "name": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 80
+                    "maxLength": 80,
+                    "pattern": "^[^\\u0000-\\u001F]+$"
                   },
                   "description": {
                     "type": [
                       "string",
                       "null"
                     ],
-                    "maxLength": 500
+                    "maxLength": 500,
+                    "pattern": "^[^\\u0000-\\u001F]*$"
                   },
                   "price": {
                     "type": "object",
@@ -17839,7 +17845,8 @@
                       "string",
                       "null"
                     ],
-                    "maxLength": 500
+                    "maxLength": 500,
+                    "pattern": "^[^\\u0000-\\u001F]*$"
                   },
                   "category_code": {
                     "type": [
