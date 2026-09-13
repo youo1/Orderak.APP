@@ -2,7 +2,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, setCsrfToken } from '../../shared/api/client';
-import type { AdminIdentity, AdminSessionResponse } from '../../../../../contracts/typescript/admin';
+import type { AdminIdentity, AdminSessionResponse } from '@orderak/contracts-typescript';
 
 export type AdminUser = AdminIdentity;
 

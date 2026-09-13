@@ -10,6 +10,9 @@ current seller client; iOS and desktop are reserved future clients.
 - `services/backend/`: Cloudflare Workers backend. Android should call this backend only.
 - `contracts/openapi/`: Platform-neutral Seller, Admin, and Integrations API contracts.
 - `contracts/typescript/`: Shared TypeScript types for server and web code.
+  Import them as the workspace package `@orderak/contracts-typescript`, never by
+  relative path — a path that leaves the package is invisible to Turborepo, so a
+  change here would not rebuild or retest whatever consumed it.
 - `design/`: Figma and Canva links plus exported design assets.
 - `docs/`: Product plan, API notes, setup steps, and architecture notes.
 - `quality/performance/`: Contract and API performance verification.

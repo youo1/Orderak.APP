@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ACTIVE_ADMIN_DOMAINS, ADMIN_SECTIONS } from "../../../contracts/typescript/admin";
+import { ACTIVE_ADMIN_DOMAINS, ADMIN_SECTIONS } from "@orderak/contracts-typescript";
 
 describe("canonical React admin coverage registry", () => {
 	it("declares every required control-plane domain with route and RBAC", () => {
