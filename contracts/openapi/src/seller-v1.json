@@ -12909,11 +12909,15 @@
                     "properties": {
                       "amount_minor": {
                         "type": "integer",
-                        "minimum": 0
+                        "minimum": 0,
+                        "maximum": 10000000000
                       },
                       "currency": {
                         "type": "string",
-                        "description": "Must be a currency this deployment accepts; never defaulted."
+                        "minLength": 3,
+                        "maxLength": 3,
+                        "pattern": "^[A-Z]{3}$",
+                        "description": "ISO-4217 alphabetic code. Must be a currency this deployment accepts; never defaulted."
                       }
                     }
                   },
@@ -12933,7 +12937,9 @@
                       "string",
                       "null"
                     ],
-                    "description": "Must name a category belonging to this store. An unknown code is refused, never silently cleared."
+                    "maxLength": 64,
+                    "pattern": "^c-[A-Za-z0-9]+$",
+                    "description": "Must name a category belonging to this store. An unknown or foreign code is refused, never silently cleared."
                   },
                   "discount_type": {
                     "type": [
@@ -12953,6 +12959,7 @@
                       "null"
                     ],
                     "minimum": 0,
+                    "maximum": 100000000,
                     "description": "Basis points when discount_type is PERCENTAGE (1000 = 10.00%, maximum 10000), minor units of the product's own currency when AMOUNT. Never a decimal: money is integer minor units (ADR-009)."
                   },
                   "client_request_id": {
@@ -17772,7 +17779,8 @@
             "description": "The product's immutable public code, as GET /api/v1/products returns it.",
             "schema": {
               "type": "string",
-              "minLength": 1,
+              "minLength": 3,
+              "maxLength": 64,
               "pattern": "^p-[A-Za-z0-9]+$"
             }
           }
@@ -17810,11 +17818,15 @@
                     "properties": {
                       "amount_minor": {
                         "type": "integer",
-                        "minimum": 0
+                        "minimum": 0,
+                        "maximum": 10000000000
                       },
                       "currency": {
                         "type": "string",
-                        "description": "Must be a currency this deployment accepts; never defaulted."
+                        "minLength": 3,
+                        "maxLength": 3,
+                        "pattern": "^[A-Z]{3}$",
+                        "description": "ISO-4217 alphabetic code. Must be a currency this deployment accepts; never defaulted."
                       }
                     }
                   },
@@ -17834,7 +17846,9 @@
                       "string",
                       "null"
                     ],
-                    "description": "Must name a category belonging to this store. An unknown code is refused, never silently cleared."
+                    "maxLength": 64,
+                    "pattern": "^c-[A-Za-z0-9]+$",
+                    "description": "Must name a category belonging to this store. An unknown or foreign code is refused, never silently cleared."
                   },
                   "discount_type": {
                     "type": [
@@ -17854,6 +17868,7 @@
                       "null"
                     ],
                     "minimum": 0,
+                    "maximum": 100000000,
                     "description": "Basis points when discount_type is PERCENTAGE (1000 = 10.00%, maximum 10000), minor units of the product's own currency when AMOUNT. Never a decimal: money is integer minor units (ADR-009)."
                   }
                 }
@@ -18153,7 +18168,8 @@
             "description": "The product's immutable public code, as GET /api/v1/products returns it.",
             "schema": {
               "type": "string",
-              "minLength": 1,
+              "minLength": 3,
+              "maxLength": 64,
               "pattern": "^p-[A-Za-z0-9]+$"
             }
           }
@@ -18407,7 +18423,8 @@
             "description": "The product's immutable public code, as GET /api/v1/products returns it.",
             "schema": {
               "type": "string",
-              "minLength": 1,
+              "minLength": 3,
+              "maxLength": 64,
               "pattern": "^p-[A-Za-z0-9]+$"
             }
           }
@@ -18426,11 +18443,13 @@
                 "properties": {
                   "stock": {
                     "type": "integer",
-                    "minimum": 0
+                    "minimum": 0,
+                    "maximum": 100000000
                   },
                   "expected_stock_version": {
                     "type": "integer",
                     "minimum": 0,
+                    "maximum": 9007199254740991,
                     "description": "The stock_version this edit was made against, from GET /api/v1/products."
                   }
                 }
@@ -18915,6 +18934,7 @@
               "null"
             ],
             "minimum": 0,
+            "maximum": 100000000,
             "description": "Basis points when discount_type is PERCENTAGE (1000 = 10.00%, maximum 10000), minor units of the product's own currency when AMOUNT. Never a decimal: money is integer minor units (ADR-009)."
           }
         },
