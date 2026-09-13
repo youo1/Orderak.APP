@@ -784,7 +784,17 @@ async function downloadExport(request: Request, env: AdminWorkerEnv, id: string,
 	const input = await body(request);
 	const row = await env.orderak_db.prepare("SELECT * FROM admin_exports WHERE id=? AND status='completed' AND expires_at>datetime('now')").bind(id).first<Record<string, unknown>>();
 	if (!row || (admin.role !== "owner" && Number(row.requested_by) !== admin.sub)) return jsonResponse({ error: "not_found" }, 404);
-	if (row.classification === "sensitive" && !(await consumeActionAuthorization(request, env, admin, "export.sensitive", String(row.export_type), "export-download"))) return jsonResponse({ error: "fresh_action_authorization_required" }, 403);
+	// Bound to this export, not to exports of this kind.
+	//
+	// The entity was `row.export_type`, so one authorization covered every
+	// completed export of that type for the five minutes it stayed live:
+	// stepping up to download one sensitive customer extract let the next one
+	// through as well. The request side (requestExport, below) has no id to bind
+	// to — the export does not exist until that call creates it — so it stays on
+	// the type, where the payload literal is what separates the two actions. By
+	// the time anything is downloadable there is an id, and that is what a
+	// person authorising a download believes they are authorising.
+	if (row.classification === "sensitive" && !(await consumeActionAuthorization(request, env, admin, "export.sensitive", id, "export-download"))) return jsonResponse({ error: "fresh_action_authorization_required" }, 403);
 	if (!env.orderak_audit || !row.r2_key) return jsonResponse({ error: "artifact_unavailable" }, 503);
 	const token = randomToken();
 	const pepper = env.ADMIN_EXPORT_SIGNING_KEY ?? env.ADMIN_SESSION_PEPPER;

@@ -113,17 +113,25 @@ describe("admin browser security contract", () => {
 		};
 	}
 
-	async function mintAuthorization(owner: Awaited<ReturnType<typeof enrolledOwner>>, headers: Record<string, string>, payloadHash: string) {
+	// entityId defaults to the export's id, which is what the download path binds
+	// to. The request path has no id to bind to yet — the export does not exist
+	// until that call creates it — and stays on the export type.
+	async function mintAuthorization(
+		owner: Awaited<ReturnType<typeof enrolledOwner>>,
+		headers: Record<string, string>,
+		payloadHash: string,
+		entityId = "sensitive",
+	) {
 		const minted = await call("/api/admin/v1/action-authorizations", {
 			method: "POST",
 			headers,
-			body: JSON.stringify({ action: "export.sensitive", entity_id: "audit", payload_hash: payloadHash, password: NEW_PASSWORD, totp_code: await totp(owner.secret) }),
+			body: JSON.stringify({ action: "export.sensitive", entity_id: entityId, payload_hash: payloadHash, password: NEW_PASSWORD, totp_code: await totp(owner.secret) }),
 		});
 		expect(minted.status).toBe(200);
 		return (await minted.json<{ authorization_id: string }>()).authorization_id;
 	}
 
-	it("binds a step-up authorization to the payload it was minted for", async () => {
+	it("binds a step-up authorization to the payload and the export it was minted for", async () => {
 		const { owner, headers } = await ownerWithSensitiveExport();
 
 		// Minted for REQUESTING an export. The console mints these two separately
@@ -131,7 +139,7 @@ describe("admin browser security contract", () => {
 		// ResourcePage.tsx sends "export-download" — but the server wrote
 		// payload_hash at mint time and never read it back, so either was
 		// spendable on the other.
-		const authorizationId = await mintAuthorization(owner, headers, "export-request");
+		const authorizationId = await mintAuthorization(owner, headers, "export-request", "audit");
 
 		const download = await call("/api/admin/v1/exports/sensitive/download", {
 			method: "POST",
@@ -139,6 +147,29 @@ describe("admin browser security contract", () => {
 			body: "{}",
 		});
 		expect(download.status).toBe(403);
+
+		// And bound to one export, not to every export of its type. The entity was
+		// `row.export_type`, so a single password-and-TOTP prompt covered every
+		// completed export of that kind for the five minutes it stayed live:
+		// stepping up to download one sensitive extract let the next one through.
+		await env.orderak_db.prepare(
+			"INSERT INTO admin_exports(id,export_type,classification,filters_json,status,row_count,byte_count,r2_key,expires_at,requested_by) VALUES('sensitive-2','audit','sensitive','{}','completed',1,16,'exports/sensitive.csv',datetime('now','+1 day'),1)",
+		).run();
+		const forOneExport = await mintAuthorization(owner, headers, "export-download", "sensitive");
+		const sibling = await call("/api/admin/v1/exports/sensitive-2/download", {
+			method: "POST",
+			headers: { ...headers, "x-admin-action-authorization": forOneExport },
+			body: "{}",
+		});
+		expect(sibling.status).toBe(403);
+
+		// It still spends on the export it was actually minted for.
+		const intended = await call("/api/admin/v1/exports/sensitive/download", {
+			method: "POST",
+			headers: { ...headers, "x-admin-action-authorization": forOneExport },
+			body: "{}",
+		});
+		expect(intended.status).toBe(200);
 	});
 
 	it("spends a step-up authorization exactly once, even concurrently", async () => {
@@ -166,7 +197,7 @@ describe("admin browser security contract", () => {
 		await env.orderak_db.prepare("INSERT INTO admin_exports(id,export_type,classification,filters_json,status,row_count,byte_count,r2_key,expires_at,requested_by) VALUES('sensitive','audit','sensitive','{}','completed',1,16,'exports/sensitive.csv',datetime('now','+1 day'),1)").run();
 		const headers = { cookie: owner.cookie, origin: BASE, "x-csrf-token": session.csrf_token, "content-type": "application/json" };
 		expect((await call("/api/admin/v1/exports/sensitive/download", { method: "POST", headers, body: "{}" })).status).toBe(403);
-		const authorization = await call("/api/admin/v1/action-authorizations", { method: "POST", headers, body: JSON.stringify({ action: "export.sensitive", entity_id: "audit", payload_hash: "export-download", password: NEW_PASSWORD, totp_code: await totp(owner.secret) }) });
+		const authorization = await call("/api/admin/v1/action-authorizations", { method: "POST", headers, body: JSON.stringify({ action: "export.sensitive", entity_id: "sensitive", payload_hash: "export-download", password: NEW_PASSWORD, totp_code: await totp(owner.secret) }) });
 		expect(authorization.status).toBe(200);
 		const { authorization_id } = await authorization.json<{ authorization_id: string }>();
 		const download = await call("/api/admin/v1/exports/sensitive/download", { method: "POST", headers: { ...headers, "x-admin-action-authorization": authorization_id }, body: "{}" });
