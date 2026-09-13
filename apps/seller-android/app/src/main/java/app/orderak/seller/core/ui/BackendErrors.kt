@@ -75,7 +75,12 @@ fun backendErrorResource(code: String?): Int = when {
 
     // ---- Everything else the seller can act on ----
     code == "slug_taken" -> R.string.error_slug_taken
-    code == "not_found" || code == "verification_not_found" -> R.string.error_not_found
+    // A category the seller picked no longer exists, or never belonged to this
+    // store. The product write refuses it rather than quietly filing the product
+    // under no category, so "not found" is the literal truth and the seller's
+    // next move — pick again — follows from it.
+    code == "not_found" || code == "verification_not_found" ||
+        code == "unknown_category_code" -> R.string.error_not_found
     code == "network" -> R.string.error_network
     code in REFERRAL -> R.string.error_referral
     code in INVALID_REQUEST -> R.string.error_invalid_request
@@ -159,7 +164,7 @@ val MAPPED_CODES: Set<String> =
         "orders_disabled", "buyer_restricted", "invalid_transition", "conflict",
         "bulk_deletion_unconfirmed", "ticket_closed", "primary_device_cannot_be_revoked",
         "phone_not_editable", "phone_already_used", "rate_limited", "slug_taken",
-        "not_found", "verification_not_found", "network",
+        "not_found", "verification_not_found", "unknown_category_code", "network",
     )
 
 /**
@@ -189,4 +194,23 @@ val INTENTIONALLY_GENERIC: Set<String> = setOf(
     // Ad serving degrades silently by design — an advert that cannot be shown
     // or tracked is not a failure the seller is told about.
     "ad_not_found", "ad_not_eligible",
+    // Product-write validation the app is supposed to make unreachable.
+    //
+    // The stock screen always sends the revision it read, so if the server ever
+    // answers one of these the app sent something it should not have — a bug to
+    // fix here, not a sentence to show a seller who did nothing wrong. A
+    // specific message would also be a lie about who can act on it.
+    //
+    // `name_required` is deliberately absent: it is already answered through
+    // INVALID_REQUEST, and a code may appear in exactly one of these two sets.
+    "stock_invalid", "expected_stock_version_required",
+    // Discounts have no way in yet: the editor round-trips whatever a product
+    // already carried and the controls that would set one have no caller. These
+    // three describe a discount the app cannot currently send, so there is no
+    // seller-facing sentence to write until the editor is wired up.
+    "discount_incomplete", "discount_type_unknown", "discount_value_invalid",
+    // Two creates raced for the same legacy app_id and the retry lost as well.
+    // Internal bookkeeping the seller neither caused nor can act on; retrying
+    // the save is the whole remedy, which the generic message already says.
+    "internal_conflict",
 )
