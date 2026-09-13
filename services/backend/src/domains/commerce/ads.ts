@@ -5,7 +5,7 @@
 // Impression/click tracking is optional (POST /api/v1/ads/track).
 // ============================================================
 
-import { jsonResponse, readCreds, authSeller, checkRateLimit, type AuthenticatedSeller } from "../../platform/http/shared";
+import { jsonResponse, readCreds, authSeller, checkRateLimit, type AuthenticatedSeller, clientIpOf } from "../../platform/http/shared";
 import { pickI18n, pickLocale } from "../../platform/localization/i18n";
 
 export async function handleAdsRoutes(
@@ -38,7 +38,7 @@ export async function handleAdsRoutes(
 async function resolvePlan(request: Request, env: Env, url: URL, authenticatedSeller?: AuthenticatedSeller | null): Promise<string | null> {
 	const { phone, secret } = readCreds(request, url);
 	if (phone && secret) {
-		const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret);
+		const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret, clientIpOf(request));
 		if (seller) {
 			const sub = (await env.orderak_db
 				.prepare(
@@ -114,7 +114,7 @@ async function trackAd(request: Request, env: Env, authenticatedSeller?: Authent
 	const { phone, secret } = readCreds(request, new URL(request.url));
 	const seller = authenticatedSeller !== undefined
 		? authenticatedSeller
-		: phone && secret ? await authSeller(env, phone, secret) : null;
+		: phone && secret ? await authSeller(env, phone, secret, clientIpOf(request)) : null;
 	if (!seller) return jsonResponse({ error: "unauthorized" }, 401);
 	const sellerId = String(seller.id);
 	const planId = await planForSeller(env, sellerId);

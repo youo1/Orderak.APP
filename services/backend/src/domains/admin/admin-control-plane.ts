@@ -386,7 +386,7 @@ async function updateAdministrator(request: Request, env: AdminWorkerEnv, id: nu
 	const role = input.role == null ? target.role : String(input.role);
 	const active = input.active == null ? target.active : bool(input.active);
 	if (!ALL_ROLES.includes(role as AdminRole)) return jsonResponse({ error: "invalid_role" }, 400);
-	if ((target.role === "owner" || role !== target.role || active === 0) && !(await consumeActionAuthorization(request, env, admin, "admin.access_change", String(id)))) return jsonResponse({ error: "fresh_action_authorization_required" }, 403);
+	if ((target.role === "owner" || role !== target.role || active === 0) && !(await consumeActionAuthorization(request, env, admin, "admin.access_change", String(id), `${String(input.role)}:${String(input.active)}`))) return jsonResponse({ error: "fresh_action_authorization_required" }, 403);
 	if (target.role === "owner" && active === 0) {
 		const owners = await env.orderak_db.prepare("SELECT COUNT(*) c FROM admin_users WHERE role='owner' AND active=1").first<{ c: number }>();
 		if ((owners?.c ?? 0) <= 1) return jsonResponse({ error: "last_owner_protected" }, 409);
@@ -505,14 +505,54 @@ async function authorizeAction(request: Request, env: AdminWorkerEnv, admin: Adm
 	return jsonResponse({ ok: true, authorization_id: id, expires_in_seconds: 300 });
 }
 
-export async function consumeActionAuthorization(request: Request, env: AdminWorkerEnv, admin: AdminClaims, action: string, entityId: string | null): Promise<boolean> {
+/**
+ * Spend a step-up authorization, or refuse.
+ *
+ * One statement, not two. This was a SELECT that checked `consumed_at IS NULL`
+ * followed by an UPDATE that set it: two concurrent requests both read an
+ * unconsumed row, both passed, and a single-use authorization was spent twice.
+ * The UPDATE was also unscoped by admin_id — the SELECT had checked it, so the
+ * two statements disagreed about what identified the row they were about. An
+ * `UPDATE ... RETURNING` carries every predicate and resolves the race in the
+ * database, which is the only place it can be resolved.
+ *
+ * `expectedPayload` is what finally makes payload_hash load-bearing. The column
+ * was written at mint time and never read, so an authorization was bound to an
+ * action and an entity and nothing else: the console minted separate
+ * authorizations for requesting an export and for downloading one, and either
+ * could be spent on the other. BillingVerificationsPage.tsx even carried a
+ * comment promising "the server checks the binding, so a stale authorization
+ * cannot be replayed against a different job" — describing a check that was
+ * never written. It is written now, and the caller states what it is spending
+ * the authorization on rather than being trusted to have meant it.
+ *
+ * The value must match what the client sent to /action-authorizations byte for
+ * byte, so it is taken from the same request body the client built it from
+ * rather than from a server-side re-derivation: `active` crosses the wire as a
+ * boolean and is a number by the time this file handles it, and
+ * `${role}:${active}` is a different string on each side of that conversion.
+ */
+export async function consumeActionAuthorization(
+	request: Request,
+	env: AdminWorkerEnv,
+	admin: AdminClaims,
+	action: string,
+	entityId: string | null,
+	expectedPayload: string | null,
+): Promise<boolean> {
 	const id = request.headers.get("x-admin-action-authorization") ?? "";
 	if (!id) return false;
-	const row = await env.orderak_db.prepare("SELECT id FROM admin_action_authorizations WHERE id=? AND admin_id=? AND action=? AND COALESCE(entity_id,'')=COALESCE(?,'') AND verified_at IS NOT NULL AND consumed_at IS NULL AND expires_at>datetime('now')")
-		.bind(id, admin.sub, action, entityId).first();
-	if (!row) return false;
-	await env.orderak_db.prepare("UPDATE admin_action_authorizations SET consumed_at=datetime('now') WHERE id=? AND consumed_at IS NULL").bind(id).run();
-	return true;
+	// Hashed the same way authorizeAction hashes it, including the "none"
+	// sentinel, so the two sides cannot disagree about what an absent payload is.
+	const payloadHash = await sha256Hex(expectedPayload ?? "none");
+	const row = await env.orderak_db.prepare(
+		`UPDATE admin_action_authorizations SET consumed_at=datetime('now')
+		  WHERE id=? AND admin_id=? AND action=? AND COALESCE(entity_id,'')=COALESCE(?,'')
+		    AND payload_hash=? AND verified_at IS NOT NULL AND consumed_at IS NULL
+		    AND expires_at>datetime('now')
+		  RETURNING id`,
+	).bind(id, admin.sub, action, entityId, payloadHash).first<{ id: string }>();
+	return Boolean(row);
 }
 
 async function supportMacros(env: AdminWorkerEnv): Promise<Response> {
@@ -578,7 +618,7 @@ async function createExport(request: Request, env: AdminWorkerEnv, admin: AdminC
 	const type = String(input.export_type ?? "");
 	const classification = String(input.classification ?? "internal");
 	if (!allowed(type, ["stores", "buyers", "subscriptions", "support", "audit"]) || !allowed(classification, ["internal", "sensitive"])) return jsonResponse({ error: "invalid_export" }, 400);
-	if (classification === "sensitive" && !(await consumeActionAuthorization(request, env, admin, "export.sensitive", type))) return jsonResponse({ error: "fresh_action_authorization_required" }, 403);
+	if (classification === "sensitive" && !(await consumeActionAuthorization(request, env, admin, "export.sensitive", type, "export-request"))) return jsonResponse({ error: "fresh_action_authorization_required" }, 403);
 	const id = crypto.randomUUID();
 	await env.orderak_db.prepare("INSERT INTO admin_exports(id,export_type,classification,filters_json,status,expires_at,requested_by) VALUES(?,?,?,?, 'queued',datetime('now','+24 hours'),?)")
 		.bind(id, type, classification, JSON.stringify(input.filters ?? {}), admin.sub).run();
@@ -744,7 +784,7 @@ async function downloadExport(request: Request, env: AdminWorkerEnv, id: string,
 	const input = await body(request);
 	const row = await env.orderak_db.prepare("SELECT * FROM admin_exports WHERE id=? AND status='completed' AND expires_at>datetime('now')").bind(id).first<Record<string, unknown>>();
 	if (!row || (admin.role !== "owner" && Number(row.requested_by) !== admin.sub)) return jsonResponse({ error: "not_found" }, 404);
-	if (row.classification === "sensitive" && !(await consumeActionAuthorization(request, env, admin, "export.sensitive", String(row.export_type)))) return jsonResponse({ error: "fresh_action_authorization_required" }, 403);
+	if (row.classification === "sensitive" && !(await consumeActionAuthorization(request, env, admin, "export.sensitive", String(row.export_type), "export-download"))) return jsonResponse({ error: "fresh_action_authorization_required" }, 403);
 	if (!env.orderak_audit || !row.r2_key) return jsonResponse({ error: "artifact_unavailable" }, 503);
 	const token = randomToken();
 	const pepper = env.ADMIN_EXPORT_SIGNING_KEY ?? env.ADMIN_SESSION_PEPPER;

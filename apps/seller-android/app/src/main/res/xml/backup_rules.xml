@@ -16,12 +16,21 @@
      list. The -wal and -shm sidecars are named too: excluding only the main
      database file leaves the write-ahead log, which contains the same rows.
 
+     Payment proofs and product photos: filesDir/images holds full-resolution
+     pictures a buyer sent to prove a transfer. Those are the buyer's, they are
+     the evidence for a disputed payment, and they were being copied to Google's
+     cloud backup in full. Unlike the database they are NOT recoverable from the
+     server, so this is a deliberate choice to lose them on restore rather than
+     to copy them: an image nobody can re-download is also an image nobody can
+     re-download onto a stranger's handset.
+
      The whole datastore directory rather than one file in it: every store in
      there is either re-fetched from the server on the next sync (entitlements)
      or a trivial local preference (theme, demo), so listing them individually
      only creates a way for the next one added to be missed. -->
 <full-backup-content>
     <exclude domain="file" path="datastore" />
+        <exclude domain="file" path="images" />
     <exclude domain="sharedpref" path="orderak_secure_secret.xml" />
     <exclude domain="database" path="orderak.db" />
     <exclude domain="database" path="orderak.db-wal" />

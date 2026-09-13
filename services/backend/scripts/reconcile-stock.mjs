@@ -34,20 +34,20 @@
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseEnvironment, databaseFor } from "./_wrangler-args.mjs";
 
 const backendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
 const remote = args.includes("--remote");
-const envIndex = args.indexOf("--env");
-const environment = envIndex >= 0 ? args[envIndex + 1] : null;
-
-const SAFE = /^[A-Za-z0-9_.-]+$/;
-if (environment !== null && !SAFE.test(environment)) {
-	console.error(`Refusing to pass ${JSON.stringify(environment)} to a shell.`);
+let environment;
+try {
+	environment = parseEnvironment(args);
+} catch (error) {
+	console.error(error.message);
 	process.exit(2);
 }
 
-const database = environment === "staging" ? "orderak-db-staging" : "orderak-db";
+const database = databaseFor(environment);
 
 /**
  * Quote one argument for the shell wrangler is invoked through.

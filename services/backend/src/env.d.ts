@@ -70,6 +70,17 @@ interface OrderakSecrets {
 	WEBAUTHN_WEB_ORIGIN?: string;
 	ANDROID_RELEASE_SHA256_CERT_FINGERPRINTS?: string;
 	FORWARD_TO?: string;
+	/**
+	 * Turnstile siteverify secret for storefront order creation.
+	 *
+	 * Optional, and deliberately NOT in either wrangler `secrets.required` list:
+	 * requiring it would fail every deploy until the widget exists, and the
+	 * feature is off by default precisely so it can land before the credential
+	 * does. verifyTurnstile() fails closed when TURNSTILE_ENABLED is "true" and
+	 * this is unset, so the unsafe combination refuses orders rather than
+	 * silently accepting them. Add it to `secrets.required` once the flag is on.
+	 */
+	TURNSTILE_SECRET?: string;
 }
 
 /**

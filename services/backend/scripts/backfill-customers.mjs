@@ -48,27 +48,64 @@
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseEnvironment, databaseFor, requireWriteTarget } from "./_wrangler-args.mjs";
 
 const backendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
 const remote = args.includes("--remote");
 const apply = args.includes("--apply");
-const envIndex = args.indexOf("--env");
-const environment = envIndex >= 0 ? args[envIndex + 1] : null;
-
-const SAFE = /^[A-Za-z0-9_.-]+$/;
-if (environment !== null && !SAFE.test(environment)) {
-	console.error(`Refusing to pass ${JSON.stringify(environment)} to a shell.`);
+let environment;
+try {
+	environment = parseEnvironment(args);
+	// Writing customer rows is the operation this script exists for, so the
+	// production target is the one worth being sure about.
+	requireWriteTarget(args, environment, apply);
+} catch (error) {
+	console.error(error.message);
 	process.exit(2);
 }
 
-const database = environment === "staging" ? "orderak-db-staging" : "orderak-db";
+const database = databaseFor(environment);
+
+/**
+ * Quote one argument for the shell wrangler is invoked through.
+ *
+ * Identical to reconcile-stock.mjs, deliberately: that script hit this exact
+ * problem, solved it, and wrote down why, and this one carried on passing raw
+ * SQL through cmd.exe for months afterwards.
+ *
+ * Windows needs `shell: true`, because npx is a .cmd and Node 20+ refuses to
+ * execFile one directly (EINVAL — the fix for CVE-2024-27980). With a shell in
+ * the way every argument is re-parsed by cmd.exe, and SQL is full of characters
+ * it treats as syntax: `<` and `>` redirect, `(` and `)` group, `&` separates
+ * commands.
+ *
+ * That mattered more here than in the sibling. The SQL this script builds embeds
+ * `orders.buyer_name` — text a buyer typed into a public storefront — so an
+ * unquoted `&` in a buyer's name ended the wrangler command and ran the rest of
+ * that name as a second command, on an operator's machine, with
+ * CLOUDFLARE_API_TOKEN in the environment and --remote write access. A quote or
+ * a space instead simply mangled the SQL, so the backfill applied in part and
+ * reported success. This is the only path in the repository where third-party
+ * input reached an interpreter.
+ *
+ * cmd.exe unescapes a doubled quote inside a quoted string, so that is the whole
+ * escape. On POSIX no shell is used and the argument passes through untouched.
+ */
+function shellArgument(value) {
+	if (process.platform !== "win32") return value;
+	return `"${String(value).replace(/"/g, '""')}"`;
+}
 
 function run(sql) {
 	const command = ["d1", "execute", database, "--json", remote ? "--remote" : "--local"];
 	if (environment) command.push("--env", environment);
-	command.push("--command", sql);
-	const output = execFileSync("npx", ["wrangler", ...command], {
+	// Collapsed to one line, for the same reason the sibling collapses it:
+	// cmd.exe cannot carry a newline inside a quoted argument — it ends the
+	// command there — and every query below is written multi-line for
+	// readability. SQL does not care about the whitespace; the shell does.
+	command.push("--command", sql.replace(/\s+/g, " ").trim());
+	const output = execFileSync("npx", ["wrangler", ...command].map(shellArgument), {
 		cwd: backendRoot,
 		encoding: "utf8",
 		stdio: ["ignore", "pipe", "inherit"],

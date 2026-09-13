@@ -6,8 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.widget.Toast
 import app.orderak.seller.R
-import app.orderak.seller.core.money.DEFAULT_CURRENCY
-import app.orderak.seller.core.money.formatAmount
+import app.orderak.seller.core.money.formatAmountLabel
 import app.orderak.seller.data.db.ProductEntity
 
 /**
@@ -21,9 +20,10 @@ fun shareCatalogText(context: Context, shopName: String?, sellerPhone: String?, 
         products.filter { it.available && it.stock > 0 }.forEach { p ->
             // Not a composable: the locale comes from the context the share text is
             // built in, which is the same one the rest of the screen is drawing with.
-            val priceStr = context.getString(
-                R.string.currency_egp,
-                formatAmount(p.priceMinor, p.currency, context.resources.configuration.locales[0]),
+            val priceStr = formatAmountLabel(
+                p.priceMinor,
+                p.currency,
+                context.resources.configuration.locales[0],
             )
 
             append("• ${p.name}")

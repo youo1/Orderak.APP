@@ -7,7 +7,6 @@
     <string name="common_cancel">Annuler</string>
     <string name="common_confirm">Confirmer</string>
     <string name="error_generic">Une erreur est survenue, réessayez</string>
-    <string name="currency_egp">%1$s EGP</string>
 
     <string name="auth_title">Prêt à vendre sur Orderak ?</string>
     <string name="auth_subtitle">Commençons dès maintenant.</string>

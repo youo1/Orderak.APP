@@ -172,6 +172,11 @@ val INTENTIONALLY_GENERIC: Set<String> = setOf(
     // Internal bookkeeping the seller never causes and cannot fix.
     "rtdn_persistence_failed", "play_verification_failed", "verification_superseded",
     "package_mismatch", "could_not_generate_referral_code",
+    // A store update that failed for a reason that is not the store name. It used
+    // to be answered as slug_taken, which sent the seller off to invent another
+    // name for a problem the name had nothing to do with; the honest answer is
+    // that something went wrong and the attempt can be repeated.
+    "store_update_failed",
     // Admin-surface only: never reachable from a seller credential.
     "invalid_content_config", "admin_key_required", "forbidden",
     // Machine-to-machine surfaces. The integrations API answers Google Play and

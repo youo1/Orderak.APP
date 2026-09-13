@@ -8,7 +8,6 @@
     <string name="common_cancel">إلغاء</string>
     <string name="common_confirm">تأكيد</string>
     <string name="error_generic">حدث خطأ، حاول مرة أخرى</string>
-    <string name="currency_egp">%1$s ج.م</string>
 
     <!-- S1 Auth -->
     <string name="auth_title">جاهز للبيع على أوردرك؟</string>

@@ -525,6 +525,31 @@ export async function legacySnapshot(env: Env, storeId: string): Promise<Entitle
  * map, so the client's behaviour depended on a server flag it could not see.
  */
 export async function resolveEntitlementsForClient(env: Env, storeId: string): Promise<EntitlementSnapshot> {
+	// PLAY_PROJECTION_PENDING — a Google Play purchase does not reach this answer.
+	//
+	// The Play verifier writes `organization_subscriptions`. legacySnapshot below
+	// reads `subscriptions JOIN plans`, which is a different table written by a
+	// different code path, so under ENTITLEMENTS_ENABLED=false a seller can pay
+	// Google, have the purchase verified and recorded, and still be told plan_key
+	// "free". No refund, no alert. entitlement-projection.spec.ts cannot see it:
+	// it compares the two engines' shapes without ever seeding a Play purchase and
+	// asking for the client snapshot.
+	//
+	// Nobody can reach it today — BILLING_ENABLED is "false" in both environments
+	// and a `billing_enabled` row in `settings` gates it again — and
+	// verify-billing-entitlement-path.mjs fails the build if either of those
+	// changes while this marker is still here.
+	//
+	// It is not fixed here because fixing it means deciding how two plan
+	// vocabularies line up, and they do not line up on their own: legacy `plans`
+	// holds free / starter / professional, v2 `subscription_plans` holds free /
+	// paid1 / paid2 / paid3 — three tiers against four, overlapping only on
+	// "free", at prices that are not the same numbers. Whether paid2 is
+	// "professional", or whether the legacy table should be retired instead, is a
+	// pricing decision; guessing it bills a seller for one tier and grants another.
+	//
+	// Delete this marker when the projection exists, and the guard will start
+	// requiring it.
 	if (env.ENTITLEMENTS_ENABLED === "true") return resolveEntitlements(env, storeId);
 	return legacySnapshot(env, storeId);
 }
@@ -613,11 +638,46 @@ export async function resolveEntitlements(env: Env, storeId: string): Promise<En
 	}
 }
 
-export async function getIntegerEntitlement(env: Env, storeId: string, key: string): Promise<number | null> {
+/**
+ * What an integer entitlement resolves to, which is three things and not two.
+ *
+ * `number | null` could say "this many" and "unlimited". It could not say "there
+ * is no enforceable number here", so that third case was being folded into the
+ * first as 0 — and 0 read as a ceiling refuses everything. A paid3 seller whose
+ * AI allowance is marked custom_required was told their plan "allows up to 0 ai
+ * requests per month".
+ *
+ * Migration 025 seeds 242 entitlement definitions of which 210 are `planned`, so
+ * the third case is the common one rather than the exotic one.
+ */
+export type IntegerEntitlement =
+	/** A real ceiling, from a configured value. */
+	| { kind: "limit"; value: number }
+	/** Configured, and deliberately without a ceiling. */
+	| { kind: "unlimited" }
+	/**
+	 * No enforceable number: the catalogue marks the entitlement `planned` (no
+	 * server code implements it) or `custom_required` (the value is negotiated
+	 * per customer and is not in the table).
+	 */
+	| { kind: "not_configured"; reason: "not_implemented" | "custom_required" }
+	/**
+	 * The key is not in the snapshot at all. Distinct from not_configured: that
+	 * is a declared state, this is a data error, and the two deserve different
+	 * answers.
+	 */
+	| { kind: "missing" };
+
+export async function getIntegerEntitlement(env: Env, storeId: string, key: string): Promise<IntegerEntitlement> {
 	const item = (await resolveEntitlements(env, storeId)).entitlements[key];
-	if (!item || item.implementation_status !== "implemented" || item.custom_required) return 0;
-	if (item.mode === "unlimited") return null;
-	return item.value_type === "integer" ? Number(item.value ?? 0) : 0;
+	if (!item) return { kind: "missing" };
+	if (item.custom_required) return { kind: "not_configured", reason: "custom_required" };
+	if (item.implementation_status !== "implemented") {
+		return { kind: "not_configured", reason: "not_implemented" };
+	}
+	if (item.mode === "unlimited") return { kind: "unlimited" };
+	if (item.value_type !== "integer") return { kind: "missing" };
+	return { kind: "limit", value: Number(item.value ?? 0) };
 }
 
 export async function isEntitlementEnabled(env: Env, storeId: string, key: string): Promise<boolean> {
@@ -826,13 +886,34 @@ export async function voidUsageReservation(env: Env, reservationId: string): Pro
 		 FROM entitlement_usage_reservations WHERE id=?`,
 	).bind(reservationId).first<{ organization_id: string; entitlement_key: string; period_start: string; delta: number; status: string }>();
 	if (!row || row.status !== "committed") return;
+
+	// Both statements are guarded on the reservation still being committed, and
+	// the read above only supplies the counter's address.
+	//
+	// It used to be read-then-act: this function checked status === "committed"
+	// and then decremented unconditionally. Two voids of one reservation could
+	// both pass that check and both subtract, so the seller's used count fell by
+	// twice the delta and they were handed quota they had not been given back.
+	// That is reachable without concurrency being exotic: the idempotent re-issue
+	// path hands the same committed reservation id to two callers, and
+	// public-worker voids on failure, so two failing requests sharing one
+	// idempotency key is the ordinary way in.
+	//
+	// The guards make the transition itself the interlock. In one transaction the
+	// EXISTS sees the pre-transaction status and the second statement flips it; a
+	// second transaction runs after that commit, finds 'voided', and both of its
+	// statements match nothing. The decrement cannot happen without the
+	// transition, and the transition can only happen once.
 	await env.orderak_db.batch([
 		env.orderak_db.prepare(
 			`UPDATE entitlement_usage_counters SET used=MAX(0,used-?),updated_at=datetime('now')
-			 WHERE organization_id=? AND entitlement_key=? AND period_start=?`,
-		).bind(row.delta, row.organization_id, row.entitlement_key, row.period_start),
+			 WHERE organization_id=? AND entitlement_key=? AND period_start=?
+			   AND EXISTS (SELECT 1 FROM entitlement_usage_reservations
+			                WHERE id=? AND status='committed')`,
+		).bind(row.delta, row.organization_id, row.entitlement_key, row.period_start, reservationId),
 		env.orderak_db.prepare(
-			"UPDATE entitlement_usage_reservations SET status='voided',updated_at=datetime('now') WHERE id=?",
+			`UPDATE entitlement_usage_reservations SET status='voided',updated_at=datetime('now')
+			  WHERE id=? AND status='committed'`,
 		).bind(reservationId),
 	]);
 }

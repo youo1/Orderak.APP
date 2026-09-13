@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { env, runInDurableObject } from "cloudflare:test";
-import { createSchema } from "./helpers";
+import { burstWithinOneWindow, createSchema } from "./helpers";
 import { checkRateLimit, rateLimiterStub } from "../src/platform/http/shared";
 
 /**
@@ -57,11 +57,14 @@ describe("rate limiter privacy and retention", () => {
 	});
 
 	it("still counts correctly with the digest-named object", async () => {
-		const bucket = "privacy:counting";
-		const results = await Promise.all(
-			Array.from({ length: 8 }, () => checkRateLimit(env, bucket, 3, 60)),
+		// Inside one calendar window; see burstWithinOneWindow for why that has to
+		// be arranged rather than assumed.
+		const { allowed, bucket } = await burstWithinOneWindow(
+			(b) => checkRateLimit(env, b, 3, 60),
+			async (b) => (await (await rateLimiterStub(env, b))!.peek())?.count,
+			{ bucket: "privacy:counting", calls: 8 },
 		);
-		expect(results.filter(Boolean)).toHaveLength(3);
+		expect(allowed).toBe(3);
 
 		const stub = await rateLimiterStub(env, bucket);
 		expect((await stub!.peek())?.count).toBe(8);

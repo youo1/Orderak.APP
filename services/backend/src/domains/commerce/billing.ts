@@ -6,16 +6,7 @@
 // ============================================================
 
 import { planComparison } from "./plans";
-import {
-	jsonResponse,
-	authSeller,
-	readCreds,
-	ensureReferralCode,
-	checkRateLimit,
-	audit,
-	applyDiscount,
-	type AuthenticatedSeller,
-} from "../../platform/http/shared";
+import { jsonResponse, authSeller, readCreds, ensureReferralCode, checkRateLimit, audit, applyDiscount, type AuthenticatedSeller, clientIpOf } from "../../platform/http/shared";
 import { getGateway, type CheckoutRequest, type CheckoutResult } from "./payments";
 import { runtimeControlEnabled } from "../../platform/config/runtime-config";
 
@@ -276,7 +267,7 @@ async function listPublicPlans(env: Env): Promise<Response> {
 async function subscribe(request: Request, env: Env, url: URL, authenticatedSeller?: AuthenticatedSeller | null): Promise<Response> {
 	const body = (await request.json().catch(() => ({}))) as Body;
 	const { phone, secret } = readCreds(request, url, body);
-	const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret);
+	const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret, clientIpOf(request));
 	if (!seller) return jsonResponse({ error: "auth" }, 401);
 
 	const planId = String(body.plan_id ?? "").trim();
@@ -473,24 +464,25 @@ async function createOrReplaceSubscription(
 		currentPeriodEnd: string | null;
 	},
 ): Promise<Record<string, unknown>> {
-	// Cancel previous active/pending subscriptions for this seller.
-	await env.orderak_db
-		.prepare(
+	// One batch, so the cancel and the insert are one transaction.
+	//
+	// These used to be two separate statements. A failure between them — and the
+	// insert is the one that can fail, now that a unique index guards it — left
+	// the seller's previous subscription cancelled and no new row written: a
+	// seller who had just paid, with nothing active. Two statements in one batch
+	// either both apply or neither does.
+	const statements = [
+		env.orderak_db.prepare(
 			`UPDATE subscriptions SET status = 'canceled', updated_at = datetime('now')
 			 WHERE seller_id = ? AND status IN ('active', 'pending', 'past_due')`,
-		)
-		.bind(s.sellerId)
-		.run();
-
-	const sub = await env.orderak_db
-		.prepare(
+		).bind(s.sellerId),
+		env.orderak_db.prepare(
 			`INSERT INTO subscriptions
 			   (seller_id, plan_id, status, gateway, gateway_sub_id, amount_minor,
 			    coupon_code, idempotency_key, current_period_end)
 			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 			 RETURNING *`,
-		)
-		.bind(
+		).bind(
 			s.sellerId,
 			s.planId,
 			s.status,
@@ -500,14 +492,49 @@ async function createOrReplaceSubscription(
 			s.couponCode,
 			s.idempotencyKey,
 			s.currentPeriodEnd,
-		)
-		.first();
-	return sub as Record<string, unknown>;
+		),
+	];
+
+	try {
+		const results = await env.orderak_db.batch<Record<string, unknown>>(statements);
+		const inserted = results[results.length - 1]?.results?.[0];
+		if (inserted) return inserted;
+	} catch (error) {
+		// The idempotent outcome, arriving as a constraint violation.
+		//
+		// subscribe() checks for an existing row by the same key before getting
+		// here, but that check is a read: two requests carrying one key can both
+		// pass it. Migration 056 makes the database the interlock, which means the
+		// loser of that race sees UNIQUE rather than a silent second row. The
+		// answer it wants is the winner's subscription — the same answer the
+		// pre-flight read would have given it a moment later.
+		if (!isUniqueViolation(error)) throw error;
+		const winner = await env.orderak_db.prepare(
+			"SELECT * FROM subscriptions WHERE seller_id = ? AND idempotency_key = ?",
+		).bind(s.sellerId, s.idempotencyKey).first<Record<string, unknown>>();
+		if (winner) return winner;
+		throw error;
+	}
+	throw new Error("subscription_insert_returned_no_row");
+}
+
+/**
+ * A UNIQUE constraint failure, as D1 reports it.
+ *
+ * Matched on the message because that is all D1 surfaces; narrowed to the index
+ * this function can actually collide on, so an unrelated constraint failure
+ * elsewhere in the batch is re-thrown rather than answered with somebody's
+ * subscription.
+ */
+function isUniqueViolation(error: unknown): boolean {
+	const message = error instanceof Error ? error.message : String(error);
+	return /UNIQUE constraint failed/i.test(message)
+		&& /subscriptions\.(seller_id|idempotency_key)|idx_subscriptions_seller_idempotency/i.test(message);
 }
 
 async function subscriptionStatus(request: Request, env: Env, url: URL, authenticatedSeller?: AuthenticatedSeller | null): Promise<Response> {
 	const { phone, secret } = readCreds(request, url);
-	const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret);
+	const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret, clientIpOf(request));
 	if (!seller) return jsonResponse({ error: "auth" }, 401);
 
 	let sub = (await env.orderak_db
@@ -549,7 +576,7 @@ async function subscriptionStatus(request: Request, env: Env, url: URL, authenti
 async function cancelSubscription(request: Request, env: Env, url: URL, authenticatedSeller?: AuthenticatedSeller | null): Promise<Response> {
 	const body = (await request.json().catch(() => ({}))) as Body;
 	const { phone, secret } = readCreds(request, url, body);
-	const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret);
+	const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret, clientIpOf(request));
 	if (!seller) return jsonResponse({ error: "auth" }, 401);
 
 	const sub = (await env.orderak_db
@@ -614,7 +641,7 @@ async function couponValidate(request: Request, env: Env, url: URL): Promise<Res
 async function couponApply(request: Request, env: Env, url: URL, authenticatedSeller?: AuthenticatedSeller | null): Promise<Response> {
 	const body = (await request.json().catch(() => ({}))) as Body;
 	const { phone, secret } = readCreds(request, url, body);
-	const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret);
+	const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret, clientIpOf(request));
 	if (!seller) return jsonResponse({ error: "auth" }, 401);
 
 	// Rate-limit: 5 apply attempts / minute per seller.
@@ -642,7 +669,7 @@ async function couponApply(request: Request, env: Env, url: URL, authenticatedSe
 async function referralApply(request: Request, env: Env, url: URL, authenticatedSeller?: AuthenticatedSeller | null): Promise<Response> {
 	const body = (await request.json().catch(() => ({}))) as Body;
 	const { phone, secret } = readCreds(request, url, body);
-	const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret);
+	const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret, clientIpOf(request));
 	if (!seller) return jsonResponse({ error: "auth" }, 401);
 
 	const code = String(body.code ?? "").trim().toUpperCase();
@@ -679,7 +706,7 @@ async function referralApply(request: Request, env: Env, url: URL, authenticated
 
 async function referralStats(request: Request, env: Env, url: URL, authenticatedSeller?: AuthenticatedSeller | null): Promise<Response> {
 	const { phone, secret } = readCreds(request, url);
-	const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret);
+	const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret, clientIpOf(request));
 	if (!seller) return jsonResponse({ error: "auth" }, 401);
 
 	const code = await ensureReferralCode(env, seller);
@@ -745,30 +772,35 @@ async function handleWebhook(request: Request, env: Env): Promise<Response> {
 	// Idempotency: gateways RETRY webhooks, so the same event can arrive more
 	// than once. If the provider gave us an event id, record it and skip any
 	// replay — this prevents double-crediting referrals / duplicate updates.
+	// The event id is recorded WITH the state change, not before it.
+	//
+	// This used to insert the id first and resolve the subscription afterwards.
+	// A webhook can legitimately arrive before the row it refers to exists —
+	// subscribe() calls the gateway and inserts the subscription afterwards, and
+	// an activation landing in that window found nothing. The handler returned
+	// "unknown_subscription" with the id already burned, so every retry the
+	// gateway made was answered `idempotent: true` and the activation was lost
+	// for good. A seller who had paid stayed unactivated, and the only trace was
+	// a 200.
+	//
+	// So: a read to reject an established replay, then resolve, then one batch
+	// that records the id and applies the status together. An event for a
+	// subscription that does not exist yet leaves no trace at all, which is what
+	// makes the gateway's next retry able to succeed.
 	if (event.eventId) {
-		try {
-			const res = await env.orderak_db
-				.prepare(
-					`INSERT OR IGNORE INTO webhook_events (event_id, gateway, type)
-					 VALUES (?, ?, ?)`,
-				)
-				.bind(event.eventId, gateway.name, event.type)
-				.run();
-			// D1 reports rows written; 0 means the id already existed → replay.
-			if (!res.meta?.changes) {
-				return jsonResponse({ ok: true, idempotent: true });
-			}
-		} catch (e) {
-			console.error("webhook dedupe insert failed:", e);
-			// Fail-safe: continue processing rather than dropping a real event.
-		}
+		const seen = await env.orderak_db
+			.prepare("SELECT 1 AS seen FROM webhook_events WHERE event_id = ? AND gateway = ?")
+			.bind(event.eventId, gateway.name)
+			.first<{ seen: number }>();
+		if (seen) return jsonResponse({ ok: true, idempotent: true });
 	}
 
 	const sub = (await env.orderak_db
-
 		.prepare("SELECT * FROM subscriptions WHERE gateway_sub_id = ? ORDER BY id DESC LIMIT 1")
 		.bind(event.gatewaySubId)
 		.first()) as Record<string, unknown> | null;
+	// Deliberately no dedupe row: see above. The gateway retries, and by then
+	// subscribe() will have committed the subscription this event is about.
 	if (!sub) return jsonResponse({ ok: true, ignored: "unknown_subscription" });
 
 	// Map webhook event types → subscription status.
@@ -778,10 +810,27 @@ async function handleWebhook(request: Request, env: Env): Promise<Response> {
 	else if (event.type === "invoice.paid" || event.type === "subscription.active" || event.status === "active")
 		newStatus = "active";
 
-	await env.orderak_db
-		.prepare("UPDATE subscriptions SET status = ?, updated_at = datetime('now') WHERE id = ?")
-		.bind(newStatus, sub.id)
-		.run();
+	const writes = [
+		env.orderak_db
+			.prepare("UPDATE subscriptions SET status = ?, updated_at = datetime('now') WHERE id = ?")
+			.bind(newStatus, sub.id),
+	];
+	if (event.eventId) {
+		writes.unshift(
+			env.orderak_db
+				.prepare("INSERT OR IGNORE INTO webhook_events (event_id, gateway, type) VALUES (?, ?, ?)")
+				.bind(event.eventId, gateway.name, event.type),
+		);
+	}
+	const applied = await env.orderak_db.batch(writes);
+
+	// Two deliveries of one event, in flight together: the read above cleared
+	// both, and this is where the loser finds out. The status update it just
+	// applied is the same one the winner applied, so the state is right either
+	// way — but qualifyReferral below is not idempotent, and must run once.
+	if (event.eventId && !applied[0]?.meta?.changes) {
+		return jsonResponse({ ok: true, idempotent: true });
+	}
 
 	// First successful paid payment → qualify referral.
 	if (newStatus === "active" && Number(sub.amount_minor) > 0) {

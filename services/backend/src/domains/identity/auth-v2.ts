@@ -34,15 +34,7 @@ import {
 import { validE164 } from "./phone";
 import { pickLocale } from "../../platform/localization/i18n";
 import { provisionDeviceSecret } from "./seller-session";
-import {
-	authSeller,
-	checkRateLimit,
-	constantTimeEqual,
-	hashSecret,
-	jsonResponse,
-	readCreds,
-	verifyStoredSecret,
-} from "../../platform/http/shared";
+import { authSeller, checkRateLimit, constantTimeEqual, hashSecret, jsonResponse, readCreds, verifyStoredSecret, clientIpOf } from "../../platform/http/shared";
 
 type Row = Record<string, unknown>;
 
@@ -944,7 +936,7 @@ async function requireSeller(
 	url = new URL(request.url),
 ): Promise<{ seller: Row; phone: string; secret: string } | Response> {
 	const { phone, secret } = readCreds(request, url);
-	const seller = await authSeller(env, phone, secret);
+	const seller = await authSeller(env, phone, secret, clientIpOf(request));
 	if (!seller) return jsonResponse({ error: "auth" }, 401);
 	if (String(seller.status ?? "active") !== "active") {
 		return jsonResponse({ error: "account_restricted", status: seller.status }, 403);

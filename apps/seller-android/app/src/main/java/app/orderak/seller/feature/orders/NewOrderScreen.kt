@@ -50,6 +50,7 @@ import app.orderak.seller.core.ui.NoticeBanner
 import app.orderak.seller.core.ui.SemanticRole
 import app.orderak.seller.core.money.DEFAULT_CURRENCY
 import app.orderak.seller.core.money.formatAmount
+import app.orderak.seller.core.money.formatAmountLabel
 import app.orderak.seller.domain.PayMethod
 
 /** S7 — convert a chat into a structured order in <30s (quick form + qty steppers). */
@@ -112,7 +113,7 @@ fun NewOrderScreen(
                                 ),
                             )
                             Text(
-                                stringResource(R.string.currency_egp, formatAmount(p.priceMinor, p.currency, locale)),
+                                formatAmountLabel(p.priceMinor, p.currency, locale),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.primary
                             )
@@ -174,7 +175,10 @@ fun NewOrderScreen(
                 Text(stringResource(R.string.order_total), style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    stringResource(R.string.currency_egp, formatAmount(viewModel.totalMinor(), DEFAULT_CURRENCY, locale)),
+                    // No total across currencies: see NewOrderViewModel.selectedCurrency.
+                    viewModel.selectedCurrency()
+                        ?.let { formatAmountLabel(viewModel.totalMinor(), it, locale) }
+                        ?: "—",
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.primary
                 )

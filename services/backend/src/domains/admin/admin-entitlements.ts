@@ -1,6 +1,6 @@
 import type { AdminClaims } from "../identity/auth";
 import { auditDb } from "./admin-auth";
-import { jsonResponse } from "../../platform/http/shared";
+import { jsonResponse, D1_IN_CHUNK } from "../../platform/http/shared";
 import { Hono } from "hono";
 import type { AdminEnv } from "./admin-context";
 
@@ -120,13 +120,25 @@ async function updateDraft(request: Request, env: AdminWorkerEnv, revisionId: st
 	if (!changes.length) return jsonResponse({ error: "entitlements_required" }, 400);
 	const uniqueKeys = [...new Set(changes.map((change) => String(change.entitlement_key ?? "")).filter((key) => key.length > 0))];
 	if (!uniqueKeys.length) return jsonResponse({ error: "entitlements_required" }, 400);
-	const placeholders = uniqueKeys.map(() => "?").join(",");
-	const { results: definitionRows } = await env.orderak_db.prepare(
-		`SELECT entitlement_key,value_type,supports_unlimited,admin_configurable,implementation_status
-		 FROM entitlement_definitions
-		 WHERE active=1 AND entitlement_key IN (${placeholders})`,
-	).bind(...uniqueKeys).all<Row>();
-	const definitionByKey = new Map((definitionRows ?? []).map((row) => [String(row.entitlement_key), row]));
+	// Chunked at 90, because D1 caps a statement at 100 bound parameters.
+	//
+	// This was one statement with one placeholder per key and no upper bound. A
+	// plan revision holds a full value set — migration 025 seeds 242 entitlement
+	// definitions — so saving a revision's complete set is not an edge case, it is
+	// the ordinary operation, and it exceeded the cap. D1 rejects the whole query
+	// as a driver error, which surfaces to an admin as a platform fault rather
+	// than as "too many rows". 90 is the same number api-store.ts:1316 chunks the
+	// identical pattern at, for the identical reason.
+	const definitionByKey = new Map<string, Row>();
+	for (let offset = 0; offset < uniqueKeys.length; offset += D1_IN_CHUNK) {
+		const chunk = uniqueKeys.slice(offset, offset + D1_IN_CHUNK);
+		const { results: definitionRows } = await env.orderak_db.prepare(
+			`SELECT entitlement_key,value_type,supports_unlimited,admin_configurable,implementation_status
+			 FROM entitlement_definitions
+			 WHERE active=1 AND entitlement_key IN (${chunk.map(() => "?").join(",")})`,
+		).bind(...chunk).all<Row>();
+		for (const row of definitionRows ?? []) definitionByKey.set(String(row.entitlement_key), row);
+	}
 	const prepared: Array<{ key: string; mode: string; bool: number | null; integer: number | null; text: unknown; display: string }> = [];
 	for (const change of changes) {
 		const key = String(change.entitlement_key ?? "");

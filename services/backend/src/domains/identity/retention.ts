@@ -57,9 +57,53 @@ const CLEANUP_RULES: CleanupRule[] = [
 	{ label: "inbound_emails:2y", statement: "DELETE FROM inbound_emails WHERE rowid IN (SELECT rowid FROM inbound_emails WHERE received_at < datetime('now','-2 years') LIMIT ?)" },
 	{ label: "webhook_events:90d", statement: "DELETE FROM webhook_events WHERE rowid IN (SELECT rowid FROM webhook_events WHERE processed_at < datetime('now','-90 days') LIMIT ?)" },
 	{ label: "email_events:90d", statement: "DELETE FROM email_events WHERE rowid IN (SELECT rowid FROM email_events WHERE created_at < datetime('now','-90 days') LIMIT ?)" },
+	// The raw verification token, which the outbox holds until the mail is sent.
+	//
+	// outbound_email_jobs.payload is the whole rendered job, and for an account
+	// verification that includes verify_url with the live token in it. Delivery
+	// clears it — payload=NULL on success — and nothing else ever did, so two
+	// kinds of row kept a working bearer token indefinitely: one that failed
+	// terminally, and one that never reached a terminal state at all. The 90-day
+	// rule below could not reach either, because it matches only sent and failed
+	// rows and ages them by updated_at.
+	//
+	// Seven days against a token that expires in twenty-four hours
+	// (EMAIL_TOKEN_HOURS). Anything this old is not going to be sent, and its
+	// token stopped working six days ago; what is worth keeping is the record that
+	// the mail was requested, which is the row, not the body.
+	{ label: "outbound_email_jobs:stranded7d", statement: "UPDATE outbound_email_jobs SET status='failed',last_error=COALESCE(last_error,'expired_before_dispatch'),payload=NULL,updated_at=datetime('now') WHERE rowid IN (SELECT rowid FROM outbound_email_jobs WHERE status NOT IN ('sent','failed') AND created_at < datetime('now','-7 days') LIMIT ?)" },
+	{ label: "outbound_email_jobs:failed_payload7d", statement: "UPDATE outbound_email_jobs SET payload=NULL,updated_at=updated_at WHERE rowid IN (SELECT rowid FROM outbound_email_jobs WHERE status='failed' AND payload IS NOT NULL AND updated_at < datetime('now','-7 days') LIMIT ?)" },
 	{ label: "outbound_email_jobs:90d", statement: "DELETE FROM outbound_email_jobs WHERE rowid IN (SELECT rowid FROM outbound_email_jobs WHERE status IN ('sent','failed') AND updated_at < datetime('now','-90 days') LIMIT ?)" },
 	{ label: "ad_impressions:90d", statement: "DELETE FROM ad_impressions WHERE rowid IN (SELECT rowid FROM ad_impressions WHERE created_at < datetime('now','-90 days') LIMIT ?)" },
 	{ label: "announcements:90d_post_expiry", statement: "DELETE FROM announcements WHERE rowid IN (SELECT rowid FROM announcements WHERE ends_at IS NOT NULL AND ends_at < datetime('now','-90 days') LIMIT ?)" },
+	// Phone-change challenges, which name two phone numbers each.
+	//
+	// Account deletion removes a seller's own; this is for the ones whose account
+	// is still live. The challenge is valid for ten minutes (CHALLENGE_TTL_SECONDS
+	// in phone-change.ts) and proves nothing afterwards, so a day is already
+	// generous — it existed indefinitely before.
+	{ label: "phone_change_challenges:1d", statement: "DELETE FROM phone_change_challenges WHERE rowid IN (SELECT rowid FROM phone_change_challenges WHERE expires_at < datetime('now','-1 day') LIMIT ?)" },
+	// Platform-wide buyer moderation records, the ones with no store_id.
+	//
+	// A store-scoped row goes with the store. A platform-wide restriction is not
+	// any one seller's to remove, so it ages out here instead: 2 years matches
+	// admin_audit, because that is what these are — a record of a moderation
+	// decision.
+	{ label: "buyer_restrictions:global2y", statement: "DELETE FROM buyer_restrictions WHERE rowid IN (SELECT rowid FROM buyer_restrictions WHERE store_id IS NULL AND created_at < datetime('now','-2 years') LIMIT ?)" },
+	{ label: "buyer_privacy_requests:global2y", statement: "DELETE FROM buyer_privacy_requests WHERE rowid IN (SELECT rowid FROM buyer_privacy_requests WHERE store_id IS NULL AND requested_at < datetime('now','-2 years') LIMIT ?)" },
+	// Administrator invitations, which hold an email address until accepted.
+	//
+	// An invitation that was accepted has done its work and the address is in
+	// admin_users; one that expired was never taken up. Either way the row is a
+	// standing copy of somebody's work email with no remaining purpose.
+	{ label: "admin_invitations:settled30d", statement: "DELETE FROM admin_invitations WHERE rowid IN (SELECT rowid FROM admin_invitations WHERE (accepted_at IS NOT NULL AND accepted_at < datetime('now','-30 days')) OR expires_at < datetime('now','-30 days') LIMIT ?)" },
+	// Play verification work that has finished, and the tokens it carried.
+	//
+	// A settled job holds an encrypted purchase token and a hash of it, and
+	// verification is the only thing either was for. Dead-lettered jobs are kept:
+	// they are the ones an operator still has to do something about.
+	{ label: "play_verification_jobs:settled90d", statement: "DELETE FROM play_verification_jobs WHERE rowid IN (SELECT rowid FROM play_verification_jobs WHERE status IN ('succeeded','failed') AND updated_at < datetime('now','-90 days') LIMIT ?)" },
+	{ label: "play_billing_events:settled90d", statement: "DELETE FROM play_billing_events WHERE rowid IN (SELECT rowid FROM play_billing_events WHERE status IN ('processed','ignored','failed') AND processed_at < datetime('now','-90 days') LIMIT ?)" },
 	{ label: "admin_audit:2y", statement: "DELETE FROM admin_audit WHERE rowid IN (SELECT rowid FROM admin_audit WHERE created_at < datetime('now','-2 years') LIMIT ?)" },
 ];
 

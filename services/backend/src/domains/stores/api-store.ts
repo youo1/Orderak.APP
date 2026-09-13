@@ -17,7 +17,7 @@
 // public_identifier and categories/products by their immutable codes.
 // ============================================================
 
-import { jsonResponse, methodNotAllowed, readCreds, authSeller, hashSecret, checkRateLimit, revokeSellerCredential, type AuthenticatedSeller } from "../../platform/http/shared";
+import { jsonResponse, methodNotAllowed, readCreds, authSeller, hashSecret, checkRateLimit, revokeSellerCredential, type AuthenticatedSeller, clientIpOf, logError } from "../../platform/http/shared";
 import { uploadMedia } from "../../platform/storage/media";
 import { verifyFirebaseToken } from "../../platform/auth/local-jwt";
 import { t, pickLocale } from "../../platform/localization/i18n";
@@ -278,7 +278,7 @@ export async function handleStoreRoutes(
 	if (!isStoreRoute) return null;
 
 	const { phone, secret } = readCreds(request, url);
-	const store = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret);
+	const store = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret, clientIpOf(request));
 	if (!store) return jsonResponse({ error: "auth" }, 401);
 	const tenantMutation = method !== "GET" && (
 		p === "/api/v1/store" || p === "/api/v1/categories" || p.startsWith("/api/v1/categories/")
@@ -394,7 +394,7 @@ async function handleRegister(request: Request, env: Env, url: URL): Promise<Res
 	let store = (await env.orderak_db.prepare("SELECT * FROM sellers WHERE phone = ?").bind(phone).first()) as Row | null;
 	if (store) {
 		// Existing store: only the owner (matching device secret) may update it.
-		if (!(await authSeller(env, phone, secret))) {
+		if (!(await authSeller(env, phone, secret, clientIpOf(request)))) {
 			return jsonResponse({ error: "auth" }, 401);
 		}
 
@@ -608,7 +608,20 @@ async function handleRegister(request: Request, env: Env, url: URL): Promise<Res
 				store.id,
 			)
 			.run();
-	} catch {
+	} catch (error) {
+		// Only a uniqueness collision is slug_taken.
+		//
+		// This caught everything and answered 409 "that slug is in use" to all of
+		// it, so a disk error, a constraint on another column or a malformed bind
+		// all told the seller to pick a different name — and nothing was logged,
+		// because the handler had already produced a tidy answer. The seller then
+		// picks a different name and gets the same 409, with no way to tell that
+		// the name was never the problem.
+		const message = String((error as { message?: string })?.message ?? error);
+		if (!/UNIQUE constraint failed/i.test(message)) {
+			await logError(env, "store_update_failed", error);
+			return jsonResponse({ error: "store_update_failed" }, 500);
+		}
 		return jsonResponse({ error: "slug_taken", message: t(lang, "slug.taken") }, 409);
 	}
 
@@ -1503,7 +1516,7 @@ async function restoreFirebaseSession(request: Request, env: Env): Promise<Respo
 
 	// Logging back into an already-authorized device is available on every plan.
 	// Only adding a genuinely new device is a paid feature.
-	if (await authSeller(env, verifiedPhone, deviceSecret)) {
+	if (await authSeller(env, verifiedPhone, deviceSecret, clientIpOf(request))) {
 		return jsonResponse({ ok: true, exists: true, store: fullStore(env, seller) });
 	}
 	const provisioned = await provisionDeviceSecret(env, seller, verifiedPhone, deviceSecret);
@@ -1513,7 +1526,7 @@ async function restoreFirebaseSession(request: Request, env: Env): Promise<Respo
 
 async function logoutSeller(request: Request, env: Env, url: URL): Promise<Response> {
 	const { phone, secret } = readCreds(request, url);
-	const seller = await authSeller(env, phone, secret);
+	const seller = await authSeller(env, phone, secret, clientIpOf(request));
 	if (!seller) return jsonResponse({ error: "auth" }, 401);
 	const revoked = await revokeSellerCredential(env, String(seller.id), secret);
 	// The credential this proof was issued against no longer exists, so neither
