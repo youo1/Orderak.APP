@@ -260,6 +260,49 @@ async function fulfillDeletion(env: Env, req: DeletionRequest): Promise<void> {
 		// not hashed at all. Store-scoped rows only: both tables allow a NULL
 		// store_id for a platform-wide restriction, which is not this seller's to
 		// remove and is aged out by retention instead.
+		//
+		// A count of what went, written before it goes.
+		//
+		// buyer_restrictions is a moderation record: it says this store barred
+		// this buyer. Erasing the store is the right call for the buyer's data —
+		// the restriction is about a person who never agreed to anything and it
+		// cannot outlive the store it belongs to — but a ban that disappears with
+		// no trace of the un-ban leaves no answer to "was this buyer ever barred
+		// here, and what happened to that?". The rows themselves are the personal
+		// data, so what survives is the shape of them and nothing else: two
+		// counts, the store id, and the request that caused it. No phone, no hash,
+		// no last4.
+		//
+		// Counted before the batch rather than inside it because this codebase
+		// keeps JSON assembly in TypeScript rather than in SQL; the row itself is
+		// pushed into the batch, so it commits with the deletes or not at all.
+		const moderation = await env.orderak_db
+			.prepare(
+				`SELECT
+				   (SELECT COUNT(*) FROM buyer_restrictions WHERE store_id = ?) AS restrictions,
+				   (SELECT COUNT(*) FROM buyer_privacy_requests WHERE store_id = ?) AS privacy_requests`,
+			)
+			.bind(sId, sId)
+			.first<{ restrictions: number; privacy_requests: number }>();
+		if ((moderation?.restrictions ?? 0) > 0 || (moderation?.privacy_requests ?? 0) > 0) {
+			stmts.push(
+				env.orderak_db
+					.prepare(
+						"INSERT INTO admin_audit(admin_id,action,entity,entity_id,details_json) VALUES(NULL,?,?,?,?)",
+					)
+					.bind(
+						"buyer_moderation.erased_with_store",
+						"store",
+						sId,
+						JSON.stringify({
+							deletion_request_id: req.id,
+							restrictions_removed: moderation?.restrictions ?? 0,
+							privacy_requests_removed: moderation?.privacy_requests ?? 0,
+							reason: "store erased under an account deletion request",
+						}),
+					),
+			);
+		}
 		stmts.push(env.orderak_db.prepare("DELETE FROM buyer_privacy_requests WHERE store_id = ?").bind(sId));
 		stmts.push(env.orderak_db.prepare("DELETE FROM buyer_restrictions WHERE store_id = ?").bind(sId));
 

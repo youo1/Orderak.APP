@@ -70,13 +70,31 @@ export async function acquireProviderPermit(env: Env, provider: ProviderName): P
 	throw new ProviderCircuitOpenError(provider, retryAfter);
 }
 
+/**
+ * Record a success against the permit that authorised the call.
+ *
+ * Scoped to the state the permit was issued under, which is what stops a
+ * success from closing a circuit that is not its to close. This UPDATE was
+ * `WHERE provider=?` alone: a permit is acquired before the call and spent
+ * after it, so an ordinary request that acquired its permit while the circuit
+ * was closed, then took long enough for five other calls to fail and open it,
+ * came back and set state='closed' — clearing opened_at, cooldown_until and
+ * the escalated cooldown_seconds in the same statement. The circuit reopened
+ * on the next failure with its backoff reset to 60s, and the provider outage
+ * it exists to absorb went on being hammered.
+ *
+ * A non-probe permit may therefore only reset a circuit still closed, and a
+ * probe may only close one still half_open — the state each was issued under.
+ * If the world moved on while the call was in flight, this writes nothing and
+ * the circuit keeps the state whoever moved it there intended.
+ */
 export async function recordProviderSuccess(env: Env, permit: ProviderPermit): Promise<void> {
 	const result = await env.orderak_db.prepare(
 		`UPDATE provider_circuit_state
 		 SET state='closed',failure_count=0,window_started_at=NULL,opened_at=NULL,cooldown_until=NULL,
 		     cooldown_seconds=60,probe_lease_until=NULL,updated_at=datetime('now')
-		 WHERE provider=?`,
-	).bind(permit.provider).run();
+		 WHERE provider=? AND state=?`,
+	).bind(permit.provider, permit.probe ? "half_open" : "closed").run();
 	if (permit.probe && (result.meta.changes ?? 0) === 1) {
 		console.info(JSON.stringify({ signal: "provider_circuit_closed", provider: permit.provider }));
 	}
