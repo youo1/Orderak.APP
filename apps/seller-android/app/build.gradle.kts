@@ -79,7 +79,7 @@ android {
         vectorDrawables.useSupportLibrary = true
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Crashlytics: enabled in production/staging release builds only.
-        // Overridden to "false" in debug build type and mock flavor below.
+        // Overridden to "false" in the debug build type below.
         manifestPlaceholders["crashlyticsCollectionEnabled"] = "true"
         // Performance Monitoring follows the same rule, and for a sharper
         // reason than noise: its TransportManager calls
@@ -111,18 +111,6 @@ android {
             buildConfigField("String", "DEMO_SELLER_PHONE", "\"\"")
             buildConfigField("String", "API_BASE_URL", "\"https://api.orderak.app\"")
             buildConfigField("String", "SITE_BASE_URL", "\"https://orderak.app\"")
-        }
-        create("mock") {
-            dimension = "environment"
-            // The release variant is disabled below. Keeping the registered base
-            // package lets the Firebase Gradle plugin process local mock builds.
-            versionNameSuffix = "-mock"
-            manifestPlaceholders["crashlyticsCollectionEnabled"] = "false"
-            manifestPlaceholders["performanceCollectionEnabled"] = "false"
-            buildConfigField("String", "DEPLOYMENT_ENVIRONMENT", "\"mock\"")
-            buildConfigField("String", "DEMO_SELLER_PHONE", "\"01066971791\"")
-            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:4010\"")
-            buildConfigField("String", "SITE_BASE_URL", "\"https://staging.orderak.app\"")
         }
     }
 
@@ -639,14 +627,6 @@ val verifyAuthPhase1Contract by tasks.registering {
     }
 }
 
-androidComponents {
-    beforeVariants { variant ->
-        if (variant.productFlavors.any { it.second == "mock" } && variant.buildType == "release") {
-            variant.enable = false
-        }
-    }
-}
-
 val verifySellerApiContract by tasks.registering {
     group = "verification"
     description = "Verifies Android seller API versioning and request context boundaries"
@@ -892,7 +872,13 @@ val verifyDemoDataContract by tasks.registering {
 
         val production = script
             .substringAfter("""create("production")""", "")
-            .substringBefore("""create("mock")""", "")
+            // production is the last flavour declared, so its block ends where
+            // productFlavors does. This used to slice to create("mock"); that
+            // anchor left with the mock flavour, and substringBefore's default
+            // would have returned "" — a guard passing by reading nothing.
+            // Passing "" here too keeps the isNotBlank check below as the thing
+            // that notices when an anchor stops matching.
+            .substringBefore("signingConfigs", "")
         check(production.isNotBlank()) { "Could not read the production flavour block." }
 
         val declaration = production.lineSequence()
@@ -965,9 +951,9 @@ tasks.named("preBuild") {
  *
  * Nothing about that failure points at Firebase from the outside - it reads as
  * an OS-compatibility problem - which is what earns it a build check. The
- * manifest now also keeps Performance Monitoring off in debug and mock builds,
- * so a placeholder config degrades instead of crashing; this task makes sure
- * nobody has to discover the degradation by hand.
+ * manifest now also keeps Performance Monitoring off in debug builds, so a
+ * placeholder config degrades instead of crashing; this task makes sure nobody
+ * has to discover the degradation by hand.
  *
  * CI builds with the placeholder deliberately, so CI is exempt.
  */

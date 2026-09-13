@@ -120,13 +120,18 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
-      # google-services.json is gitignored, so processMockDebugGoogleServices
-      # fails with "File google-services.json is missing" without this. The mock
-      # flavour declares no applicationIdSuffix, so it builds under the base
-      # package the shared placeholder already covers.
+      # google-services.json is gitignored, so processStagingDebugGoogleServices
+      # fails with "File google-services.json is missing" without this. The
+      # shared placeholder covers app.orderak.seller.staging.
       - name: Create CI Firebase configuration
         run: bash .github/scripts/write-ci-google-services.sh
-      - run: ./gradlew testMockDebugUnitTest verifySellerApiContract
+      # This ran under the mock flavour until that flavour was deleted. Neither
+      # task was ever flavour-specific: verifySellerApiContract greps src/main
+      # source text, and the only unit test that read BuildConfig was
+      # BackendUrlTest asserting mock's own API_BASE_URL constant. The job name
+      # is unchanged because it is a required status check on the protected
+      # branches; it started no Prism before this change either.
+      - run: ./gradlew testStagingDebugUnitTest verifySellerApiContract
         working-directory: apps/seller-android
 
   schemathesis-changed:

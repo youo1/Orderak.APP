@@ -21,7 +21,16 @@ for (const marker of forbiddenRepositoryMarkers) {
 
 const protectedTasks = [
 	["verifyLocalizationContract", "verifyAuthPhase1Contract"],
-	["verifyAuthPhase1Contract", "androidComponents"],
+	// This boundary was "androidComponents" while a beforeVariants block sat
+	// between the two tasks, disabling the mock flavour's release variant. The
+	// mock flavour was deleted on 2026-09-13 and that block went with it, so
+	// indexOf ran on to the *second* androidComponents block 350 lines later
+	// and read four unrelated tasks as this one's body — including the comment
+	// that documents this exact hazard, whose prose contains `return@doLast`.
+	// The guard failed loudly rather than silently, which is the right failure,
+	// but the anchor was always the odd one out: every other row names the next
+	// declaration, so this one does now too.
+	["verifyAuthPhase1Contract", "verifySellerApiContract"],
 	["verifySellerApiContract", "verifyDesignSystemContract"],
 	// verifyDesignSystemContract used to appear only as the boundary marker
 	// above, so its body was never scanned for bypass patterns and the

@@ -43,9 +43,10 @@
        commands above, confirm the chain still terminates at one of these roots,
        and move the date. See docs/runbooks/certificate-pinning.md.
 
-     The mock flavour is unaffected: app/src/mock/AndroidManifest.xml scopes
-     `usesCleartextTraffic="true"` to itself for the 10.0.2.2 emulator host, and
-     the domain-config below only covers orderak.app. -->
+     Cleartext is now permitted nowhere. The mock flavour used to re-enable it
+     for the 10.0.2.2 emulator host through its own manifest overlay; that
+     flavour is gone, so every variant reaches orderak.app over TLS and the
+     base-config below is the whole story. -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
