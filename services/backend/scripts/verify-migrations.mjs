@@ -23,6 +23,8 @@
 //      what makes a duplicate prefix tempting in the first place.
 //   4. A migration that removes or renames schema the running Worker may still
 //      be reading has to say that it knows it does. See ROLLOUT SAFETY below.
+//   5. A migration that creates a table with IF NOT EXISTS and then backfills
+//      it cannot be replayed without doubling the backfill. See REPLAY SAFETY.
 //
 // ROLLOUT SAFETY
 //   production-deploy.yml applies migrations and *then* deploys the Workers.
@@ -46,6 +48,32 @@
 //
 //   The marker does not make anything safe. It makes the question unskippable,
 //   and it puts the answer next to the SQL where the next person will find it.
+//
+// REPLAY SAFETY
+//   wrangler will not run an applied migration twice, so a replay is always a
+//   person: restoring a backup over a live database, repairing a divergence by
+//   hand, or pointing the runner at a database whose d1_migrations table does
+//   not match its schema. Those are the circumstances in which someone reaches
+//   for a migration file, and they are the worst possible circumstances in
+//   which to find out it is not idempotent.
+//
+//   `CREATE TABLE IF NOT EXISTS` followed by an unguarded `INSERT ... SELECT`
+//   is the combination that fails quietly. The CREATE finds the table already
+//   there and does nothing; the backfill reads rows that are still there and
+//   inserts a second copy of every one. Nothing errors. 052_stock_movements.sql
+//   does exactly this, three times, into a ledger — so replaying it to repair a
+//   stock divergence would deepen the divergence it was run to fix, and the
+//   OPENING_BALANCE remainder it computes last would paper over the result by
+//   writing a correcting row.
+//
+//   An unconditional `CREATE TABLE` does not need the guard: a replay either
+//   fails loudly on the CREATE or is rebuilding a scratch table it made in the
+//   same file. That is why the table-rebuild migrations do not trip this.
+//
+//   The fix in a new migration is a guard on the backfill — `WHERE NOT EXISTS
+//   (SELECT 1 FROM target ...)`, `ON CONFLICT DO NOTHING`, or `INSERT OR
+//   IGNORE` — chosen so that running the file twice leaves the same rows as
+//   running it once.
 // ============================================================
 
 import fs from "node:fs";
@@ -141,6 +169,63 @@ for (const name of files) {
 		"    Add a line explaining why that is safe here:\n" +
 		"      -- rollout: expand-contract  <reason>",
 	);
+}
+
+/**
+ * A backfill that cannot run twice, in a file that can be run twice.
+ *
+ * Matched narrowly on purpose: an `INSERT ... SELECT` (a backfill derived from
+ * rows already in the database, not a seed of literal VALUES) into a table the
+ * same migration created with `IF NOT EXISTS`, with no guard on the insert.
+ * Across the whole migration history this matches one file, which is the file
+ * that has the defect. A rule that also flagged the ten table-rebuild
+ * migrations would be muted within a week.
+ */
+const BACKFILL_INSERT = /INSERT\s+(?:OR\s+\w+\s+)?INTO\s+([A-Za-z_][A-Za-z0-9_]*)(.*?);/gis;
+const SOFT_CREATE = /CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+([A-Za-z_][A-Za-z0-9_]*)/gi;
+const HARD_CREATE = /CREATE\s+(?:VIRTUAL\s+)?TABLE\s+(?!IF\s+NOT\s+EXISTS)([A-Za-z_][A-Za-z0-9_]*)/gi;
+const INSERT_GUARD = /NOT\s+EXISTS|ON\s+CONFLICT|INSERT\s+OR\s+(?:IGNORE|REPLACE)/i;
+
+/**
+ * Migrations that predate this check and are already applied everywhere.
+ *
+ * 052 creates stock_movements with IF NOT EXISTS and backfills it three times
+ * without a guard. It is not exempt because that is acceptable — it is exempt
+ * because the file is applied history and migrations.lock exists to keep
+ * applied history from being edited. Rewriting it would change a file every
+ * environment has already run, to fix a hazard that only exists for a manual
+ * replay; the honest place for the guard is the next migration that touches
+ * this ledger, and the honest place for the warning is here.
+ */
+const ACCEPTED_UNGUARDED_BACKFILL = new Set(["052_stock_movements.sql"]);
+
+for (const name of files) {
+	if (ACCEPTED_UNGUARDED_BACKFILL.has(name)) continue;
+	const source = fs.readFileSync(path.join(migrationsDir, name), "utf8");
+	const statements = source
+		.split("\n")
+		.filter((line) => !/^\s*--/.test(line))
+		.join("\n");
+	const softCreated = new Set([...statements.matchAll(SOFT_CREATE)].map((m) => m[1].toLowerCase()));
+	const hardCreated = new Set([...statements.matchAll(HARD_CREATE)].map((m) => m[1].toLowerCase()));
+	const flagged = new Set();
+	for (const match of statements.matchAll(BACKFILL_INSERT)) {
+		const target = match[1].toLowerCase();
+		if (!/\bSELECT\b/i.test(match[0])) continue;
+		if (INSERT_GUARD.test(match[0])) continue;
+		if (hardCreated.has(target) || !softCreated.has(target)) continue;
+		flagged.add(match[1]);
+	}
+	for (const target of flagged) {
+		fail(
+			`"${name}" creates ${target} with IF NOT EXISTS and then backfills it unguarded.\n` +
+			"    Running the file a second time — restoring over a live database, or repairing\n" +
+			"    a divergence by hand — finds the table already there, skips the CREATE, and\n" +
+			"    inserts a second copy of every backfilled row without erroring.\n" +
+			"    Guard the INSERT so a replay is a no-op:\n" +
+			`      ... WHERE NOT EXISTS (SELECT 1 FROM ${target} ...)   -- or ON CONFLICT DO NOTHING`,
+		);
+	}
 }
 
 /* ---------------------------------------------------------------------------

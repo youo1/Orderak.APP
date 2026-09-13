@@ -74,6 +74,30 @@ function PreviewFrame({ snapshot }: { snapshot: Snapshot | null }) {
     const payload = { type: 'orderak-theme-preview', schemaVersion: 2, snapshot };
     if (new Blob([JSON.stringify(payload)]).size <= 128 * 1024) ref.current.contentWindow.postMessage(payload, window.location.origin);
   }, [ready, snapshot]);
+  // sandbox="allow-scripts allow-same-origin", and the second flag has to stay.
+  //
+  // The pairing is normally a warning sign: a framed document that is both
+  // scriptable and same-origin with its parent can reach through window.parent
+  // into the console's DOM and storage, and can remove this attribute from its
+  // own frame. Dropping allow-same-origin was tried and does not work — it gives
+  // the document an opaque origin, and `script-src 'self'` in theme-preview.html
+  // then matches nothing, so the preview bundle is blocked and the frame renders
+  // blank. Measured, not assumed: framed with allow-scripts alone the readiness
+  // ping never arrives; with the flag, or unsandboxed, it does. 'self' is an
+  // origin, and an opaque origin is not one.
+  //
+  // What actually contains this frame is that same CSP, which is strict enough
+  // that the flag has nothing to act on. `default-src 'none'; script-src 'self'`
+  // with no 'unsafe-inline' means an injected inline handler does not fire, an
+  // injected <script> tag does not run, and an off-origin script does not load —
+  // all three verified against this document's policy. Script execution is the
+  // precondition for everything allow-same-origin would grant, and the policy
+  // denies it. preview.ts escapes snapshot values into markup as well, so the
+  // one value that reaches HTML is neutralised before the policy is asked.
+  //
+  // The change that would let the flag go is serving the preview from its own
+  // origin, where the sandbox and the CSP stop contradicting each other. That is
+  // a DNS and routing change, not an attribute.
   return <iframe ref={ref} title="Isolated design system preview" className="theme-preview-frame" src="/theme-preview?schema=2" sandbox="allow-scripts allow-same-origin" />;
 }
 

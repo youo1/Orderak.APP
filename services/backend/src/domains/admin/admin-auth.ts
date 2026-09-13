@@ -21,7 +21,7 @@ import {
 	type AdminClaims,
 	type AdminRole,
 } from "../identity/auth";
-import type { AdminSessionResponse } from "../../../../../contracts/typescript/admin";
+import type { AdminSessionResponse } from "@orderak/contracts-typescript";
 
 const MIN_PASSWORD_LEN = 12;
 const IDLE_SECONDS = 15 * 60;

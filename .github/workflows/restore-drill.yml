@@ -118,7 +118,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
         working-directory: services/backend
 
-      - name: Download encrypted backup and checksum from R2
+      - name: Download encrypted backup, checksum and manifest from R2
         working-directory: services/backend
         run: |
           set -euo pipefail
@@ -126,6 +126,14 @@ jobs:
             --file="/tmp/${DB}.sql.age" --remote
           npx wrangler r2 object get "orderak-backups/d1/${DB}/${TS}.sql.age.sha256" \
             --file="/tmp/${DB}.sql.age.sha256" --remote
+          # The manifest written by the backup job for *this* object, not the
+          # mutable pointer under pointers/. d1-backup.yml uploads all three
+          # under the same timestamp, so this is the row count the database had
+          # at the moment these bytes were produced. It is what turns the drill
+          # from "something restored" into "everything restored".
+          npx wrangler r2 object get "orderak-backups/d1/${DB}/${TS}.manifest.json" \
+            --file="/tmp/${DB}.expected-manifest.json" --remote
+          [ -s "/tmp/${DB}.expected-manifest.json" ] || { echo "ERROR: the manifest for ${TS} is empty."; exit 1; }
 
       - name: Verify the stored checksum before decrypting anything
         run: |
@@ -148,8 +156,24 @@ jobs:
         working-directory: services/backend
         run: |
           set -euo pipefail
+          # --compare-exact, against this object's own manifest.
+          #
+          # This step ran `--min-tables 1` and nothing else, which passed for any
+          # export that restored a single table. It proved the ciphertext
+          # decrypts and replays — not that what came back is what went in. An
+          # object truncated in transit, or partially overwritten, restores
+          # cleanly with fewer rows and passed this drill.
+          #
+          # Nothing legitimate changes between an export and a replay of that
+          # same export, so this is an equality check: every table the manifest
+          # records must come back at exactly its recorded count. Retention
+          # earns no exemption here — it prunes the live database over time, and
+          # no time passes inside an immutable object. --min-tables is left off
+          # because the manifest supplies a real floor; the verifier raises it to
+          # the number of tables the manifest carries.
           node scripts/verify-d1-restore.mjs "/tmp/${DB}.sql" \
-            --manifest "/tmp/${DB}.drill-manifest.json" --min-tables 1
+            --manifest "/tmp/${DB}.drill-manifest.json" \
+            --compare "/tmp/${DB}.expected-manifest.json" --compare-exact
 
       - name: Wipe decrypted and encrypted material from the runner
         if: always()

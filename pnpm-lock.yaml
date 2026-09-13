@@ -24,6 +24,9 @@ importers:
       '@material/material-color-utilities':
         specifier: 0.3.0
         version: 0.3.0
+      '@orderak/contracts-typescript':
+        specifier: workspace:*
+        version: link:../../contracts/typescript
       '@radix-ui/react-dialog':
         specifier: 1.1.23
         version: 1.1.23(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -125,6 +128,8 @@ importers:
         specifier: ^6.16.3
         version: 6.16.3
 
+  contracts/typescript: {}
+
   services/backend:
     dependencies:
       '@hono/zod-openapi':
@@ -133,6 +138,9 @@ importers:
       '@material/material-color-utilities':
         specifier: 0.3.0
         version: 0.3.0
+      '@orderak/contracts-typescript':
+        specifier: workspace:*
+        version: link:../../contracts/typescript
       '@sentry/cloudflare':
         specifier: ^10.71.0
         version: 10.71.0(supports-color@10.2.2)(wrangler@4.131.0(@types/node@24.13.3))

@@ -12,8 +12,19 @@
 //
 //   --manifest <path>   Write a JSON manifest of table row counts.
 //   --compare <path>    Compare against a previous manifest and fail on any
-//                       table that lost rows or disappeared.
+//                       table that lost rows or disappeared. A retention-pruned
+//                       table may shrink, but only within --max-prune-drop.
+//   --compare-exact     Every table in the compared manifest must restore to
+//                       exactly the count it records. For drilling an object
+//                       against its own manifest, where any difference is
+//                       corruption rather than the passage of time.
 //   --min-tables <n>    Fail if fewer than n tables are restored (default 1).
+//                       With --compare the floor is raised to the number of
+//                       tables the manifest carries, so it is derived from what
+//                       the database actually had rather than guessed.
+//   --max-prune-drop <f>  Largest fraction of its rows a retention-pruned table
+//                       may lose between two backups before that is treated as
+//                       loss rather than pruning (default 0.25).
 //
 // Exit code 0 means the export restored cleanly; non-zero means the backup is
 // not recoverable and the run should fail loudly.
@@ -60,16 +71,34 @@ function prunedTables() {
 
 function parseArgs(argv) {
 	const [file, ...rest] = argv;
-	const options = { file, manifest: null, compare: null, minTables: 1 };
-	for (let i = 0; i < rest.length; i += 2) {
+	const options = { file, manifest: null, compare: null, minTables: 1, compareExact: false, maxPruneDrop: 0.25 };
+	// `--compare-exact` is a flag, so the pair-wise walk below cannot be assumed:
+	// consuming a value for it would swallow the next option's name.
+	for (let i = 0; i < rest.length; ) {
+		const flag = rest[i];
+		if (flag === "--compare-exact") {
+			options.compareExact = true;
+			i += 1;
+			continue;
+		}
 		const value = rest[i + 1];
-		if (rest[i] === "--manifest") options.manifest = value;
-		else if (rest[i] === "--compare") options.compare = value;
-		else if (rest[i] === "--min-tables") options.minTables = Number(value);
+		if (flag === "--manifest") options.manifest = value;
+		else if (flag === "--compare") options.compare = value;
+		else if (flag === "--min-tables") options.minTables = Number(value);
+		else if (flag === "--max-prune-drop") options.maxPruneDrop = Number(value);
 		else {
-			console.error(`Unknown option: ${rest[i]}`);
+			console.error(`Unknown option: ${flag}`);
 			process.exit(2);
 		}
+		i += 2;
+	}
+	if (!Number.isFinite(options.maxPruneDrop) || options.maxPruneDrop < 0 || options.maxPruneDrop > 1) {
+		console.error(`--max-prune-drop must be a fraction between 0 and 1, got ${options.maxPruneDrop}.`);
+		process.exit(2);
+	}
+	if (options.compareExact && !options.compare) {
+		console.error("--compare-exact requires --compare.");
+		process.exit(2);
 	}
 	return options;
 }
@@ -112,8 +141,22 @@ try {
 		.all()
 		.map((row) => row.name);
 
-	if (tables.length < options.minTables) {
-		console.error(`FAIL: restored ${tables.length} tables, expected at least ${options.minTables}.`);
+	// The table floor, derived rather than asserted.
+	//
+	// `--min-tables 1` is a check that a restore produced *a* table, which every
+	// non-empty export passes. The number of tables the database actually had is
+	// recorded in the manifest this backup — or the previous one — already wrote,
+	// so when one is supplied the floor comes from there. A restore missing
+	// entire tables then fails on the count before the per-table comparison has
+	// to notice each one.
+	const previous = options.compare ? JSON.parse(readFileSync(options.compare, "utf8")) : null;
+	const manifestTableCount = Object.keys(previous?.tables ?? {}).length;
+	const tableFloor = Math.max(options.minTables, manifestTableCount);
+	if (tables.length < tableFloor) {
+		console.error(
+			`FAIL: restored ${tables.length} tables, expected at least ${tableFloor}` +
+				(manifestTableCount > options.minTables ? ` (from ${options.compare}, which records ${manifestTableCount}).` : "."),
+		);
 		process.exit(1);
 	}
 
@@ -158,8 +201,7 @@ try {
 		console.log(`Manifest written: ${options.manifest}`);
 	}
 
-	if (options.compare) {
-		const previous = JSON.parse(readFileSync(options.compare, "utf8"));
+	if (previous) {
 		const pruned = prunedTables();
 		for (const [table, before] of Object.entries(previous.tables ?? {})) {
 			const now = counts[table];
@@ -168,16 +210,55 @@ try {
 				// deletes rows, never the table.
 				console.error(`FAIL: table "${table}" was in the previous backup and is missing now.`);
 				failed = true;
+			} else if (options.compareExact) {
+				// Same bytes, same counts. Nothing legitimate moves between an
+				// export and a drill of that same export, so pruning earns no
+				// exemption here and a gain is as wrong as a loss.
+				if (now !== before) {
+					console.error(`FAIL: table "${table}" restored ${now} rows, the manifest for this object records ${before}.`);
+					failed = true;
+				}
 			} else if (now < before) {
-				if (pruned.has(table)) {
-					console.log(`  note: "${table}" ${before} -> ${now}; retention prunes this table, so a decrease is expected.`);
-				} else {
+				// A pruned table is allowed to shrink, but not without limit.
+				//
+				// The exemption used to be unbounded: any table retention.ts names
+				// could go to zero and the drill still passed, printing a note that
+				// said the decrease was expected. admin_audit is on that list — it
+				// is pruned at two years — so a statement that emptied the audit log
+				// this morning was indistinguishable from retention doing its job,
+				// and the one check that would have caught it said so out loud and
+				// exited 0.
+				//
+				// Retention removes rows that have aged past a boundary, which for a
+				// table with any spread of ages is a slice, not the body. A drop past
+				// this fraction between two consecutive backups is not that shape,
+				// and is worth a human deciding rather than a note.
+				const dropped = before - now;
+				const fraction = before === 0 ? 0 : dropped / before;
+				if (!pruned.has(table)) {
 					console.error(`FAIL: table "${table}" lost rows: ${before} -> ${now}.`);
 					failed = true;
+				} else if (fraction > options.maxPruneDrop) {
+					console.error(
+						`FAIL: table "${table}" lost ${dropped} of ${before} rows (${(fraction * 100).toFixed(1)}%) — ` +
+							`retention prunes it, but not past ${(options.maxPruneDrop * 100).toFixed(0)}%. ` +
+							`Confirm this was retention before re-running with a higher --max-prune-drop.`,
+					);
+					failed = true;
+				} else {
+					console.log(
+						`  note: "${table}" ${before} -> ${now} (${(fraction * 100).toFixed(1)}%); retention prunes this table, so a decrease of this size is expected.`,
+					);
 				}
 			}
 		}
-		if (!failed) console.log(`Compared against ${options.compare}: no durable table lost rows.`);
+		if (!failed) {
+			console.log(
+				options.compareExact
+					? `Compared against ${options.compare}: every table restored to the exact count this object recorded.`
+					: `Compared against ${options.compare}: no durable table lost rows, and no pruned table lost more than ${(options.maxPruneDrop * 100).toFixed(0)}%.`,
+			);
+		}
 	}
 } finally {
 	db?.close();

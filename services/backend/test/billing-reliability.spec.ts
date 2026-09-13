@@ -41,6 +41,50 @@ describe("billing reliability controls", () => {
 		expect(row).toMatchObject({ state: "closed", failure_count: 0 });
 	});
 
+	it("does not let a success from before the circuit opened close it mid-cooldown", async () => {
+		// The permit an ordinary call holds is acquired before the request and
+		// spent after it. This one is acquired while the circuit is closed, and
+		// by the time it comes back five other calls have failed and opened it.
+		const inFlight = await acquireProviderPermit(env, "google_play");
+		expect(inFlight.probe).toBe(false);
+
+		for (let index = 0; index < 5; index += 1) {
+			const permit = await acquireProviderPermit(env, "google_play");
+			await recordProviderFailure(env, permit);
+		}
+		const opened = await env.orderak_db.prepare(
+			"SELECT state,cooldown_until FROM provider_circuit_state WHERE provider='google_play'",
+		).first<{ state: string; cooldown_until: number | null }>();
+		expect(opened?.state).toBe("open");
+
+		// The slow call succeeds. It must not reset a circuit it knows nothing
+		// about — the provider is down, and the cooldown is what keeps traffic
+		// off it.
+		await recordProviderSuccess(env, inFlight);
+
+		const after = await env.orderak_db.prepare(
+			"SELECT state,cooldown_until FROM provider_circuit_state WHERE provider='google_play'",
+		).first<{ state: string; cooldown_until: number | null }>();
+		expect(after?.state).toBe("open");
+		expect(after?.cooldown_until).toBe(opened?.cooldown_until);
+		await expect(acquireProviderPermit(env, "google_play")).rejects.toBeInstanceOf(ProviderCircuitOpenError);
+	});
+
+	it("still lets an ordinary success clear the failure window while the circuit is closed", async () => {
+		// The guard narrows which states a success may write, not whether a
+		// success counts: four failures short of opening must still be forgotten.
+		for (let index = 0; index < 4; index += 1) {
+			const permit = await acquireProviderPermit(env, "google_play");
+			await recordProviderFailure(env, permit);
+		}
+		const permit = await acquireProviderPermit(env, "google_play");
+		await recordProviderSuccess(env, permit);
+		const row = await env.orderak_db.prepare(
+			"SELECT state,failure_count FROM provider_circuit_state WHERE provider='google_play'",
+		).first<{ state: string; failure_count: number }>();
+		expect(row).toMatchObject({ state: "closed", failure_count: 0 });
+	});
+
 	it("rejects a stale generation and rolls back the whole entitlement batch", async () => {
 		await env.orderak_db.prepare(
 			"INSERT INTO organizations(id,name,owner_store_id) VALUES('org-race','Race shop','store-race')",
