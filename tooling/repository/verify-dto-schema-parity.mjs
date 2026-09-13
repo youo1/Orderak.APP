@@ -14,9 +14,10 @@
 //
 //   Three defects, one cause: no check in this repository ever compared a Kotlin
 //   DTO to an OpenAPI schema. The CI job named `prism-android-contract` starts
-//   no Prism and compares no schema — it runs the mock-flavour unit tests and a
+//   no Prism and compares no schema — it runs the Android unit tests and a
 //   string grep over four Kotlin files, which proves symbols exist and nothing
-//   about payloads.
+//   about payloads. (It ran those tests under the mock flavour until that
+//   flavour was deleted on 2026-09-13; the name was already misleading before.)
 //
 // WHAT IT CHECKS, IN BOTH DIRECTIONS
 //   * A property the contract marks REQUIRED must exist on the DTO, or the
