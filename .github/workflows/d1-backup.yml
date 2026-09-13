@@ -162,21 +162,62 @@ jobs:
 
       - name: Fetch previous manifest for row-loss comparison
         working-directory: services/backend
-        continue-on-error: true
+        # Deliberately not continue-on-error, and deliberately not gated on
+        # whether the file arrived.
+        #
+        # This step used to be `continue-on-error: true` followed by a `[ -s ]`
+        # test, and the next step announced "No previous manifest found —
+        # skipping row-loss comparison (first run)". A revoked R2 scope, a
+        # transient 5xx and a genuine first run all produced that same sentence
+        # and the same green run: the row-loss gate — the only check standing
+        # between a truncated export and an overwritten pointer — could be
+        # skipped by any failure at all, silently and indefinitely.
+        #
+        # So the exit code decides. A key that is genuinely absent is the one
+        # tolerated outcome, and only because a first backup of a new database
+        # has nothing to compare against; it sets a flag the next step reads.
+        # Every other failure fails the job, printing what wrangler said.
+        #
+        # Residual gap, stated rather than papered over: R2 answers "no such
+        # key" for a key that was deleted as readily as for one never written,
+        # and wrangler exposes no object listing to tell those apart. A pointer
+        # that vanishes after the first successful run still reads as a first
+        # run here. The retention lock on the d1/ prefix is what makes the
+        # immutable per-timestamp copies the place that question gets settled.
         run: |
-          npx wrangler r2 object get "orderak-backups/pointers/${DB}/latest.manifest.json" \
-            --file="/tmp/${DB}.previous.json" --remote
+          set -uo pipefail
+          set +e
+          OUT=$(npx wrangler r2 object get "orderak-backups/pointers/${DB}/latest.manifest.json" \
+            --file="/tmp/${DB}.previous.json" --remote 2>&1)
+          STATUS=$?
+          set -e
+          echo "$OUT"
+          if [ "$STATUS" -eq 0 ]; then
+            echo "FIRST_RUN=false" >> "$GITHUB_ENV"
+          elif echo "$OUT" | grep -qiE 'does not exist|not found|no such key|nosuchkey|10007'; then
+            echo "FIRST_RUN=true" >> "$GITHUB_ENV"
+            # wrangler can create the output file before it fails, and an empty
+            # file downstream is indistinguishable from a manifest of no tables.
+            rm -f "/tmp/${DB}.previous.json"
+            echo "No pointer object exists for ${DB} — treating this as the first backup of this database."
+          else
+            echo "ERROR: could not read the previous manifest, and R2 did not say the key is absent."
+            echo "ERROR: refusing to take a backup whose row-loss gate cannot run."
+            echo "ERROR: fix the credential or the outage and re-run — do not skip this."
+            exit "$STATUS"
+          fi
 
       - name: Restore drill — prove the export is recoverable
         working-directory: services/backend
         run: |
           set -euo pipefail
           ARGS=""
-          if [ -s "/tmp/${DB}.previous.json" ]; then
+          if [ "${FIRST_RUN}" = "false" ]; then
+            [ -s "/tmp/${DB}.previous.json" ] || { echo "ERROR: the previous manifest downloaded empty — refusing to skip the comparison."; exit 1; }
             ARGS="--compare /tmp/${DB}.previous.json"
             echo "Comparing against the previous backup's manifest."
           else
-            echo "No previous manifest found — skipping row-loss comparison (first run)."
+            echo "First backup of ${DB} — there is no previous manifest to compare against."
           fi
           # shellcheck disable=SC2086
           node scripts/verify-d1-restore.mjs "/tmp/${DB}.sql" \
