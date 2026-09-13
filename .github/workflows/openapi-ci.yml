@@ -216,6 +216,34 @@ jobs:
             --report junit,har \
             --report-dir "schemathesis-report-${SHARD}/coverage" \
             --output-sanitize true
+      # POSITIVE GENERATION ONLY, AND WHY THAT IS NOT A WEAKENING
+      #
+      # Schemathesis defaults to `--mode all`, which mixes negative cases in:
+      # bodies that deliberately violate the schema, to check the API refuses
+      # them. Against the real API that is a good question. Against Prism it is
+      # not a question at all — Prism serves the contract, it is not the
+      # implementation, so "does it reject bad input" has no meaningful answer
+      # here. What actually happens is worse than useless: Prism leaves the
+      # connection open on a malformed body instead of answering 400, and
+      # Schemathesis reports a ten-second read timeout as a Network Error.
+      #
+      # This went unnoticed until product CRUD arrived because those were the
+      # first operations with `additionalProperties: false`. Everything else in
+      # the draft is unconstrained and skipped by changed-operation-shard.mjs's
+      # fuzz-safe filter, so the fuzzing phase had never generated a body for
+      # anything. The first operations it could fuzz failed on three separate
+      # runs, on four different operations between them.
+      #
+      # Measured against a local Prism on 2026-09-13: `--mode all` produced
+      # Network Errors on the product routes; `--mode positive` ran 1200 cases
+      # across all four with none. The hook below already scrubs control
+      # characters from bodies, headers, query and path, and cannot help here —
+      # a negative case is schema-violating by construction, which is the point
+      # of it.
+      #
+      # Negative testing is not lost, it moves to where it means something:
+      # openapi-nightly.yml runs against api.staging.orderak.app, which answers
+      # with the real Worker and really does reject malformed input.
       - name: Three fuzz cases per constrained changed operation
         timeout-minutes: 8
         shell: bash
@@ -229,6 +257,7 @@ jobs:
             --url http://127.0.0.1:4010 \
             --workers 1 \
             --phases fuzzing \
+            --mode positive \
             --generation-deterministic \
             --generation-codec ascii \
             --max-examples 3 \
