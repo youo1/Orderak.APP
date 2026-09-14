@@ -26,16 +26,20 @@ import { BASE, SELF, authHeaders, createSchema, registerStore } from "./helpers"
 beforeEach(createSchema);
 afterEach(() => vi.restoreAllMocks());
 
-function signalsFrom(log: ReturnType<typeof vi.spyOn>): Record<string, unknown>[] {
-	return log.mock.calls
-		.map(([first]) => {
-			try {
-				return JSON.parse(String(first)) as Record<string, unknown>;
-			} catch {
-				return null;
-			}
-		})
-		.filter((entry): entry is Record<string, unknown> => entry?.signal === "catalog_mirror_called");
+type ConsoleSpy = { mock: { calls: unknown[][] } };
+
+function signalsFrom(log: ConsoleSpy): Record<string, unknown>[] {
+	const parsed: Record<string, unknown>[] = [];
+	for (const call of log.mock.calls) {
+		try {
+			const entry = JSON.parse(String(call[0])) as Record<string, unknown>;
+			if (entry.signal === "catalog_mirror_called") parsed.push(entry);
+		} catch {
+			// Not every console.log in a request is a JSON signal; the ones that
+			// are not are simply not what this suite is reading.
+		}
+	}
+	return parsed;
 }
 
 async function pushMirror(r: Awaited<ReturnType<typeof registerStore>>, extraHeaders: Record<string, string> = {}) {
