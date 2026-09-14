@@ -1,6 +1,5 @@
 package app.orderak.seller.data.catalog
 
-import app.orderak.seller.data.db.ProductDao
 import app.orderak.seller.data.db.ProductEntity
 import java.util.UUID
 import javax.inject.Inject
@@ -53,9 +52,9 @@ internal enum class LegacyAttempt { CONVERTED, RETRY, TERMINAL }
  */
 @Singleton
 class LegacyCatalogueReconciler @Inject constructor(
-    private val productDao: ProductDao,
-    private val writes: ProductWriteRepository,
-    private val store: LegacyReconcileStore,
+    private val products: LegacyProductSource,
+    private val writes: ProductCreating,
+    private val store: LegacyReconcileRecords,
 ) {
 
     /**
@@ -65,7 +64,7 @@ class LegacyCatalogueReconciler @Inject constructor(
      * catalogue refresh is allowed to proceed on, and nothing weaker.
      */
     suspend fun reconcile(): Boolean {
-        for (product in productDao.allOnce().filter(::isLegacy)) {
+        for (product in products.all().filter(::isLegacy)) {
             val existing = store.record(product.id)
             if (existing?.state == LegacyReconcileState.CONVERTED) continue
             if (existing?.state == LegacyReconcileState.REFUSED) continue
@@ -119,7 +118,7 @@ class LegacyCatalogueReconciler @Inject constructor(
     /** Rows still waiting, so a screen can show the seller what is holding. */
     suspend fun pending(): List<ProductEntity> {
         val records = store.all()
-        return productDao.allOnce()
+        return products.all()
             .filter(::isLegacy)
             .filter { records[it.id]?.state != LegacyReconcileState.CONVERTED }
             .filter { records[it.id]?.state != LegacyReconcileState.REFUSED }
@@ -139,7 +138,7 @@ class LegacyCatalogueReconciler @Inject constructor(
             imageUrl = product.imageUrl,
             categoryCode = product.categoryCode,
         )
-        return when (writes.create(draft, clientRequestId = key)) {
+        return when (writes.create(draft, key)) {
             is ProductWriteDecision.Store -> LegacyAttempt.CONVERTED
             // The server's opinion is unknown, so nothing has been ruled out.
             is ProductWriteDecision.Unreachable -> LegacyAttempt.RETRY

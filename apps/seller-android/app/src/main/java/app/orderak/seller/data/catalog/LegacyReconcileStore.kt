@@ -69,12 +69,12 @@ data class LegacyReconcileRecord(
 @Singleton
 class LegacyReconcileStore @Inject constructor(
     @param:ApplicationContext private val context: Context,
-) {
+) : LegacyReconcileRecords {
 
     private val json = Json { ignoreUnknownKeys = true }
 
     /** Every record this device holds, keyed by the local product row id. */
-    suspend fun all(): Map<Long, LegacyReconcileRecord> {
+    override suspend fun all(): Map<Long, LegacyReconcileRecord> {
         val raw = context.legacyReconcileStore.data.first()[RECORDS] ?: return emptyMap()
         return runCatching { json.decodeFromString<Map<Long, LegacyReconcileRecord>>(raw) }
             // A blob that will not decode is scaffolding, not seller data. Losing
@@ -83,15 +83,15 @@ class LegacyReconcileStore @Inject constructor(
             .getOrDefault(emptyMap())
     }
 
-    suspend fun record(localId: Long): LegacyReconcileRecord? = all()[localId]
+    override suspend fun record(localId: Long): LegacyReconcileRecord? = all()[localId]
 
-    suspend fun put(localId: Long, record: LegacyReconcileRecord) {
+    override suspend fun put(localId: Long, record: LegacyReconcileRecord) {
         val updated = all() + (localId to record)
         context.legacyReconcileStore.edit { it[RECORDS] = json.encodeToString(updated) }
     }
 
     /** The count the Phase 4 gate is stated in terms of. */
-    suspend fun unsentCount(): Int = all().values.count { it.state == LegacyReconcileState.UNSENT }
+    override suspend fun unsentCount(): Int = all().values.count { it.state == LegacyReconcileState.UNSENT }
 
     /** Rows the seller was shown and chose to discard, so a screen can say so. */
     suspend fun refused(): Map<Long, LegacyReconcileRecord> =

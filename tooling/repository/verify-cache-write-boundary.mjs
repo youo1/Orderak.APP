@@ -129,9 +129,12 @@ const DAO_HOLDERS = new Set([
   ...ALLOWED,
   // Reads only; its writes moved to ProductWriteRepository in the cutover.
   `${base}/data/catalog/CatalogRepository.kt`,
-  // One-time migration jobs. Both read the catalogue and write only through
+  // One-time migration job. Reads the catalogue and writes only through
   // ProductWriteRepository, which goes to the server first.
-  `${base}/data/catalog/LegacyCatalogueReconciler.kt`,
+  //
+  // LegacyCatalogueReconciler used to be here and no longer is: it takes narrow
+  // ports now rather than a DAO, so it cannot reach one at all. A name leaving
+  // this list is the direction it is supposed to move in.
   `${base}/data/catalog/StockDrain.kt`,
 ]);
 
