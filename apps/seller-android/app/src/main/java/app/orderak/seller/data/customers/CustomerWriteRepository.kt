@@ -1,21 +1,50 @@
 package app.orderak.seller.data.customers
 
 import app.orderak.seller.data.remote.BackendApi
+import app.orderak.seller.data.remote.CustomerDto
+import app.orderak.seller.data.remote.CustomerRes
 import app.orderak.seller.data.remote.CustomerUpdateReq
 import app.orderak.seller.data.session.SessionStore
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** What became of a customer edit, in terms a screen can render. */
+/**
+ * What became of a customer edit.
+ *
+ * Exactly one variant carries a customer, so exactly one branch can reach the
+ * cache — the same shape the product writes use, and for the same reason: the
+ * Class A invariant is a claim about every branch at once, and written as a
+ * value it can be enumerated by a test instead of re-read by a person.
+ */
 sealed interface CustomerWriteResult {
-    data object Saved : CustomerWriteResult
+    data class Saved(val customer: CustomerDto) : CustomerWriteResult
 
-    /** It did not reach the server. Nothing local changed. */
+    /** It did not reach the server. Nothing local changed, and nothing queued. */
     data object Offline : CustomerWriteResult
 
-    /** The server refused it. Nothing local changed. */
+    /** The server considered it and said no. Nothing local changed. */
     data class Refused(val code: String?) : CustomerWriteResult
+}
+
+/** The codes `BackendApi` reports when a request never got an answer. */
+private val TRANSPORT_FAILURES = setOf(
+    "network", "bad_response",
+    "http_500", "http_502", "http_503", "http_504",
+)
+
+/**
+ * Read one customer write's answer.
+ *
+ * `ok` alone is not enough to store: a response claiming success without a
+ * customer describes nothing, and writing a half-decoded body into the cache
+ * would put a record in front of the seller that the server never sent.
+ */
+fun decideCustomerWrite(res: CustomerRes): CustomerWriteResult {
+    val customer = res.customer
+    if (res.ok && customer != null) return CustomerWriteResult.Saved(customer)
+    if (res.error in TRANSPORT_FAILURES) return CustomerWriteResult.Offline
+    return CustomerWriteResult.Refused(res.error)
 }
 
 /**
@@ -69,22 +98,10 @@ class CustomerWriteRepository @Inject constructor(
                 note = note.trim(),
             ),
         )
-        if (!res.ok) {
-            return if (res.error in TRANSPORT_FAILURES) {
-                CustomerWriteResult.Offline
-            } else {
-                CustomerWriteResult.Refused(res.error)
-            }
-        }
-        res.customer?.let { cache.putAll(listOf(it)) }
-        return CustomerWriteResult.Saved
-    }
-
-    private companion object {
-        /** The codes `BackendApi` reports when a request never got an answer. */
-        val TRANSPORT_FAILURES = setOf(
-            "network", "bad_response",
-            "http_500", "http_502", "http_503", "http_504",
-        )
+        val decision = decideCustomerWrite(res)
+        // The cache is touched on exactly one line, inside the one branch that
+        // has a customer to store. Every other outcome returns without writing.
+        if (decision is CustomerWriteResult.Saved) cache.putAll(listOf(decision.customer))
+        return decision
     }
 }
