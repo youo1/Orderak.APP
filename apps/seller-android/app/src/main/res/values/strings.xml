@@ -299,6 +299,10 @@
     <string name="common_retry">Retry</string>
     <string name="order_cancel_confirm">Cancel this order and restore its stock?</string>
     <string name="product_delete_confirm">Delete this product? This can’t be undone.</string>
+    <string name="product_stock_conflict_title">The shop&#8217;s stock changed</string>
+    <string name="product_stock_conflict_body">You set %1$d. The shop now has %2$d — an order came in while you were editing. Your other changes are saved.</string>
+    <string name="product_stock_conflict_use_shop">Use %1$d</string>
+    <string name="product_stock_conflict_keep_mine">Set %1$d anyway</string>
     <string name="category_delete_confirm">Delete this category? Products will become uncategorized.</string>
     <string name="categories_error">Couldn’t update categories. Try again.</string>
     <string name="settings_delete_confirm">Submit a verified account-deletion request? The request follows the published deletion timeline.</string>

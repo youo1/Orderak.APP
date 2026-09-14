@@ -181,6 +181,31 @@ fun ProductEditScreen(
                 }
             }
 
+            // A failed write that says nothing is the worst of the three outcomes.
+            //
+            // The data authority contract's Class A rule is that an operation
+            // which cannot reach the server "fails, visibly" — nothing is queued
+            // and nothing is written, so the only thing standing between the
+            // seller and a silently discarded edit is this line. Until now the
+            // screen rendered the plan limit and nothing else, which meant a save
+            // with no connection re-enabled the button and left no trace.
+            state.writeError?.takeIf { it != ProductWriteError.PLAN_LIMIT }?.let { error ->
+                Text(
+                    stringResource(
+                        when (error) {
+                            ProductWriteError.OFFLINE -> R.string.error_network
+                            ProductWriteError.UNKNOWN_CATEGORY -> R.string.error_not_found
+                            // Covered by the block below, which says more than a
+                            // sentence can; listed so this `when` stays total.
+                            ProductWriteError.PLAN_LIMIT -> R.string.error_plan_limit
+                            ProductWriteError.REFUSED -> R.string.error_generic
+                        },
+                    ),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+
             if (state.quotaExceeded) {
                 // A one-line error told the seller a save had failed and nothing
                 // about why or what to do. The paywall names the limit, the
@@ -229,6 +254,38 @@ fun ProductEditScreen(
                 }
             },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.common_cancel)) } },
+        )
+    }
+
+    // The stock conflict, which is a question rather than an error.
+    //
+    // The seller's figure and the shop's disagree because an order arrived while
+    // they were editing. Both numbers are real and the app cannot know which one
+    // the seller means, so it shows both and asks. Re-sending theirs
+    // automatically against the revision the server just reported is
+    // last-write-wins wearing a different name: it would erase the decrement the
+    // order made, which is the one outcome the compare-and-set exists to prevent.
+    //
+    // Dismissing takes the shop's figure. That is a choice the seller made by
+    // tapping away, and it is the half of the choice that cannot destroy
+    // anything — their number is still in the field afterwards, unsaved.
+    state.stockConflict?.let { conflict ->
+        AlertDialog(
+            onDismissRequest = { viewModel.acceptShopStock() },
+            title = { Text(stringResource(R.string.product_stock_conflict_title)) },
+            text = {
+                Text(stringResource(R.string.product_stock_conflict_body, conflict.yours, conflict.shop))
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.acceptShopStock() }) {
+                    Text(stringResource(R.string.product_stock_conflict_use_shop, conflict.shop))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.reapplyMyStock(onBack) }) {
+                    Text(stringResource(R.string.product_stock_conflict_keep_mine, conflict.yours))
+                }
+            },
         )
     }
 }
