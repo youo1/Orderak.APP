@@ -12848,6 +12848,395 @@
             }
           }
         }
+      },
+      "post": {
+        "operationId": "post_v1_products",
+        "tags": [
+          "seller"
+        ],
+        "x-owner": "Seller Experience",
+        "x-data-classification": "pending-review",
+        "x-rate-limit": "seller-authenticated-default",
+        "x-stability": "draft",
+        "security": [
+          {
+            "sellerDevice": []
+          }
+        ],
+        "summary": "Create one product",
+        "description": "Creates a single product in the authenticated store's catalogue.\n\nIdempotent under retry when the caller supplies client_request_id: the same store and the same id resolve to the product already created rather than a second one. This is the only product route that needs it — PUT replaces, DELETE is idempotent by semantics, and stock is protected by compare-and-set.\n\nStock is not accepted here. A new product starts at zero and moves only through a buyer's order or PATCH /api/v1/products/{product_code}/stock, because inventory is server-owned.",
+        "parameters": [
+          {
+            "$ref": "./components/common.json#/parameters/RequestId"
+          },
+          {
+            "$ref": "./components/common.json#/parameters/ClientPlatform"
+          },
+          {
+            "$ref": "./components/common.json#/parameters/AppVersion"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "price"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80,
+                    "pattern": "^[^\\u0000-\\u001F]+$"
+                  },
+                  "description": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 500,
+                    "pattern": "^[^\\u0000-\\u001F]*$"
+                  },
+                  "price": {
+                    "type": "object",
+                    "required": [
+                      "amount_minor",
+                      "currency"
+                    ],
+                    "properties": {
+                      "amount_minor": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000000000
+                      },
+                      "currency": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 3,
+                        "pattern": "^[A-Z]{3}$",
+                        "description": "ISO-4217 alphabetic code. Must be a currency this deployment accepts; never defaulted."
+                      }
+                    }
+                  },
+                  "available": {
+                    "type": "boolean",
+                    "default": true
+                  },
+                  "image_url": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 500,
+                    "pattern": "^[^\\u0000-\\u001F]*$"
+                  },
+                  "category_code": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 64,
+                    "pattern": "^c-[A-Za-z0-9]+$",
+                    "description": "Must name a category belonging to this store. An unknown or foreign code is refused, never silently cleared."
+                  },
+                  "discount_type": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "enum": [
+                      "PERCENTAGE",
+                      "AMOUNT",
+                      null
+                    ],
+                    "description": "Decides how discount_value is read. Both halves move together or neither does."
+                  },
+                  "discount_value": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 100000000,
+                    "description": "Basis points when discount_type is PERCENTAGE (1000 = 10.00%, maximum 10000), minor units of the product's own currency when AMOUNT. Never a decimal: money is integer minor units (ADR-009)."
+                  },
+                  "client_request_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 100,
+                    "description": "Caller-chosen retry key, unique per store. Repeating it returns the product already created.",
+                    "pattern": "^[^\\u0000-\\u001F]*$"
+                  }
+                }
+              },
+              "examples": {
+                "valid": {
+                  "value": {
+                    "name": "Mango Juice",
+                    "description": "Chilled, 330ml",
+                    "price": {
+                      "amount_minor": 2500,
+                      "currency": "EGP"
+                    },
+                    "available": true,
+                    "category_code": "c-8G32DY"
+                  }
+                },
+                "validation_failure": {
+                  "value": {
+                    "name": "Mango Juice",
+                    "price": {
+                      "amount_minor": 2500,
+                      "currency": "KWD"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created, or the product an earlier identical request already created.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "product"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "product": {
+                      "$ref": "#/components/schemas/Product"
+                    },
+                    "replayed": {
+                      "type": "boolean",
+                      "description": "Present and true when client_request_id matched a product this store had already created, so no second product was made."
+                    }
+                  }
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "ok": true,
+                      "product": {
+                        "app_id": 1,
+                        "remote_uuid": "0f1a2b3c-4d5e-6f70-8192-a3b4c5d6e7f8",
+                        "product_code": "p-A1B2C3D4",
+                        "name": "Mango Juice",
+                        "slug": "mango-juice",
+                        "description": "Chilled, 330ml",
+                        "price": {
+                          "amount_minor": 2500,
+                          "currency": "EGP"
+                        },
+                        "stock": 0,
+                        "stock_version": 0,
+                        "available": true,
+                        "image_url": null,
+                        "category_code": "c-8G32DY",
+                        "discount_type": "PERCENTAGE",
+                        "discount_value": 750
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failure",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/validation_failed",
+                      "title": "Validation Failed",
+                      "status": 400,
+                      "code": "validation_failed",
+                      "detail": "One or more fields are invalid.",
+                      "request_id": "018f-example",
+                      "field_errors": {
+                        "field": "invalid"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/auth",
+                      "title": "Auth",
+                      "status": 401,
+                      "code": "auth",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/forbidden",
+                      "title": "Forbidden",
+                      "status": 403,
+                      "code": "forbidden",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "plan_limit_reached: creating this product would exceed the store's plan allowance. A downgrade never blocks editing or deleting what already exists, only growth.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/plan_limit_reached",
+                      "title": "Plan Limit Reached",
+                      "status": 409,
+                      "code": "plan_limit_reached",
+                      "detail": "Your plan allows up to 20 products.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              },
+              "Retry-After": {
+                "$ref": "./components/common.json#/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/rate_limited",
+                      "title": "Rate Limited",
+                      "status": 429,
+                      "code": "rate_limited",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example",
+                      "retryable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Retryable dependency failure",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              },
+              "Retry-After": {
+                "$ref": "./components/common.json#/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/temporarily_unavailable",
+                      "title": "Temporarily Unavailable",
+                      "status": 503,
+                      "code": "temporarily_unavailable",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example",
+                      "retryable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/products/sync": {
@@ -17359,6 +17748,1001 @@
           }
         }
       }
+    },
+    "/api/v1/products/{product_code}": {
+      "put": {
+        "operationId": "put_v1_products_product_code",
+        "tags": [
+          "seller"
+        ],
+        "x-owner": "Seller Experience",
+        "x-data-classification": "pending-review",
+        "x-rate-limit": "seller-authenticated-default",
+        "x-stability": "draft",
+        "security": [
+          {
+            "sellerDevice": []
+          }
+        ],
+        "summary": "Replace one product's metadata",
+        "description": "A full replacement of the product's editable metadata. A field the caller omits is cleared, because a seller who removes a description means it to go.\n\nNever writes stock or stock_version. An existing product's inventory moves through a buyer's order or through the stock route, never through a metadata write that happens to carry a number.",
+        "parameters": [
+          {
+            "$ref": "./components/common.json#/parameters/RequestId"
+          },
+          {
+            "$ref": "./components/common.json#/parameters/ClientPlatform"
+          },
+          {
+            "$ref": "./components/common.json#/parameters/AppVersion"
+          },
+          {
+            "name": "product_code",
+            "in": "path",
+            "required": true,
+            "description": "The product's immutable public code, as GET /api/v1/products returns it.",
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 64,
+              "pattern": "^p-[A-Za-z0-9]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "price"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80,
+                    "pattern": "^[^\\u0000-\\u001F]+$"
+                  },
+                  "description": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 500,
+                    "pattern": "^[^\\u0000-\\u001F]*$"
+                  },
+                  "price": {
+                    "type": "object",
+                    "required": [
+                      "amount_minor",
+                      "currency"
+                    ],
+                    "properties": {
+                      "amount_minor": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000000000
+                      },
+                      "currency": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 3,
+                        "pattern": "^[A-Z]{3}$",
+                        "description": "ISO-4217 alphabetic code. Must be a currency this deployment accepts; never defaulted."
+                      }
+                    }
+                  },
+                  "available": {
+                    "type": "boolean",
+                    "default": true
+                  },
+                  "image_url": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 500,
+                    "pattern": "^[^\\u0000-\\u001F]*$"
+                  },
+                  "category_code": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 64,
+                    "pattern": "^c-[A-Za-z0-9]+$",
+                    "description": "Must name a category belonging to this store. An unknown or foreign code is refused, never silently cleared."
+                  },
+                  "discount_type": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "enum": [
+                      "PERCENTAGE",
+                      "AMOUNT",
+                      null
+                    ],
+                    "description": "Decides how discount_value is read. Both halves move together or neither does."
+                  },
+                  "discount_value": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 100000000,
+                    "description": "Basis points when discount_type is PERCENTAGE (1000 = 10.00%, maximum 10000), minor units of the product's own currency when AMOUNT. Never a decimal: money is integer minor units (ADR-009)."
+                  }
+                }
+              },
+              "examples": {
+                "valid": {
+                  "value": {
+                    "name": "Mango Juice",
+                    "description": "Chilled, 330ml",
+                    "price": {
+                      "amount_minor": 2500,
+                      "currency": "EGP"
+                    },
+                    "available": true,
+                    "category_code": "c-8G32DY"
+                  }
+                },
+                "validation_failure": {
+                  "value": {
+                    "name": "Mango Juice",
+                    "price": {
+                      "amount_minor": 2500,
+                      "currency": "KWD"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The product as the store now holds it.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "product"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "product": {
+                      "$ref": "#/components/schemas/Product"
+                    },
+                    "replayed": {
+                      "type": "boolean",
+                      "description": "Present and true when client_request_id matched a product this store had already created, so no second product was made."
+                    }
+                  }
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "ok": true,
+                      "product": {
+                        "app_id": 1,
+                        "remote_uuid": "0f1a2b3c-4d5e-6f70-8192-a3b4c5d6e7f8",
+                        "product_code": "p-A1B2C3D4",
+                        "name": "Mango Juice",
+                        "slug": "mango-juice",
+                        "description": "Chilled, 330ml",
+                        "price": {
+                          "amount_minor": 2500,
+                          "currency": "EGP"
+                        },
+                        "stock": 0,
+                        "stock_version": 0,
+                        "available": true,
+                        "image_url": null,
+                        "category_code": "c-8G32DY",
+                        "discount_type": "PERCENTAGE",
+                        "discount_value": 750
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failure",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/validation_failed",
+                      "title": "Validation Failed",
+                      "status": 400,
+                      "code": "validation_failed",
+                      "detail": "One or more fields are invalid.",
+                      "request_id": "018f-example",
+                      "field_errors": {
+                        "field": "invalid"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/auth",
+                      "title": "Auth",
+                      "status": 401,
+                      "code": "auth",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/forbidden",
+                      "title": "Forbidden",
+                      "status": 403,
+                      "code": "forbidden",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No product with that code belongs to the authenticated store.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/not_found",
+                      "title": "Not Found",
+                      "status": 404,
+                      "code": "not_found",
+                      "detail": "No product with that code belongs to this store.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              },
+              "Retry-After": {
+                "$ref": "./components/common.json#/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/rate_limited",
+                      "title": "Rate Limited",
+                      "status": 429,
+                      "code": "rate_limited",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example",
+                      "retryable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Retryable dependency failure",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              },
+              "Retry-After": {
+                "$ref": "./components/common.json#/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/temporarily_unavailable",
+                      "title": "Temporarily Unavailable",
+                      "status": 503,
+                      "code": "temporarily_unavailable",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example",
+                      "retryable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "delete_v1_products_product_code",
+        "tags": [
+          "seller"
+        ],
+        "x-owner": "Seller Experience",
+        "x-data-classification": "pending-review",
+        "x-rate-limit": "seller-authenticated-default",
+        "x-stability": "draft",
+        "security": [
+          {
+            "sellerDevice": []
+          }
+        ],
+        "summary": "Delete one product",
+        "description": "Removes one product from the catalogue. Deletion is explicit and immediate; nothing infers a deletion from a device having forgotten a product.\n\nStock movements for the product are kept. The ledger carries its own copy of the product's identity so that a later deletion cannot rewrite history.",
+        "parameters": [
+          {
+            "$ref": "./components/common.json#/parameters/RequestId"
+          },
+          {
+            "$ref": "./components/common.json#/parameters/ClientPlatform"
+          },
+          {
+            "$ref": "./components/common.json#/parameters/AppVersion"
+          },
+          {
+            "name": "product_code",
+            "in": "path",
+            "required": true,
+            "description": "The product's immutable public code, as GET /api/v1/products returns it.",
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 64,
+              "pattern": "^p-[A-Za-z0-9]+$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "product_code"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "product_code": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "ok": true,
+                      "product_code": "p-A1B2C3D4"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failure",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/validation_failed",
+                      "title": "Validation Failed",
+                      "status": 400,
+                      "code": "validation_failed",
+                      "detail": "One or more fields are invalid.",
+                      "request_id": "018f-example",
+                      "field_errors": {
+                        "field": "invalid"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/auth",
+                      "title": "Auth",
+                      "status": 401,
+                      "code": "auth",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/forbidden",
+                      "title": "Forbidden",
+                      "status": 403,
+                      "code": "forbidden",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No product with that code belongs to the authenticated store.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/not_found",
+                      "title": "Not Found",
+                      "status": 404,
+                      "code": "not_found",
+                      "detail": "No product with that code belongs to this store.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              },
+              "Retry-After": {
+                "$ref": "./components/common.json#/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/rate_limited",
+                      "title": "Rate Limited",
+                      "status": 429,
+                      "code": "rate_limited",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example",
+                      "retryable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Retryable dependency failure",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              },
+              "Retry-After": {
+                "$ref": "./components/common.json#/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/temporarily_unavailable",
+                      "title": "Temporarily Unavailable",
+                      "status": 503,
+                      "code": "temporarily_unavailable",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example",
+                      "retryable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/products/{product_code}/stock": {
+      "patch": {
+        "operationId": "patch_v1_products_product_code_stock",
+        "tags": [
+          "seller"
+        ],
+        "x-owner": "Seller Experience",
+        "x-data-classification": "pending-review",
+        "x-rate-limit": "seller-authenticated-default",
+        "x-stability": "draft",
+        "security": [
+          {
+            "sellerDevice": []
+          }
+        ],
+        "summary": "Adjust one product's stock",
+        "description": "Sets a product's stock, refusing the write when the caller's revision is stale.\n\nexpected_stock_version is required rather than optional. Optional is how last-write-wins returns: a caller with no opinion about what it is overwriting would silently erase a decrement a buyer's order had just made. On a mismatch the response carries the authoritative stock and revision so the seller can be shown both values and choose.\n\nA successful adjustment writes one stock_movements row, unless the new figure equals the old one.",
+        "parameters": [
+          {
+            "$ref": "./components/common.json#/parameters/RequestId"
+          },
+          {
+            "$ref": "./components/common.json#/parameters/ClientPlatform"
+          },
+          {
+            "$ref": "./components/common.json#/parameters/AppVersion"
+          },
+          {
+            "name": "product_code",
+            "in": "path",
+            "required": true,
+            "description": "The product's immutable public code, as GET /api/v1/products returns it.",
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 64,
+              "pattern": "^p-[A-Za-z0-9]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "stock",
+                  "expected_stock_version"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "stock": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100000000
+                  },
+                  "expected_stock_version": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "The stock_version this edit was made against, from GET /api/v1/products."
+                  }
+                }
+              },
+              "examples": {
+                "valid": {
+                  "value": {
+                    "stock": 12,
+                    "expected_stock_version": 5
+                  }
+                },
+                "stale_revision": {
+                  "value": {
+                    "stock": 12,
+                    "expected_stock_version": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The product as the store now holds it, carrying the new revision.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "product"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "product": {
+                      "$ref": "#/components/schemas/Product"
+                    },
+                    "replayed": {
+                      "type": "boolean",
+                      "description": "Present and true when client_request_id matched a product this store had already created, so no second product was made."
+                    }
+                  }
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "ok": true,
+                      "product": {
+                        "app_id": 1,
+                        "remote_uuid": "0f1a2b3c-4d5e-6f70-8192-a3b4c5d6e7f8",
+                        "product_code": "p-A1B2C3D4",
+                        "name": "Mango Juice",
+                        "slug": "mango-juice",
+                        "description": "Chilled, 330ml",
+                        "price": {
+                          "amount_minor": 2500,
+                          "currency": "EGP"
+                        },
+                        "stock": 0,
+                        "stock_version": 0,
+                        "available": true,
+                        "image_url": null,
+                        "category_code": "c-8G32DY",
+                        "discount_type": "PERCENTAGE",
+                        "discount_value": 750
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failure",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/validation_failed",
+                      "title": "Validation Failed",
+                      "status": 400,
+                      "code": "validation_failed",
+                      "detail": "One or more fields are invalid.",
+                      "request_id": "018f-example",
+                      "field_errors": {
+                        "field": "invalid"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/auth",
+                      "title": "Auth",
+                      "status": 401,
+                      "code": "auth",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/forbidden",
+                      "title": "Forbidden",
+                      "status": 403,
+                      "code": "forbidden",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No product with that code belongs to the authenticated store.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/not_found",
+                      "title": "Not Found",
+                      "status": 404,
+                      "code": "not_found",
+                      "detail": "No product with that code belongs to this store.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "stale_stock: expected_stock_version did not match the store's current revision, so nothing was written. The body carries the authoritative stock and revision so the caller can show the seller both values and let them choose.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/stale_stock",
+                      "title": "Stale Stock",
+                      "status": 409,
+                      "code": "stale_stock",
+                      "detail": "The stock revision this edit was made against is no longer current.",
+                      "stock": 8,
+                      "stock_version": 6,
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              },
+              "Retry-After": {
+                "$ref": "./components/common.json#/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/rate_limited",
+                      "title": "Rate Limited",
+                      "status": 429,
+                      "code": "rate_limited",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example",
+                      "retryable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Retryable dependency failure",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              },
+              "Retry-After": {
+                "$ref": "./components/common.json#/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/temporarily_unavailable",
+                      "title": "Temporarily Unavailable",
+                      "status": 503,
+                      "code": "temporarily_unavailable",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example",
+                      "retryable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -17538,6 +18922,27 @@
               "string",
               "null"
             ]
+          },
+          "discount_type": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "PERCENTAGE",
+              "AMOUNT",
+              null
+            ],
+            "description": "Decides how discount_value is read. Both halves move together or neither does."
+          },
+          "discount_value": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 100000000,
+            "description": "Basis points when discount_type is PERCENTAGE (1000 = 10.00%, maximum 10000), minor units of the product's own currency when AMOUNT. Never a decimal: money is integer minor units (ADR-009)."
           }
         },
         "required": [

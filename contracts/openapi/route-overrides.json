@@ -28,6 +28,18 @@
     "path": "/api/v1/categories/{category_code}"
   },
   {
+    "method": "PUT",
+    "path": "/api/v1/products/{product_code}"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/products/{product_code}"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/products/{product_code}/stock"
+  },
+  {
     "method": "GET",
     "path": "/api/v1/support/tickets/{id}"
   },

@@ -44,6 +44,9 @@ const PARAMETER_NAMES = new Map([
   // The customer key is a normalised phone number, not an id, and the contract
   // says so. See services/backend/src/domains/identity/phone.ts.
   ["/api/v1/customers/{id}", "/api/v1/customers/{customer_key}"],
+  // A product is addressed by its public `p-XXXXXXXX` code on every route that
+  // takes one. `id` would name the internal UUID, which no client ever sends.
+  ["/api/v1/products/{id}", "/api/v1/products/{product_code}"],
 ]);
 
 /**
