@@ -216,6 +216,77 @@ data class RemoteProductDto(
     val available: Boolean = true,
     val image_url: String? = null,
     val category_code: String? = null,
+    /**
+     * `PERCENTAGE`, `AMOUNT`, or absent. Decides how [discount_value] is read,
+     * and the two only ever travel together.
+     */
+    val discount_type: String? = null,
+    /**
+     * Basis points for a percentage (1000 is 10.00%), minor units of the
+     * product's own currency for an amount. An integer either way: money is
+     * integer minor units (ADR-009), and the local column being a Double is the
+     * shape that rule exists to forbid.
+     */
+    val discount_value: Long? = null,
+)
+
+/**
+ * One product as this device asks the server to hold it.
+ *
+ * Deliberately carries no identity and no stock. The product is named by the
+ * code in the URL, and stock moves only through a buyer's order or the explicit
+ * stock route — a metadata write that happened to carry a number would be this
+ * device asserting a count it cannot know.
+ *
+ * `client_request_id` makes a create safe to retry. The server resolves the same
+ * store and the same id to the product it already made rather than a second one,
+ * which is the difference between a lost response costing nothing and costing a
+ * duplicate product.
+ */
+@Serializable
+data class ProductWriteReq(
+    val name: String,
+    val description: String? = null,
+    val price: MoneyDto,
+    val available: Boolean = true,
+    val image_url: String? = null,
+    val category_code: String? = null,
+    val discount_type: String? = null,
+    val discount_value: Long? = null,
+    val client_request_id: String? = null,
+)
+
+/** A stock figure and the revision it was decided against. */
+@Serializable
+data class StockAdjustReq(
+    val stock: Int,
+    val expected_stock_version: Long,
+)
+
+/**
+ * The answer to a single product write.
+ *
+ * On a stale stock edit the server sends `stock` and `stock_version` alongside
+ * the error, so the seller can be shown both numbers without a second request.
+ * Re-sending automatically with the returned revision would be last-write-wins
+ * wearing a different name, and would erase a buyer's decrement.
+ */
+@Serializable
+data class ProductWriteRes(
+    val ok: Boolean = false,
+    val product: RemoteProductDto? = null,
+    val replayed: Boolean = false,
+    val stock: Int? = null,
+    val stock_version: Long? = null,
+    @SerialName("code") val error: String? = null,
+)
+
+/** The answer to a delete, which names the product it removed. */
+@Serializable
+data class ProductDeleteRes(
+    val ok: Boolean = false,
+    val product_code: String? = null,
+    @SerialName("code") val error: String? = null,
 )
 
 /**
@@ -922,6 +993,19 @@ class BackendApi @Inject constructor(
      * Build credential headers for seller API calls. Throws [IllegalStateException]
      * when phone or secret are blank — callers must gate on authenticated state.
      */
+    /**
+     * One path segment, escaped.
+     *
+     * `URLEncoder` is form encoding rather than path encoding, so it would turn a
+     * space into `+` where a path wants `%20`. That difference cannot arise here:
+     * every value passed to this is a server-minted resource code matching
+     * `p-[A-Za-z0-9]+`, which encodes to itself. It is applied anyway, because a
+     * code interpolated into a URL without escaping is the kind of thing that
+     * stays correct only until the first value that is not what was assumed.
+     */
+    private fun encodePath(segment: String): String =
+        java.net.URLEncoder.encode(segment, "UTF-8")
+
     private suspend fun creds(phone: String, secret: String): Map<String, String> {
         if (phone.isBlank() || secret.isBlank()) {
             throw IllegalStateException("BackendApi called without seller credentials")
@@ -1138,6 +1222,46 @@ class BackendApi @Inject constructor(
     suspend fun syncProducts(phone: String, secret: String, req: ProductsSyncReq): ProductsSyncRes =
         apiCall({ ProductsSyncRes(error = it) }) {
             postRaw("/api/v1/products/sync", json.encodeToString(req), creds(phone, secret))
+        }
+
+    // ---- Products, one at a time ----
+    //
+    // The routes that replace the mirror above. Each names exactly one product
+    // and says exactly what to do with it, so a device that has forgotten a
+    // product says nothing about it rather than deleting it.
+
+    suspend fun createProduct(phone: String, secret: String, req: ProductWriteReq): ProductWriteRes =
+        apiCall({ ProductWriteRes(error = it) }) {
+            postRaw("/api/v1/products", json.encodeToString(req), creds(phone, secret))
+        }
+
+    suspend fun updateProduct(
+        phone: String,
+        secret: String,
+        productCode: String,
+        req: ProductWriteReq,
+    ): ProductWriteRes =
+        apiCall({ ProductWriteRes(error = it) }) {
+            putRaw("/api/v1/products/${encodePath(productCode)}", json.encodeToString(req), creds(phone, secret))
+        }
+
+    suspend fun deleteProduct(phone: String, secret: String, productCode: String): ProductDeleteRes =
+        apiCall({ ProductDeleteRes(error = it) }) {
+            deleteRaw("/api/v1/products/${encodePath(productCode)}", creds(phone, secret))
+        }
+
+    suspend fun adjustProductStock(
+        phone: String,
+        secret: String,
+        productCode: String,
+        req: StockAdjustReq,
+    ): ProductWriteRes =
+        apiCall({ ProductWriteRes(error = it) }) {
+            patchRaw(
+                "/api/v1/products/${encodePath(productCode)}/stock",
+                json.encodeToString(req),
+                creds(phone, secret),
+            )
         }
 
     // ---- Plans ----
