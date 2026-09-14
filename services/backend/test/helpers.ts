@@ -455,6 +455,28 @@ export async function seedProduct(
 }
 
 /**
+ * A product with units on the shelf, in one call.
+ *
+ * Two requests, because creating and stocking are genuinely two operations: a
+ * create cannot carry a stock figure, since inventory is server-owned and moves
+ * only through a buyer's order or an explicit adjustment. Most suites want a
+ * product that exists and has stock, and do not care about that distinction, so
+ * this spares them from restating it.
+ *
+ * Returns the product as the API reports it after stocking, so `product_code`
+ * and the post-adjustment `stock_version` are both current.
+ */
+export async function seedStockedProduct(
+	r: Registered,
+	stock: number,
+	overrides: Record<string, unknown> = {},
+): Promise<Record<string, unknown>> {
+	const created = await seedProduct(r, overrides);
+	if (stock <= 0) return created;
+	return setProductStock(r, String(created.product_code), stock, Number(created.stock_version ?? 0));
+}
+
+/**
  * Set a product's stock through the endpoint that owns it.
  *
  * Creation deliberately starts every product at zero — stock is server-owned and

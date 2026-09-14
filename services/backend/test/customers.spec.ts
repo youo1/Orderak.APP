@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { BASE, SELF, authHeaders, createSchema, env, registerStore, type Registered } from "./helpers";
+import { BASE, SELF, authHeaders, createSchema, env, registerStore, seedStockedProduct, type Registered } from "./helpers";
 import { normalizeBuyerPhone, validE164, isPrivacySentinel } from "../src/domains/identity/phone";
 
 /**
@@ -24,13 +24,8 @@ async function storeIdOf(r: Registered): Promise<string> {
 }
 
 async function seedProduct(r: Registered): Promise<string> {
-	const res = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
-		method: "POST", headers: authHeaders(r),
-		body: JSON.stringify({
-			products: [{ app_id: 1, name: "Cola", price: { amount_minor: 1500, currency: "EGP" }, stock: 50, available: true }],
-		}),
-	});
-	return ((await res.json()) as { products: { product_code: string }[] }).products[0].product_code;
+	const product = await seedStockedProduct(r, 50, { name: "Cola", price: { amount_minor: 1500, currency: "EGP" } });
+	return String(product.product_code);
 }
 
 /**

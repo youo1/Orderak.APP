@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from "vitest";
-import { BASE, SELF, authHeaders, createSchema, env, registerStore } from "./helpers";
+import { BASE, SELF, authHeaders, createSchema, env, registerStore, seedStockedProduct } from "./helpers";
 import type { Registered } from "./helpers";
 
 /** Registered exposes the public identifiers, not the internal row id. */
@@ -271,18 +271,11 @@ describe("POST /api/v1/orders", () => {
 
 	const key = (suffix: string) => `manual-order-${suffix}`;
 
-	async function seed(r: Registered, appId = 1, stock = 10): Promise<string> {
-		const res = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
-			method: "POST",
-			headers: authHeaders(r),
-			body: JSON.stringify({
-				products: [{
-					app_id: appId, name: "Cola", price: { amount_minor: 1500, currency: "EGP" },
-					stock, available: true,
-				}],
-			}),
+	async function seed(r: Registered, _appId = 1, stock = 10): Promise<string> {
+		const product = await seedStockedProduct(r, stock, {
+			name: "Cola", price: { amount_minor: 1500, currency: "EGP" },
 		});
-		return ((await res.json()) as { products: { product_code: string }[] }).products[0].product_code;
+		return String(product.product_code);
 	}
 
 	async function create(r: Registered, body: Record<string, unknown>): Promise<Response> {

@@ -7,7 +7,7 @@
 // must never be deleted, whichever column happens to reference it.
 import { beforeEach, describe, expect, it } from "vitest";
 import { SELF, env } from "cloudflare:test";
-import { createSchema, registerStore, authHeaders, type Registered } from "./helpers";
+import { createSchema, registerStore, authHeaders, seedStockedProduct, type Registered } from "./helpers";
 import { reclaimOrphanedMedia } from "../src/platform/storage/media-reclaim";
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13]);
@@ -156,15 +156,10 @@ describe("media reclamation", () => {
 		const r = await registerStore({ store_name: "Fresh Market" });
 		const key = await upload(r);
 		await age(key);
-		await SELF.fetch("https://api.orderak.app/api/v1/products/sync", {
-			method: "POST",
-			headers: authHeaders(r),
-			body: JSON.stringify({
-				products: [{
-					app_id: 1, name: "Cola", price: { amount_minor: 1500, currency: "EGP" },
-					stock: 10, available: true, image_url: `https://orderak.app/media/${key}`,
-				}],
-			}),
+		await seedStockedProduct(r, 10, {
+			name: "Cola",
+			price: { amount_minor: 1500, currency: "EGP" },
+			image_url: `https://orderak.app/media/${key}`,
 		});
 
 		expect(await reclaimOrphanedMedia(testEnv({ MEDIA_RECLAIM_ENABLED: "true" }))).toBe(0);
