@@ -61,7 +61,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import app.orderak.seller.R
 import android.content.Context
-import app.orderak.seller.data.remote.SyncScheduler
+import app.orderak.seller.data.refresh.RefreshScheduler
 import app.orderak.seller.data.remote.BackendApi
 import app.orderak.seller.data.db.OrderakDatabase
 import app.orderak.seller.data.session.SessionLogoutManager
@@ -173,7 +173,7 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             sessionStore.savePayout(instapay.trim(), vfcash.trim())
             if (slug.isNotBlank()) sessionStore.saveSlug(slug.trim())
-            SyncScheduler.syncNow(appContext)   // يبعت التحديث للباك اند فورًا
+            RefreshScheduler.refreshNow(appContext)   // يبعت التحديث للباك اند فورًا
             onDone()
         }
     }

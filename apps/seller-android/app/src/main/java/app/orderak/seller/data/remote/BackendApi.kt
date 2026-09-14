@@ -70,56 +70,6 @@ data class RegisterRes(
 data class MoneyDto(val amount_minor: Long, val currency: String = "EGP")
 
 /**
- * One product on its way up.
- *
- * `remote_uuid` is the server's own id for this product, learnt on the sync
- * that first accepted it and kept ever since. It is the identity: `app_id` is
- * this device's Room row id, and two phones signed into one store both hand out
- * 1, 2, 3… for different products, so a server matching on it overwrote one
- * with the other. Null only until a product has synced for the first time, and
- * a null tells the server exactly that.
- */
-@Serializable
-data class ProductDto(
-    val app_id: Long, val remote_uuid: String? = null,
-    val name: String, val price: MoneyDto,
-    val stock: Int, val available: Boolean,
-    val description: String? = null,
-    val image_url: String? = null,
-    val category_code: String? = null,
-    val stock_dirty: Boolean = false,
-    val expected_stock_version: Long? = null,
-)
-
-/**
- * A full-mirror push. Whatever this list omits, the server deletes.
- *
- * `baseline_version` is the catalog_version this device last downloaded. The
- * server requires it for any push that modifies or deletes an existing product,
- * and refuses the write when it does not match — because absence is not evidence
- * of deletion, and a device that has been offline sends the same payload as a
- * seller who deleted everything. Null is only correct for a purely additive
- * push, which cannot destroy what it has never seen.
- */
-@Serializable
-data class ProductsSyncReq(
-    val products: List<ProductDto>,
-    val baseline_version: Long? = null,
-    val confirm_deletion: Boolean = false,
-)
-
-/** Per-product identity assigned by the backend (immutable product_code). */
-@Serializable
-data class ProductCodeDto(
-    val app_id: Long,
-    val product_code: String,
-    val remote_uuid: String? = null,
-    val stock: Int = 0,
-    val stock_version: Long = 0,
-    val category_code: String? = null,
-)
-
-/**
  * The body of a status transition.
  *
  * Serialized rather than built by hand. This was the one request in the client
@@ -182,33 +132,21 @@ data class OrderStatusRes(
 )
 
 @Serializable
-data class ProductsSyncRes(
-    val ok: Boolean = false, val count: Int = 0,
-    val products: List<ProductCodeDto> = emptyList(),
-    val conflicts: List<Long> = emptyList(),
-    /** Present on catalog_baseline_required and stale_catalog: download again. */
-    val catalog_version: Long? = null,
-    /**
-     * Present on bulk_deletion_unconfirmed: how many products this push would
-     * delete, and out of how many the store currently holds.
-     *
-     * Read rather than ignored because the confirmation the server is asking
-     * for has to be put to the seller, and a prompt that cannot name the numbers
-     * is a prompt people click through. See SyncRepository.pendingBulkDeletion.
-     */
-    val deleting: Int? = null,
-    val of: Int? = null,
-    @SerialName("code") val error: String? = null,
-)
-
-/** One product as the server holds it, for the download that establishes a baseline. */
-@Serializable
 data class RemoteProductDto(
     val app_id: Long,
     /** The server's id for this product — the key the local row is matched on. */
     val remote_uuid: String? = null,
     val product_code: String,
     val name: String,
+    /**
+     * The URL-safe form of the name, as the storefront addresses this product.
+     *
+     * Declared because the contract guarantees it, not because a screen reads it
+     * yet — a client that omits a guaranteed field cannot notice when it starts
+     * mattering. `verify-dto-schema-parity.mjs` is what made this absence
+     * visible.
+     */
+    val slug: String? = null,
     val description: String? = null,
     val price: MoneyDto = MoneyDto(0),
     val stock: Int = 0,
@@ -1217,11 +1155,6 @@ class BackendApi @Inject constructor(
     suspend fun fetchProducts(phone: String, secret: String): ProductsPullRes =
         apiCall({ ProductsPullRes(error = it) }) {
             getRaw("/api/v1/products", creds(phone, secret))
-        }
-
-    suspend fun syncProducts(phone: String, secret: String, req: ProductsSyncReq): ProductsSyncRes =
-        apiCall({ ProductsSyncRes(error = it) }) {
-            postRaw("/api/v1/products/sync", json.encodeToString(req), creds(phone, secret))
         }
 
     // ---- Products, one at a time ----

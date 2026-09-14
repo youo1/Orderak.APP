@@ -71,7 +71,7 @@ import app.orderak.seller.core.ui.SyncStatusBanner
 import app.orderak.seller.feature.customers.CustomersScreen
 import app.orderak.seller.feature.orders.OrdersScreen
 import app.orderak.seller.feature.products.ProductsScreen
-import app.orderak.seller.data.remote.SyncScheduler
+import app.orderak.seller.data.refresh.RefreshScheduler
 import app.orderak.seller.data.remote.BackendConfig
 import app.orderak.seller.data.remote.AppVersionPolicy
 import app.orderak.seller.data.billing.EntitlementFreshness
@@ -143,8 +143,8 @@ fun MainScreen(
 
     val appContext = LocalContext.current.applicationContext
     LaunchedEffect(Unit) {
-        SyncScheduler.ensurePeriodic(appContext)
-        SyncScheduler.syncNow(appContext)
+        RefreshScheduler.ensurePeriodic(appContext)
+        RefreshScheduler.refreshNow(appContext)
     }
     LaunchedEffect(viewModel, updatedMessage, refreshFailedMessage) {
         viewModel.planRefreshEvents.collect { result ->
@@ -202,7 +202,7 @@ fun MainScreen(
                     syncStatus = syncStatus,
                     versionMode = versionMode,
                     versionPolicy = versionPolicy,
-                    onRetrySync = { SyncScheduler.syncNow(appContext) },
+                    onRetrySync = { RefreshScheduler.refreshNow(appContext) },
                     onRefresh = viewModel::refreshPlanSettings,
                     onSeeOrders = { surfaceName = SellerSurface.Orders.name },
                     onOpenAnnouncements = onOpenAnnouncements,

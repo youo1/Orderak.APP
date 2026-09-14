@@ -82,6 +82,14 @@ jobs:
       - name: Verify no hand-written colour in the Android app
         run: node tooling/repository/verify-no-hardcoded-colors.mjs
 
+      # D1 is the system of record and Room is a cache of it (ADR-012). That rule
+      # is only as strong as the narrowest place it can be broken, which is one
+      # productDao().upsert() in a view model written by someone reasonably
+      # assuming the local database is where products live. Nothing would fail;
+      # the seller would see their edit and a later refresh would replace it.
+      - name: Verify only the cache writers write the cache
+        run: node tooling/repository/verify-cache-write-boundary.mjs
+
       # formatAmount defaults to the ambient locale, which is right for a library
       # and wrong for a screen: the order list shipped Latin-digit money beside
       # Arabic-Indic dates in the same row until a greyscale screenshot put them

@@ -75,6 +75,21 @@ class ProductCacheWriter @Inject constructor(
         db.productDao().byProductCode(productCode)?.let { db.productDao().delete(it.id) }
     }
 
+    /**
+     * Forget a product the server never knew about.
+     *
+     * The one deletion not preceded by a server confirmation, and it is not an
+     * exception to the rule: a row with no `productCode` was never accepted by
+     * the server, so there is nothing to confirm and this device holds the only
+     * copy. Removing it is exactly what the seller asked for.
+     *
+     * Every other deletion goes through [remove] after the server has agreed.
+     */
+    suspend fun removeNeverSynced(localId: Long) = db.withTransaction {
+        val row = db.productDao().byId(localId)
+        if (row != null && row.productCode.isNullOrBlank()) db.productDao().delete(localId)
+    }
+
     /** Record the public URL an uploaded image landed on. */
     suspend fun setImageUrl(localId: Long, url: String?) = db.productDao().setImageUrl(localId, url)
 

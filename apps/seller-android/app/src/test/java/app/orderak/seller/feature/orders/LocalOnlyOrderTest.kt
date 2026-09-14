@@ -52,7 +52,7 @@ class LocalOnlyOrderTest {
 
     @Test
     fun `an order that failed to post is still marked, and still has its key`() {
-        // The retry path: SyncRepository.pushPendingOrders finds it by
+        // The retry path: OrderCommandQueue.drain finds it by
         // remoteId IS NULL AND idempotencyKey IS NOT NULL, and the key is what
         // makes the retry return the same order rather than a second one.
         val queued = order(remoteId = null).copy(idempotencyKey = "b8f1-0000")
