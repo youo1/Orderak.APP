@@ -1441,6 +1441,29 @@ function remoteUuidOf(raw: Row): string | null {
 }
 
 async function syncProducts(request: Request, env: Env, store: Row): Promise<Response> {
+	// WHO IS STILL CALLING THIS, AND ON WHAT BUILD
+	//
+	// The mirror is being decommissioned, and the decision to delete it turns on
+	// a question nobody could answer from here: is any installed app still using
+	// it? Route coverage proves no code in this repository calls it. It says
+	// nothing about a phone in a shop somewhere running last month's build, and a
+	// deletion decided on the first question while believing it answered the
+	// second is how a working app stops working.
+	//
+	// So every call announces itself with the version that made it. Silence over
+	// an observation window is the evidence the deletion is gated on — and unlike
+	// `catalog_version = 0`, which cannot tell "no products" from "products only
+	// on a device", silence here means exactly what it appears to mean.
+	//
+	// This block goes with the endpoint.
+	console.log(JSON.stringify({
+		signal: "catalog_mirror_called",
+		store_id: String(store.id),
+		platform: request.headers.get("x-orderak-platform") ?? null,
+		app_version: request.headers.get("x-orderak-app-version") ?? null,
+		version_code: request.headers.get("x-orderak-version-code") ?? null,
+	}));
+
 	// This endpoint is a MIRROR: anything the submitted list omits is deleted at
 	// the end of this function, and an empty list deletes the entire catalog.
 	// That makes the difference between "the seller has no products" and "this
