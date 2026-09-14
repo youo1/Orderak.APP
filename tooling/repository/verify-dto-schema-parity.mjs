@@ -188,8 +188,13 @@ const PAIRS = [
 		clientOnly: [],
 	},
 	{
-		dto: "ProductCodeDto",
-		pointer: ["components", "schemas", "SyncedProductIdentity"],
+		// Replaces the ProductCodeDto/SyncedProductIdentity pair, which described
+		// the mirror's reply and went with the Kotlin type when the app stopped
+		// calling it. This is the load-bearing pair now: every product route
+		// answers with this shape, so a field the server adds and the client
+		// silently drops is caught here rather than in a bug report.
+		dto: "RemoteProductDto",
+		pointer: ["components", "schemas", "Product"],
 		clientOnly: [],
 	},
 ];

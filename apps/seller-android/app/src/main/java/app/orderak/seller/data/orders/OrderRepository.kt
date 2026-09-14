@@ -71,7 +71,7 @@ class OrderRepository @Inject constructor(
      * reinstall and is not counted against the plan.
      *
      * A post that FAILED is not an error the seller has to act on. The row keeps
-     * its idempotency key, [SyncRepository] retries it on the next sync, and the
+     * its idempotency key, the order command queue retries it, and the
      * screens say plainly that it is not on the account yet — see
      * LocalOnlyOrder.kt. The key is what makes that retry safe: the server
      * returns the order already written rather than creating a second one.
@@ -231,27 +231,6 @@ class OrderRepository @Inject constructor(
         val removed = orderDao.deleteLocalOnly(orderId) > 0
         if (removed) _refusedPushes.update { it - orderId }
         removed
-    }
-
-    /**
-     * Apply a seller's edit to a customer.
-     *
-     * Written locally and marked dirty, not posted here. The seller is often
-     * offline, and an edit that failed because of that would either be lost or
-     * would have to block the screen on a network call. [SyncRepository] posts
-     * every dirty row on the next sync and clears the flag on acknowledgement;
-     * until then the local value is the one shown.
-     *
-     * The phone is not a parameter. It is the identity — see CustomerDao.
-     */
-    suspend fun editCustomer(customerKey: String, name: String, altContact: String, note: String) {
-        db.customerDao().applyEdit(
-            key = customerKey,
-            name = name.trim().ifBlank { null },
-            altContact = altContact.trim().ifBlank { null },
-            note = note.trim().ifBlank { null },
-            updatedAt = System.currentTimeMillis(),
-        )
     }
 
     /**

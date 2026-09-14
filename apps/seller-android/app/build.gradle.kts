@@ -98,17 +98,12 @@ android {
             applicationIdSuffix = ".staging"
             versionNameSuffix = "-staging"
             buildConfigField("String", "DEPLOYMENT_ENVIRONMENT", "\"staging\"")
-            buildConfigField("String", "DEMO_SELLER_PHONE", "\"01066971791\"")
             buildConfigField("String", "API_BASE_URL", "\"https://api.staging.orderak.app\"")
             buildConfigField("String", "SITE_BASE_URL", "\"https://staging.orderak.app\"")
         }
         create("production") {
             dimension = "environment"
             buildConfigField("String", "DEPLOYMENT_ENVIRONMENT", "\"production\"")
-            // Empty, and verifyDemoDataContract fails the build if it ever is
-            // not: demo data seeds a local database and suppresses sync, which
-            // would silently stop a real seller's catalogue reaching the server.
-            buildConfigField("String", "DEMO_SELLER_PHONE", "\"\"")
             buildConfigField("String", "API_BASE_URL", "\"https://api.orderak.app\"")
             buildConfigField("String", "SITE_BASE_URL", "\"https://orderak.app\"")
         }
@@ -846,77 +841,126 @@ val verifyDesignSystemContract by tasks.registering {
 }
 
 /**
- * Demo data must never be reachable in a production build.
+ * The catalogue is the server's, and the device holds a cache of it.
  *
- * `DemoDataSeeder` writes a shop into the local database and switches sync off
- * for that account. The second half is the dangerous one: the product push is a
- * full mirror, so a production build that entered demo mode would replace a
- * real seller's catalogue with a demo shop, or — with sync suppressed — quietly
- * stop uploading their real one.
+ * WHAT THIS GUARDS
+ *   ADR-012 replaced a full-mirror catalogue push with per-product REST writes.
+ *   The mirror asserted the complete set of products by omission, so a device
+ *   that had forgotten one deleted it; below ten products the bulk-delete
+ *   confirmation did not engage at all, and an empty push with a valid baseline
+ *   wiped a store in silence.
  *
- * The whole guarantee rests on the production flavour's DEMO_SELLER_PHONE being
- * empty, which is one careless edit away from not being true. This asserts it.
+ *   That shape is gone, and the risk now is that a piece of it comes back. Not
+ *   all at once — one helper reintroduced because it looked useful, one dirty
+ *   flag because an edit needed to survive being offline, one baseline because
+ *   something had to decide whether a device was behind. Each is reasonable on
+ *   its own and together they are the mirror again.
+ *
+ * WHY THE SYMBOL LIST IS THE WEAKER KIND OF GUARD, AND KEPT ANYWAY
+ *   Forbidding names is a dependency on implementation detail rather than on an
+ *   architectural property, and ADR-012 says so in as many words. It is right
+ *   for now because the concrete risk during a migration is someone restoring
+ *   one of these exact symbols from the history. Once the architecture has
+ *   settled, each line should move to a property that
+ *   verify-cache-write-boundary.mjs can express — "no product mutation path
+ *   writes Room directly" is stronger than "no class named X" — and this list
+ *   should shrink to nothing. That is a stated intent with an owner, not a hope.
  */
-val verifyDemoDataContract by tasks.registering {
+val verifyDataAuthorityContract by tasks.registering {
     group = "verification"
-    description = "Fails when demo data could reach a production build"
+    description = "Fails when the mirror's machinery returns to the app"
 
-    val buildScript = project.projectDir.resolve("build.gradle.kts")
-    val seeder = project.projectDir.resolve(
-        "src/main/java/app/orderak/seller/data/demo/DemoDataSeeder.kt",
-    )
-    inputs.files(buildScript, seeder)
+    val appRoot = project.projectDir
+    val workspaceRoot = appRoot.parentFile.parentFile.parentFile
+    val mainRoot = appRoot.resolve("src/main/java/app/orderak/seller")
+    inputs.dir(mainRoot)
 
     doLast {
-        val script = buildScript.readText()
-
-        val production = script
-            .substringAfter("""create("production")""", "")
-            // production is the last flavour declared, so its block ends where
-            // productFlavors does. This used to slice to create("mock"); that
-            // anchor left with the mock flavour, and substringBefore's default
-            // would have returned "" — a guard passing by reading nothing.
-            // Passing "" here too keeps the isNotBlank check below as the thing
-            // that notices when an anchor stops matching.
-            .substringBefore("signingConfigs", "")
-        check(production.isNotBlank()) { "Could not read the production flavour block." }
-
-        val declaration = production.lineSequence()
-            .firstOrNull { "DEMO_SELLER_PHONE" in it }
-            ?: error("The production flavour must declare DEMO_SELLER_PHONE explicitly.")
-        // A phone number is digits. An empty constant has none.
-        check(declaration.none(Char::isDigit)) {
-            "The production flavour's DEMO_SELLER_PHONE must be empty, but reads: " +
-                declaration.trim() + ". " +
-                "Demo data suppresses sync, which would stop a real seller's " +
-                "catalogue reaching the server."
+        fun requireContract(condition: Boolean, message: String) {
+            if (!condition) {
+                throw GradleException(
+                    "DATA AUTHORITY CONTRACT WARNING: " + message +
+                        "\nRead docs/contracts/sync-conflict-contract.md and " +
+                        "docs/decisions/adr-012-server-authoritative-catalogue.md. " +
+                        "Do not bypass this guard.",
+                )
+            }
         }
 
-        val source = seeder.readText()
-        check("BuildConfig.DEMO_SELLER_PHONE.isEmpty()) return false" in source) {
-            "DemoDataSeeder.isDemoSeller must return false on an empty " +
-                "DEMO_SELLER_PHONE before looking at the signed-in phone. " +
-                "That check is what makes the production flavour's empty " +
-                "constant sufficient."
+        val contract = workspaceRoot.resolve("docs/contracts/sync-conflict-contract.md").readText()
+        requireContract(
+            "**Contract version:** 2" in contract,
+            "The data authority contract changed version. Re-read it before changing this guard.",
+        )
+
+        val sources = mainRoot.walkTopDown()
+            .filter { it.isFile && it.extension == "kt" }
+            .map { it to it.readText() }
+            .toList()
+        val allSource = sources.joinToString("\n") { it.second }
+
+        // The mirror's machinery, by name. Each of these existed to answer a
+        // question the new shape does not ask: which of two catalogues is right.
+        val mirrorSymbols = listOf(
+            "CatalogPushDecision", "adoptServerCatalog", "applySync", "acceptSync",
+            "rebaseConflict", "baseline_version", "catalogBaseline", "confirm_deletion",
+            "PendingBulkDeletion", "ProductsSyncReq", "SyncRepository",
+            "DemoDataSeeder", "DEMO_SELLER_PHONE",
+        )
+        // `stockDirty` and `syncedStockVersion` are deliberately absent, and this
+        // is the one place that absence is explained rather than assumed.
+        //
+        // They are still real columns. Room stays at version 10 for the whole of
+        // this phase, and a device upgrading into the cutover can be carrying
+        // stock edits that were flagged under the mirror and never pushed. That
+        // is genuine seller intent held nowhere else, so StockDrain reads both
+        // columns to deliver it through the route that owns stock now.
+        //
+        // They belong on the list above the moment the Room migration drops them,
+        // which is the same change that deletes StockDrain. Adding them earlier
+        // would forbid the code that exists to make removing them safe.
+        for (symbol in mirrorSymbols) {
+            val offenders = sources.filter { (_, text) -> symbol in text }
+            requireContract(
+                offenders.isEmpty(),
+                "`" + symbol + "` is part of the catalogue mirror and must not return: " +
+                    offenders.joinToString(", ") { it.first.name },
+            )
         }
 
-        val sync = project.projectDir.resolve(
-            "src/main/java/app/orderak/seller/data/remote/SyncRepository.kt",
-        ).readText()
-        check("if (demoDataSeeder.isDemoSeller()) return false" in sync) {
-            "SyncRepository.doSync must refuse to run for the demo account. " +
-                "Its product push is a full mirror: syncing a seeded device " +
-                "would delete the account's real catalogue."
-        }
+        // The command log has to still be here. A refactor that removed the
+        // idempotency key or the pending query would turn Class B into a
+        // best-effort write, and nothing else in the build would notice.
+        requireContract(
+            "idempotencyKey" in allSource,
+            "OrderEntity.idempotencyKey is what makes an order safe to retry.",
+        )
+        requireContract(
+            "fun pendingUpload(" in allSource,
+            "OrderDao.pendingUpload() is how unacknowledged orders are found.",
+        )
+        requireContract(
+            "class OrderCommandQueue" in allSource,
+            "OrderCommandQueue is the durable command log; orders are Class B.",
+        )
+
+        // A destructive fallback would delete a seller's unsent orders on any
+        // schema mismatch. The scoped `From(` variant is the one that is allowed.
+        val database = mainRoot.resolve("data/db/OrderakDatabase.kt").readText()
+        requireContract(
+            !Regex("fallbackToDestructiveMigration\\s*\\(").containsMatchIn(database),
+            "Room must not fall back to destroying the database; only the scoped " +
+                "fallbackToDestructiveMigrationFrom(...) form is allowed.",
+        )
     }
 }
 
 tasks.named("preBuild") {
-    dependsOn(verifyDemoDataContract)
     dependsOn(verifyLocalizationContract)
     dependsOn(verifyAuthPhase1Contract)
     dependsOn(verifySellerApiContract)
     dependsOn(verifyDesignSystemContract)
+    dependsOn(verifyDataAuthorityContract)
 }
 
 // ============================================================

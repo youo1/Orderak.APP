@@ -38,7 +38,11 @@ const protectedTasks = [
 	// contrast validation left in the system now that colour is generated
 	// rather than published, which makes it the last one that should have
 	// been unprotected.
-	["verifyDesignSystemContract", "tasks.named(\"preBuild\")"],
+	["verifyDesignSystemContract", "verifyDataAuthorityContract"],
+	// Added with the catalogue cutover. It is the only guard standing between
+	// the app and the mirror coming back a piece at a time, so it protects
+	// itself the same way the others do.
+	["verifyDataAuthorityContract", "tasks.named(\"preBuild\")"],
 ];
 
 const forbiddenTaskPatterns = [

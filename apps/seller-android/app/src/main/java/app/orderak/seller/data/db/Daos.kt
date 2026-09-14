@@ -1,6 +1,5 @@
 package app.orderak.seller.data.db
 
-import app.orderak.seller.data.remote.ProductCodeDto
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -81,21 +80,6 @@ interface ProductDao {
      * gone. Nothing matching means the product is new here, and [adoptedProduct]
      * gives it a fresh row rather than claiming an occupied one.
      */
-    @Transaction
-    suspend fun adoptServerCatalog(products: List<ProductEntity>) {
-        for (product in products) {
-            val local = product.remoteUuid?.let { byRemoteUuid(it) }
-                ?: product.productCode?.let { byProductCode(it) }
-            upsert(adoptedProduct(product, local))
-        }
-    }
-
-    @Query("UPDATE products SET productCode=:code, remoteUuid=:uuid, stock=:stock, syncedStockVersion=:version, stockDirty=0 WHERE id=:id")
-    suspend fun acceptSync(id: Long, code: String?, uuid: String?, stock: Int, version: Long)
-
-    @Query("UPDATE products SET productCode=:code, remoteUuid=:uuid, syncedStockVersion=:version WHERE id=:id")
-    suspend fun rebaseConflict(id: Long, code: String?, uuid: String?, version: Long)
-
     /** Persist the public R2 URL returned after uploading the local product image. */
     @Query("UPDATE products SET imageUrl = :url WHERE id = :id")
     suspend fun setImageUrl(id: Long, url: String?)
@@ -118,16 +102,6 @@ interface ProductDao {
      * another phone under app_ids that collide with this phone's row ids — which
      * stamped another device's product code onto a local product.
      */
-    @Transaction
-    suspend fun applySync(codes: List<ProductCodeDto>, conflicts: Set<Long>) {
-        for (item in codes) {
-            if (item.app_id in conflicts) {
-                rebaseConflict(item.app_id, item.product_code, item.remote_uuid, item.stock_version)
-            } else {
-                acceptSync(item.app_id, item.product_code, item.remote_uuid, item.stock, item.stock_version)
-            }
-        }
-    }
 }
 
 @Dao
@@ -320,7 +294,7 @@ interface CustomerDao {
      *
      * REPLACE rather than a field-by-field update because the server row is
      * authoritative for every column here. It is called only for rows that are
-     * not dirty — see `SyncRepository`, which posts local edits before pulling,
+     * not dirty. Vestigial since the cutover: a customer edit is Class A now, so
      * so an unacknowledged edit is never overwritten by the value it replaced.
      */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
