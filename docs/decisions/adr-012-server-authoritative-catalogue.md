@@ -120,6 +120,40 @@ is local, unsynced, and lost on reinstall. The contract names it so the "Room is
 a cache" rule has no undocumented hole. Whether payments belong in Orderak at all
 is a separate decision this ADR does not make.
 
+## Retiring the mirror: what the decision rests on
+
+The mirror is served alongside the product routes until every installed app has
+moved. Deciding when that is true is the risky part, because the obvious
+evidence is not evidence.
+
+**`catalog_version = 0` is not a usable signal.** It cannot distinguish a seller
+with no products from a seller whose products exist only on a phone, and those
+are opposite situations.
+
+**Route coverage answers a different question than the one being asked.** It
+proves no code in this repository calls the endpoint. A phone in a shop running
+last month's build is invisible to a grep, and a deletion decided on the first
+question while believing it answered the second is how a working app stops
+working.
+
+So the endpoint announces every call with the build that made it — the
+`catalog_mirror_called` signal in `syncProducts`, carrying platform, app version
+and version code, emitted before the request is validated so a refused push from
+an old client still counts as a caller. Silence over the observation window means
+what it appears to mean. `mirror-decommission-evidence.spec.ts` asserts the
+signal fires, including for a caller sending no version headers at all, and that
+the product routes produce none of it — because a signal nobody emits looks
+exactly like a signal nobody triggers.
+
+One risk the original plan assumed is smaller than it looks. The legacy
+reconciliation converts device-only products through `POST /api/v1/products`, not
+through the mirror, so deleting the mirror cannot strand them. What the deletion
+can break is a client that never upgraded, which is what the minimum-supported-
+version gate is for — and that is measured on the proportion of **active devices
+on a CRUD-capable build**, from `sellers.primary_device_app_version` and
+`primary_device_last_used_at`, rather than on the proportion of a staged rollout,
+which measures something else entirely.
+
 ## Alternatives considered
 
 **Harden the mirror.** Lower the bulk-deletion floor, add dirty flags for
