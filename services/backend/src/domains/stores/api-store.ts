@@ -1090,8 +1090,30 @@ async function readProductFields(env: Env, storeId: string, raw: Row): Promise<P
 	const name = String(raw.name ?? "").trim().slice(0, 80);
 	if (!name) return jsonResponse({ error: "name_required" }, 400);
 
+	// A malformed price is refused, not read as zero.
+	//
+	// The mirror reads `price_minor: 500` — the pre-ADR-009 shape — as a missing
+	// price object and stores 0. money-wire.spec.ts documents that rather than
+	// asserting it is right, and says so: "When request validation lands
+	// (ADR-010) this should become a 400 instead." These routes are that
+	// validation, and no shipped client calls them, so there is no compatibility
+	// argument for carrying the behaviour across. A product silently priced at
+	// nothing is the most expensive kind of quiet wrong answer there is.
 	const rawPrice = (raw.price ?? {}) as { amount_minor?: unknown; currency?: unknown };
-	const price = Math.max(0, Math.floor(Number(rawPrice.amount_minor) || 0));
+	if (raw.price == null || typeof raw.price !== "object" || Array.isArray(raw.price)) {
+		return jsonResponse({
+			error: "price_required",
+			message: "price is an object: { amount_minor, currency }. A bare number is not accepted.",
+		}, 400);
+	}
+	const amountMinor = Number(rawPrice.amount_minor);
+	if (!Number.isFinite(amountMinor) || amountMinor < 0) {
+		return jsonResponse({
+			error: "price_invalid",
+			message: "price.amount_minor is a non-negative integer in minor units.",
+		}, 400);
+	}
+	const price = Math.floor(amountMinor);
 	// Rejected rather than defaulted, for the reason the mirror states: defaulting
 	// is how 15000 fils becomes 150.00 EGP — plausible, wrong by a factor of ten,
 	// and undetectable afterwards because nothing recorded what was meant.

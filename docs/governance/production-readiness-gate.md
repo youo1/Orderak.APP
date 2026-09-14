@@ -112,9 +112,24 @@ the one that matters: the other four only put information somewhere.
 
 ### Cross-store isolation — what the suite actually proves
 
-The highest-value case is covered: seller B's `POST /api/v1/products/sync`
-payload cannot touch seller A's `store_id`, under any field. That endpoint is
-the destructive one, which is why the suite was written alongside item 04.
+The highest-value case is covered on both product write surfaces. Seller B's
+`POST /api/v1/products/sync` payload cannot touch seller A's `store_id` under
+any field — that endpoint is the destructive one, which is why the suite was
+written alongside item 04 — and the per-product routes that replace it are
+covered in `product-crud.spec.ts` with a successor for each of those cases.
+
+Two differences are worth stating rather than leaving to be inferred. The
+successors are structurally stronger where the mirror's cases relied on refusing
+a foreign identity field: `PUT` and `DELETE` take no identity in the body at all,
+so the only way to name a product is a code that must belong to the caller's
+store. And one assertion has **no successor**: the mirror's "baseline is computed
+per store" case describes `baseline_version`, which ceases to exist with the
+mirror. It is recorded here because an assertion that quietly disappears is how a
+coverage gap starts.
+
+One case in the new suite has no predecessor: a foreign stock adjustment must
+leave **zero `stock_movements` rows** in the victim's ledger. The mirror's suite
+never checked the ledger, and the ledger is financial state.
 
 It also covers a seller credential being refused on `/api/admin/v1/*`, which had
 no test before.

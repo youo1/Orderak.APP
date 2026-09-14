@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from "vitest";
-import { BASE, SELF, authHeaders, createSchema, env, registerStore } from "./helpers";
+import { BASE, SELF, authHeaders, createSchema, env, registerStore, seedStockedProduct } from "./helpers";
 import type { Registered } from "./helpers";
 
 /**
@@ -34,13 +34,10 @@ describe("stock movements", () => {
 	}
 
 	async function seed(r: Registered, stock = 10): Promise<string> {
-		const res = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
-			method: "POST", headers: authHeaders(r),
-			body: JSON.stringify({
-				products: [{ app_id: 1, name: "Cola", price: { amount_minor: 1500, currency: "EGP" }, stock, available: true }],
-			}),
+		const product = await seedStockedProduct(r, stock, {
+			name: "Cola", price: { amount_minor: 1500, currency: "EGP" },
 		});
-		return ((await res.json()) as { products: { product_code: string }[] }).products[0].product_code;
+		return String(product.product_code);
 	}
 
 	async function order(r: Registered, code: string, qty: number, key: string): Promise<number> {
@@ -133,6 +130,7 @@ describe("stock movements", () => {
 		const pulled = (await (await SELF.fetch(`${BASE}/api/v1/products`, { headers: authHeaders(r) })).json()) as {
 			products: { app_id: number; stock_version: number }[];
 		};
+		const before = (await movements(storeId)).filter((m) => m.cause === "MANUAL_ADJUSTMENT").length;
 		await SELF.fetch(`${BASE}/api/v1/products/sync`, {
 			method: "POST", headers: authHeaders(r),
 			body: JSON.stringify({
@@ -145,9 +143,16 @@ describe("stock movements", () => {
 			}),
 		});
 
+		// Counted as a difference rather than an absolute, because seeding is now
+		// itself a seller setting a figure: `seed()` creates the product at zero
+		// and then adjusts it to ten, which is a MANUAL_ADJUSTMENT of its own. The
+		// row this test is about is the second one, so assert the one it produced
+		// instead of assuming it is the only one in the table.
 		const adjustments = (await movements(storeId)).filter((m) => m.cause === "MANUAL_ADJUSTMENT");
-		expect(adjustments).toHaveLength(1);
-		expect(adjustments[0]).toMatchObject({ delta: 15, actor: "seller", balance_after: 25, reconstructed: 0 });
+		expect(adjustments).toHaveLength(before + 1);
+		const written = adjustments.filter((m) => m.balance_after === 25);
+		expect(written).toHaveLength(1);
+		expect(written[0]).toMatchObject({ delta: 15, actor: "seller", balance_after: 25, reconstructed: 0 });
 		expect(code).toBeTruthy();
 	});
 
@@ -161,6 +166,9 @@ describe("stock movements", () => {
 		// freshly created product is already at 0, and sending 0 then would be
 		// current rather than stale — which is what this test needs to avoid.
 		await order(r, code, 1, "ledger-stale-setup");
+		// Same reason as above: seeding writes an adjustment of its own, so what
+		// must not change is the count, not that the count is zero.
+		const before = (await movements(storeId)).filter((m) => m.cause === "MANUAL_ADJUSTMENT").length;
 		const stale = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
 			method: "POST", headers: authHeaders(r),
 			body: JSON.stringify({
@@ -172,7 +180,7 @@ describe("stock movements", () => {
 			}),
 		});
 		expect(stale.status).toBe(409);
-		expect((await movements(storeId)).filter((m) => m.cause === "MANUAL_ADJUSTMENT")).toHaveLength(0);
+		expect((await movements(storeId)).filter((m) => m.cause === "MANUAL_ADJUSTMENT")).toHaveLength(before);
 	});
 
 	it("sums to the stock the product actually holds", async () => {

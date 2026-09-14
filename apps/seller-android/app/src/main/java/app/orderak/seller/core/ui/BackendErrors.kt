@@ -204,6 +204,11 @@ val INTENTIONALLY_GENERIC: Set<String> = setOf(
     // `name_required` is deliberately absent: it is already answered through
     // INVALID_REQUEST, and a code may appear in exactly one of these two sets.
     "stock_invalid", "expected_stock_version_required",
+    // A price that arrived as a bare number instead of an amount and a currency,
+    // or as something that is not a number at all. The editor parses the field
+    // and refuses to save until it holds one, so these describe a request the
+    // app should never have been able to build.
+    "price_required", "price_invalid",
     // Discounts have no way in yet: the editor round-trips whatever a product
     // already carried and the controls that would set one have no caller. These
     // three describe a discount the app cannot currently send, so there is no

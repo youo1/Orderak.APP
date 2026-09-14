@@ -101,6 +101,7 @@ and closure evidence. Archived plans do not create new implementation scope.
 | [D1 migration drift runbook](./runbooks/d1-migration-drift.md) | Diagnose migration state safely; ledger mutation requires backup and explicit approval |
 | [D1 restore runbook](./runbooks/d1-restore.md) | Recover a database from the encrypted R2 backups; key custody, rotation, and when Time Travel is the better move |
 | [ADR-011](./decisions/adr-011-off-account-backup-copy.md) | **Proposed:** a backup copy outside this Cloudflare account, and why the third-party option is blocked on `R-003` |
+| [ADR-012](./decisions/adr-012-server-authoritative-catalogue.md) | D1 owns the catalogue and the device holds a cache; why the order outbox is a command log rather than a sync engine, and why there are no tombstones |
 | [Firebase authentication outage runbook](./runbooks/firebase-auth-outage.md) | Respond to Firebase sign-in outages |
 | [Google Play billing DLQ runbook](./runbooks/play-billing-dlq.md) | Investigate and safely requeue dead-lettered billing verifications without exposing purchase tokens |
 | [Tenant shard migration runbook](./runbooks/tenant-shard-migration.md) | Rehearsal-gated fence/copy/checksum/catch-up/flip/rollback procedure and evidence requirements |

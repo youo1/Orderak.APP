@@ -407,7 +407,87 @@ Response:
 - `available` — `valid` **and** not already taken.
 - `suggestions` — up to 3 free alternatives, returned only when not available.
 
-### Sync Products
+### Products
+
+One product per request, addressed by its immutable public `product_code`. These
+are the routes to write against; the catalogue mirror below is served only until
+every device has moved across.
+
+```http
+POST   /api/v1/products
+PUT    /api/v1/products/{product_code}
+DELETE /api/v1/products/{product_code}
+PATCH  /api/v1/products/{product_code}/stock
+```
+
+**`POST /api/v1/products`** creates one product and answers `201` with it.
+
+```json
+{
+  "name": "Pizza",
+  "description": "Stone baked",
+  "price": { "amount_minor": 15000, "currency": "EGP" },
+  "available": true,
+  "image_url": null,
+  "category_code": "c-8G32DY",
+  "client_request_id": "018f-editor-save-3"
+}
+```
+
+`client_request_id` is optional and makes the create safe to retry: the same
+store and the same id resolve to the product already created rather than a
+second one, and the reply carries `"replayed": true`. Without it, two identical
+requests make two products — a caller that sends no id has not asked for
+deduplication and does not silently get it.
+
+A new product starts at **zero stock**. Inventory is server-owned and moves only
+through a buyer's order or the stock route below, so a create that accepted a
+figure would be a device asserting a count it cannot know.
+
+`price` is an object. A bare `price_minor: 500` is refused with `400
+price_required` rather than read as a missing price and stored as zero.
+
+An unknown or foreign `category_code` is refused with `400
+unknown_category_code`. The mirror files such a product under no category
+instead, which is defensible for a batch where one bad code should not reject
+the other two hundred; for a single deliberate write it is a quiet wrong answer
+to a question the seller asked.
+
+**`PUT /api/v1/products/{product_code}`** replaces the editable metadata. It is a
+replacement and not a partial update: a field the caller omits is **cleared**,
+because a seller who removes a description means it to go. It never writes
+`stock` or `stock_version`.
+
+**`DELETE /api/v1/products/{product_code}`** removes one product. Stock movements
+for it are kept — the ledger carries its own copy of the product's identity so a
+later deletion cannot rewrite history. There is no tombstone and none is coming.
+
+**`PATCH /api/v1/products/{product_code}/stock`** adjusts stock under
+compare-and-set.
+
+```json
+{ "stock": 12, "expected_stock_version": 5 }
+```
+
+`expected_stock_version` is **required**. Optional would be last-write-wins: a
+caller with no opinion about what it is overwriting would erase a decrement a
+buyer's order had just made. A mismatch answers `409 stale_stock` carrying the
+authoritative `stock` and `stock_version`, so the client can show the seller both
+numbers and let them choose. Re-sending automatically with the returned revision
+is the same defect wearing a different name.
+
+Discounts travel on both write routes as `discount_type` (`PERCENTAGE`,
+`AMOUNT`, or `null`) and `discount_value`. The value is **basis points** for a
+percentage — `1000` is 10.00%, capped at `10000` — and **minor units** of the
+product's own currency for an amount. Both halves move together or neither does.
+
+### Sync Products (legacy, being retired)
+
+> **Deprecated.** Use the product routes above. This endpoint mirrors the
+> catalogue: products absent from the submitted array are **deleted**. It is
+> served only until every active device runs a build that uses the routes above,
+> and it will be removed. See
+> [ADR-012](../decisions/adr-012-server-authoritative-catalogue.md).
 
 ```http
 POST /api/v1/products/sync

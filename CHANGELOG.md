@@ -8,6 +8,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Per-product write routes — `POST /api/v1/products`, `PUT` and `DELETE
+  /api/v1/products/{product_code}`, and `PATCH
+  /api/v1/products/{product_code}/stock` — replacing the catalogue mirror, which
+  deletes any product absent from a submitted payload. The create is idempotent
+  under retry via `client_request_id`. Product discounts now have a server
+  column and travel on both write routes. See
+  [ADR-012](docs/decisions/adr-012-server-authoritative-catalogue.md).
+
 - Phase 0 launch-governance package with the program charter, RACI, operating
   cadence, evidence standard, temporary risk freeze, source-plan traceability,
   initialized control registers, and an objective G0 exit checklist.
