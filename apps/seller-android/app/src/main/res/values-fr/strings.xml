@@ -537,4 +537,21 @@
     <string name="error_phone_already_used">Ce numéro a déjà un compte Orderak.</string>
     <string name="error_phone_change">Votre numéro n\'a pas pu être modifié. Vérifiez les deux numéros et réessayez.</string>
     <string name="error_referral">Ce code n\'a pas pu être utilisé.</string>
+
+
+    <!-- Produits enregistres sur ce telephone qui n'ont jamais atteint le
+         compte. L'actualisation du catalogue est bloquee tant que cette liste
+         n'est pas vide, donc le vendeur doit pouvoir la voir et la vider. -->
+    <string name="products_stuck_title">Certains produits ne sont pas sur votre compte</string>
+    <plurals name="products_stuck_body">
+        <item quantity="one">%d produit n\'est enregistré que sur ce téléphone. Votre catalogue ne sera pas actualisé tant qu\'il n\'est pas envoyé ou supprimé.</item>
+        <item quantity="other">%d produits ne sont enregistrés que sur ce téléphone. Votre catalogue ne sera pas actualisé tant qu\'ils ne sont pas envoyés ou supprimés.</item>
+    </plurals>
+    <string name="products_stuck_action">Voir</string>
+    <string name="products_stuck_dialog_title">Pas sur votre compte</string>
+    <string name="products_stuck_waiting">En attente d\'envoi</string>
+    <string name="products_stuck_refused">Votre compte n\'a pas accepté celui-ci. Modifiez-le, ou supprimez-le.</string>
+    <string name="products_stuck_discard">Supprimer</string>
+    <string name="products_stuck_discard_title">Supprimer %1$s ?</string>
+    <string name="products_stuck_discard_confirm">Ce produit n\'est enregistré que sur ce téléphone et votre compte ne l\'a jamais reçu : le supprimer ici le supprime partout. Cette action est irréversible.</string>
 </resources>

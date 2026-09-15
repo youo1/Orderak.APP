@@ -533,4 +533,21 @@
     <string name="error_phone_already_used">That number already has an Orderak account.</string>
     <string name="error_phone_change">Your number could not be changed. Verify both numbers again and retry.</string>
     <string name="error_referral">That code could not be used.</string>
+
+
+    <!-- Products saved on this phone that never reached the account. The
+         catalogue refresh is gated on this list being empty, so the seller has
+         to be able to see and clear it. -->
+    <string name="products_stuck_title">Some products aren\'t on your account</string>
+    <plurals name="products_stuck_body">
+        <item quantity="one">One product is saved on this phone only. Your catalogue will not update until it is sent or removed.</item>
+        <item quantity="other">%d products are saved on this phone only. Your catalogue will not update until they are sent or removed.</item>
+    </plurals>
+    <string name="products_stuck_action">Review</string>
+    <string name="products_stuck_dialog_title">Not on your account</string>
+    <string name="products_stuck_waiting">Waiting to send</string>
+    <string name="products_stuck_refused">Your account would not accept this one. Edit it, or remove it.</string>
+    <string name="products_stuck_discard">Remove</string>
+    <string name="products_stuck_discard_title">Remove %1$s?</string>
+    <string name="products_stuck_discard_confirm">This product is saved on this phone only and your account never received it, so removing it here removes it everywhere. This cannot be undone.</string>
 </resources>
