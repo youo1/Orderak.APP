@@ -926,8 +926,19 @@ async function deleteCategory(env: Env, store: Row, code: string): Promise<Respo
 // ---- Product pull (non-destructive read) -----------------------------------
 
 /**
- * The store's catalogue version — the baseline a device must hold before it may
- * overwrite or delete anything. See migrations/050_catalog_baseline_version.sql.
+ * The store's catalogue-metadata revision, bumped by create, update and delete
+ * but never by a stock movement.
+ *
+ * It used to be the baseline a device had to hold before the mirror would let
+ * it overwrite or delete anything (migrations/050_catalog_baseline_version.sql
+ * still describes that world). The mirror is gone and so is that meaning: no
+ * write is gated on this number any more, and the endpoint that was has no
+ * successor.
+ *
+ * What it is for now is cache freshness and observability. A client may use it
+ * to decide WHEN to refresh; it must never use it to decide WHAT is true —
+ * the refresh path is unconditionally `GET /products` -> replace the cache.
+ * See docs/contracts/sync-conflict-contract.md.
  */
 async function catalogVersion(env: Env, storeId: string): Promise<number> {
 	const row = await env.orderak_db
