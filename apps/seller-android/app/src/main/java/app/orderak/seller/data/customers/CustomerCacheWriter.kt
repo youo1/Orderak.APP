@@ -1,7 +1,8 @@
 package app.orderak.seller.data.customers
 
-import app.orderak.seller.data.db.CustomerDao
+import androidx.room.withTransaction
 import app.orderak.seller.data.db.CustomerEntity
+import app.orderak.seller.data.db.OrderakDatabase
 import app.orderak.seller.data.remote.CustomerDto
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -22,12 +23,34 @@ import javax.inject.Singleton
  */
 @Singleton
 class CustomerCacheWriter @Inject constructor(
-    private val customerDao: CustomerDao,
+    private val db: OrderakDatabase,
 ) {
 
-    /** Take the server's copy of every customer it sent. */
-    suspend fun putAll(remote: List<CustomerDto>) {
+    /**
+     * Take the server's copy of every customer it sent.
+     *
+     * WHY THE WHOLE LIST IS ONE TRANSACTION
+     *   Each row is a read (`findByKey`) followed by a write, and the read is
+     *   what preserves this device's own first-seen time — see [createdAt]
+     *   below. Orders write customers too, through `insertIgnore` and `fillName`
+     *   on the order path, and those are deliberately outside this boundary
+     *   because an order is Class B and genuinely owns that projection.
+     *
+     *   So without a transaction an order arriving mid-refresh can insert a
+     *   customer between this loop's read and its write, and the write then
+     *   stamps `createdAt = now` over a row that already had an earlier one.
+     *   The result is the customer list reordering itself for a reason the
+     *   seller cannot explain — which is precisely what reading the local value
+     *   exists to prevent.
+     *
+     *   This is not the delete-all-then-insert-N shape the contract forbids:
+     *   nothing here deletes, so a failure loses no customer. It is the weaker
+     *   half of the same rule — a partial cache must not be observable — and it
+     *   is the one writer that was not holding it.
+     */
+    suspend fun putAll(remote: List<CustomerDto>) = db.withTransaction {
         val now = System.currentTimeMillis()
+        val customerDao = db.customerDao()
         for (dto in remote) {
             val local = customerDao.findByKey(dto.customer_key)
             customerDao.upsert(
