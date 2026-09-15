@@ -4,7 +4,7 @@
 //
 // Responsibilities are split into modules (modular monolith):
 //   identity.ts       store identity: UUIDs, codes, slugs, public_identifier
-//   api-store.ts      /api/v1/register, /api/v1/store, /api/v1/categories, products/sync
+//   api-store.ts      /api/v1/register, /api/v1/store, /api/v1/categories, /api/v1/products
 //   media.ts          R2 image upload + /media/{key} serving
 //   catalog.ts        public store/category/product HTML (SEO)
 //   public-router.ts  /{public_identifier}[/{module}/{code}] + legacy 301s

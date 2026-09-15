@@ -308,7 +308,15 @@ for (const [relative, expectedServers] of Object.entries(serverExpectations)) {
 // looked yet, and three guards exist to do it. These four say what they mean
 // instead. The mirror is deliberately still counted here: both surfaces are
 // served while the app moves across, and this number drops by one when it goes.
-if (operationCount !== 252) fail(`OpenAPI operation inventory changed: expected 252, found ${operationCount}.`);
+// Lowered to 251 on 2026-09-15: POST /api/v1/products/sync is gone. It mirrored
+// the catalogue — the device sent the products it held and the server deleted
+// the rest — so absence meant deletion, and three guards existed to decide when
+// to believe it. The four product routes that replaced it say what they mean,
+// and the app stopped calling this one in the cutover. Deleted on evidence
+// rather than on a grep: the endpoint announced every call with the build that
+// made it, and seven days of Workers logs across production and staging showed
+// none. See ADR-012.
+if (operationCount !== 251) fail(`OpenAPI operation inventory changed: expected 251, found ${operationCount}.`);
 const seller = JSON.parse(read("contracts/openapi/src/seller-v1.json"));
 for (const [route, pathItem] of Object.entries(seller.paths)) {
   for (const method of ["get", "post", "put", "patch", "delete"]) {

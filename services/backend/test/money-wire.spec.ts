@@ -61,32 +61,6 @@ describe("money on the wire", () => {
 		expect(Number(none?.c)).toBe(0);
 	});
 
-	it("stores zero for a bare integer price through the mirror, as it always has", async () => {
-		const seller = await registerStore({ phone: "+201500009002" });
-
-		await SELF.fetch(`${BASE}/api/v1/products/sync`, {
-			method: "POST",
-			headers: authHeaders(seller),
-			// Unchanged on purpose. The mirror is served until every device has
-			// moved to the product routes, and changing what it does to a payload
-			// a shipped app might still send would be a breaking change made for
-			// tidiness. This expectation dies with the endpoint, not before it.
-			body: JSON.stringify({
-				products: [{ app_id: 2, name: "Water", price_minor: 500, stock: 3, available: true }],
-			}),
-		});
-
-		const stored = await env.orderak_db
-			.prepare("SELECT price_minor FROM products WHERE store_id = ?")
-			.bind(await storeIdOf(seller))
-			.first<{ price_minor: number }>();
-
-		// Documents current behaviour: the legacy shape yields 0, not 500. When
-		// request validation lands (ADR-010) this should become a 400 instead, and
-		// this expectation should change with it rather than be deleted.
-		expect(stored?.price_minor).toBe(0);
-	});
-
 	it("returns order totals as an object carrying the currency", async () => {
 		const seller = await registerStore({ phone: "+201500009003" });
 		await env.orderak_db

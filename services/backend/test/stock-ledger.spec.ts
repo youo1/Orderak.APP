@@ -28,10 +28,6 @@ describe("stock movements", () => {
 		return results as never;
 	}
 
-	async function baselineVersion(r: Registered): Promise<number> {
-		const res = await SELF.fetch(`${BASE}/api/v1/products`, { headers: authHeaders(r) });
-		return ((await res.json()) as { catalog_version: number }).catalog_version;
-	}
 
 	async function seed(r: Registered, stock = 10): Promise<string> {
 		const product = await seedStockedProduct(r, stock, {
@@ -128,32 +124,25 @@ describe("stock movements", () => {
 		const code = await seed(r, 10);
 		const storeId = await storeIdOf(r);
 		const pulled = (await (await SELF.fetch(`${BASE}/api/v1/products`, { headers: authHeaders(r) })).json()) as {
-			products: { app_id: number; stock_version: number }[];
+			products: { stock_version: number }[];
 		};
-		const before = (await movements(storeId)).filter((m) => m.cause === "MANUAL_ADJUSTMENT").length;
-		await SELF.fetch(`${BASE}/api/v1/products/sync`, {
-			method: "POST", headers: authHeaders(r),
-			body: JSON.stringify({
-				baseline_version: await baselineVersion(r),
-				products: [{
-					app_id: 1, name: "Cola", price: { amount_minor: 1500, currency: "EGP" },
-					stock: 25, available: true, stock_dirty: true,
-					expected_stock_version: pulled.products[0].stock_version,
-				}],
-			}),
-		});
-
-		// Counted as a difference rather than an absolute, because seeding is now
+		// Counted as a difference rather than an absolute, because seeding is
 		// itself a seller setting a figure: `seed()` creates the product at zero
-		// and then adjusts it to ten, which is a MANUAL_ADJUSTMENT of its own. The
-		// row this test is about is the second one, so assert the one it produced
-		// instead of assuming it is the only one in the table.
+		// and adjusts it to ten, which is a MANUAL_ADJUSTMENT of its own.
+		const before = (await movements(storeId)).filter((m) => m.cause === "MANUAL_ADJUSTMENT").length;
+
+		const res = await SELF.fetch(`${BASE}/api/v1/products/${code}/stock`, {
+			method: "PATCH",
+			headers: authHeaders(r),
+			body: JSON.stringify({ stock: 25, expected_stock_version: pulled.products[0].stock_version }),
+		});
+		expect(res.status).toBe(200);
+
 		const adjustments = (await movements(storeId)).filter((m) => m.cause === "MANUAL_ADJUSTMENT");
 		expect(adjustments).toHaveLength(before + 1);
 		const written = adjustments.filter((m) => m.balance_after === 25);
 		expect(written).toHaveLength(1);
 		expect(written[0]).toMatchObject({ delta: 15, actor: "seller", balance_after: 25, reconstructed: 0 });
-		expect(code).toBeTruthy();
 	});
 
 	it("writes nothing when a stale revision means the adjustment did not apply", async () => {
@@ -166,18 +155,12 @@ describe("stock movements", () => {
 		// freshly created product is already at 0, and sending 0 then would be
 		// current rather than stale — which is what this test needs to avoid.
 		await order(r, code, 1, "ledger-stale-setup");
-		// Same reason as above: seeding writes an adjustment of its own, so what
-		// must not change is the count, not that the count is zero.
 		const before = (await movements(storeId)).filter((m) => m.cause === "MANUAL_ADJUSTMENT").length;
-		const stale = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
-			method: "POST", headers: authHeaders(r),
-			body: JSON.stringify({
-				baseline_version: await baselineVersion(r),
-				products: [{
-					app_id: 1, name: "Cola", price: { amount_minor: 1500, currency: "EGP" },
-					stock: 99, available: true, stock_dirty: true, expected_stock_version: 0,
-				}],
-			}),
+
+		const stale = await SELF.fetch(`${BASE}/api/v1/products/${code}/stock`, {
+			method: "PATCH",
+			headers: authHeaders(r),
+			body: JSON.stringify({ stock: 99, expected_stock_version: 0 }),
 		});
 		expect(stale.status).toBe(409);
 		expect((await movements(storeId)).filter((m) => m.cause === "MANUAL_ADJUSTMENT")).toHaveLength(before);

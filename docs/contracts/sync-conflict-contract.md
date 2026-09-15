@@ -93,18 +93,20 @@ GET /api/v1/products -> replace the cache
 A `catalog_version` that drives reconciliation is a sync engine returning
 through the back door.
 
-## Migration coexistence
+## The mirror is gone
 
-`POST /api/v1/products/sync` is still served while the app moves across. During
-that window the server is authoritative **for clients that use the CRUD
-routes**, and not for the others: a legacy client that mirrors can still recreate
-a product a newer client deleted.
+`POST /api/v1/products/sync` was removed on 2026-09-15. While it was served
+alongside the product routes the server was authoritative only for clients using
+the new routes: a legacy client that mirrored could still recreate a product a
+newer client had deleted. That window is closed, and the qualification with it —
+D1 is now authoritative for the catalogue without exception.
 
-This is a stated limitation of the migration, not a property of the target
-architecture. Full server authority arrives when the mirror is decommissioned,
-and the decision to decommission is gated on the proportion of active devices
-running a CRUD-capable build — not on the proportion of a staged rollout, which
-measures something else.
+It was deleted on evidence rather than on a grep. Route coverage could only prove
+that no code in this repository called it, which is a different question from
+whether an installed app did; the endpoint therefore announced every call with
+the build that made it, and seven days of Workers logs across production and
+staging showed none. See
+[ADR-012](../decisions/adr-012-server-authoritative-catalogue.md).
 
 ## Pending-mutation envelope
 
