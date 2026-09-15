@@ -421,6 +421,86 @@ export function authHeaders(r: Registered): Record<string, string> {
 	};
 }
 
+/**
+ * Put one product in a store's catalogue, through the API that owns it.
+ *
+ * Suites that need a product in order to test something else — orders, stock
+ * movements, storefront rendering, media — used to seed one by posting a
+ * catalogue mirror, which made every one of them a caller of the endpoint being
+ * retired. Going through `POST /api/v1/products` means the fixture describes
+ * what it wants (a product) rather than how the product used to arrive.
+ *
+ * Returns the created product as the API reports it, so a caller can read
+ * `product_code` and `stock_version` without a second request.
+ */
+export async function seedProduct(
+	r: Registered,
+	overrides: Record<string, unknown> = {},
+): Promise<Record<string, unknown>> {
+	const res = await SELF.fetch(`${BASE}/api/v1/products`, {
+		method: "POST",
+		headers: authHeaders(r),
+		body: JSON.stringify({
+			name: "Water Bottle",
+			price: { amount_minor: 600, currency: "EGP" },
+			available: true,
+			...overrides,
+		}),
+	});
+	const body = (await res.json()) as { ok?: boolean; product?: Record<string, unknown> };
+	if (!res.ok || !body.product) {
+		throw new Error(`seedProduct failed: ${res.status} ${JSON.stringify(body)}`);
+	}
+	return body.product;
+}
+
+/**
+ * A product with units on the shelf, in one call.
+ *
+ * Two requests, because creating and stocking are genuinely two operations: a
+ * create cannot carry a stock figure, since inventory is server-owned and moves
+ * only through a buyer's order or an explicit adjustment. Most suites want a
+ * product that exists and has stock, and do not care about that distinction, so
+ * this spares them from restating it.
+ *
+ * Returns the product as the API reports it after stocking, so `product_code`
+ * and the post-adjustment `stock_version` are both current.
+ */
+export async function seedStockedProduct(
+	r: Registered,
+	stock: number,
+	overrides: Record<string, unknown> = {},
+): Promise<Record<string, unknown>> {
+	const created = await seedProduct(r, overrides);
+	if (stock <= 0) return created;
+	return setProductStock(r, String(created.product_code), stock, Number(created.stock_version ?? 0));
+}
+
+/**
+ * Set a product's stock through the endpoint that owns it.
+ *
+ * Creation deliberately starts every product at zero — stock is server-owned and
+ * moves through an order or an explicit adjustment, never through a metadata
+ * write — so a suite that needs units on the shelf asks for them here.
+ */
+export async function setProductStock(
+	r: Registered,
+	productCode: string,
+	stock: number,
+	expectedStockVersion: number,
+): Promise<Record<string, unknown>> {
+	const res = await SELF.fetch(`${BASE}/api/v1/products/${encodeURIComponent(productCode)}/stock`, {
+		method: "PATCH",
+		headers: authHeaders(r),
+		body: JSON.stringify({ stock, expected_stock_version: expectedStockVersion }),
+	});
+	const body = (await res.json()) as { ok?: boolean; product?: Record<string, unknown> };
+	if (!res.ok || !body.product) {
+		throw new Error(`setProductStock failed: ${res.status} ${JSON.stringify(body)}`);
+	}
+	return body.product;
+}
+
 export { SELF, env, BASE };
 
 /**

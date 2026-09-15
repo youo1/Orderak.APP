@@ -12,7 +12,7 @@
 // decorative).
 import { beforeEach, describe, expect, it, vi, afterEach } from "vitest";
 import { SELF, env } from "cloudflare:test";
-import { createSchema, registerStore, authHeaders, type Registered } from "./helpers";
+import { createSchema, registerStore, authHeaders, seedStockedProduct, type Registered } from "./helpers";
 import { verifyTurnstile } from "../src/platform/http/turnstile";
 
 const SITE = "https://orderak.app";
@@ -22,12 +22,8 @@ function testEnv(overrides: Record<string, unknown> = {}) {
 }
 
 async function seedProduct(r: Registered): Promise<string> {
-	const res = await SELF.fetch("https://api.orderak.app/api/v1/products/sync", {
-		method: "POST",
-		headers: authHeaders(r),
-		body: JSON.stringify({ products: [{ app_id: 1, name: "Cola", price: { amount_minor: 1500, currency: "EGP" }, stock: 10, available: true }] }),
-	});
-	return (await res.json<{ products: { product_code: string }[] }>()).products[0].product_code;
+	const product = await seedStockedProduct(r, 10, { name: "Cola", price: { amount_minor: 1500, currency: "EGP" } });
+	return String(product.product_code);
 }
 
 beforeEach(async () => {

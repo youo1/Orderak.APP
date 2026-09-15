@@ -241,21 +241,35 @@ sequenceDiagram
     D1-->>Worker: New orders
     Worker-->>WM: { orders: [...] }
     WM->>Room: Insert/update orders
-    App->>WM: On-demand sync (foreground/manual)
-    WM->>Worker: POST /api/v1/products/sync (stock_dirty + expected_stock_version)
-    Worker->>D1: Mirror metadata; compare-and-set explicit stock edits
-    D1-->>Worker: Confirmed
-    Worker-->>WM: Product identity + authoritative stock revision
-    WM->>Room: Update codes, UUIDs, stock revisions
+    App->>Worker: POST/PUT/DELETE /api/v1/products (one product, online only)
+    Worker->>D1: Write that product
+    D1-->>Worker: The product as it now stands
+    Worker-->>App: The product, or a refusal
+    App->>Room: Cache what the server returned, or nothing at all
+    App->>Worker: PATCH /api/v1/products/{code}/stock (expected_stock_version)
+    Worker-->>App: 200, or 409 stale_stock with the authoritative pair
+    WM->>Worker: GET /api/v1/products (refresh)
+    WM->>Room: Replace the cache in one transaction
 ```
 
-- **Room** is the local operational cache/source for the offline Android UI;
-  D1 remains authoritative for account creation, store identity, authentication,
-  billing, and accepted legal versions.
+- **Room** is a cache of what D1 holds, plus a queue of commands that have not
+  reached it yet. D1 is the system of record for everything: account creation,
+  store identity, authentication, billing, accepted legal versions, and — since
+  [ADR-012](../decisions/adr-012-server-authoritative-catalogue.md) — the
+  catalogue.
 - **WorkManager** runs periodic sync (15-minute cadence) plus on-demand
   foreground/manual sync.
-- Orders are pulled by paginated cursor (`order_no`). Product metadata is
-  mirrored; existing inventory uses optimistic revisions.
+- Orders are pulled by paginated cursor (`order_no`).
+- **Product writes are moving from a mirror to per-product REST.** The diagram
+  above is the mirror, which is still served: the device sends the products it
+  holds and the server deletes the rest, so absence means deletion and three
+  guards exist to decide when to believe it. `POST`, `PUT`, `DELETE
+  /api/v1/products` and `PATCH /api/v1/products/{product_code}/stock` replace it,
+  one product per request, with no meaning attached to absence. Both surfaces are
+  live during the migration; the mirror is removed once active devices have moved
+  across.
+- Inventory keeps its optimistic revision either way: `expected_stock_version` is
+  overselling protection, not synchronisation machinery.
 
 ## Backend structure
 

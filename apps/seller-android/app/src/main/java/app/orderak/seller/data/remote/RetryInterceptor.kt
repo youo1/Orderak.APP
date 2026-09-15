@@ -19,10 +19,16 @@ import okhttp3.Response
  *
  * WHAT IS NOT RETRIED, AND WHY THAT IS THE IMPORTANT PART
  *   Only GETs and requests carrying an idempotency key. `createOrder` dedupes on
- *   `idempotency-key` and is safe to replay; `POST /api/v1/products/sync` is a
- *   full-mirror push where whatever the payload omits is deleted, and replaying
- *   one of those against a catalogue that moved in between is how a seller loses
- *   products. A retry policy that cannot tell those apart is worse than none.
+ *   `idempotency-key` and is safe to replay. `POST /api/v1/products` is not: it
+ *   is idempotent on the server under `client_request_id`, but that key travels
+ *   in the body rather than the header this reads, so from here it is an
+ *   ordinary POST and replaying one would be a second product. A retry policy
+ *   that cannot tell those apart is worse than none.
+ *
+ *   The example this rule was written around was the catalogue mirror, where a
+ *   replay against a catalogue that had moved deleted whatever the stale payload
+ *   omitted. That endpoint is gone; the rule outlived it, because the property
+ *   it protects was never specific to it.
  */
 class RetryInterceptor(
     private val maxAttempts: Int = 3,

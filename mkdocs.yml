@@ -96,6 +96,7 @@ nav:
     - ADR 008 - Evolvable Safety Contracts: decisions/adr-008-evolvable-safety-contracts.md
     - ADR 009 — Minor Units with Explicit Currency: decisions/adr-009-minor-units-with-explicit-currency.md
     - ADR 010 — Schema-First API Contract: decisions/adr-010-schema-first-api-contract.md
+    - ADR 012 — Server-Authoritative Catalogue: decisions/adr-012-server-authoritative-catalogue.md
   - Runbooks:
     - Account Deletion: runbooks/account-deletion.md
     - Incident Response: runbooks/incident-response.md

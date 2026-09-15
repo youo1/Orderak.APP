@@ -1,6 +1,5 @@
 package app.orderak.seller.data.db
 
-import app.orderak.seller.data.remote.ProductCodeDto
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -56,10 +55,6 @@ interface ProductDao {
     @Query("SELECT * FROM products")
     suspend fun allOnce(): List<ProductEntity>
 
-    /** The local row holding a given server product, if this device has one. */
-    @Query("SELECT * FROM products WHERE remoteUuid = :uuid LIMIT 1")
-    suspend fun byRemoteUuid(uuid: String): ProductEntity?
-
     @Query("SELECT * FROM products WHERE productCode = :code LIMIT 1")
     suspend fun byProductCode(code: String): ProductEntity?
 
@@ -81,21 +76,6 @@ interface ProductDao {
      * gone. Nothing matching means the product is new here, and [adoptedProduct]
      * gives it a fresh row rather than claiming an occupied one.
      */
-    @Transaction
-    suspend fun adoptServerCatalog(products: List<ProductEntity>) {
-        for (product in products) {
-            val local = product.remoteUuid?.let { byRemoteUuid(it) }
-                ?: product.productCode?.let { byProductCode(it) }
-            upsert(adoptedProduct(product, local))
-        }
-    }
-
-    @Query("UPDATE products SET productCode=:code, remoteUuid=:uuid, stock=:stock, syncedStockVersion=:version, stockDirty=0 WHERE id=:id")
-    suspend fun acceptSync(id: Long, code: String?, uuid: String?, stock: Int, version: Long)
-
-    @Query("UPDATE products SET productCode=:code, remoteUuid=:uuid, syncedStockVersion=:version WHERE id=:id")
-    suspend fun rebaseConflict(id: Long, code: String?, uuid: String?, version: Long)
-
     /** Persist the public R2 URL returned after uploading the local product image. */
     @Query("UPDATE products SET imageUrl = :url WHERE id = :id")
     suspend fun setImageUrl(id: Long, url: String?)
@@ -118,16 +98,6 @@ interface ProductDao {
      * another phone under app_ids that collide with this phone's row ids — which
      * stamped another device's product code onto a local product.
      */
-    @Transaction
-    suspend fun applySync(codes: List<ProductCodeDto>, conflicts: Set<Long>) {
-        for (item in codes) {
-            if (item.app_id in conflicts) {
-                rebaseConflict(item.app_id, item.product_code, item.remote_uuid, item.stock_version)
-            } else {
-                acceptSync(item.app_id, item.product_code, item.remote_uuid, item.stock, item.stock_version)
-            }
-        }
-    }
 }
 
 @Dao
@@ -182,6 +152,22 @@ interface OrderDao {
 
     @Insert suspend fun insert(order: OrderEntity): Long
     @Insert suspend fun insertItems(items: List<OrderItemEntity>)
+
+    /**
+     * Give an order line the server's code for the product it names.
+     *
+     * Called once, by the legacy reconciliation, at the moment a product that
+     * existed only on this device acquires a code. Without it that product's
+     * unsent order keeps a null code for ever: the backfill had nothing to copy,
+     * and the catalogue refresh will shortly delete the row `productId` points
+     * at, taking the last way to resolve one with it.
+     *
+     * `productCode IS NULL` on purpose. A line that already carries a code
+     * carries the code it was sold under, and a later conversion must not
+     * rewrite it.
+     */
+    @Query("UPDATE order_items SET productCode = :code WHERE productId = :localId AND productCode IS NULL")
+    suspend fun stampProductCode(localId: Long, code: String)
 
     @Query("UPDATE orders SET status = :status WHERE id = :id")
     suspend fun updateStatus(id: Long, status: String)
@@ -288,39 +274,21 @@ interface CustomerDao {
     suspend fun findByKey(key: String): CustomerEntity?
 
     /**
-     * A seller's edit, applied locally and marked for the next sync.
+     * The local edit path went with the dirty flag in Room 11.
      *
-     * The phone is not in the SET list. It is the identity: changing it would
-     * not be an edit but a claim that this is a different customer, and the
-     * order rows that join on it would silently stop matching.
+     * A customer edit is a Class A write now: it reaches the server or it does
+     * not happen, and what lands here afterwards is the server's answer through
+     * CustomerCacheWriter. `applyEdit`, `dirty()` and `clearDirty()` existed to
+     * hold an edit the server had not acknowledged, and nothing has called any
+     * of them since that stopped being possible.
      */
-    @Query(
-        """UPDATE customers
-              SET name = :name, altContact = :altContact, note = :note,
-                  updatedAt = :updatedAt, dirty = 1
-            WHERE customerKey = :key"""
-    )
-    suspend fun applyEdit(
-        key: String,
-        name: String?,
-        altContact: String?,
-        note: String?,
-        updatedAt: Long,
-    )
-
-    /** Rows carrying an edit the server has not acknowledged. */
-    @Query("SELECT * FROM customers WHERE dirty = 1")
-    suspend fun dirty(): List<CustomerEntity>
-
-    @Query("UPDATE customers SET dirty = 0 WHERE customerKey = :key")
-    suspend fun clearDirty(key: String)
 
     /**
      * A customer as the server holds them.
      *
      * REPLACE rather than a field-by-field update because the server row is
      * authoritative for every column here. It is called only for rows that are
-     * not dirty — see `SyncRepository`, which posts local edits before pulling,
+     * not dirty. Vestigial since the cutover: a customer edit is Class A now, so
      * so an unacknowledged edit is never overwritten by the value it replaced.
      */
     @Insert(onConflict = OnConflictStrategy.REPLACE)

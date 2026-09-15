@@ -301,6 +301,10 @@
     <string name="common_retry">Réessayer</string>
     <string name="order_cancel_confirm">Annuler cette commande et restaurer son stock ?</string>
     <string name="product_delete_confirm">Supprimer ce produit ? Cette action est irréversible.</string>
+    <string name="product_stock_conflict_title">Le stock a changé</string>
+    <string name="product_stock_conflict_body">Vous avez saisi %1$d. La boutique en a maintenant %2$d : une commande est arrivée pendant votre modification. Vos autres changements sont enregistrés.</string>
+    <string name="product_stock_conflict_use_shop">Utiliser %1$d</string>
+    <string name="product_stock_conflict_keep_mine">Forcer %1$d</string>
     <string name="category_delete_confirm">Supprimer cette catégorie ? Les produits seront non classés.</string>
     <string name="categories_error">Impossible de mettre à jour les catégories. Réessayez.</string>
     <string name="settings_delete_confirm">Envoyer une demande vérifiée de suppression du compte ? Le délai publié s’applique.</string>
@@ -519,8 +523,6 @@
     <string name="error_product_missing">Un des produits de cette commande ne figure plus dans votre catalogue.</string>
     <string name="error_currency">Ce prix est dans une devise que votre boutique n\'accepte pas encore.</string>
     <string name="error_order_moved">Cette commande a déjà avancé. Actualisez pour voir où elle en est.</string>
-    <string name="error_catalog_out_of_date">Votre catalogue n\'est pas à jour sur ce téléphone. Il sera retéléchargé à la prochaine synchronisation.</string>
-    <string name="error_catalog_bulk_delete">Cela supprimerait la majeure partie de votre catalogue. Confirmez la suppression pour continuer.</string>
     <string name="error_too_large">C\'est trop volumineux pour être envoyé. Essayez un fichier plus petit ou un message plus court.</string>
     <string name="error_unsupported_file">Ce type de fichier n\'est pas pris en charge. Utilisez une image JPEG, PNG, GIF ou WebP.</string>
     <string name="error_ticket_closed">Ce ticket de support est clos. Ouvrez-en un nouveau.</string>

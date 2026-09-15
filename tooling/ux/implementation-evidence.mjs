@@ -80,7 +80,11 @@ export const EVIDENCE = {
   "products_catalog.product_creation_and_editing": {
     kind: "screen",
     value: "ProductEditScreen",
-    behaviour: { layer: "backend", file: "store.spec.ts", test: "assigns product codes and links categories" },
+    // Repointed on 2026-09-15. The named test lived in the catalogue mirror's
+    // suite and went with the endpoint; its successor asserts the same thing
+    // about the route that replaced it — a created product comes back with the
+    // code the server assigned and the category it was filed under.
+    behaviour: { layer: "backend", file: "product-crud.spec.ts", test: "creates a product and returns it in the shape the pull uses" },
   },
   "products_catalog.product_descriptions": { kind: "screen", value: "ProductEditScreen" },
   "products_catalog.public_orderak_catalog": { kind: "endpoint", value: "/api/v1/store", integration: "/api/v1/store" },
@@ -149,11 +153,11 @@ export const EVIDENCE = {
     value: "CustomerDetailsScreen",
     behaviour: {
       layer: "android",
-      file: "CustomerMergeTest.kt",
-      test: "an edit the server has not acknowledged survives the next pull",
+      file: "CustomerWriteDecisionTest.kt",
+      test: "no failure of any shape is reported as saved",
     },
     integration: "/api/v1/customers",
-    note: "Promoted with the editor, not with the screen. This row is why the behaviour axis exists: the screen resolved for months while rendering an order list with no edit control, no save and no write path, and the catalogue sold it at paid1 the whole time. The named test asserts the property that makes the editor worth having — an edit the server has not acknowledged is never overwritten by the value it replaced.",
+    note: "Promoted with the editor, not with the screen. This row is why the behaviour axis exists: the screen resolved for months while rendering an order list with no edit control, no save and no write path, and the catalogue sold it at paid1 the whole time. The named test changed with ADR-012 and the property changed with it. It used to be that an edit the server had not acknowledged was never overwritten by the value it replaced; there is no unacknowledged edit any more, because a customer edit is Class A and either reaches the server or does not happen. What is asserted now is the harm arriving by the opposite route — the screen reporting \"saved\" for a write that never left the device.",
   },
   "analytics_reporting.operational_dashboard":       { kind: "screen", value: "MainScreen" },
   "support_service.in_app_support_tickets":          { kind: "endpoint", value: "/api/v1/support/tickets", integration: "/api/v1/support/tickets" },
@@ -196,7 +200,7 @@ export const KINDS_REQUIRING_BEHAVIOUR = ["screen", "route", "module"];
  */
 export const BEHAVIOUR_BASELINE = {
   "products_catalog.product_descriptions":
-    "Descriptions persist through the catalogue mirror, but nothing asserts that a description survives the round trip.",
+    "Descriptions persist through POST and PUT /api/v1/products, but nothing asserts that a description survives the round trip.",
   "orders_fulfilment.manual_order_creation":
     "Cannot be tested honestly yet. The order is written to Room and never reaches the server, so there is no server behaviour to assert and no client harness for the screen. Work item 05 makes this testable.",
   "orders_fulfilment.order_history":

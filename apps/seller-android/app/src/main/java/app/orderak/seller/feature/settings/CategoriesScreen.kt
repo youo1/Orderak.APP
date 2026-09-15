@@ -53,6 +53,7 @@ import app.orderak.seller.data.billing.EntitlementManager
 import app.orderak.seller.data.billing.FeatureKeys
 import app.orderak.seller.data.db.CategoryEntity
 import app.orderak.seller.data.db.OrderakDatabase
+import app.orderak.seller.data.catalog.CategoryCacheWriter
 import app.orderak.seller.data.remote.BackendApi
 import app.orderak.seller.data.remote.CategoryDto
 import app.orderak.seller.data.remote.CategoryReq
@@ -74,6 +75,7 @@ class CategoriesViewModel @Inject constructor(
     private val sessionStore: SessionStore,
     private val api: BackendApi,
     private val db: OrderakDatabase,
+    private val categoryCache: CategoryCacheWriter,
     /** Exposed so the screen can ask whether an upgrade can actually be bought. */
     val entitlements: EntitlementManager,
 ) : ViewModel() {
@@ -104,10 +106,10 @@ class CategoriesViewModel @Inject constructor(
         val res = api.listCategories(phone, secret)
         if (res.ok) {
             _categories.value = res.categories
-            // Mirror locally so the product editor can offer a category picker.
-            db.categoryDao().replaceAll(
-                res.categories.map { CategoryEntity(name = it.name, categoryCode = it.category_code, slug = it.slug, sortOrder = it.sort_order) }
-            )
+            // Cache locally so the product editor can offer a category picker
+            // without a round trip. Through the writer, so there is one place a
+            // category row is written and the boundary guard can say so.
+            categoryCache.replaceAll(res.categories)
         } else _error.value = res.error ?: "bad_response"
         _loading.value = false
     }

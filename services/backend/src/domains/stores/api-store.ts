@@ -9,8 +9,11 @@
 //   POST /api/v1/categories                 create category
 //   PUT  /api/v1/categories/{category_code} update category
 //   DELETE /api/v1/categories/{category_code} delete category
-//   GET  /api/v1/products                  pull the store's catalog (pull before mirror push)
-//   POST /api/v1/products/sync              mirror products (returns codes)
+//   GET  /api/v1/products                   pull the store's catalog
+//   POST /api/v1/products                   create one product
+//   PUT  /api/v1/products/{product_code}    replace one product's metadata
+//   DELETE /api/v1/products/{product_code}  delete one product
+//   PATCH /api/v1/products/{product_code}/stock  adjust stock (compare-and-set)
 //   POST /api/v1/media/upload               upload logo/cover/product image
 //
 // Internal UUIDs are never returned to the client. The app references stores by
@@ -273,16 +276,23 @@ export async function handleStoreRoutes(
 		p === "/api/v1/categories" ||
 		p.startsWith("/api/v1/categories/") ||
 		p === "/api/v1/products" ||
-		p === "/api/v1/products/sync" ||
+		p.startsWith("/api/v1/products/") ||
 		p === "/api/v1/media/upload";
 	if (!isStoreRoute) return null;
 
 	const { phone, secret } = readCreds(request, url);
 	const store = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret, clientIpOf(request));
 	if (!store) return jsonResponse({ error: "auth" }, 401);
+	// Every mutating store route belongs here, and the cost of forgetting one is
+	// asymmetric: a route missing from `isStoreRoute` above fails loudly, while a
+	// route missing from THIS list ships silently and writes to a tenant that is
+	// fenced or mid-copy instead of answering 503. The product CRUD routes are
+	// enumerated explicitly for that reason, and `product-crud.spec.ts` asserts
+	// the whole set rather than trusting this line to stay complete.
 	const tenantMutation = method !== "GET" && (
 		p === "/api/v1/store" || p === "/api/v1/categories" || p.startsWith("/api/v1/categories/")
-		|| p === "/api/v1/products/sync" || p === "/api/v1/media/upload"
+		|| p === "/api/v1/products"
+		|| p.startsWith("/api/v1/products/") || p === "/api/v1/media/upload"
 	);
 	if (tenantMutation) {
 		try {
@@ -342,10 +352,24 @@ export async function handleStoreRoutes(
 
 		// ---- GET /api/v1/products (pull) ----
 	if (p === "/api/v1/products" && method === "GET") return pullProducts(env, store);
+	if (p === "/api/v1/products" && method === "POST") return createProduct(request, env, store);
 
-	// ---- POST /api/v1/products/sync ----
-	if (p === "/api/v1/products/sync" && method === "POST") {
-		return syncProducts(request, env, store);
+	// ---- /api/v1/products/{product_code}[/stock] ----
+	if (p.startsWith("/api/v1/products/")) {
+		const rest = decodeURIComponent(p.slice("/api/v1/products/".length));
+		// Same discipline as the customers routes: a segment containing "/" is a
+		// sub-resource, not a code, so the two are told apart by shape rather than
+		// by a second startsWith that could match a code containing a slash.
+		if (rest.endsWith("/stock")) {
+			const code = rest.slice(0, -"/stock".length);
+			if (!code || code.includes("/")) return jsonResponse({ error: "not_found" }, 404);
+			if (method === "PATCH") return adjustProductStock(request, env, store, code);
+			return methodNotAllowed("PATCH");
+		}
+		if (!rest || rest.includes("/")) return jsonResponse({ error: "not_found" }, 404);
+		if (method === "PUT") return updateProduct(request, env, store, rest);
+		if (method === "DELETE") return deleteProduct(env, store, rest);
+		return methodNotAllowed("PUT", "DELETE");
 	}
 
 	// ---- POST /api/v1/media/upload ----
@@ -359,8 +383,7 @@ export async function handleStoreRoutes(
 		return uploadMedia(request, env, String(store.id));
 	}
 
-	if (p === "/api/v1/products") return methodNotAllowed("GET");
-	if (p === "/api/v1/products/sync") return methodNotAllowed("POST");
+	if (p === "/api/v1/products") return methodNotAllowed("GET", "POST");
 	if (p === "/api/v1/media/upload") return methodNotAllowed("POST");
 	// Unreachable: isStoreRoute admits no other path and each is answered above.
 	// The contract guard reads these Allow lists as the method set a path serves,
@@ -925,7 +948,7 @@ async function pullProducts(env: Env, store: Row): Promise<Response> {
 		.prepare(
 			`SELECT p.id, p.app_id, p.product_code, p.name, p.slug, p.description,
 			        p.price_minor, p.currency, p.stock, p.stock_version, p.available, p.image_url,
-			        c.category_code
+			        p.discount_type, p.discount_value, c.category_code
 			 FROM products p
 			 LEFT JOIN categories c ON c.id = p.category_id
 			 WHERE p.store_id = ?
@@ -936,526 +959,450 @@ async function pullProducts(env: Env, store: Row): Promise<Response> {
 	return jsonResponse({
 		ok: true,
 		catalog_version: version,
-		products: (results ?? []).map((r: Row) => ({
-			app_id: Number(r.app_id),
-			// The identity the device sends back on every later push. app_id is
-			// this store's internal numbering and means nothing on the device
-			// receiving it; product_code is public and shareable. Neither is the
-			// key the mirror matches on.
-			remote_uuid: String(r.id),
-			product_code: String(r.product_code),
-			name: r.name,
-			slug: r.slug ?? null,
-			description: r.description ?? null,
-			// Money travels as an object so the client can render it (ADR-009).
-			price: { amount_minor: Number(r.price_minor), currency: String(r.currency || DEFAULT_CURRENCY) },
-			stock: Number(r.stock),
-			stock_version: Number(r.stock_version ?? 0),
-			available: r.available === 1,
-			image_url: r.image_url ?? null,
-			category_code: r.category_code ?? null,
-		})),
+		// One shape for every product this API returns, so a pull and a write
+		// cannot drift into describing the same row differently. `remote_uuid` is
+		// the identity the mirror sends back on a push; `product_code` is the
+		// public, shareable one and the only identity the CRUD routes use.
+		// Money travels as an object so the client can render it (ADR-009).
+		products: (results ?? []).map(productResponseRow),
 	});
 }
 
-// ---- Product sync ----------------------------------------------------------
+// ---- Product CRUD ----------------------------------------------------------
+//
+// One product per request, addressed by its public code. This is the surface
+// that replaces the catalogue mirror below, and the difference that matters is
+// not the verb count: the mirror asserts the complete set of products by
+// omission, so a device that has forgotten something deletes it. These say what
+// they mean, so a device that has forgotten something says nothing.
+//
+// Everything here deliberately re-states rules the mirror also implements rather
+// than sharing them. The duplication is temporary and dies with the mirror; the
+// alternative was extracting shared helpers out of a 470-line function that
+// every shipped app still depends on, which is a refactor of the thing being
+// removed and buys nothing.
+
+/** A discount as the wire carries it, or a 400 explaining why it does not. */
+type DiscountInput = { type: string | null; value: number | null };
 
 /**
- * When a mirror deletes most of a catalogue, ask the caller to say it meant to.
+ * Read and check a product's discount pair.
  *
- * The threshold is a fraction rather than a count because "deleting 20 products"
- * means nothing without knowing whether the store had 21 or 2,000. The floor
- * exists so a seller with three products is not asked to confirm deleting two of
- * them, which is ordinary tidying and would train them to confirm reflexively —
- * and a prompt people click through protects nothing.
+ * The pair is only meaningful together, and `discount_value` means different
+ * things depending on `discount_type` — basis points for PERCENTAGE, minor units
+ * for AMOUNT. Migration 057 states that contract and enforces it with triggers;
+ * this rejects the same shapes earlier so the caller gets a named error instead
+ * of a constraint failure.
+ *
+ * Absent is not the same as null. `undefined` leaves the existing value alone on
+ * a PUT; an explicit null clears it. Both halves must move together either way.
  */
-const BULK_DELETE_MIN_CATALOG = 10;
-const BULK_DELETE_FRACTION = 0.5;
+function readDiscount(raw: Row): DiscountInput | Response {
+	const hasType = "discount_type" in raw;
+	const hasValue = "discount_value" in raw;
+	if (!hasType && !hasValue) return { type: null, value: null };
 
+	const type = raw.discount_type == null ? null : String(raw.discount_type).toUpperCase();
+	const value = raw.discount_value == null ? null : Math.floor(Number(raw.discount_value));
 
-/**
- * The server-assigned product id a submitted row carries, or null when it has
- * never synced. Blank is null: a client with nothing to send must not be able
- * to claim the product whose id is the empty string.
- */
-function remoteUuidOf(raw: Row): string | null {
-	if (raw.remote_uuid == null) return null;
-	const uuid = String(raw.remote_uuid);
-	return uuid === "" ? null : uuid;
-}
-
-async function syncProducts(request: Request, env: Env, store: Row): Promise<Response> {
-	// This endpoint is a MIRROR: anything the submitted list omits is deleted at
-	// the end of this function, and an empty list deletes the entire catalog.
-	// That makes the difference between "the seller has no products" and "this
-	// request did not say" the difference between a correct write and total data
-	// loss, so the two must never collapse into the same value.
-	//
-	// They used to. The body was parsed with `.catch(() => ({}))` and `products`
-	// was defaulted with `Array.isArray(...) ? ... : []`, so a truncated upload,
-	// a proxy that mangled the body, or a client that renamed the field all
-	// arrived here as an empty mirror and returned 200 after wiping the store.
-	// Neither failure is something a caller can distinguish from success.
-	//
-	// An explicitly empty `products: []` is still honoured — a seller who
-	// deletes their last product has an empty catalog, and SyncRepository.kt
-	// sends exactly that. Only the *absence* of the field is now an error.
-	let body: Row;
-	try {
-		body = (await request.json()) as Row;
-	} catch {
-		return jsonResponse({ error: "invalid_json" }, 400);
-	}
-	if (body === null || typeof body !== "object" || Array.isArray(body)) {
-		return jsonResponse({ error: "invalid_json" }, 400);
-	}
-	if (!Array.isArray(body.products)) {
+	if ((type === null) !== (value === null)) {
 		return jsonResponse({
-			error: "products_required",
-			message: "products must be an array. Omitting it is rejected because this endpoint mirrors the catalog and would otherwise delete it.",
+			error: "discount_incomplete",
+			message: "discount_type and discount_value must be set together or both omitted.",
 		}, 400);
 	}
-	const requested = body.products as Row[];
-	const limit = await getPlanLimit(env, String(store.id), "max_products");
-	if (limit !== null) {
-		const validRequestedCount = requested.filter((product) => Number.isFinite(Number(product.app_id))).length;
-		let currentUsage = 0;
-		let projectedUsage = validRequestedCount;
-		if (env.ENTITLEMENTS_ENABLED === "true") {
-			const usage = await env.orderak_db.prepare(
-				`SELECT
-				   (SELECT COUNT(*) FROM products current_store WHERE current_store.store_id=?) AS store_count,
-				   COUNT(p.id) AS organization_count
-				 FROM organization_stores os
-				 LEFT JOIN products p ON p.store_id=os.store_id
-				 WHERE os.organization_id=(SELECT organization_id FROM organization_stores WHERE store_id=?)`,
-			).bind(store.id, store.id).first<{ store_count: number; organization_count: number }>();
-			const currentStoreCount = Number(usage?.store_count ?? 0);
-			currentUsage = Number(usage?.organization_count ?? currentStoreCount);
-			projectedUsage = currentUsage - currentStoreCount + validRequestedCount;
-		} else {
-			const usage = await env.orderak_db.prepare("SELECT COUNT(*) AS c FROM products WHERE store_id=?")
-				.bind(store.id).first<{ c: number }>();
-			currentUsage = Number(usage?.c ?? 0);
-			projectedUsage = validRequestedCount;
-		}
-
-		// Downgrades block growth, never maintenance. Sellers who are already
-		// above the new limit may edit or delete existing products as long as the
-		// submitted mirror does not increase organization-wide usage.
-		if (projectedUsage > limit && projectedUsage > currentUsage) {
-			if (env.ENTITLEMENTS_ENABLED === "true") {
-				return entitlementLimitReached(await resolveEntitlements(env, String(store.id)), "max_products");
-			}
-			return limitReached("max_products", limit, currentUsage);
-		}
+	if (type === null) return { type: null, value: null };
+	if (type !== "PERCENTAGE" && type !== "AMOUNT") {
+		return jsonResponse({ error: "discount_type_unknown", discount_type: type, allowed: ["PERCENTAGE", "AMOUNT"] }, 400);
 	}
-	const list = requested;
-	const storeId = String(store.id);
-
-	// Existing identity and stock revisions. Stock is optimistic-concurrency
-	// controlled separately from the catalog metadata upsert so a stale Android
-	// mirror can never restore inventory consumed by a newer buyer order.
-	const { results: existingRows } = (await env.orderak_db
-		.prepare("SELECT id, app_id, product_code, stock, stock_version FROM products WHERE store_id = ?")
-		.bind(storeId)
-		.all()) as { results: Row[] };
-	type ExistingProduct = { id: string; appId: number; productCode: string; stock: number; stockVersion: number };
-	// Keyed by the server's own product id, because that is the identity two
-	// devices agree on. The app_id index beside it serves the one case that has
-	// nothing better — see the identity resolution below.
-	const existing = new Map<string, ExistingProduct>();
-	const existingByAppId = new Map<number, ExistingProduct>();
-	const takenAppIds = new Set<number>();
-	for (const r of existingRows ?? []) {
-		const item: ExistingProduct = {
-			id: String(r.id), appId: Number(r.app_id), productCode: String(r.product_code),
-			stock: Number(r.stock), stockVersion: Number(r.stock_version ?? 0),
-		};
-		existing.set(item.id, item);
-		existingByAppId.set(item.appId, item);
-		takenAppIds.add(item.appId);
-	}
-
-	const { results: catRows } = (await env.orderak_db
-		.prepare("SELECT id, category_code FROM categories WHERE store_id = ?")
-		.bind(storeId)
-		.all()) as { results: Row[] };
-	const catByCode = new Map<string, string>();
-	for (const c of catRows ?? []) catByCode.set(String(c.category_code), String(c.id));
-
-	// ---- Which submitted row is which stored product? -----------------------
-	//
-	// `app_id` is the Android Room autoincrement row id. It identifies a row on
-	// ONE device: two phones signed into the same store both allocate 1, 2, 3…
-	// for different products. Matching on it made the second phone's product an
-	// overwrite of the first phone's, silently, and no version check can help —
-	// that is an identity collision, not a staleness problem.
-	//
-	// The client has stored the server's id since its first sync (`remoteUuid`
-	// in ProductEntity, written back from the `remote_uuid` this endpoint
-	// returns). It now sends it, and it is the identity: the same product
-	// carries the same value on every device, and nothing else does.
-	//
-	// app_id survives as a hint, honoured under two conditions:
-	//
-	//   * The row sent no remote_uuid. A row that names an identity is not
-	//     guessing; if the server no longer holds it, the product was deleted
-	//     there, and falling through to app_id would let the resurrection land
-	//     on top of an unrelated product.
-	//   * Nothing else in this request has already claimed that product. A
-	//     stored product matched by its id belongs to the row that named it, so
-	//     a hint pointing at the same product is pointing at the wrong thing —
-	//     which is exactly the collision, and the row is a new product instead.
-	//
-	// The hint has to stay, or the next push from an app built before this
-	// change — which sends app_id alone — would duplicate its whole catalogue.
-	const claimed = new Set<string>();
-	const matches: Array<ExistingProduct | null> = list.map(() => null);
-	const seenUuids = new Set<string>();
-	for (let index = 0; index < list.length; index++) {
-		const raw = list[index];
-		if (!Number.isFinite(Number(raw.app_id))) continue;
-		const uuid = remoteUuidOf(raw);
-		if (uuid === null) continue;
-		// Two rows claiming one product would upsert the same row twice in one
-		// statement, which SQLite refuses; and it means the device has lost track
-		// of which local row is which, which guessing here would not repair.
-		if (seenUuids.has(uuid)) return jsonResponse({ error: "duplicate_remote_uuid", remote_uuid: uuid }, 400);
-		seenUuids.add(uuid);
-		const row = existing.get(uuid);
-		if (!row) continue;
-		matches[index] = row;
-		claimed.add(row.id);
-	}
-	for (let index = 0; index < list.length; index++) {
-		const raw = list[index];
-		const hint = Number(raw.app_id);
-		if (!Number.isFinite(hint) || matches[index] !== null || remoteUuidOf(raw) !== null) continue;
-		const row = existingByAppId.get(hint);
-		if (!row || claimed.has(row.id)) continue;
-		matches[index] = row;
-		claimed.add(row.id);
-	}
-
-	const records: Array<{
-		id: string; categoryId: string | null; productCode: string; appId: number; storedAppId: number; name: string;
-		slug: string | null; description: string | null; price: number; currency: string; stock: number;
-		available: number; imageUrl: string | null; categoryCode: string | null;
-		existed: boolean; stockDirty: boolean; expectedStockVersion: number | null;
-	}> = [];
-	const seenAppIds = new Set<number>();
-	const generatedCodes = new Set([...existing.values()].map((item) => item.productCode));
-	let nextFreeAppId = 1;
-
-	for (let index = 0; index < list.length; index++) {
-		const raw = list[index];
-		const appId = Number(raw.app_id);
-		if (!Number.isFinite(appId)) continue;
-		// Still rejected, even though app_id no longer decides identity: it is
-		// the key this endpoint answers on, so two rows sharing one would leave
-		// the device unable to tell which of its products the reply describes.
-		if (seenAppIds.has(appId)) return jsonResponse({ error: "duplicate_app_id", app_id: appId }, 400);
-		seenAppIds.add(appId);
-		const name = String(raw.name ?? "").slice(0, 80);
-		const rawPrice = (raw.price ?? {}) as { amount_minor?: unknown; currency?: unknown };
-		const price = Math.max(0, Math.floor(Number(rawPrice.amount_minor) || 0));
-		// An amount is meaningless without its currency (ADR-009), and the client
-		// has always sent one — `MoneyDto(priceMinor, currency)` in
-		// SyncRepository.kt. It was read as far as `amount_minor` and the currency
-		// dropped on the floor, so every row landed on the column default.
-		//
-		// Rejected rather than defaulted when it is not a currency this deployment
-		// accepts. Defaulting is how 15000 fils becomes 150.00 EGP: a plausible
-		// number, silently wrong by a factor of ten, and undetectable afterwards
-		// because nothing recorded what was meant.
-		const currency = rawPrice.currency == null ? DEFAULT_CURRENCY : String(rawPrice.currency).toUpperCase();
-		if (!(ENABLED_CURRENCIES as readonly string[]).includes(currency)) {
-			return jsonResponse({
-				error: "currency_not_enabled",
-				app_id: appId,
-				currency,
-				enabled: [...ENABLED_CURRENCIES],
-			}, 400);
-		}
-		const stock = Math.max(0, Math.floor(Number(raw.stock) || 0));
-		const available = raw.available ? 1 : 0;
-		const description = raw.description != null ? String(raw.description).slice(0, 500) : null;
-		const imageUrl = raw.image_url != null ? String(raw.image_url).slice(0, 500) : null;
-		const slug = name ? slugify(name) || null : null;
-		const categoryCode = raw.category_code != null ? String(raw.category_code) : null;
-		const categoryId = categoryCode ? catByCode.get(categoryCode) ?? null : null;
-
-		const previous = matches[index];
-		let productCode = previous?.productCode;
-		if (!productCode) {
-			if (requested.length <= 20) productCode = await uniqueResourceCode(env, "p");
-			else do productCode = newResourceCode("p", 8); while (generatedCodes.has(productCode));
-			generatedCodes.add(productCode);
-		}
-
-		// The app_id column keeps its per-store uniqueness, so a colliding hint
-		// cannot be stored verbatim. A product already here keeps the number it
-		// was stored with; a new one takes the sending device's number when that
-		// number is free, and the next free number when it is not.
-		//
-		// The device is never told, and does not need to be: the reply echoes the
-		// app_id it sent, which is its own row id and the only value it can act
-		// on. The stored number is what an app built before this change reads
-		// back as a row id, which is why it stays unique rather than repeating.
-		let storedAppId: number;
-		if (previous) storedAppId = previous.appId;
-		else if (Number.isSafeInteger(appId) && !takenAppIds.has(appId)) storedAppId = appId;
-		else {
-			while (takenAppIds.has(nextFreeAppId)) nextFreeAppId++;
-			storedAppId = nextFreeAppId;
-		}
-		takenAppIds.add(storedAppId);
-
-		records.push({
-			id: previous?.id ?? newUuid(), categoryId, productCode, appId, storedAppId, name, slug, description,
-			price, currency, stock, available, imageUrl, categoryCode, existed: previous != null,
-			stockDirty: raw.stock_dirty === true,
-			expectedStockVersion: raw.expected_stock_version != null && Number.isSafeInteger(Number(raw.expected_stock_version))
-				? Number(raw.expected_stock_version) : null,
-		});
-	}
-
-	// What this push would do to what is already there. Computed before anything
-	// is written, because the baseline rule below depends on both answers.
-	const removedCodes = [...existing.values()].filter((item) => !claimed.has(item.id)).map((item) => item.productCode);
-	const wipesEverything = records.length === 0 && existing.size > 0;
-	const deletionCount = wipesEverything ? existing.size : removedCodes.length;
-	const modifiesExisting = records.some((record) => record.existed);
-
-	// A device may only overwrite or delete what it has proved it has seen.
-	//
-	// Absence is not evidence of deletion. A device with an empty database sends
-	// the same payload as a seller who deleted their last product, and a device
-	// that has been offline since Tuesday sends the same payload as a seller who
-	// reverted every edit made since. Neither is distinguishable here, so the
-	// question is answered earlier: does this device hold the catalogue as it
-	// currently stands?
-	//
-	// A purely additive push is exempt. A device adding products it invented
-	// cannot destroy anything it has not seen, and requiring a baseline there
-	// would break the first sync of a brand-new store for no gain.
-	const currentVersion = await catalogVersion(env, storeId);
-	const claimedBaseline = body.baseline_version != null && Number.isSafeInteger(Number(body.baseline_version))
-		? Number(body.baseline_version)
-		: null;
-	if (deletionCount > 0 || modifiesExisting) {
-		if (claimedBaseline === null) {
-			return jsonResponse({
-				error: "catalog_baseline_required",
-				message: "This push would modify or delete products. Send baseline_version from GET /api/v1/products first.",
-				catalog_version: currentVersion,
-			}, 409);
-		}
-		if (claimedBaseline !== currentVersion) {
-			return jsonResponse({
-				error: "stale_catalog",
-				message: "The catalog changed since this device last downloaded it. Download again, merge, and retry.",
-				catalog_version: currentVersion,
-				baseline_version: claimedBaseline,
-			}, 409);
-		}
-	}
-
-	// A current baseline proves the device has seen what it is deleting; it does
-	// not prove the seller meant to. Deleting most of a catalogue in one push is
-	// rare enough as an intention and common enough as a defect that it is worth
-	// making the caller say so explicitly.
-	if (deletionCount > 0 && existing.size >= BULK_DELETE_MIN_CATALOG
-		&& deletionCount >= existing.size * BULK_DELETE_FRACTION && body.confirm_deletion !== true) {
+	if (!Number.isSafeInteger(value) || (value as number) < 0) {
 		return jsonResponse({
-			error: "bulk_deletion_unconfirmed",
-			message: "This push deletes most of the catalog. Re-send with confirm_deletion: true if that is intended.",
-			deleting: deletionCount,
-			of: existing.size,
+			error: "discount_value_invalid",
+			message: "discount_value is an integer: basis points for PERCENTAGE (1000 = 10.00%), minor units for AMOUNT.",
+		}, 400);
+	}
+	if (type === "PERCENTAGE" && (value as number) > 10000) {
+		return jsonResponse({
+			error: "discount_value_invalid",
+			message: "A PERCENTAGE discount cannot exceed 10000 basis points (100.00%).",
+		}, 400);
+	}
+	return { type, value };
+}
+
+/**
+ * Whether this store may hold one more product, under the plan it is on.
+ *
+ * The mirror's copy of this rule computes headroom for a whole submitted list;
+ * this one answers for a single write, which is the same rule with `delta` of 1
+ * on create and 0 on update. Both branches — entitlements and legacy plan limits
+ * — are preserved, and so is the property that matters most:
+ *
+ *   Downgrades block growth, never maintenance.
+ *
+ * A seller already over a reduced limit may still edit and delete what they
+ * have. Only `delta > 0` can be refused, which is why every caller that is not
+ * creating passes 0 and always passes.
+ */
+async function productHeadroom(env: Env, store: Row, delta: number): Promise<Response | null> {
+	const limit = await getPlanLimit(env, String(store.id), "max_products");
+	if (limit === null || delta <= 0) return null;
+
+	if (env.ENTITLEMENTS_ENABLED === "true") {
+		const usage = await env.orderak_db.prepare(
+			`SELECT COUNT(p.id) AS organization_count
+			 FROM organization_stores os
+			 LEFT JOIN products p ON p.store_id=os.store_id
+			 WHERE os.organization_id=(SELECT organization_id FROM organization_stores WHERE store_id=?)`,
+		).bind(store.id).first<{ organization_count: number }>();
+		const currentUsage = Number(usage?.organization_count ?? 0);
+		if (currentUsage + delta > limit) {
+			return entitlementLimitReached(await resolveEntitlements(env, String(store.id)), "max_products");
+		}
+		return null;
+	}
+
+	const usage = await env.orderak_db.prepare("SELECT COUNT(*) AS c FROM products WHERE store_id=?")
+		.bind(store.id).first<{ c: number }>();
+	const currentUsage = Number(usage?.c ?? 0);
+	if (currentUsage + delta > limit) return limitReached("max_products", limit, currentUsage);
+	return null;
+}
+
+/** The product's metadata as a write supplies it, or a 400 naming what is wrong. */
+type ProductFields = {
+	name: string; slug: string | null; description: string | null;
+	price: number; currency: string; available: number; imageUrl: string | null;
+	categoryCode: string | null; categoryId: string | null;
+	discount: DiscountInput;
+};
+
+async function readProductFields(env: Env, storeId: string, raw: Row): Promise<ProductFields | Response> {
+	const name = String(raw.name ?? "").trim().slice(0, 80);
+	if (!name) return jsonResponse({ error: "name_required" }, 400);
+
+	// A malformed price is refused, not read as zero.
+	//
+	// The mirror reads `price_minor: 500` — the pre-ADR-009 shape — as a missing
+	// price object and stores 0. money-wire.spec.ts documents that rather than
+	// asserting it is right, and says so: "When request validation lands
+	// (ADR-010) this should become a 400 instead." These routes are that
+	// validation, and no shipped client calls them, so there is no compatibility
+	// argument for carrying the behaviour across. A product silently priced at
+	// nothing is the most expensive kind of quiet wrong answer there is.
+	const rawPrice = (raw.price ?? {}) as { amount_minor?: unknown; currency?: unknown };
+	if (raw.price == null || typeof raw.price !== "object" || Array.isArray(raw.price)) {
+		return jsonResponse({
+			error: "price_required",
+			message: "price is an object: { amount_minor, currency }. A bare number is not accepted.",
+		}, 400);
+	}
+	const amountMinor = Number(rawPrice.amount_minor);
+	if (!Number.isFinite(amountMinor) || amountMinor < 0) {
+		return jsonResponse({
+			error: "price_invalid",
+			message: "price.amount_minor is a non-negative integer in minor units.",
+		}, 400);
+	}
+	const price = Math.floor(amountMinor);
+	// Rejected rather than defaulted, for the reason the mirror states: defaulting
+	// is how 15000 fils becomes 150.00 EGP — plausible, wrong by a factor of ten,
+	// and undetectable afterwards because nothing recorded what was meant.
+	const currency = rawPrice.currency == null ? DEFAULT_CURRENCY : String(rawPrice.currency).toUpperCase();
+	if (!(ENABLED_CURRENCIES as readonly string[]).includes(currency)) {
+		return jsonResponse({ error: "currency_not_enabled", currency, enabled: [...ENABLED_CURRENCIES] }, 400);
+	}
+
+	const discount = readDiscount(raw);
+	if (discount instanceof Response) return discount;
+
+	// An unknown category is refused, not silently nulled.
+	//
+	// The catalogue mirror this replaced filed such a product under no category
+	// instead, which was defensible for a batch where one bad code should not
+	// reject the other 200. A single deliberate write is different: the seller
+	// named a category, and filing the product under none is a quiet wrong answer
+	// to a question they asked. Refusing is also the stronger tenant boundary —
+	// another store's code fails loudly rather than being ignored.
+	const categoryCode = raw.category_code == null ? null : String(raw.category_code);
+	let categoryId: string | null = null;
+	if (categoryCode) {
+		const row = await env.orderak_db
+			.prepare("SELECT id FROM categories WHERE store_id=? AND category_code=?")
+			.bind(storeId, categoryCode).first<{ id: string }>();
+		if (!row) return jsonResponse({ error: "unknown_category_code", category_code: categoryCode }, 400);
+		categoryId = String(row.id);
+	}
+
+	return {
+		name,
+		slug: slugify(name) || null,
+		description: raw.description != null ? String(raw.description).slice(0, 500) : null,
+		price,
+		currency,
+		available: raw.available === false ? 0 : 1,
+		imageUrl: raw.image_url != null ? String(raw.image_url).slice(0, 500) : null,
+		categoryCode,
+		categoryId,
+		discount,
+	};
+}
+
+/** One product in the shape `GET /api/v1/products` already returns. */
+function productResponseRow(r: Row): Record<string, unknown> {
+	return {
+		app_id: Number(r.app_id),
+		remote_uuid: String(r.id),
+		product_code: String(r.product_code),
+		name: r.name,
+		slug: r.slug ?? null,
+		description: r.description ?? null,
+		price: { amount_minor: Number(r.price_minor), currency: String(r.currency || DEFAULT_CURRENCY) },
+		stock: Number(r.stock),
+		stock_version: Number(r.stock_version ?? 0),
+		available: r.available === 1,
+		image_url: r.image_url ?? null,
+		category_code: r.category_code ?? null,
+		discount_type: r.discount_type ?? null,
+		discount_value: r.discount_value == null ? null : Number(r.discount_value),
+	};
+}
+
+const PRODUCT_SELECT = `SELECT p.id, p.app_id, p.product_code, p.name, p.slug, p.description,
+	        p.price_minor, p.currency, p.stock, p.stock_version, p.available, p.image_url,
+	        p.discount_type, p.discount_value, c.category_code
+	 FROM products p LEFT JOIN categories c ON c.id = p.category_id
+	 WHERE p.store_id = ? AND p.product_code = ?`;
+
+async function productByCode(env: Env, storeId: string, code: string): Promise<Row | null> {
+	return (await env.orderak_db.prepare(PRODUCT_SELECT).bind(storeId, code).first()) as Row | null;
+}
+
+/**
+ * Create one product.
+ *
+ * Idempotent under retry when the caller supplies `client_request_id`: the same
+ * store and the same id resolve to the product already created rather than a
+ * second one. See migration 058 for why this endpoint is the only one that needs
+ * it, and why the reconciliation that ships with the new client depends on it.
+ */
+async function createProduct(request: Request, env: Env, store: Row): Promise<Response> {
+	let body: Row;
+	try { body = (await request.json()) as Row; } catch { return jsonResponse({ error: "invalid_json" }, 400); }
+
+	const storeId = String(store.id);
+	const clientRequestId = body.client_request_id == null ? null : String(body.client_request_id).slice(0, 100) || null;
+
+	// Answered before anything is written, and again on a UNIQUE collision below:
+	// this read closes the ordinary retry, the collision closes the race.
+	if (clientRequestId) {
+		const existing = (await env.orderak_db
+			.prepare(`${PRODUCT_SELECT.replace("p.product_code = ?", "p.client_request_id = ?")}`)
+			.bind(storeId, clientRequestId).first()) as Row | null;
+		if (existing) return jsonResponse({ ok: true, product: productResponseRow(existing), replayed: true });
+	}
+
+	const overLimit = await productHeadroom(env, store, 1);
+	if (overLimit) return overLimit;
+
+	const fields = await readProductFields(env, storeId, body);
+	if (fields instanceof Response) return fields;
+
+	const id = newUuid();
+	const productCode = await uniqueResourceCode(env, "p");
+
+	// app_id is legacy compatibility, never identity.
+	//
+	// It exists so an app built against the mirror can still read `pullProducts`.
+	// Computing it as a separate SELECT and then binding the result would leave a
+	// read/write gap two concurrent creates could both pass through; the subquery
+	// closes that gap by evaluating inside the statement that consumes it. The
+	// UNIQUE(store_id, app_id) constraint remains the correctness backstop, and
+	// the retry below is what answers it — not a general retry on any UNIQUE,
+	// which would paper over a product_code collision meaning something else.
+	const insert = () => env.orderak_db.prepare(
+		`INSERT INTO products (id, store_id, category_id, product_code, app_id, name, slug, description,
+		   price_minor, currency, stock, available, image_url, discount_type, discount_value, client_request_id)
+		 VALUES (?, ?, ?, ?, (SELECT COALESCE(MAX(app_id),0)+1 FROM products WHERE store_id=?), ?, ?, ?,
+		   ?, ?, ?, ?, ?, ?, ?, ?)`,
+	).bind(
+		id, storeId, fields.categoryId, productCode, storeId, fields.name, fields.slug, fields.description,
+		fields.price, fields.currency, 0, fields.available, fields.imageUrl,
+		fields.discount.type, fields.discount.value, clientRequestId,
+	);
+
+	const bump = env.orderak_db
+		.prepare("UPDATE sellers SET catalog_version = catalog_version + 1, updated_at = datetime('now') WHERE id = ?")
+		.bind(storeId);
+
+	try {
+		await env.orderak_db.batch([insert(), bump]);
+	} catch (error) {
+		const message = String((error as Error)?.message ?? "");
+		if (message.includes("products_store_client_request_id")) {
+			// Two retries of the same create raced. The winner's row is the answer.
+			const existing = (await env.orderak_db
+				.prepare(`${PRODUCT_SELECT.replace("p.product_code = ?", "p.client_request_id = ?")}`)
+				.bind(storeId, clientRequestId).first()) as Row | null;
+			if (existing) return jsonResponse({ ok: true, product: productResponseRow(existing), replayed: true });
+		}
+		if (message.includes("app_id")) {
+			try {
+				await env.orderak_db.batch([insert(), bump]);
+			} catch {
+				return jsonResponse({ error: "internal_conflict", message: "Could not assign a product number." }, 500);
+			}
+		} else if (message.includes("invalid_discount")) {
+			return jsonResponse({ error: "discount_value_invalid" }, 400);
+		} else {
+			throw error;
+		}
+	}
+
+	await refreshProductTranslations(env, storeId);
+	const created = await productByCode(env, storeId, productCode);
+	return jsonResponse({ ok: true, product: created ? productResponseRow(created) : null }, 201);
+}
+
+/**
+ * Replace one product's metadata.
+ *
+ * A full replacement, not a partial update wearing a PUT: a field the caller
+ * omits is cleared, because a seller who removes a description means it to go.
+ *
+ * `stock` and `stock_version` are never written here. That is the same rule the
+ * mirror's upsert keeps by omitting stock from its DO UPDATE list, and for the
+ * same reason: an existing product's stock moves through a buyer's order or
+ * through the compare-and-set below, never through a metadata write that happens
+ * to carry a number.
+ */
+async function updateProduct(request: Request, env: Env, store: Row, code: string): Promise<Response> {
+	let body: Row;
+	try { body = (await request.json()) as Row; } catch { return jsonResponse({ error: "invalid_json" }, 400); }
+
+	const storeId = String(store.id);
+	const existing = await productByCode(env, storeId, code);
+	if (!existing) return jsonResponse({ error: "not_found" }, 404);
+
+	const fields = await readProductFields(env, storeId, body);
+	if (fields instanceof Response) return fields;
+
+	// delta 0: an edit never grows the catalogue, so a seller over a reduced limit
+	// can still maintain what they have.
+	const overLimit = await productHeadroom(env, store, 0);
+	if (overLimit) return overLimit;
+
+	try {
+		await env.orderak_db.batch([
+			env.orderak_db.prepare(
+				`UPDATE products SET category_id=?, name=?, slug=?, description=?, price_minor=?, currency=?,
+				   available=?, image_url=?, discount_type=?, discount_value=?, updated_at=datetime('now')
+				 WHERE store_id=? AND product_code=?`,
+			).bind(
+				fields.categoryId, fields.name, fields.slug, fields.description, fields.price, fields.currency,
+				fields.available, fields.imageUrl, fields.discount.type, fields.discount.value, storeId, code,
+			),
+			env.orderak_db
+				.prepare("UPDATE sellers SET catalog_version = catalog_version + 1, updated_at = datetime('now') WHERE id = ?")
+				.bind(storeId),
+		]);
+	} catch (error) {
+		if (String((error as Error)?.message ?? "").includes("invalid_discount")) {
+			return jsonResponse({ error: "discount_value_invalid" }, 400);
+		}
+		throw error;
+	}
+
+	await refreshProductTranslations(env, storeId);
+	const updated = await productByCode(env, storeId, code);
+	return jsonResponse({ ok: true, product: updated ? productResponseRow(updated) : null });
+}
+
+/**
+ * Adjust one product's stock, and refuse a stale revision.
+ *
+ * `expected_stock_version` is required rather than optional. Optional is how
+ * last-write-wins returns: a caller with no opinion about what it is overwriting
+ * would silently erase a decrement a buyer's order had just made.
+ */
+async function adjustProductStock(request: Request, env: Env, store: Row, code: string): Promise<Response> {
+	let body: Row;
+	try { body = (await request.json()) as Row; } catch { return jsonResponse({ error: "invalid_json" }, 400); }
+
+	const storeId = String(store.id);
+	const stock = Math.floor(Number(body.stock));
+	if (!Number.isSafeInteger(stock) || stock < 0) return jsonResponse({ error: "stock_invalid" }, 400);
+	if (body.expected_stock_version == null || !Number.isSafeInteger(Number(body.expected_stock_version))) {
+		return jsonResponse({
+			error: "expected_stock_version_required",
+			message: "Send the stock_version this edit was made against, from GET /api/v1/products.",
+		}, 400);
+	}
+	const expected = Number(body.expected_stock_version);
+
+	const current = await productByCode(env, storeId, code);
+	if (!current) return jsonResponse({ error: "not_found" }, 404);
+
+	const delta = stock - Number(current.stock);
+	const statements = [
+		env.orderak_db.prepare(
+			`UPDATE products SET stock=?, stock_version=stock_version+1, updated_at=datetime('now')
+			 WHERE store_id=? AND product_code=? AND stock_version=?`,
+		).bind(stock, storeId, code, expected),
+	];
+	// The ledger row carries both the expected revision AND the resulting stock in
+	// its predicate. The revision alone is not proof the UPDATE above applied: an
+	// order's trigger moves stock and bumps the same counter, so a row could match
+	// the revision while describing a different quantity. Both, or neither.
+	if (delta !== 0) {
+		statements.push(env.orderak_db.prepare(
+			`INSERT INTO stock_movements (id, store_id, product_id, product_code, delta, balance_after,
+			   cause, cause_id, actor, reconstructed)
+			 SELECT lower(hex(randomblob(16))), p.store_id, p.id, p.product_code, ?, p.stock,
+			        'MANUAL_ADJUSTMENT', NULL, 'seller', 0
+			   FROM products p
+			  WHERE p.store_id=? AND p.product_code=? AND p.stock_version=? AND p.stock=?`,
+		).bind(delta, storeId, code, expected + 1, stock));
+	}
+
+	const [applied] = await env.orderak_db.batch(statements);
+	if (!applied.meta.changes) {
+		const fresh = await productByCode(env, storeId, code);
+		return jsonResponse({
+			error: "stale_stock",
+			stock: Number(fresh?.stock ?? current.stock),
+			stock_version: Number(fresh?.stock_version ?? current.stock_version ?? 0),
 		}, 409);
 	}
 
-	// Keep every statement below D1's bound-parameter ceiling. Each chunk is one
-	// upsert query, so a 2,000-product catalog does not consume 2,000 queries.
-	//
-	// SYNC_CHUNK_ROWS × the column count must stay under 100. Adding `currency`
-	// took the row from 12 bindings to 13, and 8 × 13 = 104 would have exceeded
-	// the ceiling — the failure mode being a runtime D1 error on any catalog
-	// larger than seven products, which no existing test would have caught.
-	const SYNC_COLUMNS = 13;
-	const SYNC_CHUNK_ROWS = Math.floor(100 / SYNC_COLUMNS); // 7
-	const stmts: D1PreparedStatement[] = [];
-	for (let offset = 0; offset < records.length; offset += SYNC_CHUNK_ROWS) {
-		const chunk = records.slice(offset, offset + SYNC_CHUNK_ROWS);
-		const values = chunk.map(() => `(${Array(SYNC_COLUMNS).fill("?").join(",")})`).join(",");
-		const bindings = chunk.flatMap((record) => [
-			record.id, storeId, record.categoryId, record.productCode, record.storedAppId, record.name,
-			record.slug, record.description, record.price, record.currency, record.stock, record.available, record.imageUrl,
-		]);
-		stmts.push(env.orderak_db.prepare(
-			// `stock` is bound on INSERT and deliberately absent from DO UPDATE: a
-			// new product's stock comes from the device that invented it, and an
-			// existing product's stock moves only through the compare-and-set
-			// below or a buyer's order.
-			`INSERT INTO products (id,store_id,category_id,product_code,app_id,name,slug,description,price_minor,currency,stock,available,image_url)
-			 VALUES ${values}
-			 ON CONFLICT(id) DO UPDATE SET
-			 category_id=excluded.category_id,name=excluded.name,slug=excluded.slug,description=excluded.description,
-			 price_minor=excluded.price_minor,currency=excluded.currency,available=excluded.available,
-			 image_url=excluded.image_url,updated_at=datetime('now')`,
-		).bind(...bindings));
-	}
-	// A product arrives holding stock, and those units have to come from
-	// somewhere or the ledger can never reconcile for it. The mirror's INSERT
-	// takes the figure straight from the device that invented the product, which
-	// makes this its opening balance in the literal sense: the count it started
-	// with, before anything moved it.
-	//
-	// Only for products this push creates. An existing product's stock is not
-	// touched by the upsert — it moves through an order or the adjustment below.
-	for (const record of records) {
-		if (record.existed || record.stock === 0) continue;
-		stmts.push(env.orderak_db.prepare(
-			`INSERT INTO stock_movements (
-			   id, store_id, product_id, product_code, delta, balance_after,
-			   cause, cause_id, actor, reconstructed
-			 ) VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, 'OPENING_BALANCE', NULL, 'seller', 0)`,
-		).bind(storeId, record.id, record.productCode, record.stock, record.stock));
-	}
+	const updated = await productByCode(env, storeId, code);
+	return jsonResponse({ ok: true, product: updated ? productResponseRow(updated) : null });
+}
 
-	for (let offset = 0; offset < removedCodes.length; offset += 90) {
-		const chunk = removedCodes.slice(offset, offset + 90);
-		stmts.push(env.orderak_db.prepare(`DELETE FROM products WHERE store_id=? AND product_code IN (${chunk.map(() => "?").join(",")})`)
-			.bind(storeId, ...chunk));
-	}
-	if (!records.length) stmts.push(env.orderak_db.prepare("DELETE FROM products WHERE store_id=?").bind(storeId));
+/**
+ * Delete one product.
+ *
+ * No tombstone, and none is coming. A tombstone would make local absence mean
+ * something, which is the property the mirror had and this API exists to remove:
+ * the server deletes, `GET /api/v1/products` returns without the row, and the
+ * device's cache follows. Nothing infers a deletion from a device forgetting.
+ *
+ * `stock_movements` rows survive, by the design migration 052 states: the
+ * movement carries its own copy of the product's identity precisely so a later
+ * deletion cannot rewrite history.
+ */
+async function deleteProduct(env: Env, store: Row, code: string): Promise<Response> {
+	const storeId = String(store.id);
+	const existing = await productByCode(env, storeId, code);
+	if (!existing) return jsonResponse({ error: "not_found" }, 404);
 
-	// Stock joins the same batch rather than following it in a second one.
-	//
-	// It used to run afterwards, in its own batch. Two batches are two
-	// transactions, so a failure between them left the metadata writes and the
-	// deletions committed with the stock statements never attempted, and nothing
-	// recorded that half the push had landed. One batch is one transaction: all
-	// of it, or none.
-	//
-	// This does NOT make a stale stock revision reject the push, and it is not
-	// meant to. A conflicting revision changes zero rows rather than raising, so
-	// the rest still commits and the response reports the conflict — which is the
-	// contract the client is built on: applySync() takes the authoritative state
-	// for the rows that landed and keeps local intent for the ones that did not.
-	// Partial application of STOCK is deliberate. Partial application of the
-	// batch was not.
-	const stockRecords = records.filter((record) => record.existed && record.stockDirty);
-	const versionedStock = stockRecords.filter((record) => record.expectedStockVersion != null);
-	const stockOffset = stmts.length;
-	for (const record of versionedStock) {
-		stmts.push(env.orderak_db.prepare(
-			`UPDATE products SET stock=?,stock_version=stock_version+1,updated_at=datetime('now')
-			 WHERE store_id=? AND id=? AND stock_version=?`,
-		).bind(record.stock, storeId, record.id, record.expectedStockVersion));
-	}
-
-	// The seller setting a figure themselves is the one stock movement made in
-	// application code rather than by a trigger, and until now the only one that
-	// left no trace at all: the compare-and-set above bumps stock_version and
-	// writes nothing else, so afterwards a seller correcting a count and an order
-	// that went missing are the same event.
-	//
-	// Conditional on the update having applied, not on having been attempted. A
-	// stale revision matches no rows, and a ledger row written anyway would
-	// record a movement that did not happen — which is worse than the silence it
-	// replaces, because reconciliation would then believe it.
-	for (const record of versionedStock) {
-		// By the product's own id, like everything else that addresses a stored
-		// row: `record.appId` is the sending device's numbering, which is not
-		// what this store is keyed by and can belong to another device's product.
-		const previous = existing.get(record.id);
-		if (!previous) continue;
-		const delta = record.stock - previous.stock;
-		if (delta === 0) continue;
-		stmts.push(env.orderak_db.prepare(
-			`INSERT INTO stock_movements (
-			   id, store_id, product_id, product_code, delta, balance_after,
-			   cause, cause_id, actor, reconstructed
-			 )
-			 SELECT lower(hex(randomblob(16))), p.store_id, p.id, p.product_code, ?, p.stock,
-			        'MANUAL_ADJUSTMENT', NULL, 'seller', 0
-			 FROM products p
-			 WHERE p.store_id=? AND p.id=? AND p.stock_version=? AND p.stock=?`,
-		// Both halves are needed. The version alone is not proof the update
-		// applied: an order's trigger bumps it too, so a push whose stale
-		// revision was refused can still find the row sitting at expected+1 and
-		// record a movement that never happened. Requiring the new stock as well
-		// distinguishes "this statement wrote it" from "it happens to look like
-		// this", and within one batch nothing else can move it in between.
-		).bind(delta, storeId, record.id, Number(record.expectedStockVersion) + 1, record.stock));
-	}
-
-	// Every accepted push moves the version, so the next device to send this
-	// baseline back is told to download again. In the same batch: a version that
-	// could be bumped without the write landing, or the reverse, is worse than
-	// no version at all.
-	stmts.push(env.orderak_db
-		.prepare("UPDATE sellers SET catalog_version = catalog_version + 1, updated_at = datetime('now') WHERE id = ?")
-		.bind(storeId));
-
-	const batchResults = await env.orderak_db.batch(stmts);
-
-	let conflicts = stockRecords.filter((record) => record.expectedStockVersion == null).map((record) => record.appId);
-	conflicts = conflicts.concat(versionedStock
-		.filter((_, index) => Number(batchResults[stockOffset + index]?.meta?.changes ?? 0) !== 1)
-		.map((record) => record.appId));
-
-	// An empty mirror against a non-empty catalog is legitimate — a seller can
-	// delete their last product — but it is also what a client-side database
-	// loss looks like from here, and the two are indistinguishable at this
-	// layer. Record it so the difference can be established afterwards from the
-	// audit trail rather than guessed at from a support ticket.
-	if (!records.length && existing.size > 0) {
-		await auditDb(env, null, "catalog.mirror_emptied", {
-			entity: "store",
-			entity_id: storeId,
-			actor_type: "seller",
-			actor_id: storeId,
-			deleted_product_count: existing.size,
-		}, request);
-	}
-
-	// One entry per submitted row, keyed by the app_id that row was sent with.
-	//
-	// It used to be every product in the store, keyed by the stored app_id. For
-	// a single device those are the same list — a mirror leaves the store
-	// holding exactly what was pushed — but for a second device they are not:
-	// the reply carried the other device's products under app_ids that collide
-	// with this device's local row ids, and the client writes this reply back by
-	// app_id. Answering only about what was asked removes the ambiguity rather
-	// than asking the client to resolve it.
-	const { results: syncedRows } = (await env.orderak_db.prepare(
-		`SELECT p.id,p.stock,p.stock_version,c.category_code
-		 FROM products p LEFT JOIN categories c ON c.id=p.category_id
-		 WHERE p.store_id=?`,
-	).bind(storeId).all()) as { results: Row[] };
-	const storedById = new Map<string, Row>();
-	for (const row of syncedRows ?? []) storedById.set(String(row.id), row);
-	const mapping = records.map((record) => {
-		const row = storedById.get(record.id);
-		return {
-			app_id: record.appId, product_code: record.productCode, remote_uuid: record.id,
-			category_code: row?.category_code == null ? null : String(row.category_code),
-			stock: Number(row?.stock ?? record.stock), stock_version: Number(row?.stock_version ?? 0),
-		};
-	});
-	await refreshProductTranslations(env, storeId);
-	// The push moved the version, so the baseline the device just used is spent.
-	// Returning the new one saves a round trip and, more to the point, keeps the
-	// device current: a client that pushed successfully and then kept its old
-	// baseline would be refused on its very next edit for no reason it could see.
-	const nextVersion = currentVersion + 1;
-	if (conflicts.length) {
-		return jsonResponse({ ok: false, error: "stale_stock", conflicts, products: mapping, catalog_version: nextVersion }, 409);
-	}
-	return jsonResponse({ ok: true, count: mapping.length, products: mapping, catalog_version: nextVersion });
+	await env.orderak_db.batch([
+		env.orderak_db.prepare("DELETE FROM products WHERE store_id=? AND product_code=?").bind(storeId, code),
+		env.orderak_db
+			.prepare("UPDATE sellers SET catalog_version = catalog_version + 1, updated_at = datetime('now') WHERE id = ?")
+			.bind(storeId),
+	]);
+	return jsonResponse({ ok: true, product_code: code });
 }
 
 async function restoreFirebaseSession(request: Request, env: Env): Promise<Response> {

@@ -63,6 +63,8 @@ import app.orderak.seller.data.billing.FeatureAvailabilityResolver
 import app.orderak.seller.data.billing.FeatureKeys.EDITABLE_CUSTOMER_PROFILES
 import app.orderak.seller.data.db.CustomerEntity
 import app.orderak.seller.data.db.OrderEntity
+import app.orderak.seller.data.customers.CustomerWriteRepository
+import app.orderak.seller.data.customers.CustomerWriteResult
 import app.orderak.seller.data.orders.OrderRepository
 import app.orderak.seller.feature.orders.OrderCard
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -81,6 +83,7 @@ import javax.inject.Inject
 @HiltViewModel
 class CustomerDetailsViewModel @Inject constructor(
     private val repo: OrderRepository,
+    private val customerWrites: CustomerWriteRepository,
     featureAvailability: FeatureAvailabilityResolver,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -113,14 +116,29 @@ class CustomerDetailsViewModel @Inject constructor(
     private val _saved = MutableStateFlow(false)
     val saved: StateFlow<Boolean> = _saved.asStateFlow()
 
+    private val _saveFailed = MutableStateFlow(false)
+    val saveFailed: StateFlow<Boolean> = _saveFailed.asStateFlow()
+
+    /**
+     * Save the edit to the server, and only then report success.
+     *
+     * A customer edit is Class A: if it does not reach the server it does not
+     * happen, and nothing is written locally or queued. Reporting "saved" on a
+     * write that never left the device is the failure this replaces — the seller
+     * closed the screen believing their correction was kept.
+     */
     fun save(name: String, altContact: String, note: String) {
         viewModelScope.launch {
-            repo.editCustomer(customerKey, name, altContact, note)
-            _saved.value = true
+            when (customerWrites.edit(customerKey, name, altContact, note)) {
+                is CustomerWriteResult.Saved -> _saved.value = true
+                else -> _saveFailed.value = true
+            }
         }
     }
 
     fun savedShown() { _saved.value = false }
+
+    fun saveFailureShown() { _saveFailed.value = false }
 }
 
 /** S12 — a customer's details, their order history, and the edit that persists. */

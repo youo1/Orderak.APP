@@ -131,7 +131,7 @@ class NewOrderViewModel @Inject constructor(
                 _state.value = s.copy(saving = false, stockError = true)
                 return@launch
             }
-            val lines = selected.map { (p, q, _) -> NewOrderLine(p.id, p.name, q, p.priceMinor, p.currency) }
+            val lines = selected.map { (p, q, _) -> NewOrderLine(p.id, p.productCode, p.name, q, p.priceMinor, p.currency) }
             val id = orderRepo.create(
                 buyerPhone = s.phone, buyerName = s.name.ifBlank { null },
                 payMethod = s.payMethod, note = s.note.ifBlank { null }, lines = lines

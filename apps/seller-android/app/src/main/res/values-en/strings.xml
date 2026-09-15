@@ -301,6 +301,10 @@
     <string name="common_retry">Retry</string>
     <string name="order_cancel_confirm">Cancel this order and restore its stock?</string>
     <string name="product_delete_confirm">Delete this product? This can’t be undone.</string>
+    <string name="product_stock_conflict_title">The shop&#8217;s stock changed</string>
+    <string name="product_stock_conflict_body">You set %1$d. The shop now has %2$d — an order came in while you were editing. Your other changes are saved.</string>
+    <string name="product_stock_conflict_use_shop">Use %1$d</string>
+    <string name="product_stock_conflict_keep_mine">Set %1$d anyway</string>
     <string name="category_delete_confirm">Delete this category? Products will become uncategorized.</string>
     <string name="categories_error">Couldn’t update categories. Try again.</string>
     <string name="settings_delete_confirm">Submit a verified account-deletion request? The request follows the published deletion timeline.</string>
@@ -517,8 +521,6 @@
     <string name="error_product_missing">One of the products in this order is no longer in your catalogue.</string>
     <string name="error_currency">This price is in a currency your store cannot accept yet.</string>
     <string name="error_order_moved">This order already moved on. Refresh to see where it is now.</string>
-    <string name="error_catalog_out_of_date">Your catalogue is out of date on this phone. It downloads again on the next sync.</string>
-    <string name="error_catalog_bulk_delete">This would delete most of your catalogue. Confirm the deletion to continue.</string>
     <string name="error_too_large">That is too large to send. Try a smaller file or a shorter message.</string>
     <string name="error_unsupported_file">That file type is not supported. Use a JPEG, PNG, GIF or WebP image.</string>
     <string name="error_ticket_closed">This support ticket is closed. Open a new one instead.</string>
