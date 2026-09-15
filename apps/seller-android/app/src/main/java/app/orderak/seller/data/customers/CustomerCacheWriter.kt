@@ -46,7 +46,6 @@ class CustomerCacheWriter @Inject constructor(
                     // for no reason a seller could explain.
                     createdAt = local?.createdAt ?: now,
                     updatedAt = now,
-                    dirty = false,
                 ),
             )
         }

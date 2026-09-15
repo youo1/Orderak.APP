@@ -29,6 +29,16 @@ fun interface LegacyProductSource {
     suspend fun all(): List<ProductEntity>
 }
 
+/**
+ * Stamping a converted product's new code onto the order lines that name it.
+ *
+ * Narrow on purpose: the reconciliation may fill a code in where there is none,
+ * and nothing else. It cannot change a line, a quantity or a price.
+ */
+fun interface OrderLineStamping {
+    suspend fun stamp(localProductId: Long, productCode: String)
+}
+
 /** Creating one product on the server, under a caller-chosen retry key. */
 fun interface ProductCreating {
     suspend fun create(draft: ProductDraft, clientRequestId: String): ProductWriteDecision

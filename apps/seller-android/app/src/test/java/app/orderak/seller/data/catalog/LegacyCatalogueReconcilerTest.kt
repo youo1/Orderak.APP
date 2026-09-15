@@ -75,7 +75,6 @@ class LegacyCatalogueReconcilerTest {
         currency = "EGP",
         stock = 3,
         productCode = null,
-        remoteUuid = null,
     )
 
     private fun stored(code: String = "p-A1B2C3D4") = ProductWriteDecision.Store(
@@ -87,12 +86,21 @@ class LegacyCatalogueReconcilerTest {
         ),
     )
 
+    /** Records which local product ids had a code stamped onto their order lines. */
+    private class Stamps : OrderLineStamping {
+        val stamped = mutableListOf<Pair<Long, String>>()
+        override suspend fun stamp(localProductId: Long, productCode: String) {
+            stamped += localProductId to productCode
+        }
+    }
+
     private fun reconciler(
         products: List<ProductEntity>,
         creator: Creator,
         records: Records = Records(),
+        stamps: Stamps = Stamps(),
     ) = Triple(
-        LegacyCatalogueReconciler({ products }, creator, records),
+        LegacyCatalogueReconciler({ products }, creator, records, stamps),
         creator,
         records,
     )
