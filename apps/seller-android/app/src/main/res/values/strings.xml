@@ -519,8 +519,6 @@
     <string name="error_product_missing">One of the products in this order is no longer in your catalogue.</string>
     <string name="error_currency">This price is in a currency your store cannot accept yet.</string>
     <string name="error_order_moved">This order already moved on. Refresh to see where it is now.</string>
-    <string name="error_catalog_out_of_date">Your catalogue is out of date on this phone. It downloads again on the next sync.</string>
-    <string name="error_catalog_bulk_delete">This would delete most of your catalogue. Confirm the deletion to continue.</string>
     <string name="error_too_large">That is too large to send. Try a smaller file or a shorter message.</string>
     <string name="error_unsupported_file">That file type is not supported. Use a JPEG, PNG, GIF or WebP image.</string>
     <string name="error_ticket_closed">This support ticket is closed. Open a new one instead.</string>

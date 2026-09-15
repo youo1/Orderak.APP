@@ -362,8 +362,11 @@ production URL returns the public 404.
 | `POST` | `/api/v1/categories` | Create a category → returns immutable `category_code` (`c-XXXXXX`). |
 | `PUT`  | `/api/v1/categories/{category_code}` | Rename / reorder (code is immutable). |
 | `DELETE` | `/api/v1/categories/{category_code}` | Delete (products are un-linked). |
-| `GET`  | `/api/v1/products` | Pull the store's full catalog (name, price, stock, codes, images, category). Non-destructive read — used by Android to seed a fresh local database before the first mirror push. |
-| `POST` | `/api/v1/products/sync` | Mirror product metadata and explicitly reconcile stock by optimistic revision; returns public codes, UUID mapping, stock, and `stock_version`. |
+| `GET`  | `/api/v1/products` | Pull the store's full catalog (name, price, stock, codes, images, category). The refresh Android replaces its cache from. |
+| `POST` | `/api/v1/products` | Create one product; idempotent under retry via `client_request_id`. |
+| `PUT`  | `/api/v1/products/{product_code}` | Replace one product's editable metadata. Never writes stock. |
+| `DELETE` | `/api/v1/products/{product_code}` | Delete one product. Stock movements are kept. |
+| `PATCH` | `/api/v1/products/{product_code}/stock` | Adjust stock under compare-and-set; a stale revision answers `409 stale_stock`. |
 | `POST` | `/api/v1/media/upload` | Multipart image upload to R2 → `{ url }`. Served publicly at `GET /media/{key}`. |
 
 Auth is via `x-orderak-phone` + `x-orderak-secret` headers. Public URLs and
@@ -480,99 +483,6 @@ Discounts travel on both write routes as `discount_type` (`PERCENTAGE`,
 `AMOUNT`, or `null`) and `discount_value`. The value is **basis points** for a
 percentage — `1000` is 10.00%, capped at `10000` — and **minor units** of the
 product's own currency for an amount. Both halves move together or neither does.
-
-### Sync Products (legacy, being retired)
-
-> **Deprecated.** Use the product routes above. This endpoint mirrors the
-> catalogue: products absent from the submitted array are **deleted**. It is
-> served only until every active device runs a build that uses the routes above,
-> and it will be removed. See
-> [ADR-012](../decisions/adr-012-server-authoritative-catalogue.md).
-
-```http
-POST /api/v1/products/sync
-Content-Type: application/json
-```
-
-Request:
-
-```json
-{
-  "phone": "01012345678",
-  "secret": "device-uuid-secret",
-  "baseline_version": 7,
-  "products": [
-    { "app_id": 1, "remote_uuid": "018f-pizza", "name": "Pizza", "price": { "amount_minor": 15000, "currency": "EGP" }, "stock": 10, "available": true, "stock_dirty": true, "expected_stock_version": 4 },
-    { "app_id": 2, "remote_uuid": null, "name": "Burger", "price": { "amount_minor": 8000, "currency": "EGP" }, "stock": 5, "available": true, "stock_dirty": false, "expected_stock_version": 9 }
-  ]
-}
-```
-
-A product is identified by `remote_uuid`, the id this endpoint returned when it
-first accepted the product. Send it on every later push; send `null` (or omit
-it) only for a product that has never synced, as Burger does above.
-
-`app_id` is the client's own row id, and it is not an identity: two phones
-signed into one store both number their products 1, 2, 3…, so matching a push on
-it filed the second phone's product as an edit of the first phone's and
-overwrote it. It survives for two things — the reply echoes it back so a device
-can find the local row each entry describes, and a product carrying no
-`remote_uuid` is matched by it when no other row in the request has already
-claimed that product, which is what keeps an app built before this change
-working.
-
-`baseline_version` is the `catalog_version` this device last downloaded from
-`GET /api/v1/products`. Any push that modifies or deletes an existing product
-must send it, and a value that no longer matches the store is refused with
-`409 stale_catalog`.
-
-`image_url` must be a public URL returned by `POST /api/v1/media/upload`, not a
-local device path. The app uploads each product image once, caches the returned
-URL, and sends it here.
-
-Product quota enforcement is growth-aware. If a downgrade leaves a store over
-its effective limit, an equal-size mirror update (editing existing products) or
-a smaller mirror (deleting products) is accepted. A mirror that increases the
-current count is rejected with `409 PLAN_LIMIT_REACHED` until the count is
-below the limit. Existing product rows are never deleted by the policy engine.
-
-The status a plan limit answers with depends on the kind of limit, and on
-nothing else. A structural cap such as `max_products` or `max_categories` is a
-conflict with the plan's shape and answers `409`. A limit that resets —
-`max_orders_per_month`, `max_ai_requests_per_month` — is a rate and answers
-`429` with `Retry-After` set to the UTC calendar-month boundary the quota is
-actually counted on. Until 2026-09-12 the same monthly condition answered `409`
-through the legacy plan model and `429` through the entitlements engine, so the
-status depended on `ENTITLEMENTS_ENABLED`; both paths read one rule now. The
-`code` is `plan_limit_reached` either way and has always been the stable
-identifier to branch on.
-
-Existing stock changes only when `stock_dirty=true` and
-`expected_stock_version` matches. A stale explicit edit returns `409` with
-RFC 9457 `code:"stale_stock"`, conflicted `app_id` values, and current product mappings;
-the app rebases and retries. A routine mirror with `stock_dirty=false` cannot
-overwrite stock consumed by public orders.
-
-Response:
-
-```json
-{
-  "ok": true,
-  "count": 2,
-  "products": [
-    { "app_id": 1, "product_code": "p-H72LP9", "remote_uuid": "018f-pizza", "stock": 10, "stock_version": 5, "category_code": null },
-    { "app_id": 2, "product_code": "p-K91QD2", "remote_uuid": "018f-burger", "stock": 5, "stock_version": 9, "category_code": "c-A82KD9" }
-  ]
-}
-```
-
-The reply holds one entry per **submitted** product, keyed by the `app_id` it
-was sent with — never the rest of the store, whose `app_id` values belong to
-other devices and collide with the caller's own row ids. Persist each
-`remote_uuid`: sending it next time is what stops another device's product from
-being filed as an edit of this one.
-
-Products not included in the list are **deleted** from the server (mirror sync).
 
 ### Fetch Orders
 

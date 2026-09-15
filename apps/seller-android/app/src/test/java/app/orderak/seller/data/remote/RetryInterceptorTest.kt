@@ -132,10 +132,11 @@ class RetryInterceptorTest {
 
     @Test
     fun `never replays a POST without an idempotency key`() {
-        // products/sync is a full-mirror push: whatever the payload omits, the
-        // server deletes. Replaying one against a catalogue that moved in between
-        // is how a seller loses products.
-        val req = request(url = "https://api.orderak.app/api/v1/products/sync", method = "POST")
+        // Creating a product is idempotent on the server under
+        // `client_request_id`, but that key travels in the body rather than the
+        // header this interceptor reads. From here it is an ordinary POST, and a
+        // replay would be a second product.
+        val req = request(url = "https://api.orderak.app/api/v1/products", method = "POST")
         val chain = FakeChain(req, mutableListOf(response(req, 503)))
 
         val result = interceptor.intercept(chain.chain)

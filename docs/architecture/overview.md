@@ -241,12 +241,15 @@ sequenceDiagram
     D1-->>Worker: New orders
     Worker-->>WM: { orders: [...] }
     WM->>Room: Insert/update orders
-    App->>WM: On-demand sync (foreground/manual)
-    WM->>Worker: POST /api/v1/products/sync (stock_dirty + expected_stock_version)
-    Worker->>D1: Mirror metadata; compare-and-set explicit stock edits
-    D1-->>Worker: Confirmed
-    Worker-->>WM: Product identity + authoritative stock revision
-    WM->>Room: Update codes, UUIDs, stock revisions
+    App->>Worker: POST/PUT/DELETE /api/v1/products (one product, online only)
+    Worker->>D1: Write that product
+    D1-->>Worker: The product as it now stands
+    Worker-->>App: The product, or a refusal
+    App->>Room: Cache what the server returned, or nothing at all
+    App->>Worker: PATCH /api/v1/products/{code}/stock (expected_stock_version)
+    Worker-->>App: 200, or 409 stale_stock with the authoritative pair
+    WM->>Worker: GET /api/v1/products (refresh)
+    WM->>Room: Replace the cache in one transaction
 ```
 
 - **Room** is a cache of what D1 holds, plus a queue of commands that have not

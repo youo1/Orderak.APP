@@ -34,8 +34,8 @@ with a physical device or a Cloudflare account, and are marked accordingly.
 | **Entitlements** | Snapshot non-empty on all four plans, engine off **and** on, identical shape (I-4) | **Closed engine-off** — `entitlement-projection.spec.ts`. Engine-on is item 03b and has not been enabled in any environment |
 | **Localisation** | Arabic and English verified end to end, RTL included | **Guard holds** — locale parity is enforced in `android-ci.yml`; end-to-end RTL evidence outstanding |
 | **Money** | EGP plus one non-2-decimal currency, through the receipt path | **Closed in code** — `money.spec.ts`, `money-wire.spec.ts`, and the Android exponent guard |
-| **Cross-store isolation** | A suite proving no seller-facing route crosses a store boundary | **Closed** — `cross-store-isolation.spec.ts` covers the mirror, reads, store-scoped writes and the admin boundary; `customers.spec.ts` covers the customers resource added later |
-| **API contract** | Route inventory = OpenAPI = implementation, with the scanner failing closed (I-7) | **Closed** — `pnpm -C contracts/openapi run check`, 100% over 259 operations, scanner fails on an expression it cannot read |
+| **Cross-store isolation** | A suite proving no seller-facing route crosses a store boundary | **Closed** — `cross-store-isolation.spec.ts` covers reads, store-scoped writes and the admin boundary; `product-crud.spec.ts` covers the product routes that replaced the mirror; `customers.spec.ts` covers the customers resource |
+| **API contract** | Route inventory = OpenAPI = implementation, with the scanner failing closed (I-7) | **Closed** — `pnpm -C contracts/openapi run check`, 100% over 257 operations, scanner fails on an expression it cannot read |
 | **Observability** | `SENTRY_DSN` required and present in both environments; Crashlytics proven from a release build; detection responsibility named | **Partial** — see below |
 | **Release artifact** | Signed AAB, verified signature, installs and runs | **Pipeline closed, artifact open** — `android-release.yml` builds and verifies the signature; no key material yet |
 | **Data integrity** | Reconciliation reports clean on staging | **Open** — the script runs; it has not been run against staging |
@@ -112,11 +112,10 @@ the one that matters: the other four only put information somewhere.
 
 ### Cross-store isolation — what the suite actually proves
 
-The highest-value case is covered on both product write surfaces. Seller B's
-`POST /api/v1/products/sync` payload cannot touch seller A's `store_id` under
-any field — that endpoint is the destructive one, which is why the suite was
-written alongside item 04 — and the per-product routes that replace it are
-covered in `product-crud.spec.ts` with a successor for each of those cases.
+The suite was written alongside item 04 for the catalogue mirror, which was the
+only seller-facing route that deleted and therefore the one worth proving could
+not reach another store. That endpoint was removed on 2026-09-15 and its cases
+went with it; `product-crud.spec.ts` carries a successor for each.
 
 Two differences are worth stating rather than leaving to be inferred. The
 successors are structurally stronger where the mirror's cases relied on refusing
