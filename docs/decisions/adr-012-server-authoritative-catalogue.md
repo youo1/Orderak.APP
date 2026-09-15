@@ -120,11 +120,16 @@ is local, unsynced, and lost on reinstall. The contract names it so the "Room is
 a cache" rule has no undocumented hole. Whether payments belong in Orderak at all
 is a separate decision this ADR does not make.
 
-## Retiring the mirror: what the decision rests on
+## Retiring the mirror: what the decision rested on
 
-The mirror is served alongside the product routes until every installed app has
-moved. Deciding when that is true is the risky part, because the obvious
-evidence is not evidence.
+**The mirror was removed on 2026-09-15.** This section is kept in the past tense
+rather than deleted, because the reasoning is the reusable part: the next
+endpoint to be retired faces the same question, and the wrong answers below are
+the ones that look right.
+
+It was served alongside the product routes until every installed app had moved.
+Deciding when that was true was the risky part, because the obvious evidence is
+not evidence.
 
 **`catalog_version = 0` is not a usable signal.** It cannot distinguish a seller
 with no products from a seller whose products exist only on a phone, and those
@@ -136,23 +141,38 @@ last month's build is invisible to a grep, and a deletion decided on the first
 question while believing it answered the second is how a working app stops
 working.
 
-So the endpoint announces every call with the build that made it — the
-`catalog_mirror_called` signal in `syncProducts`, carrying platform, app version
-and version code, emitted before the request is validated so a refused push from
-an old client still counts as a caller. Silence over the observation window means
-what it appears to mean. `mirror-decommission-evidence.spec.ts` asserts the
-signal fires, including for a caller sending no version headers at all, and that
-the product routes produce none of it — because a signal nobody emits looks
-exactly like a signal nobody triggers.
+So the endpoint announced every call with the build that made it — a
+`catalog_mirror_called` signal carrying platform, app version and version code,
+emitted before the request was validated so a refused push from an old client
+still counted as a caller. A suite asserted the signal fired, including for a
+caller sending no version headers at all, and that the product routes produced
+none of it, because a signal nobody emits looks exactly like a signal nobody
+triggers.
 
-One risk the original plan assumed is smaller than it looks. The legacy
-reconciliation converts device-only products through `POST /api/v1/products`, not
-through the mirror, so deleting the mirror cannot strand them. What the deletion
-can break is a client that never upgraded, which is what the minimum-supported-
-version gate is for — and that is measured on the proportion of **active devices
-on a CRUD-capable build**, from `sellers.primary_device_app_version` and
-`primary_device_last_used_at`, rather than on the proportion of a staged rollout,
-which measures something else entirely.
+Seven days of Workers logs across production and staging showed none, against a
+control query returning some 44,000 requests over six Workers — so the query was
+finding data rather than silently matching nothing. Both the signal and its suite
+went with the endpoint: a test asserting that a removed endpoint announces itself
+would pass forever while meaning nothing.
+
+**What that evidence did not prove.** The traffic in that window was dominated by
+vulnerability scanners, the storefront theme endpoint and the nightly fuzz run.
+Nobody called the mirror, and almost nobody called anything — so this was not a
+busy app going quiet, and the silence alone would not have been enough.
+
+**What actually made it safe** was two things the logs could not show. The client
+had already stopped calling the endpoint in the cutover; and the legacy
+reconciliation converts device-only products through `POST /api/v1/products`
+rather than through the mirror, so removing it could not strand them. That second
+point was most of what the plan's "legacy products remaining" gate was guarding
+against, and it made that gate narrower than it first appeared.
+
+What a deletion of this kind can still break is a client that never upgraded,
+which is what a minimum-supported-version gate is for — measured on the
+proportion of **active devices on a capable build**, from
+`sellers.primary_device_app_version` and `primary_device_last_used_at`, rather
+than on the proportion of a staged rollout, which measures something else
+entirely.
 
 ## Alternatives considered
 
