@@ -224,4 +224,54 @@ describe("stock movements", () => {
 		).bind(storeId).first<{ c: number }>();
 		expect(remaining?.c).toBeGreaterThan(0);
 	});
+
+	it("refuses a movement that cannot say which product it belonged to", async () => {
+		// The constraint migration 059 added, tested by violating it.
+		//
+		// Every write path reaches `product_code` through `products`, where the
+		// column is NOT NULL, so none of them can produce a blank one today. That
+		// is exactly why this is asserted directly against the table rather than
+		// through an endpoint: the constraint exists to stop a write path that
+		// does not exist yet, and a test that can only reach it through today's
+		// paths would pass just as well without the constraint.
+		const r = await registerStore();
+		const storeId = await storeIdOf(r);
+
+		await expect(
+			env.orderak_db.prepare(
+				`INSERT INTO stock_movements
+				   (id, store_id, product_id, product_code, delta, balance_after,
+				    cause, cause_id, actor, reconstructed)
+				 VALUES ('m-unattributed', ?, 'p-gone', NULL, -1, 0,
+				         'MANUAL_ADJUSTMENT', NULL, 'seller', 0)`,
+			).bind(storeId).run(),
+		).rejects.toThrow(/NOT NULL/i);
+
+		const rows = await movements(storeId);
+		expect(rows).toEqual([]);
+	});
+
+	it("still records a sale through the triggers the rebuild recreated", async () => {
+		// Migration 059 rebuilt this table, which meant dropping and recreating
+		// both triggers: ALTER TABLE ... RENAME reparses every trigger in the
+		// schema, and both name `stock_movements` in their bodies. A rebuild that
+		// forgot to restore one would not fail the migration — it would silently
+		// stop recording, and the tests above would still pass for the
+		// adjustment path. This asserts both survived.
+		const r = await registerStore();
+		const code = await seed(r, 10);
+		const storeId = await storeIdOf(r);
+
+		const orderNo = await order(r, code, 2, "ledger-after-rebuild");
+		const sales = (await movements(storeId)).filter((m) => m.cause === "SALE");
+		expect(sales).toHaveLength(1);
+		expect(sales[0]).toMatchObject({ delta: -2, balance_after: 8 });
+
+		await SELF.fetch(`${BASE}/api/v1/orders/${orderNo}/status`, {
+			method: "PATCH", headers: authHeaders(r), body: JSON.stringify({ status: "CANCELLED" }),
+		});
+		const returned = (await movements(storeId)).filter((m) => m.cause === "SALE_CANCELLED");
+		expect(returned).toHaveLength(1);
+		expect(returned[0]).toMatchObject({ delta: 2, balance_after: 10 });
+	});
 });
