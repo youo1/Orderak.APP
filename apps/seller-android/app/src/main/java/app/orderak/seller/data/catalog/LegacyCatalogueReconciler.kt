@@ -55,6 +55,7 @@ class LegacyCatalogueReconciler @Inject constructor(
     private val products: LegacyProductSource,
     private val writes: ProductCreating,
     private val store: LegacyReconcileRecords,
+    private val orderLines: OrderLineStamping,
 ) {
 
     /**
@@ -138,8 +139,16 @@ class LegacyCatalogueReconciler @Inject constructor(
             imageUrl = product.imageUrl,
             categoryCode = product.categoryCode,
         )
-        return when (writes.create(draft, key)) {
-            is ProductWriteDecision.Store -> LegacyAttempt.CONVERTED
+        return when (val decision = writes.create(draft, key)) {
+            is ProductWriteDecision.Store -> {
+                // The moment this product acquires an identity is the only moment
+                // its unsent orders can be given one. The catalogue refresh runs
+                // next and deletes rows without a code — including the row these
+                // lines point at — so a line left unstamped here can never be
+                // resolved again.
+                orderLines.stamp(product.id, decision.product.product_code)
+                LegacyAttempt.CONVERTED
+            }
             // The server's opinion is unknown, so nothing has been ruled out.
             is ProductWriteDecision.Unreachable -> LegacyAttempt.RETRY
             // Cannot arise from a create, and is not a reason to give up on one.

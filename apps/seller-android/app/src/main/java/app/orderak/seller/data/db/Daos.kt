@@ -55,10 +55,6 @@ interface ProductDao {
     @Query("SELECT * FROM products")
     suspend fun allOnce(): List<ProductEntity>
 
-    /** The local row holding a given server product, if this device has one. */
-    @Query("SELECT * FROM products WHERE remoteUuid = :uuid LIMIT 1")
-    suspend fun byRemoteUuid(uuid: String): ProductEntity?
-
     @Query("SELECT * FROM products WHERE productCode = :code LIMIT 1")
     suspend fun byProductCode(code: String): ProductEntity?
 
@@ -156,6 +152,22 @@ interface OrderDao {
 
     @Insert suspend fun insert(order: OrderEntity): Long
     @Insert suspend fun insertItems(items: List<OrderItemEntity>)
+
+    /**
+     * Give an order line the server's code for the product it names.
+     *
+     * Called once, by the legacy reconciliation, at the moment a product that
+     * existed only on this device acquires a code. Without it that product's
+     * unsent order keeps a null code for ever: the backfill had nothing to copy,
+     * and the catalogue refresh will shortly delete the row `productId` points
+     * at, taking the last way to resolve one with it.
+     *
+     * `productCode IS NULL` on purpose. A line that already carries a code
+     * carries the code it was sold under, and a later conversion must not
+     * rewrite it.
+     */
+    @Query("UPDATE order_items SET productCode = :code WHERE productId = :localId AND productCode IS NULL")
+    suspend fun stampProductCode(localId: Long, code: String)
 
     @Query("UPDATE orders SET status = :status WHERE id = :id")
     suspend fun updateStatus(id: Long, status: String)
@@ -262,32 +274,14 @@ interface CustomerDao {
     suspend fun findByKey(key: String): CustomerEntity?
 
     /**
-     * A seller's edit, applied locally and marked for the next sync.
+     * The local edit path went with the dirty flag in Room 11.
      *
-     * The phone is not in the SET list. It is the identity: changing it would
-     * not be an edit but a claim that this is a different customer, and the
-     * order rows that join on it would silently stop matching.
+     * A customer edit is a Class A write now: it reaches the server or it does
+     * not happen, and what lands here afterwards is the server's answer through
+     * CustomerCacheWriter. `applyEdit`, `dirty()` and `clearDirty()` existed to
+     * hold an edit the server had not acknowledged, and nothing has called any
+     * of them since that stopped being possible.
      */
-    @Query(
-        """UPDATE customers
-              SET name = :name, altContact = :altContact, note = :note,
-                  updatedAt = :updatedAt, dirty = 1
-            WHERE customerKey = :key"""
-    )
-    suspend fun applyEdit(
-        key: String,
-        name: String?,
-        altContact: String?,
-        note: String?,
-        updatedAt: Long,
-    )
-
-    /** Rows carrying an edit the server has not acknowledged. */
-    @Query("SELECT * FROM customers WHERE dirty = 1")
-    suspend fun dirty(): List<CustomerEntity>
-
-    @Query("UPDATE customers SET dirty = 0 WHERE customerKey = :key")
-    suspend fun clearDirty(key: String)
 
     /**
      * A customer as the server holds them.

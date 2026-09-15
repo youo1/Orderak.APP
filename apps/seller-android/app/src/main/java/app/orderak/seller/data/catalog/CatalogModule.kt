@@ -1,5 +1,6 @@
 package app.orderak.seller.data.catalog
 
+import app.orderak.seller.data.db.OrderakDatabase
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -56,5 +57,17 @@ abstract class CatalogModule {
         @Singleton
         fun provideProductCreating(writes: ProductWriteRepository): ProductCreating =
             ProductCreating { draft, key -> writes.create(draft, key) }
+
+        /**
+         * Filling in a converted product's code on the orders that name it.
+         *
+         * Narrowed to the single DAO call, for the same reason the create above
+         * is narrowed: a one-time migration of rows the server has never seen
+         * should not be able to reach anything else on an order.
+         */
+        @Provides
+        @Singleton
+        fun provideOrderLineStamping(db: OrderakDatabase): OrderLineStamping =
+            OrderLineStamping { localId, code -> db.orderDao().stampProductCode(localId, code) }
     }
 }

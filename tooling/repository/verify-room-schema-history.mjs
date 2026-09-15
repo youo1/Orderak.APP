@@ -56,10 +56,24 @@ const schemaDir = path.join(
 /**
  * Columns a migration is allowed to remove, as "version: table.column".
  *
- * Empty until the first migration. Each entry is a deliberate statement that a
- * column is going and that whatever read it has stopped reading it.
+ * Each entry is a deliberate statement that a column is going and that whatever
+ * read it has stopped reading it. The evidence is written beside it, because
+ * "nothing reads this" is a claim that ages, and an entry nobody can re-derive
+ * is an entry nobody can safely question later.
  */
-const REMOVALS = new Set([]);
+const REMOVALS = new Set([
+  // Its only query, ProductDao.byRemoteUuid, had no callers. `productCode` is
+  // the identity every route addresses a product by; the uuid was the mirror's.
+  "11: products.remoteUuid",
+  // A local foreign key to categories.id. Nothing read it: the server's
+  // `categoryCode` is what travels, and the cache writer only copied it forward.
+  "11: products.categoryId",
+  // The flag that marked a customer edit the server had not acknowledged. A
+  // customer edit is a Class A write since the cutover — it reaches the server
+  // or it does not happen — so applyEdit, dirty() and clearDirty() lost their
+  // last callers and went with it.
+  "11: customers.dirty",
+]);
 
 /** Tables whose columns may never be removed, whatever the allowlist says. */
 const PROTECTED_TABLES = new Set(["orders", "payments"]);

@@ -96,12 +96,14 @@ class ProductCacheWriter @Inject constructor(
     /**
      * Fold a server product onto the local row, keeping only what is local.
      *
-     * `id`, `imagePath` and `categoryId` are the three fields the server has no
-     * opinion about: Room's own key, a file on this device, and a local foreign
-     * key whose public counterpart `categoryCode` is what actually travels. Every
-     * other value comes from the response, including stock — a cache that kept
-     * its own idea of stock would be asserting inventory, which is the whole
-     * thing this migration removes.
+     * `id` and `imagePath` are the two fields the server has no opinion about:
+     * Room's own key, and a file on this device. Every other value comes from the
+     * response, including stock — a cache that kept its own idea of stock would
+     * be asserting inventory, which is the whole thing this migration removes.
+     *
+     * `categoryId` and `remoteUuid` used to be carried here too. Both went with
+     * Room 11: the category's public `categoryCode` is what travels, and nothing
+     * read the uuid once `productCode` became the identity.
      */
     private fun ProductEntity?.merge(remote: RemoteProductDto): ProductEntity = ProductEntity(
         id = this?.id ?: 0L,
@@ -116,10 +118,8 @@ class ProductCacheWriter @Inject constructor(
         imageUrl = remote.image_url,
         available = remote.available,
         productCode = remote.product_code,
-        remoteUuid = remote.remote_uuid,
         syncedStockVersion = remote.stock_version,
         stockDirty = false,
-        categoryId = this?.categoryId,
         categoryCode = remote.category_code,
         createdAt = this?.createdAt ?: System.currentTimeMillis(),
     )

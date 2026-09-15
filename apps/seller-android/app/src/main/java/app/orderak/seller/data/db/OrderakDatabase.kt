@@ -23,7 +23,11 @@ import javax.inject.Singleton
     //     than creating a second one.
     // v10: customers are a row the seller edits, keyed by the normalised phone
     //     rather than the raw one, and carrying the fields the editor writes.
-    version = 10,
+    // v11: order_items carry the server's product code, so an unsent order no
+    //     longer depends on the product cache still holding the row it was
+    //     created from. Also drops three columns nothing reads: products'
+    //     remoteUuid and categoryId, and customers' dirty.
+    version = 11,
     // Exported so the next schema change has something to write a migration
     // against, and so the migration can be tested rather than asserted.
     exportSchema = true,
@@ -70,6 +74,10 @@ object DbModule {
                 dropAllTables = true,
                 1, 2, 3, 4, 5, 6, 7, 8, 9,
             )
+            // 10 is not in the list above and must never be: from here the
+            // database holds orders the server has not acknowledged, so a
+            // mismatch has to fail loudly rather than quietly discard a sale.
+            .addMigrations(OrderakMigrations.MIGRATION_10_11)
             .build()
 
     @Provides fun productDao(db: OrderakDatabase) = db.productDao()
