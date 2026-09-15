@@ -76,6 +76,30 @@
 --   two sees no behaviour change hidden in a table migration.
 --
 -- The two indices are ON this table and are rebuilt below for the same reason.
+--
+-- rollout: expand-contract  The previously deployed Worker keeps working against
+--   this rebuilt table for the length of the upload, and the pairing was checked
+--   rather than assumed:
+--
+--     * it has exactly one statement touching `stock_movements`, the seller's
+--       adjustment INSERT (api-store.ts), and that statement already supplies
+--       `product_code` from a `products` row it matched BY that code. The
+--       tightened constraint cannot reject a write it makes.
+--     * it never reads the table. The retention job names it only to skip it —
+--       `RETENTION_EXEMPT_TABLES = ["stock_movements"]` — because the ledger is
+--       financial state and is deliberately exempt from the two-year cleanup.
+--     * every column keeps its name, type and order, so no query it holds needs
+--       rewriting. `product_code` gains NOT NULL and nothing else changes.
+--     * the two triggers are recreated in this same file, so order-driven
+--       movements keep being recorded across the window.
+--
+--   The honest residual: SQLite cannot do this without the table briefly not
+--   existing between the DROP and the RENAME, and D1 gives a migration no
+--   transaction to hide that in. An order placed in that exact instant would
+--   fail its INSERT rather than write a bad row. The window is one statement
+--   wide, production has not reached 052 so the table does not exist there yet,
+--   and staging holds zero movement rows — which is the argument for applying
+--   this now rather than once the ledger is carrying real traffic.
 
 DROP TRIGGER IF EXISTS trg_order_items_claim_stock;
 DROP TRIGGER IF EXISTS trg_orders_release_stock_on_cancel;
