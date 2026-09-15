@@ -16,6 +16,25 @@ import javax.inject.Singleton
 internal enum class LegacyAttempt { CONVERTED, RETRY, TERMINAL }
 
 /**
+ * A product that exists on this phone and has not reached the server, as a
+ * screen needs to show it.
+ *
+ * [localId] is Room's row id rather than a product code, deliberately: a row in
+ * this state has no code — that is precisely what makes it stuck — so the id is
+ * the only handle a discard can be addressed by.
+ *
+ * [lastError] is null before the first attempt and after a transport failure
+ * that produced no server answer. A null reason is not "no problem"; it is "the
+ * request never got far enough to be told one", which is why the screen phrases
+ * it as waiting rather than refused.
+ */
+data class StuckLegacyProduct(
+    val localId: Long,
+    val name: String,
+    val lastError: String?,
+)
+
+/**
  * Convert products that predate the product routes into server records.
  *
  * WHY THIS JOB EXISTS
@@ -116,13 +135,21 @@ class LegacyCatalogueReconciler @Inject constructor(
         store.put(localId, existing.copy(state = LegacyReconcileState.REFUSED))
     }
 
-    /** Rows still waiting, so a screen can show the seller what is holding. */
-    suspend fun pending(): List<ProductEntity> {
+    /**
+     * Rows still waiting, so a screen can show the seller what is holding.
+     *
+     * Carries the last error alongside the name because the seller's decision
+     * needs both: "this product is stuck" is not something anyone can act on,
+     * and the reason is the only part that distinguishes "wait for signal" from
+     * "this will never send".
+     */
+    suspend fun pending(): List<StuckLegacyProduct> {
         val records = store.all()
         return products.all()
             .filter(::isLegacy)
             .filter { records[it.id]?.state != LegacyReconcileState.CONVERTED }
             .filter { records[it.id]?.state != LegacyReconcileState.REFUSED }
+            .map { StuckLegacyProduct(it.id, it.name, records[it.id]?.lastError) }
     }
 
     private suspend fun attempt(product: ProductEntity, key: String): LegacyAttempt {

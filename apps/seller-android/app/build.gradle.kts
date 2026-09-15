@@ -971,6 +971,36 @@ val verifyDataAuthorityContract by tasks.registering {
                 "picks for them, and never retries on its own.",
         )
 
+        // The same failure, a third time, and the one with the worst ending.
+        //
+        // The catalogue refresh is gated on the legacy reconciliation being
+        // clear — `SellerRefresher` runs it as `if (reconciled) refreshCatalogue
+        // (...) else false` — because adopting the server's list while a
+        // local-only product exists would delete that product. Correct, and
+        // silent: a product the server will never accept holds that gate shut
+        // for ever, and the seller sees a catalogue that has quietly stopped
+        // updating with nothing anywhere saying why.
+        //
+        // `LegacyCatalogueReconciler.discard` is the documented way out, and the
+        // reconciler is explicit that only a seller may take it: REFUSED has no
+        // transition a device can make on its own. That makes a screen part of
+        // the mechanism rather than a presentation of it — without one, the
+        // state machine has no exit at all.
+        val productsScreen = mainRoot.resolve("feature/products/ProductsScreen.kt").readText()
+        requireContract(
+            "viewModel.stuck" in productsScreen,
+            "ProductsScreen must show the products that have not reached the " +
+                "server. They hold the catalogue refresh shut, and a gate the " +
+                "seller cannot see is one they cannot clear.",
+        )
+        requireContract(
+            "discardStuck" in productsScreen,
+            "ProductsScreen must offer the discard. REFUSED is reachable only " +
+                "by an explicit seller decision, so a screen that shows the " +
+                "stuck products without offering the way out leaves the " +
+                "reconciliation with no exit.",
+        )
+
         // A destructive fallback would delete a seller's unsent orders on any
         // schema mismatch. The scoped `From(` variant is the one that is allowed.
         val database = mainRoot.resolve("data/db/OrderakDatabase.kt").readText()

@@ -32,6 +32,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -40,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -60,6 +62,7 @@ import app.orderak.seller.data.billing.EntitlementManager
 import app.orderak.seller.data.billing.FeatureKeys
 import androidx.hilt.navigation.compose.hiltViewModel as hiltVm
 import app.orderak.seller.core.money.formatAmountLabel
+import app.orderak.seller.data.catalog.StuckLegacyProduct
 import app.orderak.seller.data.db.ProductEntity
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
@@ -86,6 +89,15 @@ fun ProductsScreen(
     val quota by viewModel.quota.collectAsStateWithLifecycle()
     var showLimitDialog by rememberSaveable { mutableStateOf(false) }
     val purchaseOpen = entitlements.isPurchaseOpen()
+
+    // Products saved here that never reached the account. Until this is empty
+    // the catalogue refresh does not run at all, so it cannot be a quiet state.
+    val stuck by viewModel.stuck.collectAsStateWithLifecycle()
+    var showStuckDialog by rememberSaveable { mutableStateOf(false) }
+    // The row awaiting confirmation, not a boolean: the confirmation names the
+    // product, and a flag would leave the dialog able to delete the wrong one
+    // after the list underneath it changes.
+    var confirmDiscard by remember { mutableStateOf<StuckLegacyProduct?>(null) }
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -146,6 +158,76 @@ fun ProductsScreen(
         )
     }
 
+    if (showStuckDialog) {
+        AlertDialog(
+            onDismissRequest = { showStuckDialog = false },
+            title = { Text(stringResource(R.string.products_stuck_dialog_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    stuck.forEach { item ->
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(item.name, style = MaterialTheme.typography.bodyLarge)
+                                Text(
+                                    // TERMINAL is the reconciler's own word for
+                                    // "the server said something that will not
+                                    // change by asking again". Anything else —
+                                    // including no answer at all — is still on
+                                    // its way, and saying otherwise would push a
+                                    // seller to delete a product over a bad
+                                    // signal.
+                                    text = if (item.lastError == "TERMINAL") {
+                                        stringResource(R.string.products_stuck_refused)
+                                    } else {
+                                        stringResource(R.string.products_stuck_waiting)
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            TextButton(onClick = { confirmDiscard = item }) {
+                                Text(stringResource(R.string.products_stuck_discard))
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showStuckDialog = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
+        )
+    }
+
+    confirmDiscard?.let { target ->
+        AlertDialog(
+            onDismissRequest = { confirmDiscard = null },
+            title = { Text(stringResource(R.string.products_stuck_discard_title, target.name)) },
+            text = { Text(stringResource(R.string.products_stuck_discard_confirm)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.discardStuck(target.localId)
+                    confirmDiscard = null
+                    // Closing the list too: it is about to be one row shorter,
+                    // and a dialog that stays open over a changing list invites
+                    // the second tap to land on something else.
+                    showStuckDialog = false
+                }) {
+                    Text(stringResource(R.string.products_stuck_discard))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDiscard = null }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
+        )
+    }
+
     if (products.isEmpty() && quota.limit == null) {
         // Empty state with guidance.
         Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
@@ -166,6 +248,24 @@ fun ProductsScreen(
         }
     } else {
         Column(Modifier.fillMaxSize()) {
+            // Above the meter, because it is about whether the catalogue is
+            // updating at all — which outranks how close it is to the plan
+            // limit. Warning rather than Danger: nothing is lost, and the
+            // products are still here.
+            if (stuck.isNotEmpty()) {
+                NoticeBanner(
+                    role = SemanticRole.Warning,
+                    title = stringResource(R.string.products_stuck_title),
+                    message = pluralStringResource(
+                        R.plurals.products_stuck_body,
+                        stuck.size,
+                        stuck.size,
+                    ),
+                    actionLabel = stringResource(R.string.products_stuck_action),
+                    onAction = { showStuckDialog = true },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
             // The shared meter rather than a sentence: the same component the
             // dashboard and the subscription screen use, so "how close am I to
             // the limit" reads identically wherever a seller meets it.
