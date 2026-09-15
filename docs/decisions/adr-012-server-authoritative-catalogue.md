@@ -120,6 +120,22 @@ is local, unsynced, and lost on reinstall. The contract names it so the "Room is
 a cache" rule has no undocumented hole. Whether payments belong in Orderak at all
 is a separate decision this ADR does not make.
 
+**`catalog_version` bumps are write amplification, and the fallback is already
+sanctioned.** The mirror bumped this column once per sync. Three routes now bump
+it — create, replace and delete — so a seller editing a catalogue produces a
+burst of single-row `UPDATE`s on `sellers`, the same hot row that auth and
+session writes touch. Nothing has measured that, because it needs a real
+catalogue under real use and there is not one yet.
+
+It is recorded here rather than left to be rediscovered, along with the way out:
+**drop the bumps.** That is safe without further argument because no client may
+branch on this number for correctness — the contract already restricts it to
+deciding *when* to refresh, never *what* is true, and the refresh path is
+unconditionally `GET /products` → replace the cache. Losing the signal costs
+cache freshness and an observability datum, nothing else. Do not reach for a
+counter table or a debounce before trying the deletion; the cheapest fix is
+available precisely because the value was deliberately demoted.
+
 ## Retiring the mirror: what the decision rested on
 
 **The mirror was removed on 2026-09-15.** This section is kept in the past tense
