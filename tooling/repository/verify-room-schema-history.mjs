@@ -43,9 +43,10 @@
 //
 // WHY IT IS NARROW ENOUGH TO KEEP
 //   One declared version, one exported schema and one allowlist. It reads two
-//   files plus the schema directory, and the allowlist is empty today — the
-//   first migration is what fills it, and filling it is a line in a diff that
-//   says exactly which columns are going.
+//   files plus the schema directory. The allowlist was empty when this was
+//   written; Room 11 filled it with three entries, which is the mechanism
+//   working — each one is a line in a diff saying exactly which column is going,
+//   with the evidence for it written alongside.
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
