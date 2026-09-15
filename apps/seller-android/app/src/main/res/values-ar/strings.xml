@@ -557,4 +557,24 @@
     <string name="error_phone_already_used">الرقم ده ليه حساب في أوردرك خلاص.</string>
     <string name="error_phone_change">ما قدرناش نغيّر رقمك. أكّد الرقمين تاني وحاول.</string>
     <string name="error_referral">الكود ده ما ينفعش.</string>
+
+
+    <!-- منتجات متسجلة على الموبايل ده وما وصلتش الحساب. تحديث الكتالوج متوقف
+         لحد ما القايمة دي تفضى، عشان كده لازم البايع يشوفها ويتصرف. -->
+    <string name="products_stuck_title">فيه منتجات مش على حسابك</string>
+    <plurals name="products_stuck_body">
+        <item quantity="zero">مفيش منتجات متسجلة على الموبايل ده بس.</item>
+        <item quantity="one">فيه منتج متسجل على الموبايل ده بس. الكتالوج مش هيتحدّث لحد ما يتبعت أو يتمسح.</item>
+        <item quantity="two">فيه منتجين متسجلين على الموبايل ده بس. الكتالوج مش هيتحدّث لحد ما يتبعتوا أو يتمسحوا.</item>
+        <item quantity="few">فيه %d منتجات متسجلة على الموبايل ده بس. الكتالوج مش هيتحدّث لحد ما يتبعتوا أو يتمسحوا.</item>
+        <item quantity="many">فيه %d منتجًا متسجلة على الموبايل ده بس. الكتالوج مش هيتحدّث لحد ما يتبعتوا أو يتمسحوا.</item>
+        <item quantity="other">فيه %d منتج متسجل على الموبايل ده بس. الكتالوج مش هيتحدّث لحد ما يتبعتوا أو يتمسحوا.</item>
+    </plurals>
+    <string name="products_stuck_action">اعرضهم</string>
+    <string name="products_stuck_dialog_title">مش على حسابك</string>
+    <string name="products_stuck_waiting">مستني يتبعت</string>
+    <string name="products_stuck_refused">حسابك مارضاش يقبل ده. عدّله، أو امسحه.</string>
+    <string name="products_stuck_discard">امسح</string>
+    <string name="products_stuck_discard_title">تمسح %1$s؟</string>
+    <string name="products_stuck_discard_confirm">المنتج ده متسجل على الموبايل ده بس وحسابك ما استلمهوش، يعني لو مسحته من هنا هيتمسح خالص. مفيش رجوع.</string>
 </resources>

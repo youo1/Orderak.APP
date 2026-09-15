@@ -193,17 +193,21 @@ class SellerRefresher @Inject constructor(
         // device and nowhere else; replacing the cache with the server's list
         // before converting it destroys it. So: convert, drain, then adopt — and
         // adopt only if nothing is left unconverted.
-        val reconciled = legacyCatalogue.reconcile()
-        val stockDrained = stockDrain.drain()
-        val catalogueRefreshed = if (reconciled) refreshCatalogue(phone, secret) else false
-
-        // 2c) Post orders the seller recorded that the server has not seen.
+        // 2c) ...and then post orders the seller recorded that the server has
+        //      not seen, whatever any of that did.
         //
-        // After the catalogue work above rather than before it: an order names
-        // its products by their server-assigned code, and a legacy product has
-        // none until the reconciliation has run. An order whose products are
-        // still codeless simply stays pending for one more pass.
-        val ordersPushed = orderCommands.drain()
+        // The four steps live in `runCatalogueAndOrderSteps` rather than here,
+        // because the property that matters — the order queue drains even when
+        // the catalogue fails — is invisible in four consecutive statements and
+        // was a real defect before the cutover. It has a test there; it cannot
+        // have one here without a database and an API.
+        val (reconciled, stockDrained, catalogueRefreshed, ordersPushed) =
+            runCatalogueAndOrderSteps(
+                reconcile = { legacyCatalogue.reconcile() },
+                drainStock = { stockDrain.drain() },
+                refreshCatalogue = { refreshCatalogue(phone, secret) },
+                drainOrders = { orderCommands.drain() },
+            )
 
         // 2d) Take the server's customer list.
         //

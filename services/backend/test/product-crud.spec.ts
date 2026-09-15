@@ -401,3 +401,66 @@ describe("product CRUD: tenant write fence", () => {
 		expect(res.status).toBe(200);
 	});
 });
+
+describe("the removed mirror", () => {
+	beforeEach(createSchema);
+
+	it("answers a legacy mirror push without writing anything", async () => {
+		// What an app built before the cutover actually experiences now.
+		//
+		// This is pinned because the answer is not the obvious one and the
+		// difference is operational. `/api/v1/products/sync` still matches
+		// `isStoreRoute` through `startsWith("/api/v1/products/")`, so it is
+		// recognised, authenticated and fenced before dispatch reaches it — and
+		// dispatch then reads "sync" as a product code that serves PUT and
+		// DELETE. A legacy POST therefore lands on 405, not the 404 anyone
+		// watching for stragglers would think to filter on.
+		//
+		// A monitor looking for 404s on this path would see silence and read it
+		// as "no old clients left", which is the exact shape of wrongness #108
+		// existed to prevent: a signal nobody emits looks like a signal nobody
+		// triggers.
+		const r = await registerStore();
+		const before = await seedProduct(r);
+
+		const res = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+			method: "POST",
+			headers: authHeaders(r),
+			// The shape the mirror took, including the empty list that used to
+			// mean "delete this seller's entire catalogue".
+			body: JSON.stringify({ products: [], baseline_version: 0 }),
+		});
+
+		expect(res.status).toBe(405);
+
+		// The half that matters more than the status code: an old client cannot
+		// reach the behaviour, so the catalogue is untouched.
+		const pull = (await (await SELF.fetch(`${BASE}/api/v1/products`, {
+			headers: authHeaders(r),
+		})).json()) as { products: { product_code: string }[] };
+		expect(pull.products).toHaveLength(1);
+		expect(pull.products[0].product_code).toBe(before.product_code);
+	});
+
+	it("does not resurrect the endpoint under any other method", async () => {
+		const r = await registerStore();
+		await seedProduct(r);
+
+		for (const method of ["PUT", "DELETE", "PATCH"]) {
+			const res = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
+				method,
+				headers: authHeaders(r),
+				body: method === "DELETE" ? undefined : JSON.stringify({ products: [] }),
+			});
+			// PUT and DELETE are real verbs on a product code, so they reach a
+			// handler and answer 404 for a product called "sync"; PATCH is not.
+			// None of them is a mirror, which is the whole assertion.
+			expect([404, 405]).toContain(res.status);
+		}
+
+		const pull = (await (await SELF.fetch(`${BASE}/api/v1/products`, {
+			headers: authHeaders(r),
+		})).json()) as { products: unknown[] };
+		expect(pull.products).toHaveLength(1);
+	});
+});

@@ -23,19 +23,30 @@
 //      `fallbackToDestructiveMigration(` deletes a seller's unsent orders on any
 //      mismatch; only the `From(...)` form, which names the versions it covers,
 //      is allowed.
-//   4. Between consecutive schemas, every column that disappears is named in
+//   4. Every version step Room must migrate across is actually registered in
+//      `addMigrations(...)`. `OrderakDatabase` names four steps for a schema
+//      change — bump the version, write the Migration, add it to
+//      `addMigrations`, test it against the exported schema — and until this
+//      check the build verified three of them. A forgotten registration
+//      compiles, passes every other check here, and throws
+//      "A migration from N to N+1 was required but not found" on every device
+//      that already has the old database, while a fresh install is fine. That
+//      is the exact "builds, ships, fails on a phone" failure above, with the
+//      added twist that it cannot be reproduced by installing the app.
+//   5. Between consecutive schemas, every column that disappears is named in
 //      REMOVALS below. A column leaving is a decision; a column leaving quietly
 //      is a defect.
-//   5. `orders` and `payments` never lose a column at all. That is the
+//   6. `orders` and `payments` never lose a column at all. That is the
 //      machine-checkable form of "a migration cannot touch the command log":
 //      an unsent order is the one thing in this database with no copy anywhere
 //      else.
 //
 // WHY IT IS NARROW ENOUGH TO KEEP
 //   One declared version, one exported schema and one allowlist. It reads two
-//   files plus the schema directory, and the allowlist is empty today — the
-//   first migration is what fills it, and filling it is a line in a diff that
-//   says exactly which columns are going.
+//   files plus the schema directory. The allowlist was empty when this was
+//   written; Room 11 filled it with three entries, which is the mechanism
+//   working — each one is a line in a diff saying exactly which column is going,
+//   with the evidence for it written alongside.
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -118,6 +129,38 @@ for (let version = exported[0]; version < declared; version += 1) {
   }
 }
 
+/**
+ * The version steps Room is required to migrate, and whether each is registered.
+ *
+ * The floor is the destructive fallback's ceiling: versions it covers are thrown
+ * away rather than migrated, so they need no Migration. Everything above it does.
+ * `addMigrations(...)` is read rather than the Migration declarations, because a
+ * Migration object that exists and is never registered is the failure — Room
+ * only consults the ones it was handed.
+ */
+const fallbackVersions = [
+  ...(source.match(/fallbackToDestructiveMigrationFrom\s*\(([\s\S]*?)\)/)?.[1] ?? "")
+    .matchAll(/\b(\d+)\b/g),
+].map((match) => Number(match[1]));
+const migrateFrom = fallbackVersions.length ? Math.max(...fallbackVersions) + 1 : exported[0];
+
+const registered = new Set(
+  [...source.matchAll(/MIGRATION_(\d+)_(\d+)\b/g)].map((match) => `${match[1]}_${match[2]}`),
+);
+
+if (Number.isInteger(declared)) {
+  for (let from = migrateFrom; from < declared; from += 1) {
+    if (registered.has(`${from}_${from + 1}`)) continue;
+    problems.push(
+      `no MIGRATION_${from}_${from + 1} passed to addMigrations() in ${rel(databaseFile)}. ` +
+        `Version ${from} is above the destructive fallback, so Room must migrate it rather than ` +
+        "rebuild it: without the registration the app throws at open on every device that already " +
+        `has a version ${from} database, and a fresh install still works — so this does not ` +
+        "reproduce by installing the app",
+    );
+  }
+}
+
 const columnsOf = (version) => {
   const file = path.join(schemaDir, `${version}.json`);
   const parsed = JSON.parse(readFileSync(file, "utf8"));
@@ -168,8 +211,10 @@ if (problems.length) {
   process.exit(1);
 }
 
+const migratedSteps = Math.max(0, declared - migrateFrom);
 console.log(
   `Room schema history verified: version ${declared} declared, ` +
     `${exported.length} schema(s) exported (${exported.join(", ")}), ` +
+    `${migratedSteps} migration step(s) registered (from ${migrateFrom}), ` +
     `${REMOVALS.size} named column removal(s), destructive fallback scoped.`,
 );

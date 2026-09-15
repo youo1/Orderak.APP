@@ -220,6 +220,50 @@ class LegacyCatalogueReconcilerTest {
         assertTrue(job.pending().isEmpty())
     }
 
+    @Test
+    fun `a stuck row carries the name and the reason a screen has to show`() = runTest {
+        // The seller is being asked to delete something that exists nowhere
+        // else, so the list they are asked to decide from has to name the
+        // product and say why it is stuck. A list of bare ids would be a
+        // confirmation dialog with nothing in it.
+        val creator = Creator { ProductWriteDecision.Refused("name_required") }
+        val (job, _, _) = reconciler(listOf(legacyProduct(7, name = "Mango juice")), creator)
+        job.reconcile()
+
+        val stuck = job.pending().single()
+        assertEquals(7L, stuck.localId)
+        assertEquals("Mango juice", stuck.name)
+        // TERMINAL rather than the server's own code: the screen's only
+        // decision is "will this ever send", and that is what the reconciler
+        // has already classified.
+        assertEquals("TERMINAL", stuck.lastError)
+    }
+
+    @Test
+    fun `a row that has not been tried yet reports no reason`() = runTest {
+        // Null is "not asked yet", not "no problem". The screen phrases this as
+        // waiting rather than refused, so telling the two apart matters: a
+        // seller shown "this will never send" over an unattempted row would
+        // delete a product for no reason at all.
+        val (job, _, _) = reconciler(listOf(legacyProduct(3, name = "Water")), Creator { stored() })
+
+        val stuck = job.pending().single()
+        assertEquals("Water", stuck.name)
+        assertEquals(null, stuck.lastError)
+    }
+
+    @Test
+    fun `a transport failure leaves the row waiting rather than refused`() = runTest {
+        // The distinction the screen renders. A network failure must not read
+        // as "your account rejected this", because the action those two call
+        // for are opposites: wait, versus delete.
+        val creator = Creator { ProductWriteDecision.Unreachable }
+        val (job, _, _) = reconciler(listOf(legacyProduct(4)), creator)
+        job.reconcile()
+
+        assertEquals("RETRY", job.pending().single().lastError)
+    }
+
     // ---- 4. The gate is a count, and it stays shut -----------------------
 
     @Test
