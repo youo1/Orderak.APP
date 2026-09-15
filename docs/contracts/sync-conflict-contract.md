@@ -108,6 +108,23 @@ the build that made it, and seven days of Workers logs across production and
 staging showed none. See
 [ADR-012](../decisions/adr-012-server-authoritative-catalogue.md).
 
+### What an app built before the cutover now receives
+
+**`405`, not `404`** — and anyone monitoring for remaining old clients has to
+filter on that, or they will see silence and read it as "none left".
+
+The path still matches `isStoreRoute` through `startsWith("/api/v1/products/")`,
+so it is recognised, authenticated and tenant-fenced before dispatch reaches it.
+Dispatch then reads `sync` as a product code, and a product code serves `PUT` and
+`DELETE`; a legacy `POST` lands on the method-not-allowed for those. `PUT` and
+`DELETE` on that path reach a handler and answer `404` for a product that does
+not exist.
+
+None of them is a mirror, which is the part that matters: an old client's push
+fails and the catalogue is untouched, including the empty-payload push that used
+to delete everything. Both are asserted in `product-crud.spec.ts` rather than
+left as a reading of the routing code.
+
 ## Pending-mutation envelope
 
 Every offline-capable write defines a stable client mutation ID, an entity
