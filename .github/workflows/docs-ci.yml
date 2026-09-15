@@ -90,6 +90,15 @@ jobs:
       - name: Verify only the cache writers write the cache
         run: node tooling/repository/verify-cache-write-boundary.mjs
 
+      # Room threw the database away on every schema change up to version 10, and
+      # that was fine while it held nothing the server did not already have. It
+      # now holds orders the server has not acknowledged. A declared version with
+      # no exported schema beside it builds, ships, and throws on a phone; a
+      # column removed without anyone meaning to is invisible unless someone
+      # reads the exported JSON, which nobody does.
+      - name: Verify the Room schema history
+        run: node tooling/repository/verify-room-schema-history.mjs
+
       # formatAmount defaults to the ambient locale, which is right for a library
       # and wrong for a screen: the order list shipped Latin-digit money beside
       # Arabic-Indic dates in the same row until a greyscale screenshot put them
