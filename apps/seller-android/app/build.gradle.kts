@@ -944,6 +944,32 @@ val verifyDataAuthorityContract by tasks.registering {
             "OrderCommandQueue is the durable command log; orders are Class B.",
         )
 
+        // Two contract invariants are about what the SELLER sees, and a view
+        // model alone cannot deliver either of them.
+        //
+        // Both shipped half-built. `ProductEditViewModel` computed `writeError`
+        // and `stockConflict` correctly, and `ProductEditScreen` read neither, so
+        // a save with no connection re-enabled the button and left no trace, and
+        // a stock conflict resolved itself into silence. Nothing in the build
+        // noticed, because every layer was individually right.
+        //
+        // Class A says a write that cannot reach the server "fails, visibly".
+        // Stock compare-and-set says the conflict "is shown, and the seller
+        // resolves it explicitly". A state field that no screen reads is the
+        // exact shape of both failures, so the screen is asserted to read them.
+        val productEditScreen = mainRoot.resolve("feature/products/ProductEditScreen.kt").readText()
+        requireContract(
+            "state.writeError" in productEditScreen,
+            "ProductEditScreen must show writeError. Class A requires a failed " +
+                "write to fail visibly, and nothing is queued to make up for it.",
+        )
+        requireContract(
+            "state.stockConflict" in productEditScreen,
+            "ProductEditScreen must show stockConflict with both figures. The " +
+                "seller resolves a stale-stock 409 explicitly; the app never " +
+                "picks for them, and never retries on its own.",
+        )
+
         // A destructive fallback would delete a seller's unsent orders on any
         // schema mismatch. The scoped `From(` variant is the one that is allowed.
         val database = mainRoot.resolve("data/db/OrderakDatabase.kt").readText()
