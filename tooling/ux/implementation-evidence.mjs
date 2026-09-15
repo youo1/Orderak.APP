@@ -80,7 +80,11 @@ export const EVIDENCE = {
   "products_catalog.product_creation_and_editing": {
     kind: "screen",
     value: "ProductEditScreen",
-    behaviour: { layer: "backend", file: "store.spec.ts", test: "assigns product codes and links categories" },
+    // Repointed on 2026-09-15. The named test lived in the catalogue mirror's
+    // suite and went with the endpoint; its successor asserts the same thing
+    // about the route that replaced it — a created product comes back with the
+    // code the server assigned and the category it was filed under.
+    behaviour: { layer: "backend", file: "product-crud.spec.ts", test: "creates a product and returns it in the shape the pull uses" },
   },
   "products_catalog.product_descriptions": { kind: "screen", value: "ProductEditScreen" },
   "products_catalog.public_orderak_catalog": { kind: "endpoint", value: "/api/v1/store", integration: "/api/v1/store" },

@@ -543,8 +543,6 @@
     <string name="error_product_missing">واحد من منتجات الأوردر ده مابقاش موجود في الكتالوج.</string>
     <string name="error_currency">السعر ده بعملة متجرك لسه ما بيقبلهاش.</string>
     <string name="error_order_moved">الأوردر ده اتحرّك بالفعل. حدّث الصفحة تشوف هو فين دلوقتي.</string>
-    <string name="error_catalog_out_of_date">الكتالوج على الموبايل ده قديم. هيتحمّل تاني في المزامنة الجاية.</string>
-    <string name="error_catalog_bulk_delete">ده هيمسح معظم الكتالوج بتاعك. أكّد المسح عشان تكمل.</string>
     <string name="error_too_large">الحجم ده كبير على الإرسال. جرّب ملف أصغر أو رسالة أقصر.</string>
     <string name="error_unsupported_file">نوع الملف ده مش مدعوم. استخدم صورة JPEG أو PNG أو GIF أو WebP.</string>
     <string name="error_ticket_closed">تذكرة الدعم دي مقفولة. افتح واحدة جديدة.</string>

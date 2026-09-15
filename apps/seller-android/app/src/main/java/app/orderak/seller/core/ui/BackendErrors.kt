@@ -55,10 +55,6 @@ fun backendErrorResource(code: String?): Int = when {
     code in CURRENCY -> R.string.error_currency
     code == "invalid_transition" || code == "conflict" -> R.string.error_order_moved
 
-    // ---- Catalogue sync ----
-    code in CATALOG_STALE -> R.string.error_catalog_out_of_date
-    code == "bulk_deletion_unconfirmed" -> R.string.error_catalog_bulk_delete
-
     // ---- Uploads ----
     code in TOO_LARGE -> R.string.error_too_large
     code in UNSUPPORTED_FILE -> R.string.error_unsupported_file
@@ -114,7 +110,6 @@ private val PLAN = setOf(
 private val STOCK = setOf("stock_changed", "stale_stock", "insufficient_stock")
 private val PRODUCT_MISSING = setOf("products", "duplicate_products")
 private val CURRENCY = setOf("currency_not_enabled", "mixed_currency_order")
-private val CATALOG_STALE = setOf("stale_catalog", "catalog_baseline_required")
 private val TOO_LARGE = setOf("file_too_large", "request_body_too_large", "message_too_long")
 private val UNSUPPORTED_FILE = setOf("unsupported_type", "file_required", "invalid_form")
 private val UNAVAILABLE = setOf(
@@ -139,8 +134,8 @@ private val INVALID_REQUEST = setOf(
     "invalid", "invalid_json", "invalid_json_body", "validation_failed",
     "name_required", "no_fields", "subject_and_message_required",
     "message_required", "message_is_required", "status_required",
-    "idempotency_key_required", "products_required", "purchase_token_required",
-    "duplicate_app_id", "duplicate_remote_uuid", "invalid_client_platform",
+    "idempotency_key_required", "purchase_token_required",
+    "invalid_client_platform",
     "invalid_app_version", "invalid_request_id", "invalid_version_code",
     "invalid_phone_country", "legal_acceptance_required", "slug_invalid", "method",
     "code_required", "invalid_code", "invalid_email", "email_in_use",
@@ -158,11 +153,11 @@ private val REFERRAL = setOf(
 /** Every code this file answers with something other than the generic message. */
 val MAPPED_CODES: Set<String> =
     AUTH + ONBOARDING_RESTART + PASSKEY + PHONE_CHANGE + PLAN + STOCK +
-        PRODUCT_MISSING + CURRENCY + CATALOG_STALE + TOO_LARGE + UNSUPPORTED_FILE +
+        PRODUCT_MISSING + CURRENCY + TOO_LARGE + UNSUPPORTED_FILE +
         UNAVAILABLE + INVALID_REQUEST + REFERRAL + setOf(
         "account_restricted", "client_version_refused", "payment_unavailable",
         "orders_disabled", "buyer_restricted", "invalid_transition", "conflict",
-        "bulk_deletion_unconfirmed", "ticket_closed", "primary_device_cannot_be_revoked",
+        "ticket_closed", "primary_device_cannot_be_revoked",
         "phone_not_editable", "phone_already_used", "rate_limited", "slug_taken",
         "not_found", "verification_not_found", "unknown_category_code", "network",
     )
