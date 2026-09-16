@@ -40,6 +40,7 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 import app.orderak.seller.R
 import app.orderak.seller.core.money.formatAmountLabel
 import app.orderak.seller.core.ui.FullScreenEmpty
@@ -62,6 +63,7 @@ fun OrdersScreen(
     initialFilter: OrdersFilter? = null,
     onInitialFilterApplied: () -> Unit = {},
 ) {
+    val spacing = LocalOrderakSpacing.current
     // Keyed on the request so a second tap on the same counter re-applies it
     // after the seller has cleared the chip, and so re-entering from the nav bar
     // (where the request is null) never re-filters.
@@ -94,8 +96,8 @@ fun OrdersScreen(
         } else {
             Column {
                 LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    contentPadding = PaddingValues(horizontal = spacing.space4, vertical = spacing.space2),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.space2)
                 ) {
                     item {
                         FilterChip(selected = filter == OrdersFilter.All,
@@ -138,8 +140,8 @@ fun OrdersScreen(
                     )
                 } else {
                     LazyColumn(
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        contentPadding = PaddingValues(spacing.space4),
+                        verticalArrangement = Arrangement.spacedBy(spacing.space2)
                     ) {
                         items(list, key = { it.id }) { o ->
                             OrderCard(o, refused = o.id in refusedPushes, onClick = { onOpen(o.id) })
@@ -151,7 +153,7 @@ fun OrdersScreen(
         }
         FloatingActionButton(
             onClick = onNew,
-            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
+            modifier = Modifier.align(Alignment.BottomEnd).padding(spacing.space4)
         ) { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.order_new_title)) }
     }
 }

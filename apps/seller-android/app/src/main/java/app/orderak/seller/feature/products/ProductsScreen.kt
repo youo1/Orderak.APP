@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.clickable
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 import app.orderak.seller.R
 import app.orderak.seller.core.text.SearchText
 import app.orderak.seller.core.ui.FullScreenEmpty
@@ -79,6 +80,7 @@ fun ProductsScreen(
     viewModel: ProductsViewModel = hiltViewModel(),
     entitlements: EntitlementManager = hiltVm<EntitlementHolderViewModel>().entitlements,
 ) {
+    val spacing = LocalOrderakSpacing.current
     val products by viewModel.products.collectAsStateWithLifecycle()
     var query by rememberSaveable { mutableStateOf("") }
     // Filtered in memory over what Room already holds, so search works with the
@@ -164,7 +166,7 @@ fun ProductsScreen(
             onDismissRequest = { showStuckDialog = false },
             title = { Text(stringResource(R.string.products_stuck_dialog_title)) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.space3)) {
                     stuck.forEach { item ->
                         Row(
                             Modifier.fillMaxWidth(),
@@ -302,8 +304,8 @@ fun ProductsScreen(
                     )
                 } else {
                 LazyColumn(
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(spacing.space4),
+                    verticalArrangement = Arrangement.spacedBy(spacing.space2)
                 ) {
                     item {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
@@ -330,7 +332,7 @@ fun ProductsScreen(
                 }
                 FloatingActionButton(
                     onClick = { if (quota.canAdd) onAdd() else showLimitDialog = true },
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(spacing.space4),
                     containerColor = if (quota.canAdd) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
                 ) {
                     Icon(
@@ -355,9 +357,10 @@ private fun planName(planKey: String?): String = when (planKey) {
 
 @Composable
 private fun ProductCard(p: ProductEntity, onClick: () -> Unit) {
+    val spacing = LocalOrderakSpacing.current
     val locale = LocalConfiguration.current.locales[0]
     Card(Modifier.fillMaxWidth().clickable(onClick = onClick).semantics(mergeDescendants = true) {}) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(spacing.space3), verticalAlignment = Alignment.CenterVertically) {
             if (p.imagePath != null) {
                 AsyncImage(
                     model = File(p.imagePath),

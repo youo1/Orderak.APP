@@ -37,6 +37,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 import app.orderak.seller.R
 import app.orderak.seller.core.money.formatAmountLabel
 import app.orderak.seller.core.text.SearchText
@@ -72,6 +73,7 @@ fun CustomersScreen(
     onOpen: (String) -> Unit,
     viewModel: CustomersViewModel = hiltViewModel()
 ) {
+    val spacing = LocalOrderakSpacing.current
     val customers by viewModel.customers.collectAsStateWithLifecycle()
     var query by rememberSaveable { mutableStateOf("") }
 
@@ -132,7 +134,8 @@ private fun CustomerList(
     locale: java.util.Locale,
     onOpen: (String) -> Unit,
 ) {
-    LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    val spacing = LocalOrderakSpacing.current
+    LazyColumn(contentPadding = PaddingValues(spacing.space4), verticalArrangement = Arrangement.spacedBy(spacing.space2)) {
         items(customers, key = { it.customerKey }) { c ->
             // The shared row, with no priority rail: a customer is never
             // "waiting on the seller" the way an order is, so claiming a rail
