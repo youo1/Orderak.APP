@@ -110,15 +110,29 @@ class OperationsViewModel @Inject constructor(
     val busy = _busy.asStateFlow()
     private val _error = MutableStateFlow<String?>(null)
     val error = _error.asStateFlow()
-    private val _tickets = MutableStateFlow<List<SupportTicketDto>>(emptyList())
+    /*
+     * null until the request answers, on every one of these. NOT emptyList().
+     *
+     * Each of these screens computed `isEmpty = !busy && items.isEmpty()`, and
+     * `_busy` seeds false, so between the first composition and the
+     * LaunchedEffect that starts the load both halves were true: the empty
+     * state — "no tickets yet, create one" — rendered at a seller who has
+     * tickets, every time they opened the page.
+     *
+     * `_busy` cannot simply seed true instead: it is shared by six screens and
+     * AiAssistantScreen does not load on entry, so it would spin there forever.
+     * The list knowing whether it has been read is the fix that works for all
+     * of them.
+     */
+    private val _tickets = MutableStateFlow<List<SupportTicketDto>?>(null)
     val tickets = _tickets.asStateFlow()
-    private val _announcements = MutableStateFlow<List<AnnouncementDto>>(emptyList())
+    private val _announcements = MutableStateFlow<List<AnnouncementDto>?>(null)
     val announcements = _announcements.asStateFlow()
-    private val _translations = MutableStateFlow<List<ProductTranslationDto>>(emptyList())
+    private val _translations = MutableStateFlow<List<ProductTranslationDto>?>(null)
     val translations = _translations.asStateFlow()
-    private val _devices = MutableStateFlow<List<DeviceDto>>(emptyList())
+    private val _devices = MutableStateFlow<List<DeviceDto>?>(null)
     val devices = _devices.asStateFlow()
-    private val _passkeys = MutableStateFlow<List<PasskeyDto>>(emptyList())
+    private val _passkeys = MutableStateFlow<List<PasskeyDto>?>(null)
     val passkeys = _passkeys.asStateFlow()
     private val _deletionStatus = MutableStateFlow<DeletionRequestDto?>(null)
     val deletionStatus = _deletionStatus.asStateFlow()
@@ -154,7 +168,9 @@ class OperationsViewModel @Inject constructor(
     fun markAnnouncementRead(id: Long) = viewModelScope.launch {
         val c = credentials() ?: return@launch
         if (api.markAnnouncementRead(c.phone, c.secret, id).ok) {
-            _announcements.value = _announcements.value.map { if (it.id == id) it.copy(is_read = true) else it }
+            // ?. rather than orEmpty(): marking read before the list has been
+            // read at all would replace "not loaded" with "loaded and empty".
+            _announcements.value = _announcements.value?.map { if (it.id == id) it.copy(is_read = true) else it }
         }
     }
 
@@ -369,39 +385,17 @@ fun SupportScreen(onBack: () -> Unit, onTicket: (Long) -> Unit, vm: OperationsVi
     val error by vm.error.collectAsStateWithLifecycle()
     var creating by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) { vm.loadSupport() }
-    OperationPage(
-        title = stringResource(R.string.support_title),
-        onBack = onBack,
+
+    SupportContent(
+        tickets = tickets,
         busy = busy,
         error = error,
+        onBack = onBack,
         onRetry = vm::loadSupport,
-        isEmpty = !busy && tickets.isEmpty(),
-        empty = {
-            FullScreenEmpty(
-                message = stringResource(R.string.common_empty),
-                actionLabel = stringResource(R.string.support_new),
-                onAction = { creating = true },
-            )
-        },
-    ) {
-        Button(onClick = { creating = true }, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.support_new))
-        }
-        tickets.forEach { ticket ->
-            Card(
-                onClick = { onTicket(ticket.id) },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Column(Modifier.padding(16.dp)) {
-                    Text(ticket.subject, style = MaterialTheme.typography.titleMedium)
-                    Text("${ticket.status} · ${ticket.priority}", style = MaterialTheme.typography.bodySmall)
-                    ticket.last_message?.let {
-                        Text(it, style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
-            }
-        }
-    }
+        onTicket = onTicket,
+        onNew = { creating = true },
+    )
+
     if (creating) {
         var subject by rememberSaveable { mutableStateOf("") }
         var message by rememberSaveable { mutableStateOf("") }
@@ -423,6 +417,60 @@ fun SupportScreen(onBack: () -> Unit, onTicket: (Long) -> Unit, vm: OperationsVi
             },
             dismissButton = { TextButton(onClick = { creating = false }) { Text(stringResource(R.string.common_cancel)) } },
         )
+    }
+}
+
+/**
+ * The support ticket list, as a function of its state.
+ *
+ * `tickets` is nullable and that is the whole point of the split: `busy` seeds
+ * false and the list used to seed `emptyList()`, so "no tickets yet, open one"
+ * greeted a seller with tickets on every visit, for as long as the request took.
+ */
+@Composable
+fun SupportContent(
+    tickets: List<SupportTicketDto>?,
+    busy: Boolean,
+    error: String?,
+    onBack: () -> Unit,
+    onRetry: () -> Unit,
+    onTicket: (Long) -> Unit,
+    onNew: () -> Unit,
+) {
+    OperationPage(
+        title = stringResource(R.string.support_title),
+        onBack = onBack,
+        // Loading until the list has been read, not just while a request is in
+        // flight. The two are different and only one of them was checked.
+        busy = busy || tickets == null,
+        error = error,
+        onRetry = onRetry,
+        isEmpty = tickets?.isEmpty() == true,
+        empty = {
+            FullScreenEmpty(
+                message = stringResource(R.string.common_empty),
+                actionLabel = stringResource(R.string.support_new),
+                onAction = onNew,
+            )
+        },
+    ) {
+        Button(onClick = onNew, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.support_new))
+        }
+        tickets.orEmpty().forEach { ticket ->
+            Card(
+                onClick = { onTicket(ticket.id) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text(ticket.subject, style = MaterialTheme.typography.titleMedium)
+                    Text("${ticket.status} · ${ticket.priority}", style = MaterialTheme.typography.bodySmall)
+                    ticket.last_message?.let {
+                        Text(it, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -474,20 +522,40 @@ fun AnnouncementsScreen(onBack: () -> Unit, vm: OperationsViewModel = hiltViewMo
     val busy by vm.busy.collectAsStateWithLifecycle()
     val error by vm.error.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { vm.loadAnnouncements() }
+    AnnouncementsContent(
+        items = items,
+        busy = busy,
+        error = error,
+        onBack = onBack,
+        onRetry = vm::loadAnnouncements,
+        onRead = vm::markAnnouncementRead,
+    )
+}
+
+/** The announcements list, as a function of its state. */
+@Composable
+fun AnnouncementsContent(
+    items: List<AnnouncementDto>?,
+    busy: Boolean,
+    error: String?,
+    onBack: () -> Unit,
+    onRetry: () -> Unit,
+    onRead: (Long) -> Unit,
+) {
     OperationPage(
         title = stringResource(R.string.announcements_title),
         onBack = onBack,
-        busy = busy,
+        busy = busy || items == null,
         error = error,
-        onRetry = vm::loadAnnouncements,
-        isEmpty = !busy && items.isEmpty(),
+        onRetry = onRetry,
+        isEmpty = items?.isEmpty() == true,
         empty = {
             FullScreenEmpty(message = stringResource(R.string.common_empty))
         },
     ) {
-        items.forEach { a ->
+        items.orEmpty().forEach { a ->
             Card(
-                onClick = { vm.markAnnouncementRead(a.id) },
+                onClick = { onRead(a.id) },
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(Modifier.padding(16.dp)) {
@@ -514,7 +582,9 @@ fun AnnouncementsDashboardIndicator(
 ) {
     val items by vm.announcements.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { vm.loadAnnouncements() }
-    val unread = items.count { !it.is_read }
+    // null means the list has not been read, so there is nothing to claim:
+    // 0 renders the plain title rather than "0 unread".
+    val unread = items?.count { !it.is_read } ?: 0
     val locale = LocalConfiguration.current.locales[0]
     OutlinedButton(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -532,27 +602,18 @@ fun CatalogLanguagesScreen(onBack: () -> Unit, vm: OperationsViewModel = hiltVie
     val error by vm.error.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<ProductTranslationDto?>(null) }
     LaunchedEffect(lang) { vm.loadTranslations(lang) }
-    OperationPage(
-        title = stringResource(R.string.catalog_languages_title),
-        onBack = onBack,
+
+    CatalogLanguagesContent(
+        items = items,
+        lang = lang,
         busy = busy,
         error = error,
+        onBack = onBack,
         onRetry = { vm.loadTranslations(lang) },
-    ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { lang = "ar" }) { Text("العربية") }
-            OutlinedButton(onClick = { lang = "en" }) { Text("English") }
-        }
-        items.forEach { item ->
-            Card(onClick = { editing = item }, modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp)) {
-                    Text(item.source_name, style = MaterialTheme.typography.titleMedium)
-                    Text(item.name ?: stringResource(R.string.translation_missing))
-                    Text(item.translation_status, color = MaterialTheme.colorScheme.primary)
-                }
-            }
-        }
-    }
+        onLang = { lang = it },
+        onEdit = { editing = it },
+    )
+
     editing?.let { item ->
         var name by rememberSaveable(item.product_code, item.lang) { mutableStateOf(item.name.orEmpty()) }
         var description by rememberSaveable(item.product_code, item.lang) { mutableStateOf(item.description.orEmpty()) }
@@ -577,6 +638,52 @@ fun CatalogLanguagesScreen(onBack: () -> Unit, vm: OperationsViewModel = hiltVie
     }
 }
 
+/**
+ * The per-language catalogue list, as a function of its state.
+ *
+ * This screen's contract declares an empty state and the screen had none: with
+ * no products to translate, `OperationPage` fell through to content and drew two
+ * language buttons over blank space. It says so now — and the language switcher
+ * stays visible in that state, because "nothing in Arabic" is a reason to try
+ * English, not a dead end.
+ */
+@Composable
+fun CatalogLanguagesContent(
+    items: List<ProductTranslationDto>?,
+    lang: String,
+    busy: Boolean,
+    error: String?,
+    onBack: () -> Unit,
+    onRetry: () -> Unit,
+    onLang: (String) -> Unit,
+    onEdit: (ProductTranslationDto) -> Unit,
+) {
+    OperationPage(
+        title = stringResource(R.string.catalog_languages_title),
+        onBack = onBack,
+        busy = busy || items == null,
+        error = error,
+        onRetry = onRetry,
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { onLang("ar") }) { Text("العربية") }
+            OutlinedButton(onClick = { onLang("en") }) { Text("English") }
+        }
+        if (items?.isEmpty() == true) {
+            FullScreenEmpty(message = stringResource(R.string.common_empty))
+        }
+        items.orEmpty().forEach { item ->
+            Card(onClick = { onEdit(item) }, modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp)) {
+                    Text(item.source_name, style = MaterialTheme.typography.titleMedium)
+                    Text(item.name ?: stringResource(R.string.translation_missing))
+                    Text(item.translation_status, color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun DevicesScreen(
     onBack: () -> Unit,
@@ -593,17 +700,24 @@ fun DevicesScreen(
     var selectedPasskeyId by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { vm.loadDevices() }
     LaunchedEffect(passkeys) {
-        if (passkeys.none { it.id == selectedPasskeyId }) {
-            selectedPasskeyId = passkeys.firstOrNull()?.id
+        // Only once the list has been read. Running this against null would
+        // clear a restored selection before the passkeys arrive.
+        passkeys?.let { list ->
+            if (list.none { it.id == selectedPasskeyId }) {
+                selectedPasskeyId = list.firstOrNull()?.id
+            }
         }
     }
     OperationPage(
         title = stringResource(R.string.devices_title),
         onBack = onBack,
-        busy = busy,
+        // Two lists, and this page is empty only when BOTH have been read and
+        // both came back empty. `!busy && items.isEmpty() && passkeys.isEmpty()`
+        // was true before either request started.
+        busy = busy || items == null || passkeys == null,
         error = error,
         onRetry = if (error == "recent_auth_required") onReauthenticate else vm::loadDevices,
-        isEmpty = !busy && items.isEmpty() && passkeys.isEmpty(),
+        isEmpty = items?.isEmpty() == true && passkeys?.isEmpty() == true,
         empty = {
             FullScreenEmpty(message = stringResource(R.string.common_empty))
         },
@@ -623,7 +737,7 @@ fun DevicesScreen(
                             canAdd = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P,
                             onAdd = { activity?.let(vm::createPasskey) },
                         )
-                        passkeys.forEach { passkey ->
+                        passkeys.orEmpty().forEach { passkey ->
                             Card(
                                 onClick = { selectedPasskeyId = passkey.id },
                                 modifier = Modifier.fillMaxWidth(),
@@ -643,7 +757,7 @@ fun DevicesScreen(
                         }
                     }
                     Column(Modifier.weight(0.58f)) {
-                        passkeys.firstOrNull { it.id == selectedPasskeyId }?.let { passkey ->
+                        passkeys.orEmpty().firstOrNull { it.id == selectedPasskeyId }?.let { passkey ->
                             PasskeyDetailCard(
                                 passkey = passkey,
                                 onRename = { renameTarget = passkey },
@@ -661,7 +775,7 @@ fun DevicesScreen(
                         canAdd = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P,
                         onAdd = { activity?.let(vm::createPasskey) },
                     )
-                    passkeys.forEach { passkey ->
+                    passkeys.orEmpty().forEach { passkey ->
                         PasskeyDetailCard(
                             passkey = passkey,
                             onRename = { renameTarget = passkey },
@@ -677,7 +791,7 @@ fun DevicesScreen(
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.semantics { heading() },
         )
-        items.forEach { d ->
+        items.orEmpty().forEach { d ->
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp)) {
                     Text(

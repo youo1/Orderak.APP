@@ -155,6 +155,42 @@ export const RENDERS = {
 
   localizationSurfaceScreenshot: { kind: "component", note: "ar/en/fr side by side; one render per locale" },
 
+  // ================= account pages =================
+  // All three computed `isEmpty = !busy && items.isEmpty()`, and both halves
+  // were true before anything started loading: _busy seeds false and the lists
+  // seeded emptyList(). "Nothing here yet" greeted a seller who had tickets,
+  // announcements or translations, every time, for as long as the request took.
+  supportLoadingLight: { kind: "screen", contract: "support", state: "loading", theme: "light" },
+  supportLoadingDark: { kind: "screen", contract: "support", state: "loading", theme: "dark" },
+  supportContentLight: { kind: "screen", contract: "support", state: "content", theme: "light" },
+  supportContentDark: { kind: "screen", contract: "support", state: "content", theme: "dark" },
+  supportEmptyLight: { kind: "screen", contract: "support", state: "empty", theme: "light" },
+  supportEmptyDark: { kind: "screen", contract: "support", state: "empty", theme: "dark" },
+  supportErrorLight: { kind: "screen", contract: "support", state: "error", theme: "light" },
+  supportErrorDark: { kind: "screen", contract: "support", state: "error", theme: "dark" },
+
+  announcementsLoadingLight: { kind: "screen", contract: "announcements", state: "loading", theme: "light" },
+  announcementsLoadingDark: { kind: "screen", contract: "announcements", state: "loading", theme: "dark" },
+  announcementsContentLight: { kind: "screen", contract: "announcements", state: "content", theme: "light" },
+  announcementsContentDark: { kind: "screen", contract: "announcements", state: "content", theme: "dark" },
+  // Actionless, like the customers surface and unlike support above: a seller
+  // cannot make an announcement happen.
+  announcementsEmptyLight: { kind: "screen", contract: "announcements", state: "empty", theme: "light" },
+  announcementsEmptyDark: { kind: "screen", contract: "announcements", state: "empty", theme: "dark" },
+  announcementsErrorLight: { kind: "screen", contract: "announcements", state: "error", theme: "light" },
+  announcementsErrorDark: { kind: "screen", contract: "announcements", state: "error", theme: "dark" },
+
+  catalogLanguagesLoadingLight: { kind: "screen", contract: "catalog-languages", state: "loading", theme: "light" },
+  catalogLanguagesLoadingDark: { kind: "screen", contract: "catalog-languages", state: "loading", theme: "dark" },
+  catalogLanguagesContentLight: { kind: "screen", contract: "catalog-languages", state: "content", theme: "light" },
+  catalogLanguagesContentDark: { kind: "screen", contract: "catalog-languages", state: "content", theme: "dark" },
+  // The state this screen declared and did not have: with nothing to translate
+  // it fell through to content and drew two language buttons over blank space.
+  catalogLanguagesEmptyLight: { kind: "screen", contract: "catalog-languages", state: "empty", theme: "light" },
+  catalogLanguagesEmptyDark: { kind: "screen", contract: "catalog-languages", state: "empty", theme: "dark" },
+  catalogLanguagesErrorLight: { kind: "screen", contract: "catalog-languages", state: "error", theme: "light" },
+  catalogLanguagesErrorDark: { kind: "screen", contract: "catalog-languages", state: "error", theme: "dark" },
+
   // ================= entry =================
   // Splash had no name at all: it was an anonymous block inside
   // `composable<SplashRoute> { }`, which is why nothing could render it and why
@@ -241,7 +277,7 @@ export const RENDERS = {
 };
 
 /** Proven screen-states may never drop below this. Raise it; never lower it. */
-export const FLOOR = 27;
+export const FLOOR = 39;
 
 /**
  * The whole decision, with nothing to do with the filesystem.
