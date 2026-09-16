@@ -2,6 +2,7 @@ package app.orderak.seller.feature.orders
 
 import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
+import app.orderak.seller.data.session.SessionStore
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
@@ -50,8 +51,17 @@ class OrderDetailsViewModel @Inject constructor(
     private val imageStore: ImageStore,
     val entitlementManager: EntitlementManager,
     val featureAvailability: FeatureAvailabilityResolver,
+    sessionStore: SessionStore,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
+
+    /**
+     * The store's country, used to derive the customer key from the buyer's
+     * phone exactly as SellerRefresher does. A key built any other way addresses
+     * a customer row that does not exist.
+     */
+    val countryIso: StateFlow<String?> =
+        sessionStore.countryIso.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val orderId: Long = savedStateHandle.toRoute<OrderDetailsRoute>().id
 

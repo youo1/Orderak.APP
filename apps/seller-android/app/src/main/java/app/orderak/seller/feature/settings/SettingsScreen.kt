@@ -81,6 +81,7 @@ import app.orderak.seller.feature.auth.LanguageSheet
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
@@ -113,10 +114,26 @@ class SettingsViewModel @Inject constructor(
     val catalogId = sessionStore.publicIdentifier.combine(sessionStore.slug) { pub, slug ->
         pub?.ifBlank { null } ?: slug
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-	val planName = entitlementManager.config.map { it?.plan_name ?: "Free" }
-		.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "Free")
-	val aiAvailable = entitlementManager.config.map { entitlementManager.isFeatureEnabled(Feature.AI_ASSISTANT) }
-		.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+	/**
+	 * null until entitlements answer. NOT "Free".
+	 *
+	 * The seed was a factual claim about the seller's money, made before anything
+	 * was known: every paying seller opening حسابي was told they were on the free
+	 * plan until the config arrived, and the screen had no way to say "not yet".
+	 * The contract has declared a loading state for this surface all along.
+	 */
+	val planName: StateFlow<String?> = entitlementManager.config.map { it?.plan_name ?: "Free" }
+		.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+	/**
+	 * null until entitlements answer. NOT false.
+	 *
+	 * `false` hid the AI entry and then let it appear a beat later, which reads as
+	 * a glitch rather than a decision. Withheld while unknown, shown or omitted
+	 * once it is known.
+	 */
+	val aiAvailable: StateFlow<Boolean?> = entitlementManager.config.map { entitlementManager.isFeatureEnabled(Feature.AI_ASSISTANT) }
+		.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 	private val _billingPlans = MutableStateFlow<List<BillingPlanUi>>(emptyList())
 	val billingPlans = _billingPlans.asStateFlow()
 
@@ -267,183 +284,42 @@ fun SettingsScreen(
             )
         }
     ) { padding ->
-        Column(
-            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()),
-        ) {
-            // ── Plan section ──
-            Text(
-                stringResource(R.string.settings_current_plan, planName),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            )
-            // A plan list is not permission to sell one. `purchaseOpen` is the
-            // same decision the subscription screen and the limit notices read,
-            // so the account surface can no longer disagree with them (I-5).
-            if (purchaseOpen && activity != null && billingPlans.isNotEmpty()) {
-                billingPlans.forEach { plan ->
-                    OutlinedButton(
-                        onClick = { viewModel.purchase(activity, plan.product) },
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                    ) {
-                        Text(
-                            plan.localizedPrice?.let {
-                                stringResource(
-                                    R.string.settings_choose_plan_priced,
-                                    plan.product.name,
-                                    plan.product.base_plan_id,
-                                    it,
-                                )
-                            } ?: stringResource(
-                                R.string.settings_choose_plan,
-                                plan.product.name,
-                                plan.product.base_plan_id,
-                            )
-                        )
-                    }
-                    Spacer(Modifier.height(8.dp))
+        AccountContent(
+            state = AccountUiState(
+                planName = planName,
+                aiAvailable = aiAvailable,
+                billingPlans = billingPlans,
+                // An Activity is what a purchase needs, not what permits one.
+                // Folded in here so the surface reads one boolean.
+                purchaseOpen = purchaseOpen && activity != null,
+                storeUrl = storeUrlSaved,
+            ),
+            slug = slug,
+            onSlugChange = { slug = it },
+            instapay = instapay,
+            onInstapayChange = { instapay = it },
+            vfcash = vfcash,
+            onVfcashChange = { vfcash = it },
+            onSavePayout = {
+                viewModel.savePayout(instapay, vfcash, slug) {
+                    scope.launch { snackbarHostState.showSnackbar(payoutSaved) }
                 }
-            }
-            Spacer(Modifier.height(8.dp))
-
-            // ── Store section ──
-            SettingsSectionHeader(stringResource(R.string.store_info_title))
-            SettingsListItem(
-                icon = Icons.Outlined.Store,
-                label = stringResource(R.string.store_info_title),
-                onClick = onOpenStoreInfo,
-            )
-            SettingsListItem(
-                icon = Icons.Outlined.Category,
-                label = stringResource(R.string.categories_title),
-                onClick = onOpenCategories,
-            )
-            SettingsListItem(
-                icon = Icons.Outlined.Translate,
-                label = stringResource(R.string.catalog_languages_title),
-                onClick = onOpenCatalogLanguages,
-            )
-            SettingsListItem(
-                icon = Icons.Outlined.Person,
-                label = stringResource(R.string.seller_profile_title),
-                onClick = onOpenSellerProfile,
-            )
-            Spacer(Modifier.height(8.dp))
-
-            // ── Tools section ──
-            SettingsSectionHeader(stringResource(R.string.support_title))
-            SettingsListItem(
-                icon = Icons.Outlined.SupportAgent,
-                label = stringResource(R.string.support_title),
-                onClick = onOpenSupport,
-            )
-            SettingsListItem(
-                icon = Icons.Outlined.Campaign,
-                label = stringResource(R.string.announcements_title),
-                onClick = onOpenAnnouncements,
-            )
-            if (aiAvailable) {
-                SettingsListItem(
-                    icon = Icons.Outlined.SmartToy,
-                    label = stringResource(R.string.ai_assistant_title),
-                    onClick = onOpenAiAssistant,
-                )
-            }
-            Spacer(Modifier.height(8.dp))
-
-            // ── Account section ──
-            SettingsSectionHeader(stringResource(R.string.devices_title))
-            SettingsListItem(
-                icon = Icons.Outlined.Devices,
-                label = stringResource(R.string.devices_title),
-                onClick = onOpenDevices,
-            )
-            SettingsListItem(
-                icon = Icons.Outlined.Subscriptions,
-                label = stringResource(R.string.subscription_title),
-                onClick = onOpenSubscription,
-            )
-            SettingsListItem(
-                icon = Icons.Outlined.Delete,
-                label = stringResource(R.string.deletion_status_title),
-                onClick = onOpenDeletionStatus,
-            )
-            Spacer(Modifier.height(8.dp))
-
-            // ── Payout section ──
-            SettingsSectionHeader(stringResource(R.string.settings_payout_title))
-            Text(
-                stringResource(R.string.settings_link_title),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            )
-            OutlinedTextField(
-                value = slug,
-                onValueChange = { v -> slug = v.lowercase(Locale.ROOT).filter { (it.isLetterOrDigit() || it == '-') }.take(30) },
-                label = { Text(stringResource(R.string.settings_slug_label)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            )
-            storeUrlSaved?.takeIf { it.isNotBlank() }?.let { saved ->
-                Text(
-                    text = saved,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                )
-            } ?: run {
-                Text(
-                    text = stringResource(R.string.settings_link_pending),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                )
-            }
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = instapay, onValueChange = { instapay = it.take(60) },
-                label = { Text(stringResource(R.string.settings_instapay)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            )
-            OutlinedTextField(
-                value = vfcash, onValueChange = { vfcash = it.filter(Char::isDigit).take(11) },
-                label = { Text(stringResource(R.string.settings_vfcash)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            )
-            Button(
-                onClick = {
-                    viewModel.savePayout(instapay, vfcash, slug) {
-                        scope.launch { snackbarHostState.showSnackbar(payoutSaved) }
-                    }
-                },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            ) {
-                Text(stringResource(R.string.settings_save))
-            }
-            Spacer(Modifier.height(16.dp))
-
-            // ── Danger zone ──
-            Text(
-                stringResource(R.string.settings_delete_account),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(enabled = true) { confirmDeletion = true }
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-            )
-            Text(
-                stringResource(R.string.settings_logout),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(enabled = true) { confirmLogout = true }
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-            )
-            Spacer(Modifier.height(24.dp))
-        }
+            },
+            onPurchase = { plan -> activity?.let { viewModel.purchase(it, plan.product) } },
+            onOpenStoreInfo = onOpenStoreInfo,
+            onOpenCategories = onOpenCategories,
+            onOpenCatalogLanguages = onOpenCatalogLanguages,
+            onOpenSellerProfile = onOpenSellerProfile,
+            onOpenSupport = onOpenSupport,
+            onOpenAnnouncements = onOpenAnnouncements,
+            onOpenAiAssistant = onOpenAiAssistant,
+            onOpenDevices = onOpenDevices,
+            onOpenSubscription = onOpenSubscription,
+            onOpenDeletionStatus = onOpenDeletionStatus,
+            onRequestDeletion = { confirmDeletion = true },
+            onRequestLogout = { confirmLogout = true },
+            modifier = Modifier.padding(padding),
+        )
     }
 
     if (confirmDeletion) {
@@ -483,7 +359,7 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun SettingsSectionHeader(title: String) {
+internal fun SettingsSectionHeader(title: String) {
     Text(
         text = title,
         style = MaterialTheme.typography.labelLarge,
@@ -497,7 +373,7 @@ private fun SettingsSectionHeader(title: String) {
 }
 
 @Composable
-private fun SettingsListItem(
+internal fun SettingsListItem(
     icon: ImageVector,
     label: String,
     onClick: () -> Unit,

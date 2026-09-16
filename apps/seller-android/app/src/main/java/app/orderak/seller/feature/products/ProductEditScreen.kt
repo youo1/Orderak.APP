@@ -53,9 +53,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.orderak.seller.core.ui.FullScreenLoading
 import app.orderak.seller.R
+import app.orderak.seller.core.text.formatCount
 import coil3.compose.AsyncImage
 import java.io.File
 
@@ -88,6 +91,15 @@ fun ProductEditScreen(
             )
         }
     ) { padding ->
+        // `loaded` was computed in three places in the view model and read in
+        // none. Opening an existing product therefore drew an empty form first —
+        // blank name, stock "1" — and swapped in the real values when Room
+        // answered, so anything the seller typed in between was overwritten by
+        // the product they had opened to edit.
+        if (!state.loaded) {
+            FullScreenLoading(Modifier.padding(padding))
+            return@Scaffold
+        }
         Column(
             Modifier.fillMaxSize().padding(padding).padding(16.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -270,20 +282,37 @@ fun ProductEditScreen(
     // tapping away, and it is the half of the choice that cannot destroy
     // anything — their number is still in the field afterwards, unsaved.
     state.stockConflict?.let { conflict ->
+        val locale = LocalConfiguration.current.locales[0]
         AlertDialog(
             onDismissRequest = { viewModel.acceptShopStock() },
             title = { Text(stringResource(R.string.product_stock_conflict_title)) },
             text = {
-                Text(stringResource(R.string.product_stock_conflict_body, conflict.yours, conflict.shop))
+                Text(
+                    stringResource(
+                        R.string.product_stock_conflict_body,
+                        formatCount(conflict.yours, locale),
+                        formatCount(conflict.shop, locale),
+                    ),
+                )
             },
             confirmButton = {
                 TextButton(onClick = { viewModel.acceptShopStock() }) {
-                    Text(stringResource(R.string.product_stock_conflict_use_shop, conflict.shop))
+                    Text(
+                        stringResource(
+                            R.string.product_stock_conflict_use_shop,
+                            formatCount(conflict.shop, locale),
+                        ),
+                    )
                 }
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.reapplyMyStock(onBack) }) {
-                    Text(stringResource(R.string.product_stock_conflict_keep_mine, conflict.yours))
+                    Text(
+                        stringResource(
+                            R.string.product_stock_conflict_keep_mine,
+                            formatCount(conflict.yours, locale),
+                        ),
+                    )
                 }
             },
         )

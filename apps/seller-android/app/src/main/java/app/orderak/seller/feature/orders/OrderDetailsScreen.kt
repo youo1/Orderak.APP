@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Chat
@@ -53,8 +54,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.orderak.seller.core.phone.CustomerPhone
 import app.orderak.seller.R
 import app.orderak.seller.core.money.formatAmountLabel
+import app.orderak.seller.core.text.formatCount
 import app.orderak.seller.core.ui.FeatureGate
 import app.orderak.seller.data.billing.FeatureKeys.OCR_RECEIPT_ASSISTANCE
 import app.orderak.seller.data.db.PaymentEntity
@@ -68,6 +71,7 @@ import java.util.Date
 @Composable
 fun OrderDetailsScreen(
     onBack: () -> Unit,
+    onOpenCustomer: (String) -> Unit = {},
     viewModel: OrderDetailsViewModel = hiltViewModel()
 ) {
     // LocalConfiguration, not LocalContext.resources.configuration: the latter is
@@ -77,6 +81,7 @@ fun OrderDetailsScreen(
     val locale = LocalConfiguration.current.locales[0]
     val orderWithItems by viewModel.order.collectAsStateWithLifecycle()
     val payments by viewModel.payments.collectAsStateWithLifecycle()
+    val countryIso by viewModel.countryIso.collectAsStateWithLifecycle()
     val proof by viewModel.proof.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val entitlementManager = viewModel.entitlementManager
@@ -190,6 +195,22 @@ fun OrderDetailsScreen(
                             Text(order.buyerName ?: order.buyerPhone, style = MaterialTheme.typography.titleMedium)
                             Text(order.buyerPhone, style = MaterialTheme.typography.bodySmall)
                         }
+                        // The contract has always declared CustomerRoute as an
+                        // exit from here and there was no way to reach it: from
+                        // an order you could not get to the person who placed it,
+                        // or to the rest of what they have bought.
+                        //
+                        // The key is derived exactly as the refresher derives it
+                        // (CustomerPhone.keyFor), because a key built any other
+                        // way addresses a row that does not exist.
+                        IconButton(onClick = {
+                            onOpenCustomer(CustomerPhone.keyFor(order.buyerPhone, countryIso))
+                        }) {
+                            Icon(
+                                Icons.Outlined.Person,
+                                contentDescription = stringResource(R.string.customer_open),
+                            )
+                        }
                         StatusChip(status)
                     }
                     order.note?.let {
@@ -203,7 +224,10 @@ fun OrderDetailsScreen(
                 Column(Modifier.fillMaxWidth().padding(12.dp)) {
                     data.items.forEach { item ->
                         Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                            Text("${item.qty}×", style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                "${formatCount(item.qty, locale)}×",
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
                             Spacer(Modifier.width(8.dp))
                             Text(item.productName, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                             Text(formatAmountLabel(item.qty * item.priceMinor, order.currency, locale),

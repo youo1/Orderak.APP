@@ -165,7 +165,13 @@ fun OrderakNavHost() {
             )
         }
 
-        composable<OrderDetailsRoute> { OrderDetailsScreen(onBack = { navController.popBackStack() }) }
+        composable<OrderDetailsRoute> {
+            OrderDetailsScreen(
+                onBack = { navController.popBackStack() },
+                // The exit this contract has always declared and never had.
+                onOpenCustomer = { key -> navController.navigate(CustomerRoute(key)) },
+            )
+        }
 
         composable<CustomerRoute> {
             CustomerDetailsScreen(
@@ -212,7 +218,12 @@ fun OrderakNavHost() {
             )
         }
         composable<DeletionStatusRoute> { DeletionStatusScreen(onBack = { navController.popBackStack() }) }
-        composable<SubscriptionRoute> { SubscriptionScreen(onBack = { navController.popBackStack() }) }
+        composable<SubscriptionRoute> {
+            SubscriptionScreen(
+                onBack = { navController.popBackStack() },
+                onViewPlans = { navController.navigate(PlansRoute) },
+            )
+        }
         composable<AiAssistantRoute> { AiAssistantScreen(onBack = { navController.popBackStack() }) }
         composable<RestrictedAccountRoute> {
             RestrictedAccountScreen(

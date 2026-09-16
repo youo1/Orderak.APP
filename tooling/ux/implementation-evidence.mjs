@@ -159,7 +159,16 @@ export const EVIDENCE = {
     integration: "/api/v1/customers",
     note: "Promoted with the editor, not with the screen. This row is why the behaviour axis exists: the screen resolved for months while rendering an order list with no edit control, no save and no write path, and the catalogue sold it at paid1 the whole time. The named test changed with ADR-012 and the property changed with it. It used to be that an edit the server had not acknowledged was never overwritten by the value it replaced; there is no unacknowledged edit any more, because a customer edit is Class A and either reaches the server or does not happen. What is asserted now is the harm arriving by the opposite route — the screen reporting \"saved\" for a write that never left the device.",
   },
-  "analytics_reporting.operational_dashboard":       { kind: "screen", value: "MainScreen" },
+  "analytics_reporting.operational_dashboard": {
+    kind: "screen",
+    value: "TodayScreen",
+    behaviour: {
+      layer: "android",
+      file: "OrdersFilterTest.kt",
+      test: "the three counters are three different questions",
+    },
+    note: "Promoted when the surface stopped lying in two directions. The counters are Room COUNT(*) queries and the list they open is an in-memory predicate, so the named test pins the two definitions together — all three counters used to open the same unfiltered list, which is a control that misreports where it goes. The surface was also extracted out of MainScreen: as a private DashboardTab behind a Hilt view model it could not be rendered by anything, which is why two of the four states its contract declares had no code at all. TodayScreen takes a TodayUiState, so loading, content, empty, error and offline-over-content are each a literal in TodayScreenshotTest.",
+  },
   "support_service.in_app_support_tickets":          { kind: "endpoint", value: "/api/v1/support/tickets", integration: "/api/v1/support/tickets" },
   "team_security.session_and_device_management":     { kind: "endpoint", value: "/api/v1/devices", integration: "/api/v1/devices" },
   "language_localization.seller_translation_review": { kind: "endpoint", value: "/api/v1/catalog/translations", integration: "/api/v1/catalog/translations" },
@@ -207,8 +216,6 @@ export const BEHAVIOUR_BASELINE = {
     "The order list renders from Room. A screenshot test covers the list component; nothing covers the screen's own loading, empty and error states.",
   "customers_crm.customer_list_and_order_history":
     "Customers are derived on-device by aggregating orders. Neither the aggregation nor the screen is covered.",
-  "analytics_reporting.operational_dashboard":
-    "The Today surface composes its counters from local queries. Neither the counters nor the surface is covered.",
   "ai_capabilities.basic_ai_assistance":
     "Fail-closed behind AI_ASSISTANT_ENABLED in both environments, so there is no reachable path to exercise. The gate is reported separately; this entry is the test gap, not the gate.",
   "team_security.owner_account":

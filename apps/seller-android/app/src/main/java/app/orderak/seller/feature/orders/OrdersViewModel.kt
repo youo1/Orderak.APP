@@ -19,13 +19,33 @@ class OrdersViewModel @Inject constructor(
     repo: OrderRepository
 ) : ViewModel() {
 
-    /** null = all */
-    val filter = MutableStateFlow<OrderStatus?>(null)
+    /**
+     * What the seller is looking at. [OrdersFilter.All] is the default.
+     *
+     * Was `OrderStatus?`, where null meant all. It now carries the named
+     * questions the اليوم counters ask as well — see [OrdersFilter] for why a
+     * type rather than a widened argument.
+     */
+    val filter = MutableStateFlow<OrdersFilter>(OrdersFilter.All)
 
-    val orders: StateFlow<List<OrderEntity>> =
+    /**
+     * The visible orders, or null while Room is still answering.
+     *
+     * Seeded `emptyList()` before, which is the same defect the اليوم counters
+     * and the product catalogue had: a seller with orders met the "no orders
+     * yet, record one" screen on every cold start. On this screen that is worse
+     * than a flicker, because the empty state's action is to create an order —
+     * and a seller who takes it has now recorded a duplicate of one they already
+     * had.
+     */
+    val orders: StateFlow<List<OrderEntity>?> =
         combine(repo.orders, filter) { list, f ->
-            if (f == null) list else list.filter { it.status == f.name }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+            // One evaluation of `now` for the whole list, so a list crossing
+            // midnight mid-filter cannot include an order by one row and exclude
+            // it by the next.
+            val now = System.currentTimeMillis()
+            list.filter { f.matches(it, now) }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /**
      * Local ids of orders the server refused, so the list can mark them apart
@@ -36,5 +56,10 @@ class OrdersViewModel @Inject constructor(
             .map { it.keys }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
-    fun setFilter(status: OrderStatus?) { filter.value = status }
+    fun setFilter(filter: OrdersFilter) { this.filter.value = filter }
+
+    /** The status chips still speak in statuses; null clears to [OrdersFilter.All]. */
+    fun setStatusFilter(status: OrderStatus?) {
+        filter.value = if (status == null) OrdersFilter.All else OrdersFilter.Status(status)
+    }
 }
