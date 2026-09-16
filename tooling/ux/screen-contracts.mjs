@@ -86,10 +86,20 @@ export const CONTRACTS = [
     data: ["passkey availability", "phone country catalogue", "OTP state", "terms/privacy versions"],
     actions: [
       { do: "passkey sign-in", via: "onPasskeySignIn" },
-      { do: "request OTP", status: "unverified" },
-      { do: "verify OTP", status: "unverified" },
-      { do: "change number", status: "unverified" },
-      { do: "resend", status: "unverified" },
+      // All five go through one `dispatch(AuthEvent)` rather than a callback
+      // per action, which is why searching for "requestOtp" found nothing. The
+      // four OTP intents are dispatched, so `dispatch` — wired in this screen's
+      // own body — is what carries them.
+      { do: "request OTP", via: "dispatch" },
+      { do: "verify OTP", via: "dispatch" },
+      { do: "change number", via: "dispatch" },
+      { do: "resend", via: "dispatch" },
+      // Traced and still unverified, deliberately. `AuthScreen` is a thin
+      // wrapper around `AuthScreenContent`, and the language sheet lives in the
+      // child with local `showLanguage` state — not dispatched, so no symbol in
+      // this screen's body carries it. The control is real
+      // (AuthScreen.kt:135); this check cannot see across that split, and
+      // inventing a via to satisfy it would be the lie the check exists to stop.
       { do: "switch language", status: "unverified" },
     ],
     states: ["content", "loading", "error"],
@@ -107,8 +117,14 @@ export const CONTRACTS = [
     exit: ["MainRoute — اكتمل الإنشاء", "AuthRoute — رجوع مع حفظ المسوّدة"],
     data: ["resumable draft", "business categories", "city catalogue", "slug availability"],
     actions: [
-      { do: "save account step", status: "unverified" },
-      { do: "check slug", status: "unverified" },
+      { do: "save account step", via: "next" },
+      // Not a control the seller operates: `checkSlug()` is private and fires as
+      // they type the shop name, and the screen renders only the RESULT. Both
+      // this and the city picker live in child composables of ShopSetupScreen,
+      // so no symbol in its own body carries them — traced to
+      // `slugAvailability` and `onCitySelected` respectively, and left
+      // unverified rather than given a via this check would be wrong to accept.
+      { do: "see slug availability", status: "unverified" },
       { do: "select city", status: "unverified" },
       { do: "create store", via: "onCreate" },
     ],
@@ -127,7 +143,10 @@ export const CONTRACTS = [
     exit: ["SupportRoute", "AuthRoute — تسجيل خروج"],
     data: ["restriction reason", "support entry point"],
     actions: [
-      { do: "contact support", status: "unverified" },
+      // Real, but not via SupportRoute: a restricted account sits outside the
+      // main shell, so the control opens a mailto intent instead. The exit
+      // above said SupportRoute and was wrong about how, not whether.
+      { do: "contact support", via: "restricted_contact" },
       { do: "sign out", via: "onLogout" },
     ],
     states: ["content"],
@@ -359,8 +378,9 @@ export const CONTRACTS = [
     data: ["translations", "provenance", "supported locales"],
     actions: [
       { do: "approve", via: "saveTranslation" },
-      { do: "edit translation", status: "unverified" },
-      { do: "request retranslation", status: "unverified" },
+      { do: "edit translation", via: "saveTranslation" },
+      // No control, no view-model call, no endpoint reached from here.
+      { do: "request retranslation", status: "planned", why: "no retranslation control exists on the screen" },
     ],
     states: ["loading", "content", "empty", "error"],
     offline: false,
@@ -512,7 +532,9 @@ export const CONTRACTS = [
     data: ["ticket", "messages"],
     actions: [
       { do: "reply", via: "reply" },
-      { do: "close", status: "unverified" },
+      // The screen only HIDES the reply box when a ticket is already closed;
+      // nothing on it closes one. Reading a status is not an action.
+      { do: "close", status: "planned", why: "the screen reads closed status but offers no control to close" },
     ],
     states: ["loading", "content", "error"],
     offline: false,
@@ -530,7 +552,8 @@ export const CONTRACTS = [
     data: ["announcements", "read state"],
     actions: [
       { do: "mark read", via: "markAnnouncementRead" },
-      { do: "open link", status: "unverified" },
+      // Announcements carry no link control — tapping one marks it read.
+      { do: "open link", status: "planned", why: "announcements render text only; no link affordance exists" },
     ],
     states: ["loading", "content", "empty", "error"],
     offline: false,
@@ -661,22 +684,15 @@ export const CONTRACTS = [
  *   exist, it is `status: "planned"` with a reason, not an unverified entry.
  */
 export const UNVERIFIED_ACTIONS = new Set([
-  "auth:request OTP",
-  "auth:verify OTP",
-  "auth:change number",
-  "auth:resend",
+  // Traced to a real control that lives in a CHILD composable, so no symbol
+  // in the named screen's own body carries it. Kept here rather than given a
+  // via this check would be wrong to accept.
   "auth:switch language",
-  "shop-setup:save account step",
-  "shop-setup:check slug",
+  "shop-setup:see slug availability",
   "shop-setup:select city",
-  "restricted-account:contact support",
   "version-governance:update",
   "version-governance:dismiss — التحذير فقط",
   "store-info:copy link",
-  "catalog-languages:edit translation",
-  "catalog-languages:request retranslation",
-  "support-ticket:close",
-  "announcements:open link",
 ]);
 
 /**

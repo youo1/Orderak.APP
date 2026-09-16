@@ -81,7 +81,7 @@ Screenshot cases to write: **83 states × 2 themes = 166**.
 | Entry | SplashRoute — مفيش جلسة · تسجيل خروج |
 | Exit | MainRoute — متجر موجود · ShopSetupRoute — بائع جديد |
 | Data | passkey availability · phone country catalogue · OTP state · terms/privacy versions |
-| Actions | passkey sign-in `onPasskeySignIn` · request OTP *(untraced)* · verify OTP *(untraced)* · change number *(untraced)* · resend *(untraced)* · switch language *(untraced)* |
+| Actions | passkey sign-in `onPasskeySignIn` · request OTP `dispatch` · verify OTP `dispatch` · change number `dispatch` · resend `dispatch` · switch language *(untraced)* |
 
 ### `main-shell`
 
@@ -261,7 +261,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Entry | account · store |
 | Exit | رجوع |
 | Data | translations · provenance · supported locales |
-| Actions | approve `saveTranslation` · edit translation *(untraced)* · request retranslation *(untraced)* |
+| Actions | approve `saveTranslation` · edit translation `saveTranslation` · request retranslation *(planned)* |
 
 ## Surface: customers
 
@@ -313,7 +313,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Entry | AuthRoute — تحقّق ناجح لبائع جديد |
 | Exit | MainRoute — اكتمل الإنشاء · AuthRoute — رجوع مع حفظ المسوّدة |
 | Data | resumable draft · business categories · city catalogue · slug availability |
-| Actions | save account step *(untraced)* · check slug *(untraced)* · select city *(untraced)* · create store `onCreate` |
+| Actions | save account step `next` · see slug availability *(untraced)* · select city *(untraced)* · create store `onCreate` |
 
 ### `restricted-account`
 
@@ -329,7 +329,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Entry | SplashRoute — حساب مقيَّد · أي شاشة — إشارة CREDENTIAL_REJECTED/ACCOUNT_RESTRICTED |
 | Exit | SupportRoute · AuthRoute — تسجيل خروج |
 | Data | restriction reason · support entry point |
-| Actions | contact support *(untraced)* · sign out `onLogout` |
+| Actions | contact support `restricted_contact` · sign out `onLogout` |
 
 ### `account`
 
@@ -409,7 +409,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Entry | support |
 | Exit | رجوع |
 | Data | ticket · messages |
-| Actions | reply `reply` · close *(untraced)* |
+| Actions | reply `reply` · close *(planned)* |
 
 ### `announcements`
 
@@ -425,7 +425,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Entry | account · today — مؤشر غير مقروء |
 | Exit | رجوع |
 | Data | announcements · read state |
-| Actions | mark read `markAnnouncementRead` · open link *(untraced)* |
+| Actions | mark read `markAnnouncementRead` · open link *(planned)* |
 
 ### `deletion-status`
 
