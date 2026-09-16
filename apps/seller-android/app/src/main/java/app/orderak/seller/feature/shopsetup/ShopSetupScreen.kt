@@ -88,6 +88,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.orderak.seller.R
+import app.orderak.seller.core.text.formatCount
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -200,7 +201,9 @@ fun ShopSetupScreen(
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    stringResource(R.string.setup_step_indicator, state.step),
+                    // The Arabic string writes its “of 2” as ٢, so the step has to
+                    // be Arabic-Indic too or one sentence carries both forms.
+                    stringResource(R.string.setup_step_indicator, formatCount(state.step, locale)),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold,

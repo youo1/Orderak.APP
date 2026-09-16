@@ -80,6 +80,17 @@ fun todayContentDark() {
     OrderakTheme(darkTheme = true) { Today(LOADED) }
 }
 
+// ---- the same three counters in English ------------------------------
+// The control for the numeral change: these figures are Arabic-Indic under `ar`
+// and Latin here, and both renders have to agree with the rest of their screen.
+
+@PreviewTest
+@Preview(name = "Today content English", locale = "en")
+@Composable
+fun todayContentEnglish() {
+    OrderakTheme(darkTheme = false) { Today(LOADED.copy(shopName = "Al Amal Sweets")) }
+}
+
 // ---- loading ---------------------------------------------------------
 // Counts are null, not 0. The distinction is the whole point: a 0 is a figure
 // the seller acts on, and rendering one before the data is read is a lie.

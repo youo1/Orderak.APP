@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import app.orderak.seller.R
 import app.orderak.seller.core.money.formatAmountLabel
 import app.orderak.seller.core.text.SearchText
+import app.orderak.seller.core.text.formatCount
 import app.orderak.seller.core.ui.FullScreenEmpty
 import app.orderak.seller.core.ui.FullScreenLoading
 import app.orderak.seller.core.ui.NoticeBanner
@@ -91,6 +92,7 @@ fun StoreContent(
     modifier: Modifier = Modifier,
 ) {
     val spacing = LocalOrderakSpacing.current
+    val locale = LocalConfiguration.current.locales[0]
     val catalogue = state.products
     val quota = state.quota
 
@@ -130,10 +132,12 @@ fun StoreContent(
             NoticeBanner(
                 role = SemanticRole.Warning,
                 title = stringResource(R.string.products_stuck_title),
+                // The count picks the plural form; the digits it prints are a
+                // separate question, and Arabic answers the two differently.
                 message = pluralStringResource(
                     R.plurals.products_stuck_body,
                     state.stuckCount,
-                    state.stuckCount,
+                    formatCount(state.stuckCount, locale),
                 ),
                 actionLabel = stringResource(R.string.products_stuck_action),
                 onAction = onShowStuck,
@@ -153,7 +157,7 @@ fun StoreContent(
             )
         } else {
             Text(
-                text = stringResource(R.string.products_usage_unlimited, quota.used),
+                text = stringResource(R.string.products_usage_unlimited, formatCount(quota.used, locale)),
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = spacing.space4, vertical = spacing.space2),
             )
@@ -257,11 +261,15 @@ internal fun ProductCard(p: ProductEntity, onClick: () -> Unit) {
                         label = if (p.stock <= 0) {
                             stringResource(R.string.product_stock_out)
                         } else {
-                            stringResource(R.string.product_stock_low, p.stock)
+                            stringResource(R.string.product_stock_low, formatCount(p.stock, locale))
                         },
                     )
                 } else {
-                    Text("${p.stock}", style = MaterialTheme.typography.titleMedium)
+                    // Not "${p.stock}": interpolation has no locale, so this
+                    // column printed Latin digits beside an Arabic-Indic price in
+                    // the same card — and changed form whenever the low-stock chip
+                    // took over. See core/text/Counts.kt.
+                    Text(formatCount(p.stock, locale), style = MaterialTheme.typography.titleMedium)
                     Text(stringResource(R.string.product_stock_label), style = MaterialTheme.typography.labelSmall)
                 }
             }

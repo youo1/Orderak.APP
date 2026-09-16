@@ -21,6 +21,7 @@ import androidx.lifecycle.viewModelScope
 import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 import app.orderak.seller.R
 import app.orderak.seller.core.money.formatAmountLabel
+import app.orderak.seller.core.text.formatCount
 import app.orderak.seller.core.ui.PriorityListRow
 import app.orderak.seller.data.db.CustomerSummary
 import app.orderak.seller.data.orders.OrderRepository
@@ -78,7 +79,7 @@ internal fun CustomerList(
                 subtitle = pluralStringResource(
                     R.plurals.customer_orders_count,
                     c.ordersCount,
-                    c.ordersCount,
+                    formatCount(c.ordersCount, locale),
                 ),
                 modifier = Modifier.clickable { onOpen(c.customerKey) },
                 trailing = {

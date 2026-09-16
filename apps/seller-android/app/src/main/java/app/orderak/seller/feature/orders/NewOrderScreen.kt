@@ -52,6 +52,7 @@ import app.orderak.seller.core.ui.SemanticRole
 import app.orderak.seller.core.money.DEFAULT_CURRENCY
 import app.orderak.seller.core.money.formatAmount
 import app.orderak.seller.core.money.formatAmountLabel
+import app.orderak.seller.core.text.formatCount
 import app.orderak.seller.domain.PayMethod
 
 /** S7 — convert a chat into a structured order in <30s (quick form + qty steppers). */
@@ -134,7 +135,10 @@ fun NewOrderScreen(
                                             contentDescription = decLabel
                                         })
                                 }
-                                Text("$q", style = MaterialTheme.typography.titleMedium)
+                                Text(
+                                    formatCount(q, locale),
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
                                 val incLabel = stringResource(R.string.order_qty_increase, p.name)
                                 IconButton(onClick = { viewModel.changeQty(p, +1) }, enabled = q < p.stock) {
                                     Text("+", style = MaterialTheme.typography.titleLarge,

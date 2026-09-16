@@ -22,10 +22,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
+import app.orderak.seller.core.text.formatCount
 import app.orderak.seller.R
 import app.orderak.seller.data.billing.EntitlementManager
 import app.orderak.seller.data.billing.FeatureKeys
@@ -64,6 +66,7 @@ fun ProductsScreen(
     var confirmDiscard by remember { mutableStateOf<StuckLegacyProduct?>(null) }
 
     val context = LocalContext.current
+    val locale = LocalConfiguration.current.locales[0]
     val scope = rememberCoroutineScope()
 
     if (showLimitDialog) {
@@ -77,19 +80,22 @@ fun ProductsScreen(
                 val message = when {
                     quota.used > limit -> stringResource(
                         R.string.products_limit_body_over,
-                        limit,
-                        quota.used,
+                        formatCount(limit, locale),
+                        formatCount(quota.used, locale),
                     )
                     quota.upgradePlanKey != null && purchaseOpen -> stringResource(
                         R.string.products_limit_body,
-                        limit,
+                        formatCount(limit, locale),
                         upgradeName,
                     )
                     quota.upgradePlanKey != null -> stringResource(
                         R.string.products_limit_body_purchase_closed,
-                        limit,
+                        formatCount(limit, locale),
                     )
-                    else -> stringResource(R.string.products_limit_body_max_plan, limit)
+                    else -> stringResource(
+                        R.string.products_limit_body_max_plan,
+                        formatCount(limit, locale),
+                    )
                 }
                 Text(message)
             },

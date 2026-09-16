@@ -31,12 +31,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.orderak.seller.R
+import app.orderak.seller.core.text.formatCount
 import app.orderak.seller.core.ui.NoticeBanner
 import app.orderak.seller.core.ui.SemanticRole
 import app.orderak.seller.core.ui.colors
@@ -230,6 +232,7 @@ private fun CounterCard(
     modifier: Modifier = Modifier,
 ) {
     val spacing = LocalOrderakSpacing.current
+    val locale = LocalConfiguration.current.locales[0]
     val label = stringResource(counter.labelRes)
     // A zero is not worth colouring as a warning: nothing is owed, so the card
     // reads as neutral until there is something to act on.
@@ -242,7 +245,8 @@ private fun CounterCard(
             // One announcement for the card, so a screen reader says the label
             // and the figure instead of reading three nested nodes.
             .clearAndSetSemantics {
-                contentDescription = if (value == null) label else "$label: $value"
+                contentDescription =
+                    if (value == null) label else "$label: ${formatCount(value, locale)}"
             },
         shape = RoundedCornerShape(spacing.space4),
         color = palette.container,
@@ -283,7 +287,9 @@ private fun CounterCard(
                 CounterSkeleton(palette.containerOutline)
             } else {
                 Text(
-                    value.toString(),
+                    // Not value.toString(): these three figures sat in Latin
+                    // digits under an Arabic greeting. See core/text/Counts.kt.
+                    formatCount(value, locale),
                     style = MaterialTheme.typography.headlineSmall,
                 )
             }

@@ -48,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -64,6 +65,7 @@ import app.orderak.seller.core.ui.PlanUsageRowItem
 import app.orderak.seller.core.ui.planUsageRows
 import app.orderak.seller.core.ui.SemanticRole
 import app.orderak.seller.core.locale.AppLocales
+import app.orderak.seller.core.text.formatCount
 import app.orderak.seller.core.ui.FullScreenEmpty
 import app.orderak.seller.core.ui.FullScreenError
 import app.orderak.seller.core.ui.FullScreenLoading
@@ -502,9 +504,10 @@ fun AnnouncementsDashboardIndicator(
     val items by vm.announcements.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { vm.loadAnnouncements() }
     val unread = items.count { !it.is_read }
+    val locale = LocalConfiguration.current.locales[0]
     OutlinedButton(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
         Text(
-            if (unread > 0) stringResource(R.string.announcements_unread, unread)
+            if (unread > 0) stringResource(R.string.announcements_unread, formatCount(unread, locale))
             else stringResource(R.string.announcements_title),
         )
     }
@@ -913,6 +916,7 @@ fun AiAssistantScreen(onBack: () -> Unit, vm: OperationsViewModel = hiltViewMode
     val error by vm.error.collectAsStateWithLifecycle()
     val config by vm.entitlements.config.collectAsStateWithLifecycle()
     var input by rememberSaveable { mutableStateOf("") }
+    val locale = LocalConfiguration.current.locales[0]
     OperationPage(
         title = stringResource(R.string.ai_assistant_title),
         onBack = onBack,
@@ -925,8 +929,15 @@ fun AiAssistantScreen(onBack: () -> Unit, vm: OperationsViewModel = hiltViewMode
             quota.used?.let { used ->
                 Text(
                     stringResource(R.string.usage_ai_requests) + ": " +
-                        if (quota.mode == "unlimited") stringResource(R.string.usage_value_unlimited, used)
-                        else stringResource(R.string.usage_value, used, quota.value?.jsonPrimitive?.intOrNull ?: 0),
+                        if (quota.mode == "unlimited") {
+                            stringResource(R.string.usage_value_unlimited, formatCount(used, locale))
+                        } else {
+                            stringResource(
+                                R.string.usage_value,
+                                formatCount(used, locale),
+                                formatCount(quota.value?.jsonPrimitive?.intOrNull ?: 0, locale),
+                            )
+                        },
                     style = MaterialTheme.typography.bodySmall,
                 )
             }

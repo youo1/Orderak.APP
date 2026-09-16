@@ -97,6 +97,18 @@ fun storeContentLight() = store(StoreUiState(products = CATALOGUE, quota = QUOTA
 @Composable
 fun storeContentDark() = store(StoreUiState(products = CATALOGUE, quota = QUOTA), dark = true)
 
+// ---- the same row in English ------------------------------------------
+// Every other render here is `ar`, which is right — it is the language the
+// sellers use — and it is also why a numeral mismatch could sit on this screen
+// unnoticed: in English there is nothing to mismatch. This render is the
+// control. The price, the stock figure and the meter are one numeral system in
+// both languages or the change is half-done.
+
+@PreviewTest
+@Preview(name = "Store content English", locale = "en")
+@Composable
+fun storeContentEnglish() = store(StoreUiState(products = CATALOGUE, quota = QUOTA))
+
 // ---- empty: a real catalogue count, and no search affordance -----------
 
 @PreviewTest

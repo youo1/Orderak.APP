@@ -57,6 +57,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.orderak.seller.core.phone.CustomerPhone
 import app.orderak.seller.R
 import app.orderak.seller.core.money.formatAmountLabel
+import app.orderak.seller.core.text.formatCount
 import app.orderak.seller.core.ui.FeatureGate
 import app.orderak.seller.data.billing.FeatureKeys.OCR_RECEIPT_ASSISTANCE
 import app.orderak.seller.data.db.PaymentEntity
@@ -223,7 +224,10 @@ fun OrderDetailsScreen(
                 Column(Modifier.fillMaxWidth().padding(12.dp)) {
                     data.items.forEach { item ->
                         Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                            Text("${item.qty}×", style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                "${formatCount(item.qty, locale)}×",
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
                             Spacer(Modifier.width(8.dp))
                             Text(item.productName, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                             Text(formatAmountLabel(item.qty * item.priceMinor, order.currency, locale),

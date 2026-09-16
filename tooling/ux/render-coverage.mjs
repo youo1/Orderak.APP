@@ -70,6 +70,7 @@ export const RENDERS = {
   todayOfflineLight: { kind: "screen", contract: "today", offline: true, theme: "light" },
   todayOfflineDark: { kind: "screen", contract: "today", offline: true, theme: "dark" },
   todayGreyscale: { kind: "component", note: "اليوم counters survive greyscale — colour is never the only carrier" },
+  todayContentEnglish: { kind: "component", note: "the اليوم counters in English — the control for the Arabic digits" },
 
   // ---- components, not screens ----
   // Each of these renders a shared component with a surface's copy in it. That
@@ -134,6 +135,10 @@ export const RENDERS = {
   storeErrorLight: { kind: "screen", contract: "store", state: "error", theme: "light" },
   storeErrorDark: { kind: "screen", contract: "store", state: "error", theme: "dark" },
   storeSearchEmpty: { kind: "component", note: "a search matching nothing is not an empty catalogue — same screen, not a declared state" },
+  // The content state again in English. Not a state — the same one, in the
+  // language where a numeral mismatch is invisible, which is why المتجر carried
+  // one for as long as it did.
+  storeContentEnglish: { kind: "component", note: "the store row in English — price, stock and meter in one numeral system" },
   storeAtLimit: { kind: "component", note: "at the plan limit the FAB locks rather than vanishing — a gate, not a state" },
 
   orderListLight: { kind: "component", note: "real OrderCard rows in a hand-built Column — proves the card, not OrdersScreen" },

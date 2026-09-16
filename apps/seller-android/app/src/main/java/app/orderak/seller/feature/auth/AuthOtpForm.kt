@@ -39,6 +39,7 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalAutofill
 import androidx.compose.ui.platform.LocalAutofillTree
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -48,6 +49,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import app.orderak.seller.R
+import app.orderak.seller.core.text.formatCount
 
 /**
  * OTP entry form — title, subtitle, 6-digit code input, inline error,
@@ -139,7 +141,10 @@ fun AuthOtpForm(
                     text = if (canResend) {
                         stringResource(R.string.auth_resend)
                     } else {
-                        stringResource(R.string.auth_resend_in, secondsLeft)
+                        stringResource(
+                            R.string.auth_resend_in,
+                            formatCount(secondsLeft, LocalConfiguration.current.locales[0]),
+                        )
                     },
                     style = MaterialTheme.typography.labelLarge,
                     color = if (canResend) {

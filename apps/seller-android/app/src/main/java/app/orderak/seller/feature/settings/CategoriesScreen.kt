@@ -42,12 +42,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import app.orderak.seller.R
+import app.orderak.seller.core.text.formatCount
 import app.orderak.seller.core.ui.NoticeBanner
 import app.orderak.seller.core.ui.SemanticRole
 import app.orderak.seller.data.billing.EntitlementManager
@@ -234,6 +236,7 @@ fun CategoriesScreen(
                     message = stringResource(R.string.categories_error_body),
                 )
             }
+            val locale = LocalConfiguration.current.locales[0]
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(categories, key = { it.category_code }) { c ->
                     Card(Modifier.fillMaxWidth()) {
@@ -252,7 +255,7 @@ fun CategoriesScreen(
                                     pluralStringResource(
                                         R.plurals.categories_product_count,
                                         c.product_count,
-                                        c.product_count,
+                                        formatCount(c.product_count, locale),
                                     ),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
