@@ -26,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -55,14 +56,26 @@ import java.util.Date
 fun OrdersScreen(
     onOpen: (Long) -> Unit,
     onNew: () -> Unit,
-    viewModel: OrdersViewModel = hiltViewModel()
+    viewModel: OrdersViewModel = hiltViewModel(),
+    /** Set when a اليوم counter opened this surface; applied once, then cleared. */
+    initialFilter: OrdersFilter? = null,
+    onInitialFilterApplied: () -> Unit = {},
 ) {
+    // Keyed on the request so a second tap on the same counter re-applies it
+    // after the seller has cleared the chip, and so re-entering from the nav bar
+    // (where the request is null) never re-filters.
+    LaunchedEffect(initialFilter) {
+        if (initialFilter != null) {
+            viewModel.setFilter(initialFilter)
+            onInitialFilterApplied()
+        }
+    }
     val orders by viewModel.orders.collectAsStateWithLifecycle()
     val filter by viewModel.filter.collectAsStateWithLifecycle()
     val refusedPushes by viewModel.refusedPushes.collectAsStateWithLifecycle()
 
     Box(Modifier.fillMaxSize()) {
-        if (orders.isEmpty() && filter == null) {
+        if (orders.isEmpty() && filter == OrdersFilter.All) {
             // The shared empty state, and it carries an action. "Nothing here"
             // without a next step is a dead end, and a seller on day one meets
             // this screen before any other.
@@ -78,11 +91,32 @@ fun OrdersScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     item {
-                        FilterChip(selected = filter == null, onClick = { viewModel.setFilter(null) },
+                        FilterChip(selected = filter == OrdersFilter.All,
+                            onClick = { viewModel.setFilter(OrdersFilter.All) },
                             label = { Text(stringResource(R.string.orders_all)) })
                     }
+                    // The three اليوم counters, as chips. They are here so the
+                    // filter a counter opens is one the seller can also see,
+                    // clear and re-apply — arriving in a state with no visible
+                    // control is how a filtered list reads as a broken one.
+                    item {
+                        FilterChip(selected = filter == OrdersFilter.Today,
+                            onClick = { viewModel.setFilter(OrdersFilter.Today) },
+                            label = { Text(stringResource(R.string.dash_today_orders)) })
+                    }
+                    item {
+                        FilterChip(selected = filter == OrdersFilter.Unpaid,
+                            onClick = { viewModel.setFilter(OrdersFilter.Unpaid) },
+                            label = { Text(stringResource(R.string.dash_unpaid)) })
+                    }
+                    item {
+                        FilterChip(selected = filter == OrdersFilter.ToShip,
+                            onClick = { viewModel.setFilter(OrdersFilter.ToShip) },
+                            label = { Text(stringResource(R.string.dash_to_ship)) })
+                    }
                     items(OrderStatus.entries.filter { it != OrderStatus.CANCELLED }) { st ->
-                        FilterChip(selected = filter == st, onClick = { viewModel.setFilter(st) },
+                        FilterChip(selected = filter == OrdersFilter.Status(st),
+                            onClick = { viewModel.setStatusFilter(st) },
                             label = { Text(statusLabel(st)) })
                     }
                 }
@@ -93,7 +127,7 @@ fun OrdersScreen(
                     FullScreenEmpty(
                         message = stringResource(R.string.orders_empty_filtered),
                         actionLabel = stringResource(R.string.orders_all),
-                        onAction = { viewModel.setFilter(null) },
+                        onAction = { viewModel.setFilter(OrdersFilter.All) },
                     )
                 } else {
                     LazyColumn(

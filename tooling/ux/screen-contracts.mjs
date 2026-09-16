@@ -178,7 +178,11 @@ export const CONTRACTS = [
     actions: [
       { do: "pull to refresh", via: "onRefresh" },
       { do: "share catalog", via: "productsForShare" },
-      { do: "open order", status: "unverified" },
+      // Was `{ do: "open order", status: "unverified" }`, and the doubt was
+      // earned: no counter opened an order, and all three opened the same
+      // unfiltered list. Each now opens the orders it counts.
+      { do: "open filtered orders", via: "onOpenCounter" },
+      { do: "retry a failed plan refresh", via: "onRetry" },
       { do: "open announcements", via: "onOpenAnnouncements" },
     ],
     states: ["loading", "content", "empty", "error"],
@@ -643,7 +647,6 @@ export const UNVERIFIED_ACTIONS = new Set([
   "restricted-account:contact support",
   "version-governance:update",
   "version-governance:dismiss — التحذير فقط",
-  "today:open order",
   "orders:pull to refresh",
   "order-details:advance status",
   "order-details:mark paid",

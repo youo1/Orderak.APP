@@ -129,7 +129,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Entry | MainRoute — السطح الافتراضي |
 | Exit | OrderDetailsRoute · AnnouncementsRoute · SubscriptionRoute · مشاركة الكتالوج |
 | Data | today counters · entitlement usage · catalog link · unread announcements · billing notices |
-| Actions | pull to refresh `onRefresh` · share catalog `productsForShare` · open order *(untraced)* · open announcements `onOpenAnnouncements` |
+| Actions | pull to refresh `onRefresh` · share catalog `productsForShare` · open filtered orders `onOpenCounter` · retry a failed plan refresh `onRetry` · open announcements `onOpenAnnouncements` |
 
 ## Surface: orders
 

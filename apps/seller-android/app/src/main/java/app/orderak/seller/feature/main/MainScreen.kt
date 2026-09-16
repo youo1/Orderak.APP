@@ -61,6 +61,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.orderak.seller.R
 import app.orderak.seller.app.navigation.SellerSurface
+import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
+import app.orderak.seller.feature.orders.OrdersFilter
+import app.orderak.seller.feature.today.TodayCounter
+import app.orderak.seller.feature.today.TodayScreen
+import app.orderak.seller.feature.today.TodayUiState
 import app.orderak.seller.core.ui.NoticeBanner
 import app.orderak.seller.core.ui.PlanUsageRowItem
 import app.orderak.seller.core.ui.planUsageRows
@@ -139,6 +144,10 @@ fun MainScreen(
     // Saved by name rather than index: an ordinal survives process death only
     // until the surface list changes, and then restores the wrong screen.
     var surfaceName by rememberSaveable { mutableStateOf(SellerSurface.Default.name) }
+    // Set by a اليوم counter, read once by the orders surface. Not saveable on
+    // purpose: a filter is a request made by one tap, and restoring it after
+    // process death would filter a list the seller never asked to filter.
+    var requestedOrdersFilter by remember { mutableStateOf<OrdersFilter?>(null) }
     val surface = SellerSurface.valueOf(surfaceName)
 
     val appContext = LocalContext.current.applicationContext
@@ -203,12 +212,30 @@ fun MainScreen(
                     versionMode = versionMode,
                     versionPolicy = versionPolicy,
                     onRetrySync = { RefreshScheduler.refreshNow(appContext) },
-                    onRefresh = viewModel::refreshPlanSettings,
-                    onSeeOrders = { surfaceName = SellerSurface.Orders.name },
+                    onRefresh = { RefreshScheduler.refreshNow(appContext); viewModel.refreshPlanSettings() },
+                    // Each counter carries the question it counts, so the list it
+                    // opens is the list it is a count of. All three used to send
+                    // the seller to the same unfiltered page.
+                    onOpenCounter = { counter ->
+                        requestedOrdersFilter = when (counter) {
+                            TodayCounter.Today -> OrdersFilter.Today
+                            TodayCounter.Unpaid -> OrdersFilter.Unpaid
+                            TodayCounter.ToShip -> OrdersFilter.ToShip
+                        }
+                        surfaceName = SellerSurface.Orders.name
+                    },
                     onOpenAnnouncements = onOpenAnnouncements,
                 )
 
-                SellerSurface.Orders -> OrdersScreen(onOpen = onOpenOrder, onNew = onNewOrder)
+                SellerSurface.Orders -> OrdersScreen(
+                    onOpen = onOpenOrder,
+                    onNew = onNewOrder,
+                    // Consumed once on arrival, then cleared: re-entering the
+                    // surface from the nav bar must not silently re-apply a
+                    // filter the seller cleared.
+                    initialFilter = requestedOrdersFilter,
+                    onInitialFilterApplied = { requestedOrdersFilter = null },
+                )
                 SellerSurface.Store -> ProductsScreen(
                     onAdd = onAddProduct,
                     onEdit = onEditProduct,
@@ -249,7 +276,7 @@ private fun DashboardTab(
     versionPolicy: AppVersionPolicy?,
     onRetrySync: () -> Unit,
     onRefresh: () -> Unit,
-    onSeeOrders: () -> Unit,
+    onOpenCounter: (TodayCounter) -> Unit,
     onOpenAnnouncements: () -> Unit,
 ) {
     val adManager = LocalAdManager.current
@@ -266,58 +293,48 @@ private fun DashboardTab(
     val scope = rememberCoroutineScope()
 
     PullToRefreshBox(
-        isRefreshing = entitlementState.isRefreshing,
+        // Tracks the whole refresh, not just the plan call. The spinner used to
+        // follow `entitlementState.isRefreshing` while the gesture below only
+        // refreshed entitlements — so pulling on a screen of order counters
+        // refreshed everything except the counters.
+        isRefreshing = entitlementState.isRefreshing || syncStatus == "running",
         onRefresh = onRefresh,
         modifier = Modifier.fillMaxSize(),
     ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            item {
-                Text(stringResource(R.string.dash_greeting, shopName.orEmpty()),
-                    style = MaterialTheme.typography.titleLarge)
-            }
-            item { PlanStatusBanners(entitlementState, versionMode, versionPolicy) }
-            item { AnnouncementsDashboardIndicator(onOpenAnnouncements) }
-            if (syncStatus == "running" || syncStatus == "pending" || syncStatus == "failed") {
-                item { SyncStatusBanner(syncStatus, onRetrySync) }
-            }
-            item {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    StatCard(stringResource(R.string.dash_today_orders), today, Modifier.weight(1f), onSeeOrders)
-                    StatCard(stringResource(R.string.dash_unpaid), unpaid, Modifier.weight(1f), onSeeOrders)
-                    StatCard(stringResource(R.string.dash_to_ship), toShip, Modifier.weight(1f), onSeeOrders)
+        TodayScreen(
+            state = TodayUiState(
+                shopName = shopName,
+                todayCount = today,
+                unpaidCount = unpaid,
+                toShipCount = toShip,
+                hasProducts = hasProducts,
+                planError = entitlementState.error,
+                hasPlanSnapshot = entitlementState.config != null,
+                usingOfflinePlan = entitlementState.freshness == EntitlementFreshness.OFFLINE,
+            ),
+            onOpenCounter = onOpenCounter,
+            onShareCatalog = {
+                scope.launch {
+                    val url = storeUrl
+                    if (url.isNullOrBlank()) shareCatalogText(context, shopName, sellerPhone, viewModel.productsForShare())
+                    else shareStoreLink(context, shopName, url)
                 }
-            }
-            entitlementState.config?.let { config -> item { PlanUsageCard(config) } }
-            item {
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        if (!hasProducts) {
-                            Text(stringResource(R.string.dash_empty_title), style = MaterialTheme.typography.titleMedium)
-                            Spacer(Modifier.height(8.dp))
-                            Text(stringResource(R.string.dash_empty_body_v2),
-                                style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        } else {
-                            Button(onClick = {
-                                scope.launch {
-                                    val url = storeUrl
-                                    if (url.isNullOrBlank()) shareCatalogText(context, shopName, sellerPhone, viewModel.productsForShare())
-                                    else shareStoreLink(context, shopName, url)
-                                }
-                            }) {
-                                Icon(Icons.Outlined.Share, contentDescription = null)
-                                Text(stringResource(R.string.dash_share_catalog), Modifier.padding(start = 8.dp))
-                            }
-                        }
+            },
+            onOpenAnnouncements = onOpenAnnouncements,
+            onRetry = onRetrySync,
+            modifier = Modifier.fillMaxSize(),
+            planNotices = {
+                Column(verticalArrangement = Arrangement.spacedBy(LocalOrderakSpacing.current.space2)) {
+                    PlanStatusBanners(entitlementState, versionMode, versionPolicy)
+                    AnnouncementsDashboardIndicator(onOpenAnnouncements)
+                    if (syncStatus == "running" || syncStatus == "pending" || syncStatus == "failed") {
+                        SyncStatusBanner(syncStatus, onRetrySync)
                     }
                 }
-            }
-            item { adManager.Banner(Modifier.fillMaxWidth()) }
-        }
+            },
+            planUsage = { entitlementState.config?.let { config -> PlanUsageCard(config) } },
+            footer = { adManager.Banner(Modifier.fillMaxWidth()) },
+        )
     }
 }
 
