@@ -147,7 +147,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Entry | MainRoute — تاب الطلبات · today — فتح طلب |
 | Exit | OrderDetailsRoute · NewOrderRoute |
 | Data | orders page · status filters · sync state |
-| Actions | filter by status `setFilter` · open order `onOpen` · create manual order `onNew` · pull to refresh *(untraced)* |
+| Actions | filter by status `setFilter` · open order `onOpen` · create manual order `onNew` · pull to refresh *(planned)* |
 
 ### `order-details`
 
@@ -163,7 +163,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Entry | orders · today · customer-details · NewOrderRoute — بعد الإنشاء |
 | Exit | CustomerRoute · رجوع |
 | Data | order · line items · customer · status history · payment state |
-| Actions | advance status *(untraced)* · reject `cancel` · mark paid *(untraced)* · open customer *(untraced)* |
+| Actions | advance status `advance` · reject `cancel` · mark paid `markPaidManually` · open customer `onOpenCustomer` |
 
 ### `new-order`
 

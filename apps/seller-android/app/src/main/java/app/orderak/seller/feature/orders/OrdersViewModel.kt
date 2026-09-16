@@ -28,14 +28,24 @@ class OrdersViewModel @Inject constructor(
      */
     val filter = MutableStateFlow<OrdersFilter>(OrdersFilter.All)
 
-    val orders: StateFlow<List<OrderEntity>> =
+    /**
+     * The visible orders, or null while Room is still answering.
+     *
+     * Seeded `emptyList()` before, which is the same defect the اليوم counters
+     * and the product catalogue had: a seller with orders met the "no orders
+     * yet, record one" screen on every cold start. On this screen that is worse
+     * than a flicker, because the empty state's action is to create an order —
+     * and a seller who takes it has now recorded a duplicate of one they already
+     * had.
+     */
+    val orders: StateFlow<List<OrderEntity>?> =
         combine(repo.orders, filter) { list, f ->
             // One evaluation of `now` for the whole list, so a list crossing
             // midnight mid-filter cannot include an order by one row and exclude
             // it by the next.
             val now = System.currentTimeMillis()
             list.filter { f.matches(it, now) }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /**
      * Local ids of orders the server refused, so the list can mark them apart

@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.orderak.seller.core.ui.FullScreenLoading
 import app.orderak.seller.R
 import app.orderak.seller.core.ui.NoticeBanner
 import app.orderak.seller.core.ui.SemanticRole
@@ -64,6 +65,7 @@ fun NewOrderScreen(
     val locale = LocalConfiguration.current.locales[0]
     val state by viewModel.state.collectAsStateWithLifecycle()
     val products by viewModel.products.collectAsStateWithLifecycle()
+    val catalogue = products
 
     Scaffold(
         topBar = {
@@ -98,10 +100,14 @@ fun NewOrderScreen(
             ) }
 
             item { Text(stringResource(R.string.order_items_title), style = MaterialTheme.typography.titleMedium) }
-            if (products.isEmpty()) {
+            if (catalogue == null) {
+                // Not read yet. Saying "you have no products" here would tell a
+                // seller mid-sale that they have nothing to sell.
+                item { FullScreenLoading() }
+            } else if (catalogue.isEmpty()) {
                 item { Text(stringResource(R.string.products_empty), style = MaterialTheme.typography.bodyMedium) }
             }
-            items(products, key = { it.id }) { p ->
+            items(catalogue.orEmpty(), key = { it.id }) { p ->
                 val q = state.qty[p.id] ?: 0
                 Card {
                     Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {

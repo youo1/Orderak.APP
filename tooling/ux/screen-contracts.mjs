@@ -205,7 +205,11 @@ export const CONTRACTS = [
       { do: "filter by status", via: "setFilter" },
       { do: "open order", via: "onOpen" },
       { do: "create manual order", via: "onNew" },
-      { do: "pull to refresh", status: "unverified" },
+      // Demoted from unverified to planned: there is no PullToRefreshBox on this
+      // screen and never was. The list is a Room flow, so it updates itself and a
+      // gesture would refresh nothing the seller can see — اليوم carries the pull
+      // because its plan usage genuinely comes from the network.
+      { do: "pull to refresh", status: "planned", why: "the list is a Room flow; no refresh gesture exists" },
     ],
     states: ["loading", "content", "empty", "error"],
     offline: true,
@@ -222,10 +226,11 @@ export const CONTRACTS = [
     exit: ["CustomerRoute", "رجوع"],
     data: ["order", "line items", "customer", "status history", "payment state"],
     actions: [
-      { do: "advance status", status: "unverified" },
+      // Both were real and had simply never been traced to a symbol.
+      { do: "advance status", via: "advance" },
       { do: "reject", via: "cancel" },
-      { do: "mark paid", status: "unverified" },
-      { do: "open customer", status: "unverified" },
+      { do: "mark paid", via: "markPaidManually" },
+      { do: "open customer", via: "onOpenCustomer" },
     ],
     states: ["loading", "content", "error"],
     offline: true,
@@ -651,10 +656,6 @@ export const UNVERIFIED_ACTIONS = new Set([
   "restricted-account:contact support",
   "version-governance:update",
   "version-governance:dismiss — التحذير فقط",
-  "orders:pull to refresh",
-  "order-details:advance status",
-  "order-details:mark paid",
-  "order-details:open customer",
   "store-info:copy link",
   "catalog-languages:edit translation",
   "catalog-languages:request retranslation",

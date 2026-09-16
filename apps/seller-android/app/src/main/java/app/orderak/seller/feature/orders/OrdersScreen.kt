@@ -43,6 +43,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.orderak.seller.R
 import app.orderak.seller.core.money.formatAmountLabel
 import app.orderak.seller.core.ui.FullScreenEmpty
+import app.orderak.seller.core.ui.FullScreenLoading
 import app.orderak.seller.core.ui.PriorityListRow
 import app.orderak.seller.core.ui.SemanticChip
 import app.orderak.seller.core.ui.SemanticRole
@@ -74,8 +75,14 @@ fun OrdersScreen(
     val filter by viewModel.filter.collectAsStateWithLifecycle()
     val refusedPushes by viewModel.refusedPushes.collectAsStateWithLifecycle()
 
+    val list = orders
     Box(Modifier.fillMaxSize()) {
-        if (orders.isEmpty() && filter == OrdersFilter.All) {
+        if (list == null) {
+            // The state this screen declared and never had. An empty list stood
+            // in for "not read yet", so the empty state — whose action is
+            // "record an order" — greeted a seller who already had some.
+            FullScreenLoading()
+        } else if (list.isEmpty() && filter == OrdersFilter.All) {
             // The shared empty state, and it carries an action. "Nothing here"
             // without a next step is a dead end, and a seller on day one meets
             // this screen before any other.
@@ -120,7 +127,7 @@ fun OrdersScreen(
                             label = { Text(statusLabel(st)) })
                     }
                 }
-                if (orders.isEmpty()) {
+                if (list.isEmpty()) {
                     // Filtered to nothing is a different situation from having no
                     // orders at all: the fix is to clear the filter, not to sell
                     // something.
@@ -134,7 +141,7 @@ fun OrdersScreen(
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(orders, key = { it.id }) { o ->
+                        items(list, key = { it.id }) { o ->
                             OrderCard(o, refused = o.id in refusedPushes, onClick = { onOpen(o.id) })
                         }
                         item { Spacer(Modifier.height(80.dp)) }

@@ -216,6 +216,7 @@
     <string name="customer_note">ملاحظة</string>
     <string name="customer_contact">راسل</string>
     <string name="customer_save">حفظ</string>
+    <string name="customer_open">افتح العميل</string>
     <string name="customer_saved">اتحفظ</string>
     <string name="customer_edit_locked">تعديل بيانات العملاء متاح في الباقات المدفوعة</string>
     <string name="customer_orders_heading">الأوردرات</string>

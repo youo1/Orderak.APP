@@ -165,7 +165,13 @@ fun OrderakNavHost() {
             )
         }
 
-        composable<OrderDetailsRoute> { OrderDetailsScreen(onBack = { navController.popBackStack() }) }
+        composable<OrderDetailsRoute> {
+            OrderDetailsScreen(
+                onBack = { navController.popBackStack() },
+                // The exit this contract has always declared and never had.
+                onOpenCustomer = { key -> navController.navigate(CustomerRoute(key)) },
+            )
+        }
 
         composable<CustomerRoute> {
             CustomerDetailsScreen(

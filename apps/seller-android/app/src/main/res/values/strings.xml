@@ -203,6 +203,7 @@
     <string name="customer_note">Note</string>
     <string name="customer_contact">Message</string>
     <string name="customer_save">Save</string>
+    <string name="customer_open">Open customer</string>
     <string name="customer_saved">Customer saved</string>
     <string name="customer_edit_locked">Editing customer details is part of a paid plan</string>
     <string name="customer_orders_heading">Orders</string>
