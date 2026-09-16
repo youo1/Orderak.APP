@@ -1,17 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <string name="common_continue">Continuer</string>
     <string name="common_back">Retour</string>
     <string name="common_ok">OK</string>
     <string name="common_cancel">Annuler</string>
-    <string name="common_confirm">Confirmer</string>
     <string name="error_generic">Une erreur est survenue, réessayez</string>
 
     <string name="auth_title">Prêt à vendre sur Orderak ?</string>
     <string name="auth_subtitle">Commençons dès maintenant.</string>
-    <string name="auth_step_caption">Étape %1$d sur 2</string>
-    <string name="auth_otp_expectation">Entrez le code à 6 chiffres envoyé sur votre téléphone.</string>
     <string name="auth_phone_label">Numéro de mobile</string>
     <string name="auth_phone_hint">Entrez votre numéro</string>
     <string name="auth_phone_reason">Nous vous enverrons un code pour vérifier votre numéro.</string>
@@ -21,13 +17,11 @@
     <string name="auth_unsupported_country">Bientôt disponible dans votre pays !</string>
     <string name="auth_send_code">Envoyer le code de vérification</string>
     <string name="auth_verify_code">Vérifier le code</string>
-    <string name="auth_sending">Connexion…</string>
     <string name="auth_otp_title">Vérifiez votre numéro</string>
     <string name="auth_otp_sent_to">Envoyé au %1$s</string>
     <string name="auth_resend_in">Renvoyer dans %1$d s</string>
     <string name="auth_resend">Renvoyer le code</string>
     <string name="auth_change_number">Modifier le numéro</string>
-    <string name="auth_resend_sms">Envoyer par SMS</string>
     <string name="auth_otp_invalid">Code invalide, réessayez.</string>
     <string name="auth_send_failed">Échec de l\'envoi du code, réessayez.</string>
     <string name="auth_too_many_requests">Trop de tentatives, patientez.</string>
@@ -38,45 +32,29 @@
     <string name="auth_verifying">Vérification…</string>
     <string name="auth_otp_code_entered">Code saisi</string>
     <string name="auth_otp_waiting_for_code">En attente du code…</string>
-    <string name="auth_otp_digit_box">Chiffre %1$d</string>
-    <string name="auth_step_phone_short">Numéro</string>
-    <string name="auth_step_otp_short">Vérifier</string>
-    <string name="auth_accept_terms_hint">Acceptez les conditions pour continuer</string>
-    <string name="auth_otp_progress">Chiffre OTP %1$d sur %2$d</string>
 
     <!-- Terms -->
     <string name="auth_terms_prefix">En appuyant sur Envoyer le code de vérification, vous acceptez nos</string>
     <string name="auth_terms_link">Conditions</string>
     <string name="auth_terms_and">et notre</string>
     <string name="auth_privacy_link">Politique de confidentialité</string>
-    <string name="auth_security_note">Sécurité de niveau bancaire. Vos données sont cryptées.</string>
     <string name="auth_marketing_opt_in">Je souhaite recevoir des conseils et offres</string>
     <string name="auth_trouble">Besoin d\'aide ?</string>
-    <string name="cd_select_country">Choisir le pays : %1$s (+%2$s)</string>
-    <string name="cd_country_row">%1$s +%2$s</string>
-    <string name="cd_selected">sélectionné</string>
 
     <string name="language_pick_title">Choisissez votre langue</string>
     <string name="cd_language">Changer de langue</string>
     <string name="cd_valid_number">Numéro de téléphone valide</string>
 
     <!-- S2 Shop setup -->
-    <string name="setup_title">Détails de la boutique</string>
     <string name="setup_step_indicator">Étape %1$d sur 2</string>
-    <string name="setup_step1_title">Quel est le nom de votre boutique ?</string>
     <string name="setup_shop_name_label">Nom de la boutique (affiché aux clients)</string>
-    <string name="setup_shop_name_placeholder">ex: Boutique Heureuse</string>
     <string name="setup_category_label">Catégorie d\'activité</string>
     <string name="setup_subcategory_label">Sous-catégorie d\'activité</string>
     <string name="setup_subcategory_placeholder">Choisissez d’abord une catégorie</string>
-    <string name="setup_country_label">Pays</string>
-    <string name="setup_country_placeholder">Rechercher un pays…</string>
     <string name="setup_city_label">Ville</string>
     <string name="setup_city_placeholder">Rechercher une ville…</string>
-    <string name="setup_logo_label">Logo de la boutique (optionnel)</string>
     <string name="setup_add_photo">Ajouter une photo</string>
     <string name="setup_change_photo">Changer la photo</string>
-    <string name="setup_create_button">Créer la boutique</string>
     <string name="setup_next">Suivant</string>
     <string name="setup_birth_year_label">Année de naissance</string>
     <string name="setup_birth_year_title">Sélectionnez l\'année de naissance</string>
@@ -89,30 +67,6 @@
     <string name="setup_account_title">Créer un compte</string>
     <string name="setup_full_name_label">Nom complet</string>
     <string name="setup_email_label">Email (optionnel)</string>
-    <string name="setup_google_sync">Synchroniser avec Google pour sauvegarde</string>
-    <string name="setup_profile_photo_label">Photo de profil (optionnel)</string>
-
-    <string name="category_restaurant">🍔 Restaurant</string>
-    <string name="category_cafe">☕ Café</string>
-    <string name="category_grocery">🛒 Épicerie</string>
-    <string name="category_fashion">👕 Mode</string>
-    <string name="category_beauty">💄 Beauté</string>
-    <string name="category_pharmacy">💊 Pharmacie</string>
-    <string name="category_electronics">💻 Électronique</string>
-    <string name="category_home">🏠 Maison &amp; Ameublement</string>
-    <string name="category_automotive">🚗 Automobile</string>
-    <string name="category_gifts">🎁 Cadeaux</string>
-    <string name="category_books">📚 Livres &amp; Papeterie</string>
-    <string name="category_pet_shop">🐶 Animalerie</string>
-    <string name="category_sports">🏋️ Sports</string>
-    <string name="category_jewelry">💍 Bijouterie</string>
-    <string name="category_mobile">📱 Mobiles &amp; Accessoires</string>
-    <string name="category_services">🛠️ Services</string>
-    <string name="category_other">🛒 Autre</string>
-    <string name="volume_lt5">Moins de 5</string>
-    <string name="volume_5_20">5–20</string>
-    <string name="volume_21_50">21–50</string>
-    <string name="volume_gt50">Plus de 50</string>
 
     <string name="dash_greeting">Bienvenue, %1$s 👋</string>
     <string name="dash_today_orders">Commandes d\'aujourd\'hui</string>
@@ -121,10 +75,6 @@
     <string name="dash_empty_title">Votre boutique est prête !</string>
     <string name="dash_empty_body_v2">Ajoutez votre premier produit depuis l\'onglet Produits, puis partagez votre catalogue sur WhatsApp</string>
     <string name="dash_share_catalog">Partager le catalogue</string>
-    <string name="ai_test_title">Test backend IA</string>
-    <string name="ai_test_message_label">Message</string>
-    <string name="ai_test_send">Envoyer au backend</string>
-    <string name="ai_test_error">Erreur backend : %1$s</string>
 
     <string name="nav_dashboard">Aujourd’hui</string>
     <string name="nav_orders">Commandes</string>
@@ -138,11 +88,7 @@
     <string name="product_description_label">Description (optionnel)</string>
     <string name="product_price_label">Prix (EGP)</string>
     <string name="product_stock_label">Stock</string>
-    <string name="product_discount_title">Remise</string>
     <string name="product_discount_none">Aucune</string>
-    <string name="product_discount_percentage">Pourcentage (%)</string>
-    <string name="product_discount_amount">Montant fixe</string>
-    <string name="product_discount_value_label">Valeur de la remise</string>
     <string name="product_available">Disponible à la vente</string>
     <string name="product_save">Enregistrer le produit</string>
     <string name="product_delete">Supprimer le produit</string>
@@ -225,7 +171,6 @@
     <string name="settings_slug_label">Nom du lien (lettres anglaises)</string>
     <string name="settings_link_pending">Préparation de votre lien… apparaît ici après la première synchronisation (nécessite internet)</string>
     <string name="share_link_footer">Commandez en ligne via le lien ☝️ — Propulsé par Orderak.app</string>
-    <string name="common_premium_feature">Fonctionnalité Premium</string>
     <!-- Store Information + Categories (public URL architecture) -->
     <string name="store_info_title">Informations du magasin</string>
     <string name="store_info_country">Pays</string>
@@ -255,11 +200,7 @@
         <item quantity="other">%d produits</item>
     </plurals>
     <string name="common_delete">Supprimer</string>
-    <string name="language_system_default">Langue du système</string>
-    <string name="settings_plan_debug">Forfait d’abonnement (débogage)</string>
     <string name="plan_free">Gratuit</string>
-    <string name="plan_starter">Débutant</string>
-    <string name="plan_professional">Professionnel</string>
     <string name="error_auth">Échec de l’authentification. Réessayez.</string>
     <string name="error_slug_taken">Ce lien de magasin est déjà utilisé.</string>
     <string name="error_rate_limited">Trop de demandes. Réessayez dans un instant.</string>
@@ -285,7 +226,6 @@
     <string name="usage_devices">Appareils</string>
     <string name="usage_value">%1$d / %2$d</string>
     <string name="usage_value_unlimited">%1$d / Illimité</string>
-    <string name="products_usage_header">Produits (%1$d / %2$d)</string>
     <string name="products_usage_unlimited">Produits (%1$d / Illimité)</string>
     <string name="products_limit_title">Limite de produits atteinte</string>
     <string name="products_limit_body">Vous avez atteint la limite de %1$d produits. Passez à %2$s pour obtenir une limite supérieure.</string>
@@ -406,26 +346,20 @@
     <string name="country_picker_title">Choisir un pays</string>
     <string name="country_picker_search">Rechercher par pays ou indicatif</string>
     <string name="setup_store_title">Informations sur la boutique</string>
-    <string name="setup_account_heading">Informations du compte</string>
     <string name="setup_account_subtitle">Veuillez renseigner vos informations pour continuer.</string>
     <string name="setup_store_heading">Préparez votre boutique</string>
     <string name="setup_store_subtitle">Une courte étape vous sépare de votre première vente.</string>
     <string name="setup_email_private_help">Utilisée uniquement pour les factures et les alertes. Ne peut pas servir à récupérer le compte.</string>
     <string name="setup_email_error">Saisissez une adresse valide et inutilisée, ou laissez le champ vide.</string>
-    <string name="setup_legal_prefix">En continuant, vous acceptez les Conditions d’utilisation et la Politique de confidentialité publiées.</string>
     <string name="setup_legal_before_terms">En continuant, vous acceptez les documents publiés :</string>
     <string name="setup_legal_between_links">et</string>
-    <string name="setup_slug_label">Lien de la boutique</string>
     <string name="setup_slug_help">Vous pouvez modifier cette adresse professionnelle.</string>
     <string name="setup_slug_checking">Vérification de la disponibilité…</string>
     <string name="setup_slug_available">Ce lien est disponible.</string>
     <string name="setup_slug_taken">Ce lien est déjà utilisé.</string>
     <string name="setup_slug_invalid">Utilisez 3 à 40 lettres minuscules, chiffres ou tirets.</string>
     <string name="setup_slug_offline">Impossible de vérifier ce lien. Contrôlez votre connexion.</string>
-    <string name="setup_city_manual_help">Choisissez une suggestion ou saisissez la ville. Aucune autorisation de localisation n’est demandée.</string>
     <string name="setup_start_selling">Commencer à vendre</string>
-    <string name="setup_logo_optional_help">Facultatif — un monogramme sera utilisé si vous passez cette étape.</string>
-    <string name="category_food">Alimentation</string>
     <string name="passkeys_settings_title">Clés d’accès</string>
     <string name="passkeys_settings_help">Ajoutez, nommez ou révoquez vos clés. Les changements sensibles exigent une vérification récente par clé d’accès ou SMS.</string>
     <string name="passkeys_add">Ajouter une clé d’accès</string>
@@ -442,16 +376,8 @@
     <string name="seller_profile_verification_sent">L’e-mail a été envoyé et expire dans 24 heures.</string>
     <string name="seller_profile_verification_failed">Impossible d’envoyer l’e-mail. Réessayez plus tard.</string>
     <string name="setup_store_link_preview">Lien de votre boutique</string>
-    <string name="setup_category_and_subcategory_label">Catégorie et sous-catégorie</string>
-    <string name="setup_category_open_description">Choisir une catégorie et une sous-catégorie</string>
     <string name="setup_category_placeholder">Choisissez votre type d’activité</string>
-    <string name="setup_category_picker_title">Type d’activité</string>
-    <string name="setup_category_choose_main">Choisissez d’abord une catégorie principale.</string>
-    <string name="setup_category_search">Rechercher une catégorie principale</string>
-    <string name="setup_subcategory_search">Rechercher une sous-catégorie</string>
-    <string name="setup_city_open_description">Rechercher votre ville</string>
     <string name="setup_city_country_from_phone">Villes affichées en %1$s, selon votre numéro de téléphone.</string>
-    <string name="setup_city_picker_title">Choisissez votre ville</string>
     <string name="setup_city_search">Saisissez un nom de ville</string>
     <string name="setup_city_search_error">Impossible de charger les suggestions de villes.</string>
     <string name="setup_city_no_results">Aucune ville correspondante. Vous pouvez utiliser la saisie manuelle ci-dessous.</string>
@@ -529,15 +455,11 @@
     <string name="error_primary_device">L\'appareil sur lequel vous êtes connecté ne peut pas être retiré ici. Déconnectez-vous plutôt.</string>
     <string name="error_phone_not_editable">Le numéro de téléphone d\'un client est son identité et ne peut pas être modifié.</string>
     <string name="error_invalid_request">Certaines de ces informations ne sont pas valides. Vérifiez-les et réessayez.</string>
-    <string name="catalog_bulk_delete_title">Confirmer une suppression importante</string>
-    <string name="catalog_bulk_delete_message">Votre dernière modification supprime %1$d de vos %2$d produits. Votre compte la retient jusqu\'à confirmation, donc ces produits sont toujours sur votre page boutique.</string>
-    <string name="catalog_bulk_delete_confirm">Les supprimer</string>
     <string name="error_onboarding_restart">Votre session d\'inscription a expiré. Recommencez à partir de votre numéro.</string>
     <string name="error_passkey">Cette clé d\'accès n\'a pas pu être utilisée. Réessayez, ou connectez-vous avec votre numéro.</string>
     <string name="error_phone_already_used">Ce numéro a déjà un compte Orderak.</string>
     <string name="error_phone_change">Votre numéro n\'a pas pu être modifié. Vérifiez les deux numéros et réessayez.</string>
     <string name="error_referral">Ce code n\'a pas pu être utilisé.</string>
-
 
     <!-- Produits enregistres sur ce telephone qui n'ont jamais atteint le
          compte. L'actualisation du catalogue est bloquee tant que cette liste
