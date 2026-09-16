@@ -452,6 +452,7 @@
     <string name="setup_city_picker_title">Choose your city</string>
     <string name="setup_city_search">Type a city name</string>
     <string name="setup_city_search_error">We couldn’t load city suggestions.</string>
+    <string name="setup_category_load_error">We couldn’t load business categories. Tap to try again.</string>
     <string name="setup_city_no_results">No matching cities found. You can use manual entry below.</string>
     <string name="setup_city_use_manual">Use “%1$s” as entered</string>
     <string name="setup_city_data_attribution">City data: Countries States Cities Database (ODbL)</string>

@@ -171,6 +171,37 @@ export const RENDERS = {
   restrictedAccountLight: { kind: "screen", contract: "restricted-account", state: "content", theme: "light" },
   restrictedAccountDark: { kind: "screen", contract: "restricted-account", state: "content", theme: "dark" },
 
+  // ================= shop setup =================
+  // Both step composables took a ShopSetupViewModel directly, so the second
+  // screen a new seller ever sees could not be drawn at all — a screen with a
+  // taxonomy call, a city search, a slug check, three loading states and three
+  // error states, and renders of none of them. ShopSetupActions is what replaced
+  // that: thirteen no-op-defaulted lambdas in one value.
+  setupAccountLight: { kind: "screen", contract: "shop-setup", state: "content", theme: "light" },
+  setupAccountDark: { kind: "screen", contract: "shop-setup", state: "content", theme: "dark" },
+  setupAccountEmpty: { kind: "screen", contract: "shop-setup", state: "content", theme: "light", note: "how a seller actually meets step 1" },
+  setupStoreLight: { kind: "screen", contract: "shop-setup", state: "content", theme: "light" },
+  setupStoreDark: { kind: "screen", contract: "shop-setup", state: "content", theme: "dark" },
+  setupStoreCitySuggestions: { kind: "screen", contract: "shop-setup", state: "content", theme: "light", note: "suggestions returned; picking one closes the list" },
+  setupStoreCityManual: { kind: "screen", contract: "shop-setup", state: "content", theme: "light", note: "a town the catalogue has never heard of still has to be typeable" },
+
+  setupAccountSaving: { kind: "screen", contract: "shop-setup", state: "loading", theme: "light" },
+  setupStoreSaving: { kind: "screen", contract: "shop-setup", state: "loading", theme: "light" },
+  setupStoreSavingDark: { kind: "screen", contract: "shop-setup", state: "loading", theme: "dark" },
+  setupStoreTaxonomyLoading: { kind: "screen", contract: "shop-setup", state: "loading", theme: "light" },
+  setupStoreCitySearching: { kind: "screen", contract: "shop-setup", state: "loading", theme: "light" },
+  setupStoreSlugChecking: { kind: "screen", contract: "shop-setup", state: "loading", theme: "light" },
+
+  setupStoreError: { kind: "screen", contract: "shop-setup", state: "error", theme: "light" },
+  setupStoreErrorDark: { kind: "screen", contract: "shop-setup", state: "error", theme: "dark" },
+  setupAccountInvalidEmail: { kind: "screen", contract: "shop-setup", state: "error", theme: "light", note: "blank is valid — email is optional — so this exists only once typed" },
+  // The render that showed a red box with no message and no visible retry, on
+  // the one step that cannot be finished without a category.
+  setupStoreTaxonomyError: { kind: "screen", contract: "shop-setup", state: "error", theme: "light", note: "blocks the flow, so it must explain itself" },
+  setupStoreCityError: { kind: "screen", contract: "shop-setup", state: "error", theme: "light", note: "does NOT block the flow — manual entry is the way through" },
+  setupStoreSlugTaken: { kind: "screen", contract: "shop-setup", state: "error", theme: "light", note: "pick another name" },
+  setupStoreSlugOffline: { kind: "screen", contract: "shop-setup", state: "error", theme: "light", note: "we do not know yet — showing TAKEN here sends a seller off to rename a shop that was never taken" },
+
   // ================= auth =================
   // The first screen a tester opens, and the contract the audit called its
   // worst at five unverified claims. It needed no split: AuthScreenContent has
@@ -210,7 +241,7 @@ export const RENDERS = {
 };
 
 /** Proven screen-states may never drop below this. Raise it; never lower it. */
-export const FLOOR = 24;
+export const FLOOR = 27;
 
 /**
  * The whole decision, with nothing to do with the filesystem.

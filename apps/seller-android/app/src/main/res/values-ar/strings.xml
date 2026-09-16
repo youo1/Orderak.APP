@@ -476,6 +476,7 @@
     <string name="setup_city_picker_title">اختر مدينتك</string>
     <string name="setup_city_search">اكتب اسم المدينة</string>
     <string name="setup_city_search_error">تعذر تحميل اقتراحات المدن.</string>
+    <string name="setup_category_load_error">تعذر تحميل أنواع النشاط. دوس عشان تجرب تاني.</string>
     <string name="setup_city_no_results">لم نجد مدينة مطابقة. يمكنك استخدام الإدخال اليدوي أدناه.</string>
     <string name="setup_city_use_manual">استخدم «%1$s» كما كتبته</string>
     <string name="setup_city_data_attribution">بيانات المدن: Countries States Cities Database (ODbL)</string>
