@@ -84,10 +84,23 @@ export const RENDERS = {
   customersEmptyState: { kind: "component", note: "customers empty carries NO action — a row is created by an order arriving" },
   customersEmptyStateDark: { kind: "component", note: "customers empty, dark" },
 
-  productsLoading: { kind: "component", note: "FullScreenLoading, reached via the store's loading copy" },
-  productsEmptyCatalogue: { kind: "component", note: "FullScreenEmpty for an empty catalogue" },
-  productsEmptyCatalogueDark: { kind: "component", note: "empty catalogue, dark" },
-  productsSearchEmpty: { kind: "component", note: "search-empty is not catalogue-empty" },
+  // المتجر, once StoreContent(state) existed to render. These replace four
+  // `products*` renders that called FullScreenEmpty and FullScreenLoading
+  // directly: they were green whatever the screen did, which is the thing this
+  // guard was written to stop counting.
+  storeLoadingLight: { kind: "screen", contract: "store", state: "loading", theme: "light" },
+  storeLoadingDark: { kind: "screen", contract: "store", state: "loading", theme: "dark" },
+  storeContentLight: { kind: "screen", contract: "store", state: "content", theme: "light" },
+  storeContentDark: { kind: "screen", contract: "store", state: "content", theme: "dark" },
+  storeEmptyLight: { kind: "screen", contract: "store", state: "empty", theme: "light" },
+  storeEmptyDark: { kind: "screen", contract: "store", state: "empty", theme: "dark" },
+  // The store's error is not a blank screen: products stuck on the device block
+  // the catalogue refresh, so the surface keeps listing what Room holds and says
+  // the sync is stopped over the top of it.
+  storeErrorLight: { kind: "screen", contract: "store", state: "error", theme: "light" },
+  storeErrorDark: { kind: "screen", contract: "store", state: "error", theme: "dark" },
+  storeSearchEmpty: { kind: "component", note: "a search matching nothing is not an empty catalogue — same screen, not a declared state" },
+  storeAtLimit: { kind: "component", note: "at the plan limit the FAB locks rather than vanishing — a gate, not a state" },
 
   orderListLight: { kind: "component", note: "real OrderCard rows in a hand-built Column — proves the card, not OrdersScreen" },
   orderListDark: { kind: "component", note: "OrderCard, dark" },
@@ -105,7 +118,7 @@ export const RENDERS = {
 };
 
 /** Proven screen-states may never drop below this. Raise it; never lower it. */
-export const FLOOR = 4;
+export const FLOOR = 8;
 
 /**
  * The whole decision, with nothing to do with the filesystem.

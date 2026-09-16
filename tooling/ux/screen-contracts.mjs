@@ -700,10 +700,20 @@ export const UNVERIFIED_ACTIONS = new Set([
  * verifier cannot find them by name alone. Tabs have no route and no screen of
  * their own; the version gate is a private composable inside the shell.
  */
+/**
+ * Where a contract's actions actually live, when that is not `<Id>Screen`.
+ *
+ * These are not aliases for convenience. Each one records that the screen a
+ * seller reaches is a Hilt-wired wrapper, and the composable that decides what
+ * is drawn — and therefore the one whose body can be checked — is somewhere
+ * else. `store` moved here when `ProductsScreen` was split so its states could
+ * be rendered by a preview at all; the guard caught the move on the same
+ * commit, which is the behaviour worth keeping.
+ */
 export const ACTION_SOURCE = {
   "main-shell": "MainScreen",
   "version-governance": "VersionBlockingScreen",
   today: "DashboardTab",
-  store: "ProductsScreen",
+  store: "StoreContent",
   account: "SettingsScreen",
 };
