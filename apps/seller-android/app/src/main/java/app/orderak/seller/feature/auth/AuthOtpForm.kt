@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
@@ -191,7 +192,15 @@ private fun OtpCodeInput(
                 onCodeChanged(raw.filter(Char::isDigit))
             }
         },
-        textStyle = TextStyle(color = MaterialTheme.colorScheme.background), // invisible underlying text
+        // Transparent, not `background`.
+        //
+        // Painting the real text in the background colour hides it only where
+        // the backdrop IS that colour, and none of the four box fills are: the
+        // boxes are tinted errorContainer, primaryContainer or surfaceVariant.
+        // In the error state the typed code was legibly visible through its own
+        // boxes — found by rendering that state for the first time. Transparent
+        // hides it against anything.
+        textStyle = TextStyle(color = Color.Transparent),
         keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.NumberPassword,
             imeAction = ImeAction.Done,

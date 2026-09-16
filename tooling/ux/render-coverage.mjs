@@ -154,10 +154,47 @@ export const RENDERS = {
   surfaceBarEnglish: { kind: "component", note: "the bar in English — labels must not clip" },
 
   localizationSurfaceScreenshot: { kind: "component", note: "ar/en/fr side by side; one render per locale" },
+
+  // ================= auth =================
+  // The first screen a tester opens, and the contract the audit called its
+  // worst at five unverified claims. It needed no split: AuthScreenContent has
+  // taken an AuthUiState all along and nobody ever rendered it.
+  //
+  // Success is deliberately not here. It is not a state a seller sees — the
+  // composable runs a LaunchedEffect on it and navigates away — so a render of
+  // it would prove a side effect and nothing else.
+  authWelcomeLight: { kind: "screen", contract: "auth", state: "content", theme: "light" },
+  authWelcomeDark: { kind: "screen", contract: "auth", state: "content", theme: "dark" },
+  authWelcomePasskeyLoading: { kind: "screen", contract: "auth", state: "loading", theme: "light" },
+  authPhoneSendingDark: { kind: "screen", contract: "auth", state: "loading", theme: "dark" },
+  authWelcomePasskeyFailed: { kind: "screen", contract: "auth", state: "error", theme: "light" },
+  authOtpWrongCodeDark: { kind: "screen", contract: "auth", state: "error", theme: "dark" },
+
+  // The rest render the same screen in the same three states, reached through
+  // the other steps of the flow. They are `screen` because that is what they
+  // are — the Set dedupes, so extra proof of an already-proven state costs
+  // nothing and calling them `component` to keep a count tidy would be the one
+  // fudge the kind field exists to prevent.
+  authWelcomeRestricted: { kind: "screen", contract: "auth", state: "error", theme: "light", note: "the one auth error where retrying will not help — no encouraging retry" },
+  authPhoneLight: { kind: "screen", contract: "auth", state: "content", theme: "light", note: "phone step, a valid number" },
+  authPhoneDark: { kind: "screen", contract: "auth", state: "content", theme: "dark", note: "phone step, dark" },
+  authPhoneEmpty: { kind: "screen", contract: "auth", state: "content", theme: "light", note: "the state the phone step actually opens in" },
+  authPhoneSending: { kind: "screen", contract: "auth", state: "loading", theme: "light", note: "requesting the code" },
+  authPhoneInvalid: { kind: "screen", contract: "auth", state: "error", theme: "light", note: "the seller's to fix" },
+  authPhoneNoNetwork: { kind: "screen", contract: "auth", state: "error", theme: "light", note: "not the seller's to fix — distinct from INVALID_PHONE on purpose" },
+  authOtpLight: { kind: "screen", contract: "auth", state: "content", theme: "light", note: "code step, phone locked above it" },
+  authOtpDark: { kind: "screen", contract: "auth", state: "content", theme: "dark", note: "code step, dark" },
+  authOtpResendable: { kind: "screen", contract: "auth", state: "content", theme: "light", note: "countdown spent, so resend is offered rather than implied" },
+  authOtpVerifying: { kind: "screen", contract: "auth", state: "loading", theme: "light", note: "verifying the code" },
+  authOtpWrongCode: { kind: "screen", contract: "auth", state: "error", theme: "light", note: "wrong code — the render that caught the OTP text bleeding through its own boxes" },
+  authOtpExpired: { kind: "screen", contract: "auth", state: "error", theme: "light", note: "expired is not wrong: a new code, not a better guess" },
+  authPasskeyInvite: { kind: "screen", contract: "auth", state: "content", theme: "light", note: "offered to an existing seller" },
+  authPasskeyCreating: { kind: "screen", contract: "auth", state: "loading", theme: "light", note: "the system ceremony in flight" },
+  authPasskeyDeferred: { kind: "screen", contract: "auth", state: "content", theme: "light", note: "a new seller: recorded now, ceremony after setup — must not look like a passkey exists" },
 };
 
 /** Proven screen-states may never drop below this. Raise it; never lower it. */
-export const FLOOR = 18;
+export const FLOOR = 21;
 
 /**
  * The whole decision, with nothing to do with the filesystem.
