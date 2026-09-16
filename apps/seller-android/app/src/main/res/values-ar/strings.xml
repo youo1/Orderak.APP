@@ -363,6 +363,7 @@
     <string name="ai_you">أنت</string>
     <string name="ai_message">اسأل عن متجرك</string>
     <string name="ai_reset">بدء محادثة جديدة</string>
+    <string name="ai_empty_hint">لسه مفيش أسئلة — اسأل عن منتجاتك أو أوردراتك أو عملائك.</string>
     <string name="deletion_status_title">حالة طلب الحذف</string>
     <string name="deletion_status_none">لا يوجد طلب حذف</string>
     <string name="deletion_status_help">يُنفذ الطلب المتحقق منه وفق الموعد المنشور. تواصل مع الدعم إذا كانت الحالة غير صحيحة.</string>

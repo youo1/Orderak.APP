@@ -341,6 +341,7 @@
     <string name="ai_you">You</string>
     <string name="ai_message">Ask about your store</string>
     <string name="ai_reset">Reset conversation</string>
+    <string name="ai_empty_hint">No questions yet — ask about your products, orders or customers.</string>
     <string name="deletion_status_title">Deletion request status</string>
     <string name="deletion_status_none">No deletion request</string>
     <string name="deletion_status_help">A verified request follows the published deadline. Contact support if the status appears incorrect.</string>

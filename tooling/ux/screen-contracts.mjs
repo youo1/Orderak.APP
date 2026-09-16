@@ -495,7 +495,11 @@ export const CONTRACTS = [
     data: ["devices", "passkeys", "device limit usage"],
     actions: [
       { do: "revoke device", via: "revokeDevice" },
-      { do: "add passkey", via: "onAdd" },
+      // Was via "onAdd", a parameter name of the header composable rather than
+      // the operation. Splitting DevicesContent out moved that parameter, and
+      // the guard caught it. `createPasskey` is what actually carries the
+      // action and is what its two siblings above and below already name.
+      { do: "add passkey", via: "createPasskey" },
       { do: "remove passkey", via: "deletePasskey" },
     ],
     states: ["loading", "content", "error"],

@@ -343,6 +343,7 @@
     <string name="ai_you">Vous</string>
     <string name="ai_message">Posez une question sur votre boutique</string>
     <string name="ai_reset">Réinitialiser la conversation</string>
+    <string name="ai_empty_hint">Aucune question pour l’instant — posez une question sur vos produits, commandes ou clients.</string>
     <string name="deletion_status_title">État de la demande de suppression</string>
     <string name="deletion_status_none">Aucune demande de suppression</string>
     <string name="deletion_status_help">Une demande vérifiée suit le délai publié. Contactez l’assistance si l’état semble incorrect.</string>

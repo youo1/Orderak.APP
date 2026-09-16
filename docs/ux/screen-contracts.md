@@ -377,7 +377,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Entry | account |
 | Exit | رجوع |
 | Data | devices · passkeys · device limit usage |
-| Actions | revoke device `revokeDevice` · add passkey `onAdd` · remove passkey `deletePasskey` |
+| Actions | revoke device `revokeDevice` · add passkey `createPasskey` · remove passkey `deletePasskey` |
 
 ### `support`
 

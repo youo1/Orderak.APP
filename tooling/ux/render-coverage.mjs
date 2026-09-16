@@ -191,6 +191,59 @@ export const RENDERS = {
   catalogLanguagesErrorLight: { kind: "screen", contract: "catalog-languages", state: "error", theme: "light" },
   catalogLanguagesErrorDark: { kind: "screen", contract: "catalog-languages", state: "error", theme: "dark" },
 
+  // ---- support ticket: two declared states that did not exist ----
+  // The page passed no busy and no error to OperationPage at all, and the view
+  // model threw `result.error` away without looking at it.
+  ticketLoadingLight: { kind: "screen", contract: "support-ticket", state: "loading", theme: "light" },
+  ticketLoadingDark: { kind: "screen", contract: "support-ticket", state: "loading", theme: "dark" },
+  ticketContentLight: { kind: "screen", contract: "support-ticket", state: "content", theme: "light" },
+  ticketContentDark: { kind: "screen", contract: "support-ticket", state: "content", theme: "dark" },
+  ticketClosed: { kind: "screen", contract: "support-ticket", state: "content", theme: "light", note: "a closed thread is a record, not a conversation — no reply box" },
+  ticketErrorLight: { kind: "screen", contract: "support-ticket", state: "error", theme: "light" },
+  ticketErrorDark: { kind: "screen", contract: "support-ticket", state: "error", theme: "dark" },
+
+  // ---- deletion status ----
+  // null is both "no request" and "not read", and it is the seed.
+  deletionLoadingLight: { kind: "screen", contract: "deletion-status", state: "loading", theme: "light" },
+  deletionLoadingDark: { kind: "screen", contract: "deletion-status", state: "loading", theme: "dark" },
+  deletionNoneLight: { kind: "screen", contract: "deletion-status", state: "content", theme: "light", note: "read, and there genuinely is no request" },
+  deletionNoneDark: { kind: "screen", contract: "deletion-status", state: "content", theme: "dark" },
+  deletionPending: { kind: "screen", contract: "deletion-status", state: "content", theme: "light", note: "the case the seed hid for as long as the call took" },
+  deletionErrorLight: { kind: "screen", contract: "deletion-status", state: "error", theme: "light" },
+  deletionErrorDark: { kind: "screen", contract: "deletion-status", state: "error", theme: "dark" },
+
+  // ---- subscription ----
+  subscriptionLoadingLight: { kind: "screen", contract: "subscription", state: "loading", theme: "light" },
+  subscriptionLoadingDark: { kind: "screen", contract: "subscription", state: "loading", theme: "dark" },
+  subscriptionContentLight: { kind: "screen", contract: "subscription", state: "content", theme: "light" },
+  subscriptionContentDark: { kind: "screen", contract: "subscription", state: "content", theme: "dark" },
+  subscriptionPurchaseClosed: { kind: "screen", contract: "subscription", state: "content", theme: "light", note: "the real state today; the banner has to reach the plan list" },
+  subscriptionPurchaseOpen: { kind: "screen", contract: "subscription", state: "content", theme: "light" },
+  subscriptionVerifying: { kind: "screen", contract: "subscription", state: "loading", theme: "light", note: "money moved, entitlement has not" },
+  subscriptionBillingError: { kind: "screen", contract: "subscription", state: "error", theme: "light" },
+
+  // ---- devices ----
+  devicesLoadingLight: { kind: "screen", contract: "devices", state: "loading", theme: "light" },
+  devicesLoadingDark: { kind: "screen", contract: "devices", state: "loading", theme: "dark" },
+  devicesContentLight: { kind: "screen", contract: "devices", state: "content", theme: "light" },
+  devicesContentDark: { kind: "screen", contract: "devices", state: "content", theme: "dark" },
+  devicesNoPasskeySupport: { kind: "screen", contract: "devices", state: "content", theme: "light", note: "below Android 9 the control is disabled, not hidden" },
+  // "recent_auth_required" means sign in again, not try again, and the retry
+  // button routes to reauthentication for exactly that code.
+  devicesRecentAuthRequired: { kind: "screen", contract: "devices", state: "error", theme: "light" },
+  devicesErrorDark: { kind: "screen", contract: "devices", state: "error", theme: "dark" },
+
+  // ---- ai assistant ----
+  // The one screen here that does not load on entry, which is why _busy could
+  // not simply seed true for the six that share it.
+  assistantEmptyLight: { kind: "screen", contract: "ai-assistant", state: "empty", theme: "light" },
+  assistantEmptyDark: { kind: "screen", contract: "ai-assistant", state: "empty", theme: "dark" },
+  assistantContentLight: { kind: "screen", contract: "ai-assistant", state: "content", theme: "light" },
+  assistantContentDark: { kind: "screen", contract: "ai-assistant", state: "content", theme: "dark" },
+  assistantSending: { kind: "screen", contract: "ai-assistant", state: "loading", theme: "light" },
+  assistantErrorLight: { kind: "screen", contract: "ai-assistant", state: "error", theme: "light" },
+  assistantErrorDark: { kind: "screen", contract: "ai-assistant", state: "error", theme: "dark" },
+
   // ================= entry =================
   // Splash had no name at all: it was an anonymous block inside
   // `composable<SplashRoute> { }`, which is why nothing could render it and why
@@ -277,7 +330,7 @@ export const RENDERS = {
 };
 
 /** Proven screen-states may never drop below this. Raise it; never lower it. */
-export const FLOOR = 39;
+export const FLOOR = 55;
 
 /**
  * The whole decision, with nothing to do with the filesystem.
