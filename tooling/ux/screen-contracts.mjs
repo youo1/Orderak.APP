@@ -46,8 +46,14 @@
  *                thirteen: `categories` declares a "reorder" with no ordering
  *                control, `deletion-status` declares "request deletion" and
  *                "cancel request" on a screen that reports status and offers no
- *                control at all, and `subscription` points at a Plans screen
- *                that does not exist.
+ *                control at all, and `subscription` pointed at a Plans screen
+ *                that did not exist.
+ *
+ *              A `planned` entry's `why` is a claim about the world and ages
+ *                like one. `subscription`'s said "PlansRoute does not exist yet"
+ *                long after it was built and wired — the route existed, the
+ *                paywall reached it, and only the screen that declares it as an
+ *                exit did not. Re-read the reason, not just the status.
  */
 
 export const STATES = ["loading", "content", "empty", "error"];
@@ -578,8 +584,16 @@ export const CONTRACTS = [
     exit: ["PlansRoute", "رجوع"],
     data: ["subscription status", "entitlement usage", "billing flag state"],
     actions: [
-      { do: "view plans", status: "planned", why: "PlansRoute does not exist yet — work item 08" },
-      { do: "register interest", status: "unverified" },
+      // The `planned` reason had gone stale: PlansRoute was built and wired, and
+      // PaywallScreen reached it — but this screen, which declares it as an exit,
+      // never did. Its purchase-closed banner told a seller purchasing was shut
+      // and offered nothing, while the plans comparison exists precisely to be
+      // read in that state.
+      { do: "view plans", via: "onViewPlans" },
+      // Demoted from unverified to planned: there is no control, no string and
+      // no backend endpoint. Collecting interest means contacting those sellers
+      // later, which is a product decision rather than a wiring gap.
+      { do: "register interest", status: "planned", why: "no notify-me control or endpoint exists" },
       { do: "restore purchase", via: "recoverPurchases" },
     ],
     states: ["loading", "content", "error"],
@@ -663,7 +677,6 @@ export const UNVERIFIED_ACTIONS = new Set([
   "catalog-languages:request retranslation",
   "support-ticket:close",
   "announcements:open link",
-  "subscription:register interest",
 ]);
 
 /**

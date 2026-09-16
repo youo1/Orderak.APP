@@ -809,7 +809,11 @@ private fun passkeyTypeLabel(passkey: PasskeyDto): String =
     }
 
 @Composable
-fun SubscriptionScreen(onBack: () -> Unit, vm: OperationsViewModel = hiltViewModel()) {
+fun SubscriptionScreen(
+    onBack: () -> Unit,
+    onViewPlans: () -> Unit = {},
+    vm: OperationsViewModel = hiltViewModel(),
+) {
     val config by vm.entitlements.config.collectAsStateWithLifecycle()
     val billingState by vm.billingManager.state.collectAsStateWithLifecycle()
     OperationPage(
@@ -880,7 +884,24 @@ fun SubscriptionScreen(onBack: () -> Unit, vm: OperationsViewModel = hiltViewMod
                 role = SemanticRole.Commerce,
                 title = stringResource(R.string.subscription_purchase_closed_title),
                 message = stringResource(R.string.subscription_purchase_closed_body),
+                // The banner said purchasing was closed and offered nothing,
+                // while PlansScreen exists precisely to be READ while it is —
+                // "للعرض طول ما الشراء مقفول". This screen declared PlansRoute as
+                // an exit and had no control that reached it, so the one useful
+                // thing a seller could still do here was unreachable from here.
+                actionLabel = stringResource(R.string.paywall_view_plans),
+                onAction = onViewPlans,
             )
+        }
+
+        // Offered in both purchase states, for the reason the categories banner
+        // already gives: what the next plan includes is worth reading whether or
+        // not anything is for sale. Above it when purchase is open, the recover
+        // button is the primary action; here it is the only one.
+        if (vm.entitlements.isPurchaseOpen()) {
+            TextButton(onClick = onViewPlans, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.paywall_view_plans))
+            }
         }
     }
 }

@@ -218,7 +218,12 @@ fun OrderakNavHost() {
             )
         }
         composable<DeletionStatusRoute> { DeletionStatusScreen(onBack = { navController.popBackStack() }) }
-        composable<SubscriptionRoute> { SubscriptionScreen(onBack = { navController.popBackStack() }) }
+        composable<SubscriptionRoute> {
+            SubscriptionScreen(
+                onBack = { navController.popBackStack() },
+                onViewPlans = { navController.navigate(PlansRoute) },
+            )
+        }
         composable<AiAssistantRoute> { AiAssistantScreen(onBack = { navController.popBackStack() }) }
         composable<RestrictedAccountRoute> {
             RestrictedAccountScreen(
