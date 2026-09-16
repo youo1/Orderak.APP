@@ -107,6 +107,17 @@ export const RENDERS = {
   customersErrorDark: { kind: "screen", contract: "customers", state: "error", theme: "dark" },
   customersSearchEmpty: { kind: "component", note: "a search matching nothing is not an empty customer list" },
 
+  // ---- حسابي ----
+  // planName seeded "Free" and aiAvailable seeded false, so this surface told a
+  // paying seller they were on the free plan and hid the AI entry, then
+  // corrected both a beat later. The loading render is what those two nulls buy.
+  accountLoadingLight: { kind: "screen", contract: "account", state: "loading", theme: "light" },
+  accountLoadingDark: { kind: "screen", contract: "account", state: "loading", theme: "dark" },
+  accountContentLight: { kind: "screen", contract: "account", state: "content", theme: "light" },
+  accountContentDark: { kind: "screen", contract: "account", state: "content", theme: "dark" },
+  accountFreePlan: { kind: "component", note: "aiAvailable=false omits the entry rather than showing it locked — NotBuilt carries no upgrade affordance" },
+  accountLinkPending: { kind: "component", note: "the store link before it has been issued" },
+
   // المتجر, once StoreContent(state) existed to render. These replace four
   // `products*` renders that called FullScreenEmpty and FullScreenLoading
   // directly: they were green whatever the screen did, which is the thing this
@@ -141,7 +152,7 @@ export const RENDERS = {
 };
 
 /** Proven screen-states may never drop below this. Raise it; never lower it. */
-export const FLOOR = 16;
+export const FLOOR = 18;
 
 /**
  * The whole decision, with nothing to do with the filesystem.
