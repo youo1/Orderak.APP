@@ -298,7 +298,16 @@ class RestrictedAccountViewModel @Inject constructor(
 @Composable
 private fun OperationPage(
     title: String,
-    onBack: () -> Unit,
+    /**
+     * null draws no back arrow.
+     *
+     * RestrictedAccountScreen passed `{}`, so a locked-out seller got a back
+     * arrow that did nothing — on the one screen where they are hunting for a
+     * way out, and where the three real ways out are right below it. It is a
+     * root destination reached with navigateAsRoot, so there is genuinely
+     * nowhere behind it; the honest answer is no arrow, not a silent one.
+     */
+    onBack: (() -> Unit)?,
     busy: Boolean = false,
     error: String? = null,
     onRetry: (() -> Unit)? = null,
@@ -311,11 +320,13 @@ private fun OperationPage(
             TopAppBar(
                 title = { Text(title, modifier = Modifier.semantics { heading() }) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.common_back),
-                        )
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.common_back),
+                            )
+                        }
                     }
                 },
             )
@@ -1027,27 +1038,50 @@ fun RestrictedAccountScreen(
     vm: RestrictedAccountViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
+    RestrictedAccountContent(
+        onCheckAgain = onCheckAgain,
+        // runCatching, not a bare start: a device with no mail app resolves
+        // nothing for ACTION_SENDTO and throws ActivityNotFoundException,
+        // and a restricted account losing the app entirely is worse than
+        // the button doing nothing.
+        onContactSupport = {
+            runCatching {
+                context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:support@orderak.app")))
+            }
+        },
+        onLogout = { vm.logout(onLogout) },
+    )
+}
+
+/**
+ * The restricted-account page, with nothing in it that needs a graph.
+ *
+ * Split from [RestrictedAccountScreen] only so it can be rendered: the screen
+ * used the view model for exactly one thing, logout, and the Intent for one
+ * more, and those two are the whole reason a seller locked out of their account
+ * could not be shown this page in a screenshot.
+ *
+ * This is the page a suspended seller stares at, so it is worth looking at.
+ */
+@Composable
+fun RestrictedAccountContent(
+    onCheckAgain: () -> Unit,
+    onContactSupport: () -> Unit,
+    onLogout: () -> Unit,
+) {
     OperationPage(
         title = stringResource(R.string.restricted_title),
-        onBack = {},
+        onBack = null,
     ) {
         Text(stringResource(R.string.restricted_body), style = MaterialTheme.typography.bodyLarge)
         Button(onClick = onCheckAgain, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.common_retry))
         }
         OutlinedButton(
-            // runCatching, not a bare start: a device with no mail app resolves
-            // nothing for ACTION_SENDTO and throws ActivityNotFoundException,
-            // and a restricted account losing the app entirely is worse than
-            // the button doing nothing.
-            onClick = {
-                runCatching {
-                    context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:support@orderak.app")))
-                }
-            },
+            onClick = onContactSupport,
             modifier = Modifier.fillMaxWidth(),
         ) { Text(stringResource(R.string.restricted_contact)) }
-        OutlinedButton(onClick = { vm.logout(onLogout) }, modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(onClick = onLogout, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.settings_logout))
         }
     }

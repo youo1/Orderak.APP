@@ -716,5 +716,6 @@ export const ACTION_SOURCE = {
   today: "DashboardTab",
   store: "StoreContent",
   customers: "CustomersContent",
+  "restricted-account": "RestrictedAccountContent",
   account: "SettingsScreen",
 };

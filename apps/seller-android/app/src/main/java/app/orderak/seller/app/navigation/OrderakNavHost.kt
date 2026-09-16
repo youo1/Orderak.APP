@@ -34,6 +34,7 @@ import app.orderak.seller.feature.settings.StoreInfoScreen
 import app.orderak.seller.feature.settings.CategoriesScreen
 import app.orderak.seller.feature.settings.SellerProfileScreen
 import app.orderak.seller.feature.shopsetup.ShopSetupScreen
+import app.orderak.seller.feature.splash.SplashScreen
 import app.orderak.seller.feature.splash.SplashViewModel
 import app.orderak.seller.feature.splash.EntryDecision
 import app.orderak.seller.feature.splash.EntryUiState
@@ -86,25 +87,10 @@ fun OrderakNavHost() {
                 }
                 route?.let(navController::navigateAsRoot)
             }
-            androidx.compose.material3.Surface(
-                modifier = Modifier.fillMaxSize(),
-                color = androidx.compose.material3.MaterialTheme.colorScheme.background
-            ) {
-                if (decision is EntryDecision.Error) {
-                    Column(
-                        modifier = Modifier.fillMaxSize().padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
-                    ) {
-                        Text(stringResource(R.string.operations_error))
-                        Button(onClick = vm::retry, modifier = Modifier.padding(top = 16.dp)) {
-                            Text(stringResource(R.string.common_retry))
-                        }
-                    }
-                } else {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                }
-            }
+            SplashScreen(
+                isError = decision is EntryDecision.Error,
+                onRetry = vm::retry,
+            )
         }
 
         composable<AuthRoute> {

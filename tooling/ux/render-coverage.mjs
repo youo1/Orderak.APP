@@ -155,6 +155,22 @@ export const RENDERS = {
 
   localizationSurfaceScreenshot: { kind: "component", note: "ar/en/fr side by side; one render per locale" },
 
+  // ================= entry =================
+  // Splash had no name at all: it was an anonymous block inside
+  // `composable<SplashRoute> { }`, which is why nothing could render it and why
+  // verify-screen-contracts passed it — its bodyFor looks for a SplashScreen()
+  // that did not exist, and returns early because the contract declares no
+  // actions. A screen with two declared states and no name.
+  splashLoadingLight: { kind: "screen", contract: "splash", state: "loading", theme: "light" },
+  splashLoadingDark: { kind: "screen", contract: "splash", state: "loading", theme: "dark" },
+  splashErrorLight: { kind: "screen", contract: "splash", state: "error", theme: "light" },
+  splashErrorDark: { kind: "screen", contract: "splash", state: "error", theme: "dark" },
+
+  // The page a suspended seller stares at. Rendering it is what showed the back
+  // arrow that did nothing.
+  restrictedAccountLight: { kind: "screen", contract: "restricted-account", state: "content", theme: "light" },
+  restrictedAccountDark: { kind: "screen", contract: "restricted-account", state: "content", theme: "dark" },
+
   // ================= auth =================
   // The first screen a tester opens, and the contract the audit called its
   // worst at five unverified claims. It needed no split: AuthScreenContent has
@@ -194,7 +210,7 @@ export const RENDERS = {
 };
 
 /** Proven screen-states may never drop below this. Raise it; never lower it. */
-export const FLOOR = 21;
+export const FLOOR = 24;
 
 /**
  * The whole decision, with nothing to do with the filesystem.
