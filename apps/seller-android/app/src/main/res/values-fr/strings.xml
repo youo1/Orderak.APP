@@ -306,6 +306,7 @@
     <string name="product_stock_conflict_use_shop">Utiliser %1$d</string>
     <string name="product_stock_conflict_keep_mine">Forcer %1$d</string>
     <string name="category_delete_confirm">Supprimer cette catégorie ? Les produits seront non classés.</string>
+    <string name="category_rename">Renommer la catégorie</string>
     <string name="categories_error">Impossible de mettre à jour les catégories. Réessayez.</string>
     <string name="settings_delete_confirm">Envoyer une demande vérifiée de suppression du compte ? Le délai publié s’applique.</string>
     <string name="settings_logout_confirm">Se déconnecter et supprimer les données locales de cet appareil ?</string>

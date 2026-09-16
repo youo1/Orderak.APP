@@ -52,6 +52,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import java.util.Locale
+import app.orderak.seller.core.ui.FullScreenLoading
 import app.orderak.seller.R
 import app.orderak.seller.data.remote.BusinessSubcategoryDto
 import app.orderak.seller.data.remote.StoreDto
@@ -104,7 +105,11 @@ class StoreInfoViewModel @Inject constructor(
     init { refresh() }
 
     fun refresh() = viewModelScope.launch {
-        val phone = sessionStore.phone.first() ?: return@launch
+        // No phone means no session, and the screen is unreachable without one —
+        // but returning here left `_store` null for ever, and the screen reads
+        // null as "still loading". A state nothing can leave is worse than an
+        // empty form, so fall through to the cached view instead.
+        val phone = sessionStore.phone.first() ?: run { _store.value = cachedStore(); return@launch }
         val secret = sessionStore.getOrCreateSecret()
         val res = api.getStore(phone, secret)
         val s = res.store
@@ -113,25 +118,28 @@ class StoreInfoViewModel @Inject constructor(
             cache(s)
         } else {
             // Offline fallback: build the view from cached values.
-            _store.value = StoreDto(
-                store_name = sessionStore.shopName.first(),
-                slug = sessionStore.slug.first(),
-                country_code = sessionStore.countryIso.first(),
-                store_code = sessionStore.storeCode.first(),
-                public_identifier = sessionStore.publicIdentifier.first(),
-                description = sessionStore.description.first(),
-                phone = sessionStore.phone.first(),
-                whatsapp = sessionStore.whatsapp.first(),
-                email = sessionStore.storeEmail.first(),
-                website = sessionStore.website.first(),
-                address = sessionStore.address.first(),
-                instapay = sessionStore.instapay.first(),
-                vfcash = sessionStore.vfcash.first(),
-                logo_url = sessionStore.logoUrl.first(),
-                cover_url = sessionStore.coverUrl.first(),
-            )
+            _store.value = cachedStore()
         }
     }
+
+    /** The store as this device last knew it. Used offline and when unauthenticated. */
+    private suspend fun cachedStore() = StoreDto(
+        store_name = sessionStore.shopName.first(),
+        slug = sessionStore.slug.first(),
+        country_code = sessionStore.countryIso.first(),
+        store_code = sessionStore.storeCode.first(),
+        public_identifier = sessionStore.publicIdentifier.first(),
+        description = sessionStore.description.first(),
+        phone = sessionStore.phone.first(),
+        whatsapp = sessionStore.whatsapp.first(),
+        email = sessionStore.storeEmail.first(),
+        website = sessionStore.website.first(),
+        address = sessionStore.address.first(),
+        instapay = sessionStore.instapay.first(),
+        vfcash = sessionStore.vfcash.first(),
+        logo_url = sessionStore.logoUrl.first(),
+        cover_url = sessionStore.coverUrl.first(),
+    )
 
     fun save(req: StoreUpdateReq, onDone: () -> Unit) = viewModelScope.launch {
         _busy.value = true
@@ -288,6 +296,16 @@ fun StoreInfoScreen(
             )
         }
     ) { padding ->
+        // Ten fields above are `rememberSaveable(store)` — KEYED on the loaded
+        // store — so every change to it re-seeds them. Rendering the form before
+        // the store arrived meant a seller could start typing their shop name
+        // into an empty field and have the whole form reset under them the
+        // moment the network answered. Waiting here closes that window: the form
+        // is composed once, with the values already in hand.
+        if (store == null) {
+            FullScreenLoading(Modifier.padding(padding))
+            return@Scaffold
+        }
         Column(
             Modifier.fillMaxSize().padding(padding).padding(16.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)

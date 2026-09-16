@@ -229,7 +229,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Entry | store · product-edit |
 | Exit | رجوع |
 | Data | categories · category limit usage |
-| Actions | add `create` · rename *(untraced)* · reorder *(planned)* · delete `delete` |
+| Actions | add `create` · rename `pendingRename` · reorder *(planned)* · delete `delete` |
 
 ### `store-info`
 

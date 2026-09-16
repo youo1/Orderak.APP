@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
@@ -141,9 +142,16 @@ class CategoriesViewModel @Inject constructor(
     fun rename(code: String, name: String) = viewModelScope.launch {
         val n = name.trim()
         if (n.isBlank()) return@launch
-        val phone = sessionStore.phone.first() ?: return@launch
+        _busy.value = true
+        val phone = sessionStore.phone.first() ?: run { _busy.value = false; return@launch }
         val secret = sessionStore.getOrCreateSecret()
+        // Reports its failure, as create and delete do. It used to swallow one:
+        // the dialog closed either way, so a rename that never reached the
+        // server looked exactly like one that did until the list refused to
+        // change.
         if (api.updateCategory(phone, secret, code, CategoryReq(name = n)).ok) refresh()
+        else _error.value = "rename_failed"
+        _busy.value = false
     }
 
     fun delete(code: String) = viewModelScope.launch {
@@ -171,6 +179,9 @@ fun CategoriesScreen(
     val storeUrl by viewModel.storeUrl.collectAsStateWithLifecycle()
     var newName by rememberSaveable { mutableStateOf("") }
     var pendingDelete by rememberSaveable { mutableStateOf<String?>(null) }
+    // Code and current name together: the dialog seeds its field from the name,
+    // and the code is what the write is addressed by.
+    var pendingRename by rememberSaveable { mutableStateOf<Pair<String, String>?>(null) }
 
     Scaffold(
         topBar = {
@@ -257,6 +268,20 @@ fun CategoriesScreen(
                                         Icon(Icons.Outlined.Share, contentDescription = stringResource(R.string.action_share_link))
                                     }
                                 }
+                                // `rename` has existed on the view model since it
+                                // was written and no screen ever offered it, so a
+                                // typo in a category name was permanent: the only
+                                // way out was to delete the category, which takes
+                                // its products' filing with it.
+                                IconButton(
+                                    onClick = { pendingRename = c.category_code to c.name },
+                                    enabled = !busy,
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.Edit,
+                                        contentDescription = stringResource(R.string.category_rename),
+                                    )
+                                }
                                 IconButton(onClick = { pendingDelete = c.category_code }, enabled = !busy) {
                                     Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.common_delete),
                                         tint = MaterialTheme.colorScheme.error)
@@ -279,6 +304,37 @@ fun CategoriesScreen(
                 }
             },
             dismissButton = { TextButton(onClick = { pendingDelete = null }) { Text(stringResource(R.string.common_cancel)) } },
+        )
+    }
+    pendingRename?.let { (code, currentName) ->
+        // Seeded from the name, not blank: a rename is nearly always a small
+        // correction, and an empty field asks the seller to retype what they
+        // can already see.
+        var draft by rememberSaveable(code) { mutableStateOf(currentName) }
+        AlertDialog(
+            onDismissRequest = { pendingRename = null },
+            title = { Text(stringResource(R.string.category_rename)) },
+            text = {
+                OutlinedTextField(
+                    value = draft,
+                    onValueChange = { draft = it.take(60) },
+                    label = { Text(stringResource(R.string.categories_new)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    // Blank is not a rename, and neither is the name it already
+                    // has — both would spend a write to change nothing.
+                    enabled = draft.isNotBlank() && draft != currentName && !busy,
+                    onClick = {
+                        viewModel.rename(code, draft.trim())
+                        pendingRename = null
+                    },
+                ) { Text(stringResource(R.string.settings_save)) }
+            },
+            dismissButton = { TextButton(onClick = { pendingRename = null }) { Text(stringResource(R.string.common_cancel)) } },
         )
     }
 }

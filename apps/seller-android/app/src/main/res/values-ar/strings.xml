@@ -326,6 +326,7 @@
     <string name="product_stock_conflict_use_shop">خليها %1$d</string>
     <string name="product_stock_conflict_keep_mine">اكتب %1$d برضه</string>
     <string name="category_delete_confirm">تحذف التصنيف؟ المنتجات هتفضل من غير تصنيف.</string>
+    <string name="category_rename">غيّر اسم الفئة</string>
     <string name="categories_error">ماقدرناش نحدّث التصنيفات. حاول تاني.</string>
     <string name="settings_delete_confirm">تبعت طلب حذف حساب متأكد منه؟ الطلب هيتنفذ حسب المدة المنشورة.</string>
     <string name="settings_logout_confirm">تسجل خروج وتمسح بيانات الشغل المحلية من الجهاز ده؟</string>

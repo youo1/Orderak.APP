@@ -305,7 +305,11 @@ export const CONTRACTS = [
     data: ["categories", "category limit usage"],
     actions: [
       { do: "add", via: "create" },
-      { do: "rename", status: "unverified" },
+      // Was unverified, and the doubt was earned: `rename` existed on the view
+      // model since it was written and no screen ever offered it, so a typo in a
+      // category name was permanent — the only way out was deleting the
+      // category, which takes its products' filing with it.
+      { do: "rename", via: "pendingRename" },
       { do: "reorder", status: "planned", why: "no ordering control exists on the screen" },
       { do: "delete", via: "delete" },
     ],
@@ -651,7 +655,6 @@ export const UNVERIFIED_ACTIONS = new Set([
   "order-details:advance status",
   "order-details:mark paid",
   "order-details:open customer",
-  "categories:rename",
   "store-info:copy link",
   "catalog-languages:edit translation",
   "catalog-languages:request retranslation",
