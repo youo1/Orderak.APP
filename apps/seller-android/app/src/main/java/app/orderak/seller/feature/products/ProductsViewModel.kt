@@ -28,8 +28,17 @@ class ProductsViewModel @Inject constructor(
     private val legacyCatalogue: LegacyCatalogueReconciler,
 ) : ViewModel() {
 
-    val products: StateFlow<List<ProductEntity>> =
-        repo.products.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    /**
+     * The catalogue, or null while it is still being read.
+     *
+     * Seeded `emptyList()` before, which is the same defect the اليوم counters
+     * had: "not read yet" and "you have none" became one value, so a seller with
+     * forty products met the empty state on every cold start until Room emitted.
+     * On this screen that is worse than a flicker, because the empty state is
+     * the one that tells them to add their first product.
+     */
+    val products: StateFlow<List<ProductEntity>?> =
+        repo.products.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /**
      * Products that live on this phone and have not reached the server.
@@ -70,10 +79,14 @@ class ProductsViewModel @Inject constructor(
 
     val quota: StateFlow<ProductQuotaUiState> = combine(products, entitlementManager.config) { products, _ ->
         val limit = entitlementManager.getProductLimit()
+        // Usage is unknown until the catalogue is read. Reporting 0 used would
+        // tell a seller at their limit that they have room, and the meter is
+        // what the add button and the paywall both key off.
+        val used = products?.size ?: 0
         ProductQuotaUiState(
-            used = products.size,
+            used = used,
             limit = limit.takeUnless { it == Int.MAX_VALUE },
-            canAdd = products.size < limit,
+            canAdd = products != null && used < limit,
             upgradePlanKey = entitlementManager.nextUpgradePlanKey(),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ProductQuotaUiState())

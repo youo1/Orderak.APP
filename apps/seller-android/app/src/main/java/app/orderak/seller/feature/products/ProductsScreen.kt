@@ -53,6 +53,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.orderak.seller.R
 import app.orderak.seller.core.text.SearchText
 import app.orderak.seller.core.ui.FullScreenEmpty
+import app.orderak.seller.core.ui.FullScreenLoading
 import app.orderak.seller.core.ui.NoticeBanner
 import app.orderak.seller.core.ui.SearchField
 import app.orderak.seller.core.ui.SemanticChip
@@ -83,7 +84,7 @@ fun ProductsScreen(
     // Filtered in memory over what Room already holds, so search works with the
     // network off. Name and code both, because a seller reading a code off a
     // shelf label is the case a name-only search cannot serve.
-    val visibleProducts = products.filter { SearchText.matches(query, it.name, it.productCode) }
+    val visibleProducts = products.orEmpty().filter { SearchText.matches(query, it.name, it.productCode) }
     val shopName by viewModel.shopName.collectAsStateWithLifecycle()
     val storeUrl by viewModel.storeUrl.collectAsStateWithLifecycle()
     val quota by viewModel.quota.collectAsStateWithLifecycle()
@@ -228,24 +229,23 @@ fun ProductsScreen(
         )
     }
 
-    if (products.isEmpty() && quota.limit == null) {
-        // Empty state with guidance.
-        Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    imageVector = Icons.Outlined.Inbox,
-                    contentDescription = null,
-                    modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(16.dp))
-                Text(
-                    stringResource(R.string.products_empty),
-                    style = MaterialTheme.typography.bodyLarge,
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
+    val catalogue = products
+    if (catalogue == null) {
+        // The state this screen declared and never had. The catalogue seeded as
+        // an empty list, so a seller with products met the "add your first
+        // product" screen on every cold start until Room answered.
+        FullScreenLoading()
+    } else if (catalogue.isEmpty()) {
+        // WAS `products.isEmpty() && quota.limit == null`, and the second half
+        // was the bug. A limit is the normal case — free is 20 — so a new seller
+        // fell through to the branch below, where an empty catalogue and an
+        // empty SEARCH are the same test. They were shown
+        // «مفيش منتج مطابق لـ «»» and a "clear search" button, for a search they
+        // had not typed, on the first screen of their first session.
+        FullScreenEmpty(
+            message = stringResource(R.string.products_empty),
+            icon = Icons.Outlined.Inbox,
+        )
     } else {
         Column(Modifier.fillMaxSize()) {
             // Above the meter, because it is about whether the catalogue is
@@ -314,7 +314,7 @@ fun ProductsScreen(
                                     // filtered view — a search is how the seller
                                     // is looking at their products, not a
                                     // statement about what the shop sells.
-                                    if (url.isNullOrBlank()) shareCatalogText(context, shopName, sellerPhone, products)
+                                    if (url.isNullOrBlank()) shareCatalogText(context, shopName, sellerPhone, catalogue)
                                     else shareStoreLink(context, shopName, url)
                                 }
                             }) {

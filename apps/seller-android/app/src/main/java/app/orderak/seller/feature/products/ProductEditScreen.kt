@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.orderak.seller.core.ui.FullScreenLoading
 import app.orderak.seller.R
 import coil3.compose.AsyncImage
 import java.io.File
@@ -88,6 +89,15 @@ fun ProductEditScreen(
             )
         }
     ) { padding ->
+        // `loaded` was computed in three places in the view model and read in
+        // none. Opening an existing product therefore drew an empty form first —
+        // blank name, stock "1" — and swapped in the real values when Room
+        // answered, so anything the seller typed in between was overwritten by
+        // the product they had opened to edit.
+        if (!state.loaded) {
+            FullScreenLoading(Modifier.padding(padding))
+            return@Scaffold
+        }
         Column(
             Modifier.fillMaxSize().padding(padding).padding(16.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
