@@ -244,6 +244,36 @@ export const RENDERS = {
   assistantErrorLight: { kind: "screen", contract: "ai-assistant", state: "error", theme: "light" },
   assistantErrorDark: { kind: "screen", contract: "ai-assistant", state: "error", theme: "dark" },
 
+  // ---- plans and paywall ----
+  // Neither had a state defect: PlansUiState seeds loading = true, and the
+  // paywall reads a snapshot its caller already held. They were unrenderable,
+  // which is a different problem with the same consequence — nobody had looked.
+  plansLoadingLight: { kind: "screen", contract: "plans", state: "loading", theme: "light" },
+  plansLoadingDark: { kind: "screen", contract: "plans", state: "loading", theme: "dark" },
+  plansContentLight: { kind: "screen", contract: "plans", state: "content", theme: "light" },
+  plansContentDark: { kind: "screen", contract: "plans", state: "content", theme: "dark" },
+  plansPurchaseOpen: { kind: "screen", contract: "plans", state: "content", theme: "light", note: "the notice goes, the plans stay" },
+  plansUnavailable: { kind: "screen", contract: "plans", state: "content", theme: "light", note: "loaded and the catalogue returned nothing — not an error, so no retry" },
+  plansErrorLight: { kind: "screen", contract: "plans", state: "error", theme: "light" },
+  plansErrorDark: { kind: "screen", contract: "plans", state: "error", theme: "dark" },
+
+  paywallLight: { kind: "screen", contract: "paywall", state: "content", theme: "light" },
+  paywallDark: { kind: "screen", contract: "paywall", state: "content", theme: "dark" },
+  paywallUnknownLimit: { kind: "screen", contract: "paywall", state: "content", theme: "light", note: "no ceiling and no next plan to name — a wall with no door, if nobody looks" },
+  paywallPurchaseOpen: { kind: "screen", contract: "paywall", state: "content", theme: "light" },
+
+  // ---- customer details ----
+  // `orders` seeded emptyList(), so the page said "no orders yet" about a
+  // customer whose row exists BECAUSE an order arrived.
+  customerLoadingLight: { kind: "screen", contract: "customer-details", state: "loading", theme: "light" },
+  customerLoadingDark: { kind: "screen", contract: "customer-details", state: "loading", theme: "dark" },
+  customerContentLight: { kind: "screen", contract: "customer-details", state: "content", theme: "light" },
+  customerContentDark: { kind: "screen", contract: "customer-details", state: "content", theme: "dark" },
+  customerUnnamed: { kind: "screen", contract: "customer-details", state: "content", theme: "light", note: "the phone IS the identity — the ordinary case for a first order" },
+  customerReadOnly: { kind: "screen", contract: "customer-details", state: "content", theme: "light", note: "LockedByPlan: the fields read rather than disappear" },
+  customerNoOrdersLight: { kind: "screen", contract: "customer-details", state: "error", theme: "light", note: "read, and genuinely none — the sentence the seed used to fake" },
+  customerNoOrdersDark: { kind: "screen", contract: "customer-details", state: "error", theme: "dark" },
+
   // ================= entry =================
   // Splash had no name at all: it was an anonymous block inside
   // `composable<SplashRoute> { }`, which is why nothing could render it and why
@@ -330,7 +360,7 @@ export const RENDERS = {
 };
 
 /** Proven screen-states may never drop below this. Raise it; never lower it. */
-export const FLOOR = 55;
+export const FLOOR = 62;
 
 /**
  * The whole decision, with nothing to do with the filesystem.

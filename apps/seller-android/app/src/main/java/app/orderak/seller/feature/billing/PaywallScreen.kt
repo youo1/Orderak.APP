@@ -120,7 +120,23 @@ fun PaywallScreen(
     viewModel: PaywallViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    PaywallContent(state = state, onBack = onBack, onViewPlans = onViewPlans)
+}
 
+/**
+ * The limit-reached page, as a function of its state.
+ *
+ * Its contract declares `content` and nothing else, which is right: everything
+ * here comes from the entitlement snapshot the caller already had in hand when
+ * it decided to show this page at all.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PaywallContent(
+    state: PaywallUiState,
+    onBack: () -> Unit,
+    onViewPlans: () -> Unit,
+) {
     Scaffold(
         topBar = {
             TopAppBar(

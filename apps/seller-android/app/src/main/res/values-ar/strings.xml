@@ -516,6 +516,7 @@
     <string name="search_clear_action">امسح البحث</string>
     <string name="plans_title">الباقات</string>
     <string name="plans_feature_column">الميزة</string>
+    <string name="plans_included">متاح</string>
     <string name="plans_unavailable">تفاصيل الباقات مش متاحة دلوقتي</string>
     <string name="plans_purchase_closed">الترقية لسه مش مفتوحة. الصفحة دي عشان تشوف كل باقة فيها إيه.</string>
     <string name="plans_price_note">الأسعار هتظهر من Google Play بعملتك لما الترقية تفتح.</string>

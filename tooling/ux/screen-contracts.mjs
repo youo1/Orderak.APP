@@ -721,5 +721,6 @@ export const ACTION_SOURCE = {
   store: "StoreContent",
   customers: "CustomersContent",
   "restricted-account": "RestrictedAccountContent",
+  plans: "PlansContent",
   account: "SettingsScreen",
 };

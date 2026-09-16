@@ -492,6 +492,7 @@
     <string name="search_clear_action">Clear search</string>
     <string name="plans_title">Plans</string>
     <string name="plans_feature_column">Feature</string>
+    <string name="plans_included">Included</string>
     <string name="plans_unavailable">Plan details aren\'t available right now</string>
     <string name="plans_purchase_closed">Upgrading isn\'t open yet. This is here so you can see what each plan includes.</string>
     <string name="plans_price_note">Prices are shown by Google Play in your own currency when upgrading opens.</string>
