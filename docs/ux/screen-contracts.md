@@ -345,7 +345,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Entry | MainRoute — تاب حسابي |
 | Exit | SellerProfileRoute · StoreInfoRoute · CategoriesRoute · CatalogLanguagesRoute · SubscriptionRoute · DevicesRoute · SupportRoute · AnnouncementsRoute · AiAssistantRoute · DeletionStatusRoute |
 | Data | seller profile · plan summary · entitlement states for every entry · public slug · payout handles (InstaPay, Vodafone Cash) |
-| Actions | open group entry `onOpenStoreInfo` · save payout and slug `savePayout` · switch language *(untraced)* · purchase plan `purchase` · delete account *(untraced)* · sign out `onLogout` |
+| Actions | open group entry `onOpenStoreInfo` · save payout and slug `savePayout` · switch language `showLanguage` · purchase plan `purchase` · delete account `requestAccountDeletion` · sign out `onLogout` |
 
 ### `seller-profile`
 

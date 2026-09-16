@@ -428,9 +428,11 @@ export const CONTRACTS = [
     actions: [
       { do: "open group entry", via: "onOpenStoreInfo" },
       { do: "save payout and slug", via: "savePayout" },
-      { do: "switch language", status: "unverified" },
+      // Both were real and untraced: the language sheet is behind `showLanguage`
+      // and account deletion behind `requestAccountDeletion`.
+      { do: "switch language", via: "showLanguage" },
       { do: "purchase plan", via: "purchase" },
-      { do: "delete account", status: "unverified" },
+      { do: "delete account", via: "requestAccountDeletion" },
       { do: "sign out", via: "onLogout" },
     ],
     states: ["content", "loading"],
@@ -659,8 +661,6 @@ export const UNVERIFIED_ACTIONS = new Set([
   "store-info:copy link",
   "catalog-languages:edit translation",
   "catalog-languages:request retranslation",
-  "account:switch language",
-  "account:delete account",
   "support-ticket:close",
   "announcements:open link",
   "subscription:register interest",

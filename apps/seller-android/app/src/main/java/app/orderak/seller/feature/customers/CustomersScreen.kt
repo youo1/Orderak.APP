@@ -41,6 +41,7 @@ import app.orderak.seller.R
 import app.orderak.seller.core.money.formatAmountLabel
 import app.orderak.seller.core.text.SearchText
 import app.orderak.seller.core.ui.FullScreenEmpty
+import app.orderak.seller.core.ui.FullScreenLoading
 import app.orderak.seller.core.ui.SearchField
 import app.orderak.seller.core.ui.PriorityListRow
 import androidx.compose.ui.platform.LocalConfiguration
@@ -54,8 +55,15 @@ import javax.inject.Inject
 
 @HiltViewModel
 class CustomersViewModel @Inject constructor(repo: OrderRepository) : ViewModel() {
-    val customers: StateFlow<List<CustomerSummary>> =
-        repo.customers.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    /**
+     * The customer list, or null while it is still being derived.
+     *
+     * Seeded `emptyList()` before, which made "not read yet" and "you have no
+     * customers" the same value — and this list is AGGREGATED from orders on the
+     * device, so it is the slowest of the three to arrive.
+     */
+    val customers: StateFlow<List<CustomerSummary>?> =
+        repo.customers.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 }
 
 /** S11 — phone-keyed customer list with LTV. */
@@ -74,7 +82,15 @@ fun CustomersScreen(
     //
     // Checked before the search box is drawn, so a seller with no customers is
     // not handed something to search through nothing with.
-    if (customers.isEmpty()) {
+    val list = customers
+    if (list == null) {
+        // Aggregated from orders on the device, so this is the slowest of the
+        // three lists to arrive — and the one whose empty state says "you have
+        // no customers", which is a claim, not a placeholder.
+        FullScreenLoading()
+        return
+    }
+    if (list.isEmpty()) {
         FullScreenEmpty(message = stringResource(R.string.customers_empty))
         return
     }
@@ -83,7 +99,7 @@ fun CustomersScreen(
     // this works with the network off, which is the state a seller at a stall is
     // most often in. Phone as well as name — the phone IS the customer's
     // identity, and Arabic-Indic digits fold to Latin so ٠١٠ finds 010.
-    val visible = customers.filter { SearchText.matches(query, it.name, it.phone) }
+    val visible = list.filter { SearchText.matches(query, it.name, it.phone) }
     val locale = LocalConfiguration.current.locales[0]
 
     Column(Modifier.fillMaxSize()) {
