@@ -715,5 +715,6 @@ export const ACTION_SOURCE = {
   "version-governance": "VersionBlockingScreen",
   today: "DashboardTab",
   store: "StoreContent",
+  customers: "CustomersContent",
   account: "SettingsScreen",
 };

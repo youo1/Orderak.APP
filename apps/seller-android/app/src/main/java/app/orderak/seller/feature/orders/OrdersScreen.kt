@@ -1,31 +1,11 @@
 package app.orderak.seller.feature.orders
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.sizeIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.outlined.Inbox
-import androidx.compose.material3.Card
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -35,16 +15,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 import app.orderak.seller.R
 import app.orderak.seller.core.money.formatAmountLabel
-import app.orderak.seller.core.ui.FullScreenEmpty
-import app.orderak.seller.core.ui.FullScreenLoading
 import app.orderak.seller.core.ui.PriorityListRow
 import app.orderak.seller.core.ui.SemanticChip
 import app.orderak.seller.core.ui.SemanticRole
@@ -77,85 +53,14 @@ fun OrdersScreen(
     val filter by viewModel.filter.collectAsStateWithLifecycle()
     val refusedPushes by viewModel.refusedPushes.collectAsStateWithLifecycle()
 
-    val list = orders
-    Box(Modifier.fillMaxSize()) {
-        if (list == null) {
-            // The state this screen declared and never had. An empty list stood
-            // in for "not read yet", so the empty state — whose action is
-            // "record an order" — greeted a seller who already had some.
-            FullScreenLoading()
-        } else if (list.isEmpty() && filter == OrdersFilter.All) {
-            // The shared empty state, and it carries an action. "Nothing here"
-            // without a next step is a dead end, and a seller on day one meets
-            // this screen before any other.
-            FullScreenEmpty(
-                message = stringResource(R.string.orders_empty),
-                actionLabel = stringResource(R.string.order_new_title),
-                onAction = onNew,
-            )
-        } else {
-            Column {
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = spacing.space4, vertical = spacing.space2),
-                    horizontalArrangement = Arrangement.spacedBy(spacing.space2)
-                ) {
-                    item {
-                        FilterChip(selected = filter == OrdersFilter.All,
-                            onClick = { viewModel.setFilter(OrdersFilter.All) },
-                            label = { Text(stringResource(R.string.orders_all)) })
-                    }
-                    // The three اليوم counters, as chips. They are here so the
-                    // filter a counter opens is one the seller can also see,
-                    // clear and re-apply — arriving in a state with no visible
-                    // control is how a filtered list reads as a broken one.
-                    item {
-                        FilterChip(selected = filter == OrdersFilter.Today,
-                            onClick = { viewModel.setFilter(OrdersFilter.Today) },
-                            label = { Text(stringResource(R.string.dash_today_orders)) })
-                    }
-                    item {
-                        FilterChip(selected = filter == OrdersFilter.Unpaid,
-                            onClick = { viewModel.setFilter(OrdersFilter.Unpaid) },
-                            label = { Text(stringResource(R.string.dash_unpaid)) })
-                    }
-                    item {
-                        FilterChip(selected = filter == OrdersFilter.ToShip,
-                            onClick = { viewModel.setFilter(OrdersFilter.ToShip) },
-                            label = { Text(stringResource(R.string.dash_to_ship)) })
-                    }
-                    items(OrderStatus.entries.filter { it != OrderStatus.CANCELLED }) { st ->
-                        FilterChip(selected = filter == OrdersFilter.Status(st),
-                            onClick = { viewModel.setStatusFilter(st) },
-                            label = { Text(statusLabel(st)) })
-                    }
-                }
-                if (list.isEmpty()) {
-                    // Filtered to nothing is a different situation from having no
-                    // orders at all: the fix is to clear the filter, not to sell
-                    // something.
-                    FullScreenEmpty(
-                        message = stringResource(R.string.orders_empty_filtered),
-                        actionLabel = stringResource(R.string.orders_all),
-                        onAction = { viewModel.setFilter(OrdersFilter.All) },
-                    )
-                } else {
-                    LazyColumn(
-                        contentPadding = PaddingValues(spacing.space4),
-                        verticalArrangement = Arrangement.spacedBy(spacing.space2)
-                    ) {
-                        items(list, key = { it.id }) { o ->
-                            OrderCard(o, refused = o.id in refusedPushes, onClick = { onOpen(o.id) })
-                        }
-                        item { Spacer(Modifier.height(80.dp)) }
-                    }
-                }
-            }
-        }
-        FloatingActionButton(
-            onClick = onNew,
-            modifier = Modifier.align(Alignment.BottomEnd).padding(spacing.space4)
-        ) { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.order_new_title)) }
-    }
+    OrdersContent(
+        state = OrdersUiState(orders = orders, filter = filter, refusedPushes = refusedPushes),
+        onOpen = onOpen,
+        onNew = onNew,
+        // The view model still keeps a status-shaped setter for the chips that
+        // speak in statuses; the surface now speaks only OrdersFilter.
+        onFilter = viewModel::setFilter,
+    )
 }
 
 @Composable

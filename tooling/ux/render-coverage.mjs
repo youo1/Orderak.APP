@@ -75,14 +75,37 @@ export const RENDERS = {
   // Each of these renders a shared component with a surface's copy in it. That
   // proves the component and the string; it does not prove the screen chooses
   // them, which is exactly the defect class this repo keeps producing.
-  stateLoading: { kind: "component", note: "FullScreenLoading — the spinner every surface shares" },
-  stateLoadingDark: { kind: "component", note: "FullScreenLoading, dark" },
+  // The only shared state component no screen render reaches: FullScreenError's
+  // two callers, PlansScreen and OperationsScreens, are not previewable yet.
   stateError: { kind: "component", note: "FullScreenError carries a retry" },
   stateErrorDark: { kind: "component", note: "FullScreenError, dark" },
-  ordersEmptyState: { kind: "component", note: "FullScreenEmpty with the orders copy and its action" },
-  ordersFilteredEmptyState: { kind: "component", note: "filtered-to-none is a different sentence with a different way out" },
-  customersEmptyState: { kind: "component", note: "customers empty carries NO action — a row is created by an order arriving" },
-  customersEmptyStateDark: { kind: "component", note: "customers empty, dark" },
+
+  // ---- الطلبات ----
+  ordersLoadingLight: { kind: "screen", contract: "orders", state: "loading", theme: "light" },
+  ordersLoadingDark: { kind: "screen", contract: "orders", state: "loading", theme: "dark" },
+  ordersContentLight: { kind: "screen", contract: "orders", state: "content", theme: "light" },
+  ordersContentDark: { kind: "screen", contract: "orders", state: "content", theme: "dark" },
+  ordersEmptyLight: { kind: "screen", contract: "orders", state: "empty", theme: "light" },
+  ordersEmptyDark: { kind: "screen", contract: "orders", state: "empty", theme: "dark" },
+  // The orders are on the device either way, so the error keeps the list and
+  // marks the one the server refused rather than replacing it with a message.
+  ordersErrorLight: { kind: "screen", contract: "orders", state: "error", theme: "light" },
+  ordersErrorDark: { kind: "screen", contract: "orders", state: "error", theme: "dark" },
+  ordersFilteredToNone: { kind: "component", note: "filtered to none keeps the chips — the way out is to clear one" },
+  ordersFilteredUnpaid: { kind: "component", note: "a اليوم counter's filter arrives visible, so it can be cleared" },
+
+  // ---- العملاء ----
+  customersLoadingLight: { kind: "screen", contract: "customers", state: "loading", theme: "light" },
+  customersLoadingDark: { kind: "screen", contract: "customers", state: "loading", theme: "dark" },
+  customersContentLight: { kind: "screen", contract: "customers", state: "content", theme: "light" },
+  customersContentDark: { kind: "screen", contract: "customers", state: "content", theme: "dark" },
+  customersEmptyLight: { kind: "screen", contract: "customers", state: "empty", theme: "light" },
+  customersEmptyDark: { kind: "screen", contract: "customers", state: "empty", theme: "dark" },
+  // This surface's failure is a total it cannot honestly add up, not a lost
+  // connection: it is aggregated from orders already on the device.
+  customersErrorLight: { kind: "screen", contract: "customers", state: "error", theme: "light" },
+  customersErrorDark: { kind: "screen", contract: "customers", state: "error", theme: "dark" },
+  customersSearchEmpty: { kind: "component", note: "a search matching nothing is not an empty customer list" },
 
   // المتجر, once StoreContent(state) existed to render. These replace four
   // `products*` renders that called FullScreenEmpty and FullScreenLoading
@@ -118,7 +141,7 @@ export const RENDERS = {
 };
 
 /** Proven screen-states may never drop below this. Raise it; never lower it. */
-export const FLOOR = 8;
+export const FLOOR = 16;
 
 /**
  * The whole decision, with nothing to do with the filesystem.
