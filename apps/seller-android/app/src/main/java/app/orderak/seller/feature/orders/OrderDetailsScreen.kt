@@ -56,6 +56,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.orderak.seller.core.phone.CustomerPhone
 import app.orderak.seller.R
+import app.orderak.seller.core.ui.FeatureAvailability
+import app.orderak.seller.data.db.OrderWithItems
 import app.orderak.seller.core.money.formatAmountLabel
 import app.orderak.seller.core.text.formatCount
 import app.orderak.seller.core.ui.FeatureGate
@@ -99,6 +101,79 @@ fun OrderDetailsScreen(
         uri?.let(viewModel::verifyProof)
     }
 
+    OrderDetailsContent(
+        orderWithItems = orderWithItems,
+        payments = payments,
+        countryIso = countryIso,
+        proof = proof,
+        refusalCode = refusalCode,
+        ocrAvailability = viewModel.featureAvailability.decide(OCR_RECEIPT_ASSISTANCE).availability,
+        confirmCancel = confirmCancel,
+        confirmDiscard = confirmDiscard,
+        actions = OrderDetailsActions(
+            advance = viewModel::advance,
+            markPaidManually = viewModel::markPaidManually,
+            dismissProofResult = viewModel::dismissProofResult,
+            cancel = { viewModel.cancel(onDone = it) },
+            discardRefused = { viewModel.discardRefused(onDone = it) },
+        ),
+        onPickProof = {
+            picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        },
+        onConfirmCancel = { confirmCancel = it },
+        onConfirmDiscard = { confirmDiscard = it },
+        onOpenIntent = { intent -> runCatching { context.startActivity(intent) } },
+        onBack = onBack,
+        onOpenCustomer = onOpenCustomer,
+        snackbarHostState = snackbarHostState,
+    )
+}
+
+/** What the order page can ask the view model to do, as data. */
+data class OrderDetailsActions(
+    val advance: () -> Unit = {},
+    val markPaidManually: () -> Unit = {},
+    val dismissProofResult: () -> Unit = {},
+    val cancel: (() -> Unit) -> Unit = {},
+    val discardRefused: (() -> Unit) -> Unit = {},
+)
+
+/**
+ * One order, as a function of its state.
+ *
+ * [payments] is nullable for the same reason the lists elsewhere are: it seeded
+ * `emptyList()`, so the page said "no payment recorded" about an order whose
+ * payment may well be recorded — on the screen a seller opens precisely to check
+ * whether a transfer landed.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun OrderDetailsContent(
+    orderWithItems: OrderWithItems?,
+    payments: List<PaymentEntity>?,
+    countryIso: String?,
+    proof: ProofUiState,
+    refusalCode: String?,
+    /**
+     * The OCR gate's decision, already resolved.
+     *
+     * Not the resolver: it needs an EntitlementManager and therefore a Hilt
+     * graph, so this screen could not be rendered in any of its three gate
+     * states.
+     */
+    ocrAvailability: FeatureAvailability,
+    confirmCancel: Boolean,
+    confirmDiscard: Boolean,
+    actions: OrderDetailsActions,
+    onPickProof: () -> Unit,
+    onConfirmCancel: (Boolean) -> Unit,
+    onConfirmDiscard: (Boolean) -> Unit,
+    onOpenIntent: (android.content.Intent) -> Unit,
+    onBack: () -> Unit,
+    onOpenCustomer: (String) -> Unit,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+) {
+    val locale = LocalConfiguration.current.locales[0]
     val data = orderWithItems
     if (data == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
@@ -110,9 +185,9 @@ fun OrderDetailsScreen(
     // S6a result dialog
     (proof as? ProofUiState.Result)?.let { r ->
         AlertDialog(
-            onDismissRequest = viewModel::dismissProofResult,
+            onDismissRequest = actions.dismissProofResult,
             confirmButton = {
-                TextButton(onClick = viewModel::dismissProofResult) { Text(stringResource(R.string.common_ok)) }
+                TextButton(onClick = actions.dismissProofResult) { Text(stringResource(R.string.common_ok)) }
             },
             title = {
                 Text(
@@ -166,7 +241,7 @@ fun OrderDetailsScreen(
                             order.buyerPhone.filter(Char::isDigit)
                         }
                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$digits"))
-                        runCatching { context.startActivity(intent) }
+                        onOpenIntent(intent)
                     }) {
                         Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = stringResource(R.string.order_whatsapp))
                     }
@@ -184,7 +259,7 @@ fun OrderDetailsScreen(
             if (order.livesOnlyOnThisPhone) {
                 LocalOnlyOrderBanner(
                     refusalCode = refusalCode,
-                    onDiscard = refusalCode?.let { { confirmDiscard = true } },
+                    onDiscard = refusalCode?.let { { onConfirmDiscard(true) } },
                 )
             }
 
@@ -259,18 +334,17 @@ fun OrderDetailsScreen(
                             }
                         } else {
                             FeatureGate(
-                                resolver = viewModel.featureAvailability,
-                                featureKey = OCR_RECEIPT_ASSISTANCE,
+                                availability = ocrAvailability,
                                 onUpgrade = null,
                             ) {
                                 Button(
                                     onClick = {
-                                        picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                        onPickProof()
                                     },
                                     modifier = Modifier.fillMaxWidth()
                                 ) { Text(stringResource(R.string.payment_verify)) }
                             }
-                            OutlinedButton(onClick = viewModel::markPaidManually, modifier = Modifier.fillMaxWidth()) {
+                            OutlinedButton(onClick = actions.markPaidManually, modifier = Modifier.fillMaxWidth()) {
                                 Text(stringResource(R.string.payment_manual))
                             }
                         }
@@ -279,7 +353,7 @@ fun OrderDetailsScreen(
             }
 
             // Payment history
-            if (payments.isNotEmpty()) {
+            if (!payments.isNullOrEmpty()) {
                 Card {
                     Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(stringResource(R.string.payment_history_title), style = MaterialTheme.typography.titleMedium)
@@ -330,7 +404,7 @@ fun OrderDetailsScreen(
             val acknowledged = !order.livesOnlyOnThisPhone
             status.next?.let { next ->
                 Button(
-                    onClick = viewModel::advance,
+                    onClick = actions.advance,
                     enabled = acknowledged,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -339,7 +413,7 @@ fun OrderDetailsScreen(
             }
             if (status.canCancel) {
                 OutlinedButton(
-                    onClick = { confirmCancel = true },
+                    onClick = { onConfirmCancel(true) },
                     enabled = acknowledged,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -352,13 +426,13 @@ fun OrderDetailsScreen(
 
     if (confirmDiscard) {
         AlertDialog(
-            onDismissRequest = { confirmDiscard = false },
+            onDismissRequest = { onConfirmDiscard(false) },
             title = { Text(stringResource(R.string.order_refused_discard)) },
             text = { Text(stringResource(R.string.order_refused_discard_confirm)) },
             confirmButton = {
                 TextButton(onClick = {
-                    confirmDiscard = false
-                    viewModel.discardRefused(onDone = onBack)
+                    onConfirmDiscard(false)
+                    actions.discardRefused(onBack)
                 }) {
                     Text(
                         stringResource(R.string.order_refused_discard),
@@ -367,7 +441,7 @@ fun OrderDetailsScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { confirmDiscard = false }) {
+                TextButton(onClick = { onConfirmDiscard(false) }) {
                     Text(stringResource(R.string.common_cancel))
                 }
             },
@@ -376,15 +450,15 @@ fun OrderDetailsScreen(
 
     if (confirmCancel) {
         AlertDialog(
-            onDismissRequest = { confirmCancel = false },
+            onDismissRequest = { onConfirmCancel(false) },
             title = { Text(stringResource(R.string.order_cancel)) },
             text = { Text(stringResource(R.string.order_cancel_confirm)) },
             confirmButton = {
-                TextButton(onClick = { confirmCancel = false; viewModel.cancel(onDone = onBack) }) {
+                TextButton(onClick = { onConfirmCancel(false); actions.cancel(onBack) }) {
                     Text(stringResource(R.string.order_cancel), color = MaterialTheme.colorScheme.error)
                 }
             },
-            dismissButton = { TextButton(onClick = { confirmCancel = false }) { Text(stringResource(R.string.common_cancel)) } },
+            dismissButton = { TextButton(onClick = { onConfirmCancel(false) }) { Text(stringResource(R.string.common_cancel)) } },
         )
     }
 }

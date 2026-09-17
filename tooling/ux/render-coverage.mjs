@@ -331,6 +331,52 @@ export const RENDERS = {
   productEditStockConflict: { kind: "screen", contract: "product-edit", state: "error", theme: "light", note: "both numbers: the seller decides, and nothing retries automatically" },
   productEditStockConflictDark: { kind: "screen", contract: "product-edit", state: "error", theme: "dark" },
 
+  // ---- order details ----
+  // `payments` seeded emptyList(), so the page said "no payment recorded" about
+  // an order whose payment may well be recorded — on the screen a seller opens
+  // precisely to check whether a transfer landed.
+  orderDetailsLoadingLight: { kind: "screen", contract: "order-details", state: "loading", theme: "light" },
+  orderDetailsLoadingDark: { kind: "screen", contract: "order-details", state: "loading", theme: "dark" },
+  orderDetailsContentLight: { kind: "screen", contract: "order-details", state: "content", theme: "light" },
+  orderDetailsContentDark: { kind: "screen", contract: "order-details", state: "content", theme: "dark" },
+  orderDetailsNoPayment: { kind: "screen", contract: "order-details", state: "content", theme: "light", note: "read, and genuinely none — the sentence the seed used to fake" },
+  orderDetailsVerifyingProof: { kind: "screen", contract: "order-details", state: "loading", theme: "light" },
+  orderDetailsRefusedLight: { kind: "screen", contract: "order-details", state: "error", theme: "light" },
+  orderDetailsRefusedDark: { kind: "screen", contract: "order-details", state: "error", theme: "dark" },
+  // The gate's other two states, which nothing had ever drawn: FeatureGate took
+  // a resolver, and the resolver needs a Hilt graph.
+  orderDetailsOcrLockedByPlan: { kind: "screen", contract: "order-details", state: "content", theme: "light", note: "the only branch that may offer an upgrade" },
+  orderDetailsOcrNotBuilt: { kind: "screen", contract: "order-details", state: "content", theme: "light", note: "NO upgrade affordance — a path no plan change opens must not look like a path" },
+
+  // ---- new order ----
+  // Already honest: products is nullable and it branches on null before deciding
+  // the catalogue is empty. The split buys renders rather than a fix.
+  newOrderLoadingLight: { kind: "screen", contract: "new-order", state: "loading", theme: "light" },
+  newOrderLoadingDark: { kind: "screen", contract: "new-order", state: "loading", theme: "dark" },
+  newOrderContentLight: { kind: "screen", contract: "new-order", state: "content", theme: "light" },
+  newOrderContentDark: { kind: "screen", contract: "new-order", state: "content", theme: "dark" },
+  newOrderFilled: { kind: "screen", contract: "new-order", state: "content", theme: "light", note: "a basket and a total" },
+  newOrderEmptyCatalogue: { kind: "screen", contract: "new-order", state: "content", theme: "light", note: "an order needs something to sell — a dead end unless it says where to go" },
+  newOrderSaving: { kind: "screen", contract: "new-order", state: "loading", theme: "light" },
+  newOrderStockErrorLight: { kind: "screen", contract: "new-order", state: "error", theme: "light", note: "the stock moved between opening the form and saving it" },
+  newOrderStockErrorDark: { kind: "screen", contract: "new-order", state: "error", theme: "dark" },
+
+  // ---- the two shells ----
+  // MainScreen reads five flows off a Hilt view model; VersionBlockingScreen was
+  // private and has always taken plain values, needing a graph for nothing.
+  shellTodayLight: { kind: "screen", contract: "main-shell", state: "content", theme: "light" },
+  shellTodayDark: { kind: "screen", contract: "main-shell", state: "content", theme: "dark" },
+  shellStore: { kind: "screen", contract: "main-shell", state: "content", theme: "light", note: "no FAB: the store has its own, and two would compete" },
+  shellAccount: { kind: "screen", contract: "main-shell", state: "content", theme: "light" },
+  shellNoShopName: { kind: "screen", contract: "main-shell", state: "content", theme: "light", note: "the app name, not a blank bar and not a guess" },
+  shellEnglish: { kind: "screen", contract: "main-shell", state: "content", theme: "light", note: "where the five labels are longest" },
+
+  versionForceUpdateLight: { kind: "screen", contract: "version-governance", state: "content", theme: "light", note: "the only mode that offers a store link — the only one the seller can act on" },
+  versionForceUpdateDark: { kind: "screen", contract: "version-governance", state: "content", theme: "dark" },
+  versionBlocked: { kind: "screen", contract: "version-governance", state: "content", theme: "light", note: "updating is not the fix, so no store link" },
+  versionMaintenance: { kind: "screen", contract: "version-governance", state: "content", theme: "light" },
+  versionServerMessage: { kind: "screen", contract: "version-governance", state: "content", theme: "light", note: "blocking_message is keyed by language — the Arabic entry, not the English fallback" },
+
   // ================= entry =================
   // Splash had no name at all: it was an anonymous block inside
   // `composable<SplashRoute> { }`, which is why nothing could render it and why
@@ -417,7 +463,7 @@ export const RENDERS = {
 };
 
 /** Proven screen-states may never drop below this. Raise it; never lower it. */
-export const FLOOR = 75;
+export const FLOOR = 83;
 
 /**
  * The whole decision, with nothing to do with the filesystem.

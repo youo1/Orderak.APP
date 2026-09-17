@@ -68,8 +68,15 @@ class OrderDetailsViewModel @Inject constructor(
     val order: StateFlow<OrderWithItems?> =
         repo.order(orderId).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    val payments: StateFlow<List<PaymentEntity>> =
-        repo.payments(orderId).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    /**
+     * null until the query answers. NOT emptyList().
+     *
+     * The seed made the page say "no payment recorded" about an order whose
+     * payment may well be recorded — on the screen a seller opens precisely to
+     * check whether a transfer landed.
+     */
+    val payments: StateFlow<List<PaymentEntity>?> =
+        repo.payments(orderId).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val _proof = MutableStateFlow<ProofUiState>(ProofUiState.Idle)
     val proof: StateFlow<ProofUiState> = _proof.asStateFlow()

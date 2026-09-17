@@ -166,43 +166,14 @@ fun MainScreen(
         }
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            TopAppBar(
-                title = { Text(shopName ?: stringResource(R.string.app_name), modifier = Modifier.semantics { heading() }) },
-            )
-        },
-        floatingActionButton = {
-            if (surface == SellerSurface.Today) {
-                FloatingActionButton(onClick = onNewOrder) {
-                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.order_new_title))
-                }
-            }
-        },
-        bottomBar = {
-            NavigationBar {
-                SellerSurface.entries.forEach { item ->
-                    val label = stringResource(item.labelRes)
-                    NavigationBarItem(
-                        selected = surface == item,
-                        onClick = { surfaceName = item.name },
-                        icon = { Icon(item.icon, contentDescription = label) },
-                        label = { Text(label) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            selectedTextColor = MaterialTheme.colorScheme.onSurface,
-                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        ),
-                    )
-                }
-            }
-        }
-    ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
-            when (surface) {
+    MainShellContent(
+        shopName = shopName,
+        surface = surface,
+        onSurface = { surfaceName = it.name },
+        onNewOrder = onNewOrder,
+        snackbarHostState = snackbarHostState,
+    ) {
+        when (surface) {
                 SellerSurface.Today -> DashboardTab(
                     viewModel = viewModel,
                     sellerPhone = sellerPhone,
@@ -259,7 +230,67 @@ fun MainScreen(
                     onOpenSellerProfile = onOpenSellerProfile,
                 )
             }
-        }
+    }
+}
+
+/**
+ * The five-surface shell: what stays on screen whichever surface is showing.
+ *
+ * A top bar carrying the shop name, a FAB that belongs to اليوم alone, and the
+ * navigation bar. The surface itself is a slot, so this composable is the whole
+ * of what the `main-shell` contract means by content — and the only part of
+ * MainScreen that does not need a Hilt graph to draw.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MainShellContent(
+    shopName: String?,
+    surface: SellerSurface,
+    onSurface: (SellerSurface) -> Unit,
+    onNewOrder: () -> Unit,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    content: @Composable () -> Unit,
+) {
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            TopAppBar(
+                // The app name until the shop's own arrives. Not a blank bar,
+                // and not a guess at the shop's name.
+                title = { Text(shopName ?: stringResource(R.string.app_name), modifier = Modifier.semantics { heading() }) },
+            )
+        },
+        floatingActionButton = {
+            // اليوم only: on every other surface the primary action is that
+            // surface's own, and two would compete.
+            if (surface == SellerSurface.Today) {
+                FloatingActionButton(onClick = onNewOrder) {
+                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.order_new_title))
+                }
+            }
+        },
+        bottomBar = {
+            NavigationBar {
+                SellerSurface.entries.forEach { item ->
+                    val label = stringResource(item.labelRes)
+                    NavigationBarItem(
+                        selected = surface == item,
+                        onClick = { onSurface(item) },
+                        icon = { Icon(item.icon, contentDescription = label) },
+                        label = { Text(label) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
+                    )
+                }
+            }
+        },
+    ) { padding ->
+        Box(Modifier.fillMaxSize().padding(padding)) { content() }
     }
 }
 
@@ -375,8 +406,15 @@ private fun PlanStatusBanners(state: EntitlementSyncState, versionMode: VersionU
     }
 }
 
+/**
+ * The app held shut by governance.
+ *
+ * Three modes and one shape: an update the seller must take, a build the server
+ * refuses, and a maintenance window. Only FORCE_UPDATE offers a store link,
+ * because it is the only one the seller can act on — the other two are waits.
+ */
 @Composable
-private fun VersionBlockingScreen(mode: VersionUiMode, policy: AppVersionPolicy, onRetry: () -> Unit) {
+internal fun VersionBlockingScreen(mode: VersionUiMode, policy: AppVersionPolicy, onRetry: () -> Unit) {
     val uriHandler = LocalUriHandler.current
     val title = when (mode) {
         VersionUiMode.MAINTENANCE -> stringResource(R.string.app_version_maintenance_title)
