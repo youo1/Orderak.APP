@@ -42,6 +42,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import app.orderak.seller.R
+import app.orderak.seller.core.ui.FullScreenLoading
 import app.orderak.seller.data.remote.BackendApi
 import app.orderak.seller.data.session.SessionStore
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -81,6 +82,17 @@ class SellerProfileViewModel @Inject constructor(
     private val _emailVerificationStatus = MutableStateFlow<String?>(null)
     val emailVerificationStatus: StateFlow<String?> = _emailVerificationStatus.asStateFlow()
 
+    /**
+     * Whether the session snapshot has been read.
+     *
+     * Every field above seeds "", and reading the snapshot is a suspend call, so
+     * the form rendered with a blank phone number — the seller's own, and the
+     * one read-only identity on the page — and filled it in a beat later. The
+     * contract declares a loading state; this is what it is for.
+     */
+    private val _loaded = MutableStateFlow(false)
+    val loaded: StateFlow<Boolean> = _loaded.asStateFlow()
+
     init {
         viewModelScope.launch {
             val snap = sessionStore.snapshot()
@@ -89,6 +101,7 @@ class SellerProfileViewModel @Inject constructor(
             _email.value = snap.email.orEmpty()
             _birthYear.value = snap.birthYear.orEmpty()
             _profilePhotoUri.value = snap.profilePhotoUri.orEmpty()
+            _loaded.value = true
         }
     }
 
@@ -208,6 +221,7 @@ fun SellerProfileScreen(
     val savedBirthYear by viewModel.birthYear.collectAsStateWithLifecycle()
     val savedPhotoUri by viewModel.profilePhotoUri.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
+    val loaded by viewModel.loaded.collectAsStateWithLifecycle()
     val emailVerificationStatus by viewModel.emailVerificationStatus.collectAsStateWithLifecycle()
 
     var fullName by rememberSaveable { mutableStateOf("") }
@@ -227,6 +241,58 @@ fun SellerProfileScreen(
         uri?.let { viewModel.uploadProfilePhoto(it) { url -> if (url != null) profilePhotoUri = url } }
     }
 
+    SellerProfileContent(
+        phone = phone,
+        loaded = loaded,
+        busy = busy,
+        savedEmail = savedEmail,
+        emailVerificationStatus = emailVerificationStatus,
+        fullName = fullName,
+        email = email,
+        birthYear = birthYear,
+        profilePhotoUri = profilePhotoUri,
+        onFullName = { fullName = it },
+        onEmail = { email = it },
+        onBirthYear = { birthYear = it },
+        onProfilePhotoUri = { profilePhotoUri = it },
+        onPickPhoto = { pickPhoto.launch("image/*") },
+        onResendVerification = viewModel::resendEmailVerification,
+        onSave = viewModel::save,
+        onBack = onBack,
+        onReauthenticate = onReauthenticate,
+    )
+}
+
+/**
+ * The seller's own profile, as a function of its state.
+ *
+ * [loaded] is the screen's loading state and it was missing: every field in the
+ * view model seeds "" and the session snapshot is read in a suspend call, so the
+ * form drew with a blank phone number — the seller's own, and the one read-only
+ * identity on this page — and filled it in a beat later.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SellerProfileContent(
+    phone: String,
+    loaded: Boolean,
+    busy: Boolean,
+    savedEmail: String,
+    emailVerificationStatus: String?,
+    fullName: String,
+    email: String,
+    birthYear: String,
+    profilePhotoUri: String,
+    onFullName: (String) -> Unit,
+    onEmail: (String) -> Unit,
+    onBirthYear: (String) -> Unit,
+    onProfilePhotoUri: (String) -> Unit,
+    onPickPhoto: () -> Unit,
+    onResendVerification: (() -> Unit) -> Unit,
+    onSave: (String, String?, String?, String?, () -> Unit) -> Unit,
+    onBack: () -> Unit,
+    onReauthenticate: () -> Unit,
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -242,6 +308,13 @@ fun SellerProfileScreen(
             )
         },
     ) { padding ->
+        // The four editable fields are seeded from the snapshot on first read,
+        // so drawing the form before it lands shows a blank phone number and
+        // then swaps it in.
+        if (!loaded) {
+            FullScreenLoading(Modifier.padding(padding))
+            return@Scaffold
+        }
         Column(
             Modifier
                 .fillMaxSize()
@@ -266,7 +339,7 @@ fun SellerProfileScreen(
             )
             if (savedEmail.isNotBlank()) {
                 OutlinedButton(
-                    onClick = { viewModel.resendEmailVerification(onReauthenticate) },
+                    onClick = { onResendVerification(onReauthenticate) },
                     enabled = !busy,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -291,21 +364,21 @@ fun SellerProfileScreen(
 
             OutlinedTextField(
                 value = fullName,
-                onValueChange = { fullName = it.take(80) },
+                onValueChange = { onFullName(it.take(80)) },
                 label = { Text(stringResource(R.string.seller_profile_full_name)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
                 value = email,
-                onValueChange = { email = it.take(80) },
+                onValueChange = { onEmail(it.take(80)) },
                 label = { Text(stringResource(R.string.seller_profile_email)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
                 value = birthYear,
-                onValueChange = { v -> birthYear = v.filter(Char::isDigit).take(4) },
+                onValueChange = { v -> onBirthYear(v.filter(Char::isDigit).take(4)) },
                 label = { Text(stringResource(R.string.seller_profile_birth_year)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
@@ -324,7 +397,7 @@ fun SellerProfileScreen(
                             color = MaterialTheme.colorScheme.primary,
                         )
                     }
-                    OutlinedButton(onClick = { pickPhoto.launch("image/*") }) {
+                    OutlinedButton(onClick = { onPickPhoto() }) {
                         Text(
                             if (profilePhotoUri.isBlank()) stringResource(R.string.setup_add_photo)
                             else stringResource(R.string.setup_change_photo),
@@ -336,13 +409,7 @@ fun SellerProfileScreen(
             Spacer(Modifier.height(8.dp))
             Button(
                 onClick = {
-                    viewModel.save(
-                        fullName = fullName,
-                        email = email,
-                        birthYear = birthYear,
-                        profilePhotoUri = profilePhotoUri,
-                        onDone = onBack,
-                    )
+                    onSave(fullName, email, birthYear, profilePhotoUri, onBack)
                 },
                 enabled = !busy && fullName.isNotBlank(),
                 modifier = Modifier.fillMaxWidth(),

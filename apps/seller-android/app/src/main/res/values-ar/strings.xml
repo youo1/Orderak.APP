@@ -266,6 +266,7 @@
     <string name="link_copied">تم نسخ اللينك</string>
     <string name="categories_title">الأقسام</string>
     <string name="categories_new">قسم جديد</string>
+    <string name="categories_empty">لسه مفيش أقسام — ضيف واحد فوق عشان ترتب منتجاتك.</string>
     <string name="categories_add">إضافة</string>
     <plurals name="categories_product_count">
         <item quantity="zero">لا توجد منتجات</item>

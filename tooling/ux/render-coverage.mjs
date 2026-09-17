@@ -274,6 +274,63 @@ export const RENDERS = {
   customerNoOrdersLight: { kind: "screen", contract: "customer-details", state: "error", theme: "light", note: "read, and genuinely none — the sentence the seed used to fake" },
   customerNoOrdersDark: { kind: "screen", contract: "customer-details", state: "error", theme: "dark" },
 
+  // ---- categories ----
+  // Declared an empty state and drew nothing for it: with the list read and
+  // genuinely empty the LazyColumn rendered nothing, so a seller could not tell
+  // "no categories" from "still loading". Its `loading` flag already seeded
+  // true, so this was the one gap.
+  categoriesLoadingLight: { kind: "screen", contract: "categories", state: "loading", theme: "light" },
+  categoriesLoadingDark: { kind: "screen", contract: "categories", state: "loading", theme: "dark" },
+  categoriesContentLight: { kind: "screen", contract: "categories", state: "content", theme: "light" },
+  categoriesContentDark: { kind: "screen", contract: "categories", state: "content", theme: "dark" },
+  categoriesEmptyLight: { kind: "screen", contract: "categories", state: "empty", theme: "light" },
+  categoriesEmptyDark: { kind: "screen", contract: "categories", state: "empty", theme: "dark" },
+  categoriesErrorLight: { kind: "screen", contract: "categories", state: "error", theme: "light" },
+  categoriesErrorDark: { kind: "screen", contract: "categories", state: "error", theme: "dark" },
+  categoriesLimitReached: { kind: "screen", contract: "categories", state: "error", theme: "light", note: "a plan boundary is a notice, not a fault — the categories stay on screen" },
+  categoriesLimitPurchaseOpen: { kind: "screen", contract: "categories", state: "error", theme: "light", note: "the paywall is offered in both purchase states" },
+
+  // ---- store info ----
+  // Already honest: it waited on `store == null` before composing. The wait is
+  // load-bearing, because the ten draft fields are keyed on the loaded store.
+  storeInfoLoadingLight: { kind: "screen", contract: "store-info", state: "loading", theme: "light" },
+  storeInfoLoadingDark: { kind: "screen", contract: "store-info", state: "loading", theme: "dark" },
+  storeInfoContentLight: { kind: "screen", contract: "store-info", state: "content", theme: "light" },
+  storeInfoContentDark: { kind: "screen", contract: "store-info", state: "content", theme: "dark" },
+  storeInfoSaving: { kind: "screen", contract: "store-info", state: "loading", theme: "light" },
+  storeInfoSlugTaken: { kind: "screen", contract: "store-info", state: "error", theme: "light", note: "save stays disabled unless the slug is free OR unchanged" },
+
+  // ---- seller profile ----
+  // Declared a loading state and had none: every field seeds "" and the session
+  // snapshot is a suspend read, so the form drew with a blank phone number.
+  sellerProfileLoadingLight: { kind: "screen", contract: "seller-profile", state: "loading", theme: "light" },
+  sellerProfileLoadingDark: { kind: "screen", contract: "seller-profile", state: "loading", theme: "dark" },
+  sellerProfileContentLight: { kind: "screen", contract: "seller-profile", state: "content", theme: "light" },
+  sellerProfileContentDark: { kind: "screen", contract: "seller-profile", state: "content", theme: "dark" },
+  sellerProfileSaving: { kind: "screen", contract: "seller-profile", state: "loading", theme: "light" },
+  sellerProfileVerificationError: { kind: "screen", contract: "seller-profile", state: "error", theme: "light" },
+
+  // ---- product edit ----
+  // `state.loaded` was computed in three places in the view model and read in
+  // none, so opening an existing product drew an empty form — blank name, stock
+  // "1" — and swapped in the real values when Room answered.
+  productEditLoadingLight: { kind: "screen", contract: "product-edit", state: "loading", theme: "light" },
+  productEditLoadingDark: { kind: "screen", contract: "product-edit", state: "loading", theme: "dark" },
+  productEditContentLight: { kind: "screen", contract: "product-edit", state: "content", theme: "light" },
+  productEditContentDark: { kind: "screen", contract: "product-edit", state: "content", theme: "dark" },
+  productEditNew: { kind: "screen", contract: "product-edit", state: "content", theme: "light", note: "no id, so no delete" },
+  productEditUnavailable: { kind: "screen", contract: "product-edit", state: "content", theme: "light", note: "hidden from the catalogue — the seller owns this" },
+  productEditConfirmDelete: { kind: "screen", contract: "product-edit", state: "content", theme: "light" },
+  productEditSaving: { kind: "screen", contract: "product-edit", state: "loading", theme: "light" },
+  // A Class A write does not queue, so writeError present means nothing was
+  // saved anywhere — the editor cannot imply otherwise.
+  productEditOffline: { kind: "screen", contract: "product-edit", state: "error", theme: "light" },
+  productEditOfflineDark: { kind: "screen", contract: "product-edit", state: "error", theme: "dark" },
+  productEditPlanLimit: { kind: "screen", contract: "product-edit", state: "error", theme: "light", note: "a boundary, not a fault — what was typed stays" },
+  productEditUnknownCategory: { kind: "screen", contract: "product-edit", state: "error", theme: "light", note: "the category was deleted while the editor was open" },
+  productEditStockConflict: { kind: "screen", contract: "product-edit", state: "error", theme: "light", note: "both numbers: the seller decides, and nothing retries automatically" },
+  productEditStockConflictDark: { kind: "screen", contract: "product-edit", state: "error", theme: "dark" },
+
   // ================= entry =================
   // Splash had no name at all: it was an anonymous block inside
   // `composable<SplashRoute> { }`, which is why nothing could render it and why
@@ -360,7 +417,7 @@ export const RENDERS = {
 };
 
 /** Proven screen-states may never drop below this. Raise it; never lower it. */
-export const FLOOR = 62;
+export const FLOOR = 75;
 
 /**
  * The whole decision, with nothing to do with the filesystem.

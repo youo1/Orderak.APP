@@ -249,6 +249,7 @@
     <string name="link_copied">Lien copié</string>
     <string name="categories_title">Catégories</string>
     <string name="categories_new">Nouvelle catégorie</string>
+    <string name="categories_empty">Aucune catégorie pour l’instant — ajoutez-en une ci-dessus pour regrouper vos produits.</string>
     <string name="categories_add">Ajouter</string>
     <plurals name="categories_product_count">
         <item quantity="one">%s produit</item>

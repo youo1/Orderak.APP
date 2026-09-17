@@ -248,6 +248,7 @@
     <string name="link_copied">Link copied</string>
     <string name="categories_title">Categories</string>
     <string name="categories_new">New category</string>
+    <string name="categories_empty">No categories yet — add one above to group your products.</string>
     <string name="categories_add">Add</string>
     <plurals name="categories_product_count">
         <item quantity="one">%s product</item>

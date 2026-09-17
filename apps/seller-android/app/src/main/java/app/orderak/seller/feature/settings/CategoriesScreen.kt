@@ -185,117 +185,24 @@ fun CategoriesScreen(
     // and the code is what the write is addressed by.
     var pendingRename by rememberSaveable { mutableStateOf<Pair<String, String>?>(null) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.categories_title), modifier = Modifier.semantics { heading() }) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
-            )
-        }
-    ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = newName, onValueChange = { newName = it.take(60) },
-                    label = { Text(stringResource(R.string.categories_new)) },
-                    singleLine = true, modifier = Modifier.weight(1f)
-                )
-                Button(onClick = { viewModel.create(newName) { if (it) newName = "" } }, enabled = !busy) {
-                    Text(stringResource(R.string.categories_add))
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-            if (loading) CircularProgressIndicator()
-            when (error) {
-                null -> Unit
-                // A limit is not a fault. It reads as a notice, keeps the existing
-                // categories on screen, and offers an upgrade only when one can
-                // actually be bought.
-                LIMIT_REACHED -> NoticeBanner(
-                    role = SemanticRole.Commerce,
-                    title = stringResource(R.string.categories_limit_title),
-                    message = if (entitlements.isPurchaseOpen()) {
-                        stringResource(R.string.categories_limit_body)
-                    } else {
-                        stringResource(R.string.categories_limit_body_purchase_closed)
-                    },
-                    // The banner says a limit was reached; the paywall says what
-                    // the limit is, how much is used and what the next plan gives.
-                    // Offered in both purchase states, because the second and
-                    // third of those are useful whether or not anything is for sale.
-                    actionLabel = stringResource(R.string.paywall_view_plans),
-                    onAction = { onLimitReached(FeatureKeys.MAX_CATEGORIES) },
-                )
-                else -> NoticeBanner(
-                    role = SemanticRole.Danger,
-                    title = stringResource(R.string.categories_error),
-                    message = stringResource(R.string.categories_error_body),
-                )
-            }
-            val locale = LocalConfiguration.current.locales[0]
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(categories, key = { it.category_code }) { c ->
-                    Card(Modifier.fillMaxWidth()) {
-                        Row(
-                            Modifier.fillMaxWidth().padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column {
-                                Text(
-                                    c.name,
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        textDirection = TextDirection.Content,
-                                    ),
-                                )
-                                Text(
-                                    pluralStringResource(
-                                        R.plurals.categories_product_count,
-                                        c.product_count,
-                                        formatCount(c.product_count, locale),
-                                    ),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Row {
-                                val url = storeUrl
-                                if (!url.isNullOrBlank()) {
-                                    IconButton(onClick = { copyLink(context, "$url/c/${c.category_code}") }) {
-                                        Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(R.string.action_copy_url))
-                                    }
-                                    IconButton(onClick = { shareCategoryLink(context, c.name, url, c.category_code) }) {
-                                        Icon(Icons.Outlined.Share, contentDescription = stringResource(R.string.action_share_link))
-                                    }
-                                }
-                                // `rename` has existed on the view model since it
-                                // was written and no screen ever offered it, so a
-                                // typo in a category name was permanent: the only
-                                // way out was to delete the category, which takes
-                                // its products' filing with it.
-                                IconButton(
-                                    onClick = { pendingRename = c.category_code to c.name },
-                                    enabled = !busy,
-                                ) {
-                                    Icon(
-                                        Icons.Outlined.Edit,
-                                        contentDescription = stringResource(R.string.category_rename),
-                                    )
-                                }
-                                IconButton(onClick = { pendingDelete = c.category_code }, enabled = !busy) {
-                                    Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.common_delete),
-                                        tint = MaterialTheme.colorScheme.error)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+    CategoriesContent(
+        categories = categories,
+        loading = loading,
+        error = error,
+        busy = busy,
+        storeUrl = storeUrl,
+        purchaseOpen = entitlements.isPurchaseOpen(),
+        newName = newName,
+        onNewName = { newName = it },
+        onCreate = { viewModel.create(newName) { if (it) newName = "" } },
+        onRename = { code, name -> pendingRename = code to name },
+        onDelete = { pendingDelete = it },
+        onLimitReached = { onLimitReached(FeatureKeys.MAX_CATEGORIES) },
+        onCopyLink = { code -> storeUrl?.let { copyLink(context, "$it/c/$code") } },
+        onShareLink = { c -> storeUrl?.let { shareCategoryLink(context, c.name, it, c.category_code) } },
+        onBack = onBack,
+    )
+
     pendingDelete?.let { code ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
@@ -347,3 +254,161 @@ private const val PLAN_LIMIT_REACHED = "PLAN_LIMIT_REACHED"
 
 /** Internal marker so the screen can render a boundary as a notice, not a fault. */
 private const val LIMIT_REACHED = "plan_limit_reached"
+
+
+/**
+ * The category list, as a function of its state.
+ *
+ * [categories] is nullable so "read and empty" is distinguishable from "not read
+ * yet" — the screen's own `loading` flag already seeds true and is honest, but
+ * the list could not say which of the two a blank LazyColumn meant, and the
+ * contract declares an empty state the screen never drew.
+ *
+ * A plan limit is rendered as a notice rather than a fault: it keeps the
+ * existing categories on screen and offers the paywall in both purchase states,
+ * because what the limit is and what the next plan gives are worth reading
+ * whether or not anything is for sale.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CategoriesContent(
+    categories: List<CategoryDto>?,
+    loading: Boolean,
+    error: String?,
+    busy: Boolean,
+    storeUrl: String?,
+    purchaseOpen: Boolean,
+    newName: String,
+    onNewName: (String) -> Unit,
+    onCreate: () -> Unit,
+    onRename: (String, String) -> Unit,
+    onDelete: (String) -> Unit,
+    onLimitReached: () -> Unit,
+    onCopyLink: (String) -> Unit,
+    onShareLink: (CategoryDto) -> Unit,
+    onBack: () -> Unit,
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.categories_title), modifier = Modifier.semantics { heading() }) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
+                    }
+                },
+            )
+        }
+    ) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = newName, onValueChange = { onNewName(it.take(60)) },
+                    label = { Text(stringResource(R.string.categories_new)) },
+                    singleLine = true, modifier = Modifier.weight(1f)
+                )
+                Button(onClick = onCreate, enabled = !busy) {
+                    Text(stringResource(R.string.categories_add))
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            if (loading || categories == null) CircularProgressIndicator()
+            when (error) {
+                null -> Unit
+                // A limit is not a fault. It reads as a notice, keeps the existing
+                // categories on screen, and offers an upgrade only when one can
+                // actually be bought.
+                LIMIT_REACHED -> NoticeBanner(
+                    role = SemanticRole.Commerce,
+                    title = stringResource(R.string.categories_limit_title),
+                    message = if (purchaseOpen) {
+                        stringResource(R.string.categories_limit_body)
+                    } else {
+                        stringResource(R.string.categories_limit_body_purchase_closed)
+                    },
+                    // The banner says a limit was reached; the paywall says what
+                    // the limit is, how much is used and what the next plan gives.
+                    // Offered in both purchase states, because the second and
+                    // third of those are useful whether or not anything is for sale.
+                    actionLabel = stringResource(R.string.paywall_view_plans),
+                    onAction = onLimitReached,
+                )
+                else -> NoticeBanner(
+                    role = SemanticRole.Danger,
+                    title = stringResource(R.string.categories_error),
+                    message = stringResource(R.string.categories_error_body),
+                )
+            }
+            val locale = LocalConfiguration.current.locales[0]
+            // The state this screen declared and did not have: with the list
+            // read and genuinely empty, the LazyColumn drew nothing and left a
+            // seller looking at the add field over blank space, unsure whether
+            // it had loaded. The add field stays above it — it is the way out.
+            if (categories?.isEmpty() == true && error == null) {
+                Text(
+                    stringResource(R.string.categories_empty),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 24.dp),
+                )
+            }
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(categories.orEmpty(), key = { it.category_code }) { c ->
+                    Card(Modifier.fillMaxWidth()) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column {
+                                Text(
+                                    c.name,
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        textDirection = TextDirection.Content,
+                                    ),
+                                )
+                                Text(
+                                    pluralStringResource(
+                                        R.plurals.categories_product_count,
+                                        c.product_count,
+                                        formatCount(c.product_count, locale),
+                                    ),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Row {
+                                val url = storeUrl
+                                if (!url.isNullOrBlank()) {
+                                    IconButton(onClick = { onCopyLink(c.category_code) }) {
+                                        Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(R.string.action_copy_url))
+                                    }
+                                    IconButton(onClick = { onShareLink(c) }) {
+                                        Icon(Icons.Outlined.Share, contentDescription = stringResource(R.string.action_share_link))
+                                    }
+                                }
+                                // `rename` has existed on the view model since it
+                                // was written and no screen ever offered it, so a
+                                // typo in a category name was permanent: the only
+                                // way out was to delete the category, which takes
+                                // its products' filing with it.
+                                IconButton(
+                                    onClick = { onRename(c.category_code, c.name) },
+                                    enabled = !busy,
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.Edit,
+                                        contentDescription = stringResource(R.string.category_rename),
+                                    )
+                                }
+                                IconButton(onClick = { onDelete(c.category_code) }, enabled = !busy) {
+                                    Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.common_delete),
+                                        tint = MaterialTheme.colorScheme.error)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
