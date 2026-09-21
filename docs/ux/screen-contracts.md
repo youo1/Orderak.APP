@@ -81,7 +81,7 @@ Screenshot cases to write: **83 states × 2 themes = 166**.
 | Entry | SplashRoute — مفيش جلسة · تسجيل خروج |
 | Exit | MainRoute — متجر موجود · ShopSetupRoute — بائع جديد |
 | Data | passkey availability · phone country catalogue · OTP state · terms/privacy versions |
-| Actions | passkey sign-in `onPasskeySignIn` · request OTP `dispatch` · verify OTP `dispatch` · change number `dispatch` · resend `dispatch` · switch language *(untraced)* |
+| Actions | passkey sign-in `onPasskeySignIn` · request OTP `dispatch` · verify OTP `dispatch` · change number `dispatch` · resend `dispatch` · switch language `showLanguage` |
 
 ### `main-shell`
 
@@ -113,7 +113,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Entry | MainRoute — سياسة إصدار غير ok |
 | Exit | متجر Play · استمرار — في وضع التحذير فقط |
 | Data | AppVersionPolicy · config age |
-| Actions | update *(untraced)* · dismiss — التحذير فقط *(untraced)* |
+| Actions | update `openUri` · dismiss — التحذير فقط *(planned)* |
 
 ### `today`
 
@@ -245,7 +245,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Entry | store · account |
 | Exit | رجوع |
 | Data | store profile · business subcategories · slug · logo |
-| Actions | save `save` · upload logo `uploadImage` · copy link *(untraced)* |
+| Actions | save `save` · upload logo `uploadImage` · copy link `copyLink` |
 
 ### `catalog-languages`
 
@@ -313,7 +313,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Entry | AuthRoute — تحقّق ناجح لبائع جديد |
 | Exit | MainRoute — اكتمل الإنشاء · AuthRoute — رجوع مع حفظ المسوّدة |
 | Data | resumable draft · business categories · city catalogue · slug availability |
-| Actions | save account step `next` · see slug availability *(untraced)* · select city *(untraced)* · create store `onCreate` |
+| Actions | save account step `next` · name the shop, and see whether its link is free `onNameChanged` · select city `onCitySelected` · create store `onCreate` |
 
 ### `restricted-account`
 

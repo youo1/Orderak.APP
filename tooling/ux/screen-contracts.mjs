@@ -94,13 +94,12 @@ export const CONTRACTS = [
       { do: "verify OTP", via: "dispatch" },
       { do: "change number", via: "dispatch" },
       { do: "resend", via: "dispatch" },
-      // Traced and still unverified, deliberately. `AuthScreen` is a thin
-      // wrapper around `AuthScreenContent`, and the language sheet lives in the
-      // child with local `showLanguage` state — not dispatched, so no symbol in
-      // this screen's body carries it. The control is real
-      // (AuthScreen.kt:135); this check cannot see across that split, and
-      // inventing a via to satisfy it would be the lie the check exists to stop.
-      { do: "switch language", status: "unverified" },
+      // Was unverified because the check looked at `AuthScreen`, a thin
+      // wrapper, while the language sheet lives in `AuthScreenContent` with
+      // local `showLanguage` state. ACTION_SOURCE points at the child now — the
+      // composable that actually decides what is drawn — and all six of this
+      // contract's actions resolve there.
+      { do: "switch language", via: "showLanguage" },
     ],
     states: ["content", "loading", "error"],
     offline: false,
@@ -118,14 +117,15 @@ export const CONTRACTS = [
     data: ["resumable draft", "business categories", "city catalogue", "slug availability"],
     actions: [
       { do: "save account step", via: "next" },
-      // Not a control the seller operates: `checkSlug()` is private and fires as
-      // they type the shop name, and the screen renders only the RESULT. Both
-      // this and the city picker live in child composables of ShopSetupScreen,
-      // so no symbol in its own body carries them — traced to
-      // `slugAvailability` and `onCitySelected` respectively, and left
-      // unverified rather than given a via this check would be wrong to accept.
-      { do: "see slug availability", status: "unverified" },
-      { do: "select city", status: "unverified" },
+      // Restated, because the old wording described what the seller SEES and
+      // the list is what they DO. `checkSlug()` is private and fires as they
+      // type the shop name; availability is its feedback, not a control. The
+      // action is naming the shop, and `onNameChanged` carries it.
+      { do: "name the shop, and see whether its link is free", via: "onNameChanged" },
+      // Was unverified because the picker lives in a child composable. Splitting
+      // ShopSetupContent out put the callback in ShopSetupScreen's own body,
+      // where the check can see it.
+      { do: "select city", via: "onCitySelected" },
       { do: "create store", via: "onCreate" },
     ],
     states: ["content", "loading", "error"],
@@ -181,8 +181,16 @@ export const CONTRACTS = [
     exit: ["متجر Play", "استمرار — في وضع التحذير فقط"],
     data: ["AppVersionPolicy", "config age"],
     actions: [
-      { do: "update", status: "unverified" },
-      { do: "dismiss — التحذير فقط", status: "unverified" },
+      // `openUri` is what the update button actually does, and it is the only
+      // one of the three blocking modes that offers a control at all — the
+      // other two are waits.
+      { do: "update", via: "openUri" },
+      // Confirmed absent, and absent on purpose: the warning banner in
+      // PlanStatusBanners is built with `dismissible = false`. A seller running
+      // a version the server is about to refuse should not be able to put the
+      // notice away. Kept rather than deleted so the decision is visible; if it
+      // is ever reversed this entry becomes a via.
+      { do: "dismiss — التحذير فقط", status: "planned", why: "the warning banner is deliberately dismissible = false" },
     ],
     states: ["content"],
     offline: false,
@@ -360,7 +368,10 @@ export const CONTRACTS = [
     actions: [
       { do: "save", via: "save" },
       { do: "upload logo", via: "uploadImage" },
-      { do: "copy link", status: "unverified" },
+      // Was unverified while the copy control sat inside the Scaffold body.
+      // Splitting StoreInfoContent out left `copyLink` in StoreInfoScreen's own
+      // body, wired into the callback the content calls.
+      { do: "copy link", via: "copyLink" },
     ],
     states: ["loading", "content", "error"],
     offline: false,
@@ -687,17 +698,25 @@ export const CONTRACTS = [
  *   `status: "unverified"` with `via: "thatSymbol"`. If the handler does not
  *   exist, it is `status: "planned"` with a reason, not an unverified entry.
  */
-export const UNVERIFIED_ACTIONS = new Set([
-  // Traced to a real control that lives in a CHILD composable, so no symbol
-  // in the named screen's own body carries it. Kept here rather than given a
-  // via this check would be wrong to accept.
-  "auth:switch language",
-  "shop-setup:see slug availability",
-  "shop-setup:select city",
-  "version-governance:update",
-  "version-governance:dismiss — التحذير فقط",
-  "store-info:copy link",
-]);
+/**
+ * Empty, and kept so it can stay that way.
+ *
+ * It held six entries, every one of them the same shape: a real control that
+ * lived in a CHILD composable, so no symbol in the named screen's own body
+ * carried it. Five were resolved by the work that made those screens
+ * renderable — splitting a screen into `XxxContent(state, ...)` plus a
+ * Hilt-wired wrapper moved the callbacks into a body the check can see, and
+ * ACTION_SOURCE names the child where that is where the decision lives.
+ *
+ * The sixth was resolved by reading it again rather than by moving anything:
+ * `shop-setup:see slug availability` described what the seller SEES, and this
+ * list is what they DO. Naming the shop is the action; availability is its
+ * feedback.
+ *
+ * This set may shrink and never grow. An action that cannot be anchored is
+ * either `planned` with a reason, or it is not an action.
+ */
+export const UNVERIFIED_ACTIONS = new Set([]);
 
 /**
  * Composables that do not follow the id-to-ScreenName convention, so the
@@ -717,6 +736,7 @@ export const UNVERIFIED_ACTIONS = new Set([
 export const ACTION_SOURCE = {
   "main-shell": "MainScreen",
   "version-governance": "VersionBlockingScreen",
+  auth: "AuthScreenContent",
   today: "DashboardTab",
   store: "StoreContent",
   customers: "CustomersContent",
