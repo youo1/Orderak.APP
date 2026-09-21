@@ -114,17 +114,20 @@ class SellerProfileViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             _busy.value = true
-            val snap = sessionStore.snapshot()
+            // The decision is in profileSave, so it can be checked: this save
+            // carries the SHOP half of saveShop through from the snapshot, and
+            // getting one of those wrong erases a shop name on a birth-year edit.
+            val write = profileSave(sessionStore.snapshot(), fullName, email, birthYear, profilePhotoUri)
             sessionStore.saveShop(
-                name = snap.shopName.orEmpty(),
-                category = snap.category.orEmpty(),
-                city = snap.city.orEmpty(),
-                countryIso = snap.countryIso ?: "EG",
-                logoUri = snap.logoUri,
-                fullName = fullName.trim(),
-                email = email?.trim()?.ifBlank { null },
-                birthYear = birthYear?.trim()?.ifBlank { null },
-                profilePhotoUri = profilePhotoUri?.trim()?.ifBlank { null },
+                name = write.name,
+                category = write.category,
+                city = write.city,
+                countryIso = write.countryIso,
+                logoUri = write.logoUri,
+                fullName = write.fullName,
+                email = write.email,
+                birthYear = write.birthYear,
+                profilePhotoUri = write.profilePhotoUri,
             )
             _busy.value = false
             onDone()

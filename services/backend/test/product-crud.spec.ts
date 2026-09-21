@@ -103,6 +103,41 @@ describe("product CRUD", () => {
 		expect(body.product.stock_version).toBe(stocked.stock_version);
 	});
 
+	it("carries a description through create, pull and replace", async () => {
+		// The test next door proves an OMITTED description is cleared, which is
+		// the PUT-is-a-replacement rule. Nothing proved the opposite: that a
+		// description the seller typed survives being written, read back and
+		// written again. A field that only has a test for its disappearance is a
+		// field whose persistence nobody checked.
+		const r = await registerStore();
+		const text = "قماش كريب، مقاسات من S لـ XL";
+		const created = await seedProduct(r, { description: text });
+		expect(created.description).toBe(text);
+
+		// The pull is what the device actually reads, and it has to agree.
+		const pulled = await SELF.fetch(`${BASE}/api/v1/products`, { headers: authHeaders(r) });
+		const body = (await pulled.json()) as { products: Record<string, unknown>[] };
+		expect(body.products[0].description).toBe(text);
+
+		// Supplied again on PUT, it stays — this is the half that distinguishes
+		// "replacement clears what you omit" from "replacement loses the field".
+		const kept = "قماش كريب، مقاس واحد";
+		const res = await SELF.fetch(`${BASE}/api/v1/products/${created.product_code}`, {
+			method: "PUT", headers: authHeaders(r),
+			body: JSON.stringify({
+				name: created.name,
+				price: created.price,
+				description: kept,
+			}),
+		});
+		expect(res.status).toBe(200);
+		expect(((await res.json()) as { product: Record<string, unknown> }).product.description).toBe(kept);
+
+		const after = await SELF.fetch(`${BASE}/api/v1/products`, { headers: authHeaders(r) });
+		const afterBody = (await after.json()) as { products: Record<string, unknown>[] };
+		expect(afterBody.products[0].description).toBe(kept);
+	});
+
 	it("deletes a product without disturbing its ledger history", async () => {
 		const r = await registerStore();
 		const created = await seedProduct(r);

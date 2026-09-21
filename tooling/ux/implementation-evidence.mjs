@@ -86,13 +86,30 @@ export const EVIDENCE = {
     // code the server assigned and the category it was filed under.
     behaviour: { layer: "backend", file: "product-crud.spec.ts", test: "creates a product and returns it in the shape the pull uses" },
   },
-  "products_catalog.product_descriptions": { kind: "screen", value: "ProductEditScreen" },
+  "products_catalog.product_descriptions": {
+    kind: "screen",
+    value: "ProductEditScreen",
+    // There was already a test that an OMITTED description is cleared, which is
+    // the PUT-is-a-replacement rule. Nothing proved the opposite — that one the
+    // seller typed survives create, pull and replace. A field with a test only
+    // for its disappearance is a field whose persistence nobody checked.
+    behaviour: { layer: "backend", file: "product-crud.spec.ts", test: "carries a description through create, pull and replace" },
+  },
   "products_catalog.public_orderak_catalog": { kind: "endpoint", value: "/api/v1/store", integration: "/api/v1/store" },
 
   // ---- orders & fulfilment ----
   "orders_fulfilment.manual_order_creation": { kind: "screen", value: "NewOrderScreen" },
   "orders_fulfilment.public_catalog_orders": { kind: "endpoint", value: "/api/v1/orders", integration: "/api/v1/orders" },
-  "orders_fulfilment.order_history":         { kind: "screen", value: "OrdersScreen" },
+  "orders_fulfilment.order_history": {
+    kind: "screen",
+    value: "OrdersScreen",
+    // The debt was specifically about states: the old screenshot test rendered
+    // OrderCards in a hand-built Column and covered none of the screen's own.
+    // OrdersContent(state) is the screen, so these are its loading, content,
+    // empty and error branches. See render-coverage.mjs for why a component
+    // render would not have counted.
+    behaviour: { layer: "android", file: "OrdersScreenshotTest.kt", test: "ordersEmptyLight" },
+  },
   "orders_fulfilment.order_status_updates": {
     kind: "screen",
     value: "OrderDetailsScreen",
@@ -129,7 +146,16 @@ export const EVIDENCE = {
   },
 
   // ---- team & security ----
-  "team_security.owner_account": { kind: "screen", value: "SellerProfileScreen" },
+  "team_security.owner_account": {
+    kind: "screen",
+    value: "SellerProfileScreen",
+    // saveShop takes the SHOP's name, category, city, country and logo beside
+    // the seller's own details, and none of those five are on this screen —
+    // they are re-supplied from the session snapshot. Getting one wrong means a
+    // birth-year edit erases a shop name. The decision is `profileSave` now, so
+    // it can be asserted.
+    behaviour: { layer: "android", file: "SellerProfileSaveTest.kt", test: "the shop is carried through untouched" },
+  },
   "team_security.multiple_owner_devices": {
     kind: "route",
     value: "DevicesRoute",
@@ -147,7 +173,17 @@ export const EVIDENCE = {
   "language_localization.english_public_storefront": { kind: "endpoint", value: "/api/v1/store" },
 
   // ---- promoted in an earlier pass; evidence retained ----
-  "customers_crm.customer_list_and_order_history":   { kind: "screen", value: "CustomersScreen" },
+  "customers_crm.customer_list_and_order_history": {
+    kind: "screen",
+    value: "CustomersScreen",
+    // The debt named two gaps, the aggregation and the screen. The screen is
+    // covered by CustomersScreenshotTest; this names the aggregation, because
+    // it is the half that can be wrong silently. The test runs the DAO's own
+    // statement through Room's exported schema — CANCELLED excluded, the
+    // customer kept anyway, and currencyCount reported so the screen can
+    // withhold a total it cannot add.
+    behaviour: { layer: "android", file: "CustomerSummariesTest.kt", test: "a cancelled order counts for nothing" },
+  },
   "customers_crm.editable_customer_profiles": {
     kind: "screen",
     value: "CustomerDetailsScreen",
@@ -208,16 +244,8 @@ export const KINDS_REQUIRING_BEHAVIOUR = ["screen", "route", "module"];
  *   purpose, and work item 11 is what resolves it.
  */
 export const BEHAVIOUR_BASELINE = {
-  "products_catalog.product_descriptions":
-    "Descriptions persist through POST and PUT /api/v1/products, but nothing asserts that a description survives the round trip.",
   "orders_fulfilment.manual_order_creation":
     "Cannot be tested honestly yet. The order is written to Room and never reaches the server, so there is no server behaviour to assert and no client harness for the screen. Work item 05 makes this testable.",
-  "orders_fulfilment.order_history":
-    "The order list renders from Room. A screenshot test covers the list component; nothing covers the screen's own loading, empty and error states.",
-  "customers_crm.customer_list_and_order_history":
-    "Customers are derived on-device by aggregating orders. Neither the aggregation nor the screen is covered.",
   "ai_capabilities.basic_ai_assistance":
     "Fail-closed behind AI_ASSISTANT_ENABLED in both environments, so there is no reachable path to exercise. The gate is reported separately; this entry is the test gap, not the gate.",
-  "team_security.owner_account":
-    "The profile screen edits seller details. Onboarding validation is tested; this screen's own save path is not.",
 };
