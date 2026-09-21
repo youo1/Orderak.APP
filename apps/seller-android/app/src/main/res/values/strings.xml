@@ -2,17 +2,13 @@
 <resources>
     <string name="app_name" translatable="false">Orderak</string>
 
-    <string name="common_continue">Continue</string>
     <string name="common_back">Back</string>
     <string name="common_ok">OK</string>
     <string name="common_cancel">Cancel</string>
-    <string name="common_confirm">Confirm</string>
     <string name="error_generic">Something went wrong, try again</string>
 
     <string name="auth_title">Ready to Sell on Orderak?</string>
     <string name="auth_subtitle">Let\'s get started.</string>
-    <string name="auth_step_caption">Step %1$s of 2</string>
-    <string name="auth_otp_expectation">Enter the 6-digit code sent to your phone.</string>
     <string name="auth_phone_label">Mobile Number</string>
     <string name="auth_phone_hint">Enter your number</string>
     <string name="auth_phone_reason">We\'ll text a code to verify your number.</string>
@@ -22,13 +18,11 @@
     <string name="auth_unsupported_country">Coming soon to your country!</string>
     <string name="auth_send_code">Send Verification Code</string>
     <string name="auth_verify_code">Verify Code</string>
-    <string name="auth_sending">Connecting…</string>
     <string name="auth_otp_title">Verify your number</string>
     <string name="auth_otp_sent_to">Sent to %1$s</string>
     <string name="auth_resend_in">Resend in %1$s s</string>
     <string name="auth_resend">Resend Code</string>
     <string name="auth_change_number">Change number</string>
-    <string name="auth_resend_sms">Send via SMS</string>
     <string name="auth_otp_invalid">Invalid code. Please try again.</string>
     <string name="auth_send_failed">Failed to send code. Try again.</string>
     <string name="auth_too_many_requests">Too many attempts. Please wait.</string>
@@ -39,44 +33,28 @@
     <string name="auth_verifying">Verifying…</string>
     <string name="auth_otp_code_entered">Code entered</string>
     <string name="auth_otp_waiting_for_code">Waiting for code…</string>
-    <string name="auth_otp_digit_box">Digit %1$d</string>
-    <string name="auth_step_phone_short">Phone</string>
-    <string name="auth_step_otp_short">Verify</string>
-    <string name="auth_accept_terms_hint">Agree to terms to continue</string>
-    <string name="auth_otp_progress">OTP digit %1$d of %2$d</string>
 
     <!-- Terms -->
     <string name="auth_terms_prefix">By tapping Send Verification Code, you agree to our</string>
     <string name="auth_terms_link">Terms</string>
     <string name="auth_terms_and">and</string>
     <string name="auth_privacy_link">Privacy Policy</string>
-    <string name="auth_security_note">Banking-grade security. Your data is encrypted.</string>
     <string name="auth_marketing_opt_in">I\'d like to receive business tips and offers</string>
     <string name="auth_trouble">Need help?</string>
-    <string name="cd_select_country">Select country: %1$s (+%2$s)</string>
-    <string name="cd_country_row">%1$s +%2$s</string>
-    <string name="cd_selected">selected</string>
 
     <string name="language_pick_title">Choose your language</string>
     <string name="cd_language">Change language</string>
     <string name="cd_valid_number">Valid phone number</string>
 
-    <string name="setup_title">Shop Details</string>
     <string name="setup_step_indicator">Step %1$s of 2</string>
-    <string name="setup_step1_title">What\'s your shop name?</string>
     <string name="setup_shop_name_label">Shop Name (shown to customers)</string>
-    <string name="setup_shop_name_placeholder">e.g. Happy Store</string>
     <string name="setup_category_label">Business Category</string>
     <string name="setup_subcategory_label">Business Subcategory</string>
     <string name="setup_subcategory_placeholder">Choose a category first</string>
-    <string name="setup_country_label">Country</string>
-    <string name="setup_country_placeholder">Search country…</string>
     <string name="setup_city_label">City</string>
     <string name="setup_city_placeholder">Search city…</string>
-    <string name="setup_logo_label">Shop Logo (optional)</string>
     <string name="setup_add_photo">Add photo</string>
     <string name="setup_change_photo">Change photo</string>
-    <string name="setup_create_button">Create Store</string>
     <string name="setup_next">Next</string>
     <string name="setup_birth_year_label">Year of Birth</string>
     <string name="setup_birth_year_title">Select Year of Birth</string>
@@ -89,30 +67,6 @@
     <string name="setup_account_title">Create Account</string>
     <string name="setup_full_name_label">Full Name</string>
     <string name="setup_email_label">Email (optional)</string>
-    <string name="setup_google_sync">Sync with Google for backup</string>
-    <string name="setup_profile_photo_label">Profile Photo (optional)</string>
-
-    <string name="category_restaurant">🍔 Restaurant</string>
-    <string name="category_cafe">☕ Cafe</string>
-    <string name="category_grocery">🛒 Grocery</string>
-    <string name="category_fashion">👕 Fashion</string>
-    <string name="category_beauty">💄 Beauty</string>
-    <string name="category_pharmacy">💊 Pharmacy</string>
-    <string name="category_electronics">💻 Electronics</string>
-    <string name="category_home">🏠 Home &amp; Furniture</string>
-    <string name="category_automotive">🚗 Automotive</string>
-    <string name="category_gifts">🎁 Gifts</string>
-    <string name="category_books">📚 Books &amp; Stationery</string>
-    <string name="category_pet_shop">🐶 Pet Shop</string>
-    <string name="category_sports">🏋️ Sports</string>
-    <string name="category_jewelry">💍 Jewelry</string>
-    <string name="category_mobile">📱 Mobile &amp; Accessories</string>
-    <string name="category_services">🛠️ Services</string>
-    <string name="category_other">🛒 Other</string>
-    <string name="volume_lt5">Less than 5</string>
-    <string name="volume_5_20">5–20</string>
-    <string name="volume_21_50">21–50</string>
-    <string name="volume_gt50">More than 50</string>
 
     <string name="dash_greeting">Welcome, %1$s 👋</string>
     <string name="dash_today_orders">Today\'s orders</string>
@@ -121,10 +75,6 @@
     <string name="dash_empty_title">Your shop is ready!</string>
     <string name="dash_empty_body_v2">Add your first product from the Products tab, then share your catalog on WhatsApp</string>
     <string name="dash_share_catalog">Share catalog</string>
-    <string name="ai_test_title">AI backend test</string>
-    <string name="ai_test_message_label">Message</string>
-    <string name="ai_test_send">Send to backend</string>
-    <string name="ai_test_error">Backend error: %1$s</string>
 
     <string name="nav_dashboard">Today</string>
     <string name="nav_orders">Orders</string>
@@ -138,11 +88,7 @@
     <string name="product_description_label">Description (optional)</string>
     <string name="product_price_label">Price (EGP)</string>
     <string name="product_stock_label">Stock</string>
-    <string name="product_discount_title">Discount</string>
     <string name="product_discount_none">None</string>
-    <string name="product_discount_percentage">Percentage (%)</string>
-    <string name="product_discount_amount">Fixed Amount</string>
-    <string name="product_discount_value_label">Discount value</string>
     <string name="product_available">Available for sale</string>
     <string name="product_save">Save product</string>
     <string name="product_delete">Delete product</string>
@@ -225,7 +171,6 @@
     <string name="settings_slug_label">Link name (English letters)</string>
     <string name="settings_link_pending">Preparing your link… appears here after first sync (needs internet)</string>
     <string name="share_link_footer">Order online from the link ☝️ — Powered by Orderak.app</string>
-    <string name="common_premium_feature">Premium Feature</string>
     <!-- Store Information + Categories (public URL architecture) -->
     <string name="store_info_title">Store Information</string>
     <string name="store_info_country">Country</string>
@@ -255,11 +200,7 @@
         <item quantity="other">%s products</item>
     </plurals>
     <string name="common_delete">Delete</string>
-    <string name="language_system_default">System default</string>
-    <string name="settings_plan_debug">Subscription plan (debug)</string>
     <string name="plan_free">Free</string>
-    <string name="plan_starter">Starter</string>
-    <string name="plan_professional">Professional</string>
     <string name="error_auth">Authentication failed. Please try again.</string>
     <string name="error_slug_taken">This store link is already in use.</string>
     <string name="error_rate_limited">Too many requests. Please try again shortly.</string>
@@ -285,7 +226,6 @@
     <string name="usage_devices">Devices</string>
     <string name="usage_value">%1$s / %2$s</string>
     <string name="usage_value_unlimited">%1$s / Unlimited</string>
-    <string name="products_usage_header">Products (%1$s / %2$s)</string>
     <string name="products_usage_unlimited">Products (%1$s / Unlimited)</string>
     <string name="products_limit_title">Product limit reached</string>
     <string name="products_limit_body">You\'ve reached your limit of %1$s products. Upgrade to %2$s for a higher limit.</string>
@@ -406,26 +346,20 @@
     <string name="country_picker_title">Choose country</string>
     <string name="country_picker_search">Search by country or calling code</string>
     <string name="setup_store_title">Store information</string>
-    <string name="setup_account_heading">Account information</string>
     <string name="setup_account_subtitle">Please fill in your details to continue.</string>
     <string name="setup_store_heading">Prepare your store</string>
     <string name="setup_store_subtitle">You are one short step away from selling.</string>
     <string name="setup_email_private_help">Used only for invoices and alerts. Cannot be used for account recovery.</string>
     <string name="setup_email_error">Enter a valid, unused email address or leave it blank.</string>
-    <string name="setup_legal_prefix">By continuing, you agree to the published Terms of Use and Privacy Policy.</string>
     <string name="setup_legal_before_terms">By continuing, you agree to the published</string>
     <string name="setup_legal_between_links">and</string>
-    <string name="setup_slug_label">Store link</string>
     <string name="setup_slug_help">You can edit this professional store address.</string>
     <string name="setup_slug_checking">Checking availability…</string>
     <string name="setup_slug_available">This link is available.</string>
     <string name="setup_slug_taken">This link is already in use.</string>
     <string name="setup_slug_invalid">Use 3–40 lowercase letters, numbers, and hyphens.</string>
     <string name="setup_slug_offline">We could not check this link. Check your connection.</string>
-    <string name="setup_city_manual_help">Choose a suggestion or enter the city manually. No location permission is requested.</string>
     <string name="setup_start_selling">Start selling now</string>
-    <string name="setup_logo_optional_help">Optional — we will use a monogram if you skip it.</string>
-    <string name="category_food">Food</string>
     <string name="passkeys_settings_title">Passkeys</string>
     <string name="passkeys_settings_help">Add, name, or revoke sign-in keys. Sensitive changes require a recent Passkey or OTP verification.</string>
     <string name="passkeys_add">Add a passkey</string>
@@ -442,16 +376,8 @@
     <string name="seller_profile_verification_sent">Verification email sent. It expires in 24 hours.</string>
     <string name="seller_profile_verification_failed">We could not send the email. Try again later.</string>
     <string name="setup_store_link_preview">Your store link</string>
-    <string name="setup_category_and_subcategory_label">Category and subcategory</string>
-    <string name="setup_category_open_description">Choose a business category and subcategory</string>
     <string name="setup_category_placeholder">Choose your business type</string>
-    <string name="setup_category_picker_title">Business type</string>
-    <string name="setup_category_choose_main">First choose a main category.</string>
-    <string name="setup_category_search">Search main categories</string>
-    <string name="setup_subcategory_search">Search subcategories</string>
-    <string name="setup_city_open_description">Search for your city</string>
     <string name="setup_city_country_from_phone">Showing cities in %1$s, based on your phone number.</string>
-    <string name="setup_city_picker_title">Choose your city</string>
     <string name="setup_city_search">Type a city name</string>
     <string name="setup_city_search_error">We couldn’t load city suggestions.</string>
     <string name="setup_category_load_error">We couldn’t load business categories. Tap to try again.</string>
@@ -531,15 +457,11 @@
     <string name="error_primary_device">The device you are signed in on cannot be removed here. Sign out instead.</string>
     <string name="error_phone_not_editable">A customer\'s phone number is their identity and cannot be edited.</string>
     <string name="error_invalid_request">Some of those details were not valid. Check them and try again.</string>
-    <string name="catalog_bulk_delete_title">Confirm a large deletion</string>
-    <string name="catalog_bulk_delete_message">Your last change deletes %1$s of your %2$s products. Your account is holding it until you confirm, so those products are still on your public store page.</string>
-    <string name="catalog_bulk_delete_confirm">Delete them</string>
     <string name="error_onboarding_restart">Your sign-up session expired. Start again from your phone number.</string>
     <string name="error_passkey">That passkey could not be used. Try again, or sign in with your phone number.</string>
     <string name="error_phone_already_used">That number already has an Orderak account.</string>
     <string name="error_phone_change">Your number could not be changed. Verify both numbers again and retry.</string>
     <string name="error_referral">That code could not be used.</string>
-
 
     <!-- Products saved on this phone that never reached the account. The
          catalogue refresh is gated on this list being empty, so the seller has
