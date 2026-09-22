@@ -19,7 +19,7 @@
     <string name="auth_verify_code">Verify Code</string>
     <string name="auth_otp_title">Verify your number</string>
     <string name="auth_otp_sent_to">Sent to %1$s</string>
-    <string name="auth_resend_in">Resend in %1$d s</string>
+    <string name="auth_resend_in">Resend in %1$s s</string>
     <string name="auth_resend">Resend Code</string>
     <string name="auth_change_number">Change number</string>
     <string name="auth_otp_invalid">Invalid code. Please try again.</string>
@@ -45,7 +45,7 @@
     <string name="cd_language">Change language</string>
     <string name="cd_valid_number">Valid phone number</string>
 
-    <string name="setup_step_indicator">Step %1$d of 2</string>
+    <string name="setup_step_indicator">Step %1$s of 2</string>
     <string name="setup_shop_name_label">Shop Name (shown to customers)</string>
     <string name="setup_category_label">Business Category</string>
     <string name="setup_subcategory_label">Business Subcategory</string>
@@ -148,12 +148,13 @@
     <string name="customer_note">Note</string>
     <string name="customer_contact">Message</string>
     <string name="customer_save">Save</string>
+    <string name="customer_open">Open customer</string>
     <string name="customer_saved">Customer saved</string>
     <string name="customer_edit_locked">Editing customer details is part of a paid plan</string>
     <string name="customer_orders_heading">Orders</string>
     <plurals name="customer_orders_count">
         <item quantity="one">1 order</item>
-        <item quantity="other">%d orders</item>
+        <item quantity="other">%s orders</item>
     </plurals>
 
     <string name="settings_title">Settings</string>
@@ -191,10 +192,11 @@
     <string name="link_copied">Link copied</string>
     <string name="categories_title">Categories</string>
     <string name="categories_new">New category</string>
+    <string name="categories_empty">No categories yet — add one above to group your products.</string>
     <string name="categories_add">Add</string>
     <plurals name="categories_product_count">
-        <item quantity="one">%d product</item>
-        <item quantity="other">%d products</item>
+        <item quantity="one">%s product</item>
+        <item quantity="other">%s products</item>
     </plurals>
     <string name="common_delete">Delete</string>
     <string name="plan_free">Free</string>
@@ -221,13 +223,13 @@
     <string name="usage_ai_requests">AI requests this month</string>
     <string name="usage_categories">Categories</string>
     <string name="usage_devices">Devices</string>
-    <string name="usage_value">%1$d / %2$d</string>
-    <string name="usage_value_unlimited">%1$d / Unlimited</string>
-    <string name="products_usage_unlimited">Products (%1$d / Unlimited)</string>
+    <string name="usage_value">%1$s / %2$s</string>
+    <string name="usage_value_unlimited">%1$s / Unlimited</string>
+    <string name="products_usage_unlimited">Products (%1$s / Unlimited)</string>
     <string name="products_limit_title">Product limit reached</string>
-    <string name="products_limit_body">You\'ve reached your limit of %1$d products. Upgrade to %2$s for a higher limit.</string>
-    <string name="products_limit_body_over">Your plan allows %1$d products and you currently have %2$d. You can edit or delete existing products, but you must reduce the total below %1$d before adding another.</string>
-    <string name="products_limit_body_max_plan">You\'ve reached your limit of %1$d products. Contact support if you need more capacity.</string>
+    <string name="products_limit_body">You\'ve reached your limit of %1$s products. Upgrade to %2$s for a higher limit.</string>
+    <string name="products_limit_body_over">Your plan allows %1$s products and you currently have %2$s. You can edit or delete existing products, but you must reduce the total below %1$s before adding another.</string>
+    <string name="products_limit_body_max_plan">You\'ve reached your limit of %1$s products. Contact support if you need more capacity.</string>
     <string name="product_add_locked">Product limit reached. Tap to review upgrade options.</string>
     <string name="upgrade_now">Upgrade now</string>
     <string name="plan_paid1">Paid 1</string>
@@ -239,10 +241,11 @@
     <string name="order_cancel_confirm">Cancel this order and restore its stock?</string>
     <string name="product_delete_confirm">Delete this product? This can’t be undone.</string>
     <string name="product_stock_conflict_title">The shop&#8217;s stock changed</string>
-    <string name="product_stock_conflict_body">You set %1$d. The shop now has %2$d — an order came in while you were editing. Your other changes are saved.</string>
-    <string name="product_stock_conflict_use_shop">Use %1$d</string>
-    <string name="product_stock_conflict_keep_mine">Set %1$d anyway</string>
+    <string name="product_stock_conflict_body">You set %1$s. The shop now has %2$s — an order came in while you were editing. Your other changes are saved.</string>
+    <string name="product_stock_conflict_use_shop">Use %1$s</string>
+    <string name="product_stock_conflict_keep_mine">Set %1$s anyway</string>
     <string name="category_delete_confirm">Delete this category? Products will become uncategorized.</string>
+    <string name="category_rename">Rename category</string>
     <string name="categories_error">Couldn’t update categories. Try again.</string>
     <string name="settings_delete_confirm">Submit a verified account-deletion request? The request follows the published deletion timeline.</string>
     <string name="settings_logout_confirm">Log out and remove local business data from this device?</string>
@@ -256,7 +259,7 @@
     <string name="support_subject">Subject</string>
     <string name="support_message">Message</string>
     <string name="announcements_title">Announcements</string>
-    <string name="announcements_unread">Announcements (%1$d new)</string>
+    <string name="announcements_unread">Announcements (%1$s new)</string>
     <string name="announcement_new">New</string>
     <string name="catalog_languages_title">Catalog languages</string>
     <string name="translation_missing">Translation missing</string>
@@ -278,6 +281,7 @@
     <string name="ai_you">You</string>
     <string name="ai_message">Ask about your store</string>
     <string name="ai_reset">Reset conversation</string>
+    <string name="ai_empty_hint">No questions yet — ask about your products, orders or customers.</string>
     <string name="deletion_status_title">Deletion request status</string>
     <string name="deletion_status_none">No deletion request</string>
     <string name="deletion_status_help">A verified request follows the published deadline. Contact support if the status appears incorrect.</string>
@@ -375,6 +379,7 @@
     <string name="setup_city_country_from_phone">Showing cities in %1$s, based on your phone number.</string>
     <string name="setup_city_search">Type a city name</string>
     <string name="setup_city_search_error">We couldn’t load city suggestions.</string>
+    <string name="setup_category_load_error">We couldn’t load business categories. Tap to try again.</string>
     <string name="setup_city_no_results">No matching cities found. You can use manual entry below.</string>
     <string name="setup_city_use_manual">Use “%1$s” as entered</string>
     <string name="setup_city_data_attribution">City data: Countries States Cities Database (ODbL)</string>
@@ -385,9 +390,9 @@
     <string name="gate_not_built_body">This feature is not ready. No plan change unlocks it.</string>
     <string name="gate_not_built_badge">Coming soon</string>
     <string name="nav_account">Account</string>
-    <string name="products_limit_body_purchase_closed">You have reached %1$d products. Paid plans are not open for purchase yet — your existing products are unaffected.</string>
+    <string name="products_limit_body_purchase_closed">You have reached %1$s products. Paid plans are not open for purchase yet — your existing products are unaffected.</string>
     <string name="product_stock_out">Out of stock</string>
-    <string name="product_stock_low">%1$d left</string>
+    <string name="product_stock_low">%1$s left</string>
     <string name="categories_limit_title">Category limit reached</string>
     <string name="categories_limit_body">Your existing categories are unaffected. A higher plan raises the limit.</string>
     <string name="categories_limit_body_purchase_closed">Your existing categories are unaffected. Paid plans are not open for purchase yet.</string>
@@ -413,6 +418,7 @@
     <string name="search_clear_action">Clear search</string>
     <string name="plans_title">Plans</string>
     <string name="plans_feature_column">Feature</string>
+    <string name="plans_included">Included</string>
     <string name="plans_unavailable">Plan details aren\'t available right now</string>
     <string name="plans_purchase_closed">Upgrading isn\'t open yet. This is here so you can see what each plan includes.</string>
     <string name="plans_price_note">Prices are shown by Google Play in your own currency when upgrading opens.</string>
@@ -423,8 +429,8 @@
     <string name="paywall_limit_devices">You\'ve reached your device limit</string>
     <string name="paywall_limit_ai">You\'ve reached this month\'s AI request limit</string>
     <string name="paywall_limit_generic">You\'ve reached a limit on your plan</string>
-    <string name="paywall_usage_of_limit">You\'re using %1$d of %2$d.</string>
-    <string name="paywall_limit_only">Your plan allows %1$d.</string>
+    <string name="paywall_usage_of_limit">You\'re using %1$s of %2$s.</string>
+    <string name="paywall_limit_only">Your plan allows %1$s.</string>
     <string name="paywall_limit_unknown">Your plan doesn\'t allow any more right now.</string>
     <string name="paywall_next_plan">%1$s gives you %2$s.</string>
     <string name="paywall_dismiss">Go back</string>
@@ -462,7 +468,7 @@
     <string name="products_stuck_title">Some products aren\'t on your account</string>
     <plurals name="products_stuck_body">
         <item quantity="one">One product is saved on this phone only. Your catalogue will not update until it is sent or removed.</item>
-        <item quantity="other">%d products are saved on this phone only. Your catalogue will not update until they are sent or removed.</item>
+        <item quantity="other">%s products are saved on this phone only. Your catalogue will not update until they are sent or removed.</item>
     </plurals>
     <string name="products_stuck_action">Review</string>
     <string name="products_stuck_dialog_title">Not on your account</string>

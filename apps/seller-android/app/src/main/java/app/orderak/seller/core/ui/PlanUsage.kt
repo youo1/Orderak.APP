@@ -8,8 +8,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import app.orderak.seller.R
+import app.orderak.seller.core.text.formatCount
 import app.orderak.seller.data.billing.FeatureKeys
 import app.orderak.seller.data.remote.BackendConfig
 import kotlinx.serialization.json.JsonPrimitive
@@ -83,6 +85,7 @@ fun planUsageRows(config: BackendConfig): List<PlanUsageRow> =
 @Composable
 fun PlanUsageRowItem(row: PlanUsageRow, modifier: Modifier = Modifier) {
     val label = stringResource(row.label)
+    val locale = LocalConfiguration.current.locales[0]
     if (row.limit != null) {
         UsageMeter(label = label, used = row.used, limit = row.limit, modifier = modifier)
     } else {
@@ -92,7 +95,7 @@ fun PlanUsageRowItem(row: PlanUsageRow, modifier: Modifier = Modifier) {
         ) {
             Text(label, style = MaterialTheme.typography.bodyMedium)
             Text(
-                stringResource(R.string.usage_value_unlimited, row.used),
+                stringResource(R.string.usage_value_unlimited, formatCount(row.used, locale)),
                 style = MaterialTheme.typography.labelMedium,
             )
         }

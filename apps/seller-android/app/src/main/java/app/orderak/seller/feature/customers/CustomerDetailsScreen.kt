@@ -98,10 +98,18 @@ class CustomerDetailsViewModel @Inject constructor(
      * rewrites it, so the key would match nothing whenever the two differ.
      */
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    val orders: StateFlow<List<OrderEntity>> =
+    /**
+     * null until Room answers. NOT emptyList().
+     *
+     * A customer row exists BECAUSE an order arrived, so "this customer has no
+     * orders" is a sentence this screen can never truthfully say on arrival —
+     * and the seed made it say exactly that, every time, until the query
+     * returned.
+     */
+    val orders: StateFlow<List<OrderEntity>?> =
         customer.filterNotNull()
             .flatMapLatest { c -> repo.ordersOf(c.phone) }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /**
      * Whether the plan opens the editor.
@@ -179,6 +187,56 @@ fun CustomerDetailsScreen(
         }
     }
 
+    CustomerDetailsContent(
+        customer = customer,
+        orders = orders,
+        customerKey = viewModel.customerKey,
+        editable = editable,
+        name = name.orEmpty(),
+        altContact = altContact.orEmpty(),
+        note = note.orEmpty(),
+        onName = { name = it.take(120) },
+        onAltContact = { altContact = it.take(120) },
+        onNote = { note = it.take(2000) },
+        onSave = viewModel::save,
+        onContact = { customer?.let { contactCustomer(context, it) } },
+        onBack = onBack,
+        onOpenOrder = onOpenOrder,
+        snackbarHostState = snackbarHostState,
+    )
+}
+
+/**
+ * One customer, as a function of their state.
+ *
+ * [orders] is nullable and that is the point: a customer row exists BECAUSE an
+ * order arrived, so "no orders yet" is a sentence this screen can never
+ * truthfully say on arrival, and the seed made it say exactly that.
+ *
+ * The three text fields are seeded once by [CustomerDetailsScreen] and then
+ * owned by the field, which is why they arrive here as plain values — re-seeding
+ * on every emission would overwrite what the seller is typing whenever a sync
+ * touched the row.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CustomerDetailsContent(
+    customer: CustomerEntity?,
+    orders: List<OrderEntity>?,
+    customerKey: String,
+    editable: Boolean,
+    name: String,
+    altContact: String,
+    note: String,
+    onName: (String) -> Unit,
+    onAltContact: (String) -> Unit,
+    onNote: (String) -> Unit,
+    onSave: (String, String, String) -> Unit,
+    onContact: () -> Unit,
+    onBack: () -> Unit,
+    onOpenOrder: (Long) -> Unit,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+) {
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -186,9 +244,9 @@ fun CustomerDetailsScreen(
                 title = {
                     Text(
                         customer?.name?.takeIf { it.isNotBlank() }
-                            ?: orders.firstOrNull()?.buyerName
+                            ?: orders?.firstOrNull()?.buyerName
                             ?: customer?.phone
-                            ?: viewModel.customerKey,
+                            ?: customerKey,
                         modifier = Modifier.semantics { heading() },
                     )
                 },
@@ -211,15 +269,15 @@ fun CustomerDetailsScreen(
             item {
                 CustomerProfileSection(
                     customer = customer,
-                    name = name.orEmpty(),
-                    altContact = altContact.orEmpty(),
-                    note = note.orEmpty(),
+                    name = name,
+                    altContact = altContact,
+                    note = note,
                     editable = editable,
-                    onName = { name = it.take(120) },
-                    onAltContact = { altContact = it.take(120) },
-                    onNote = { note = it.take(2000) },
-                    onSave = { viewModel.save(name.orEmpty(), altContact.orEmpty(), note.orEmpty()) },
-                    onContact = { customer?.let { contactCustomer(context, it) } },
+                    onName = onName,
+                    onAltContact = onAltContact,
+                    onNote = onNote,
+                    onSave = { onSave(name, altContact, note) },
+                    onContact = onContact,
                 )
             }
 
@@ -231,7 +289,7 @@ fun CustomerDetailsScreen(
                 )
             }
 
-            if (orders.isEmpty()) {
+            if (orders != null && orders.isEmpty()) {
                 item {
                     Box(
                         modifier = Modifier.fillMaxWidth().padding(32.dp),
@@ -254,7 +312,7 @@ fun CustomerDetailsScreen(
                     }
                 }
             } else {
-                items(orders, key = { it.id }) { o -> OrderCard(o, onClick = { onOpenOrder(o.id) }) }
+                items(orders.orEmpty(), key = { it.id }) { o -> OrderCard(o, onClick = { onOpenOrder(o.id) }) }
             }
         }
     }

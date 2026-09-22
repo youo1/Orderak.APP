@@ -128,6 +128,21 @@ jobs:
       - name: Verify every declared screen state has a design
         run: node tooling/ux/design-coverage.mjs
 
+      # design-coverage checks that an artboard NAME appears in its own object
+      # literal, so it cannot fail when a state is undrawn or unbuilt — it
+      # reported the today contract fully designed while two of its four states
+      # did not exist. A screenshot reference PNG cannot be written down: it is
+      # there only because a @PreviewTest composed that state and the renderer
+      # produced pixels. This guard counts those, and only when the render is of
+      # the screen rather than of a component the screen might not even call.
+      #
+      # Its own tests run first, for the same reason the audit's do.
+      - name: Test the render coverage guard
+        run: node --test tooling/ux/render-coverage.test.mjs
+
+      - name: Verify every claimed render has pixels behind it
+        run: node tooling/ux/render-coverage.mjs
+
       # The plan asks for a generated-doc drift check and there was none. Its
       # absence let a real break go unnoticed: database-migrations.md is
       # generated, so frontmatter added to it by hand survived only until the

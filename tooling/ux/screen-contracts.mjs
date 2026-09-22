@@ -46,8 +46,14 @@
  *                thirteen: `categories` declares a "reorder" with no ordering
  *                control, `deletion-status` declares "request deletion" and
  *                "cancel request" on a screen that reports status and offers no
- *                control at all, and `subscription` points at a Plans screen
- *                that does not exist.
+ *                control at all, and `subscription` pointed at a Plans screen
+ *                that did not exist.
+ *
+ *              A `planned` entry's `why` is a claim about the world and ages
+ *                like one. `subscription`'s said "PlansRoute does not exist yet"
+ *                long after it was built and wired — the route existed, the
+ *                paywall reached it, and only the screen that declares it as an
+ *                exit did not. Re-read the reason, not just the status.
  */
 
 export const STATES = ["loading", "content", "empty", "error"];
@@ -80,11 +86,20 @@ export const CONTRACTS = [
     data: ["passkey availability", "phone country catalogue", "OTP state", "terms/privacy versions"],
     actions: [
       { do: "passkey sign-in", via: "onPasskeySignIn" },
-      { do: "request OTP", status: "unverified" },
-      { do: "verify OTP", status: "unverified" },
-      { do: "change number", status: "unverified" },
-      { do: "resend", status: "unverified" },
-      { do: "switch language", status: "unverified" },
+      // All five go through one `dispatch(AuthEvent)` rather than a callback
+      // per action, which is why searching for "requestOtp" found nothing. The
+      // four OTP intents are dispatched, so `dispatch` — wired in this screen's
+      // own body — is what carries them.
+      { do: "request OTP", via: "dispatch" },
+      { do: "verify OTP", via: "dispatch" },
+      { do: "change number", via: "dispatch" },
+      { do: "resend", via: "dispatch" },
+      // Was unverified because the check looked at `AuthScreen`, a thin
+      // wrapper, while the language sheet lives in `AuthScreenContent` with
+      // local `showLanguage` state. ACTION_SOURCE points at the child now — the
+      // composable that actually decides what is drawn — and all six of this
+      // contract's actions resolve there.
+      { do: "switch language", via: "showLanguage" },
     ],
     states: ["content", "loading", "error"],
     offline: false,
@@ -101,9 +116,16 @@ export const CONTRACTS = [
     exit: ["MainRoute — اكتمل الإنشاء", "AuthRoute — رجوع مع حفظ المسوّدة"],
     data: ["resumable draft", "business categories", "city catalogue", "slug availability"],
     actions: [
-      { do: "save account step", status: "unverified" },
-      { do: "check slug", status: "unverified" },
-      { do: "select city", status: "unverified" },
+      { do: "save account step", via: "next" },
+      // Restated, because the old wording described what the seller SEES and
+      // the list is what they DO. `checkSlug()` is private and fires as they
+      // type the shop name; availability is its feedback, not a control. The
+      // action is naming the shop, and `onNameChanged` carries it.
+      { do: "name the shop, and see whether its link is free", via: "onNameChanged" },
+      // Was unverified because the picker lives in a child composable. Splitting
+      // ShopSetupContent out put the callback in ShopSetupScreen's own body,
+      // where the check can see it.
+      { do: "select city", via: "onCitySelected" },
       { do: "create store", via: "onCreate" },
     ],
     states: ["content", "loading", "error"],
@@ -121,7 +143,10 @@ export const CONTRACTS = [
     exit: ["SupportRoute", "AuthRoute — تسجيل خروج"],
     data: ["restriction reason", "support entry point"],
     actions: [
-      { do: "contact support", status: "unverified" },
+      // Real, but not via SupportRoute: a restricted account sits outside the
+      // main shell, so the control opens a mailto intent instead. The exit
+      // above said SupportRoute and was wrong about how, not whether.
+      { do: "contact support", via: "restricted_contact" },
       { do: "sign out", via: "onLogout" },
     ],
     states: ["content"],
@@ -156,8 +181,16 @@ export const CONTRACTS = [
     exit: ["متجر Play", "استمرار — في وضع التحذير فقط"],
     data: ["AppVersionPolicy", "config age"],
     actions: [
-      { do: "update", status: "unverified" },
-      { do: "dismiss — التحذير فقط", status: "unverified" },
+      // `openUri` is what the update button actually does, and it is the only
+      // one of the three blocking modes that offers a control at all — the
+      // other two are waits.
+      { do: "update", via: "openUri" },
+      // Confirmed absent, and absent on purpose: the warning banner in
+      // PlanStatusBanners is built with `dismissible = false`. A seller running
+      // a version the server is about to refuse should not be able to put the
+      // notice away. Kept rather than deleted so the decision is visible; if it
+      // is ever reversed this entry becomes a via.
+      { do: "dismiss — التحذير فقط", status: "planned", why: "the warning banner is deliberately dismissible = false" },
     ],
     states: ["content"],
     offline: false,
@@ -178,7 +211,11 @@ export const CONTRACTS = [
     actions: [
       { do: "pull to refresh", via: "onRefresh" },
       { do: "share catalog", via: "productsForShare" },
-      { do: "open order", status: "unverified" },
+      // Was `{ do: "open order", status: "unverified" }`, and the doubt was
+      // earned: no counter opened an order, and all three opened the same
+      // unfiltered list. Each now opens the orders it counts.
+      { do: "open filtered orders", via: "onOpenCounter" },
+      { do: "retry a failed plan refresh", via: "onRetry" },
       { do: "open announcements", via: "onOpenAnnouncements" },
     ],
     states: ["loading", "content", "empty", "error"],
@@ -201,7 +238,11 @@ export const CONTRACTS = [
       { do: "filter by status", via: "setFilter" },
       { do: "open order", via: "onOpen" },
       { do: "create manual order", via: "onNew" },
-      { do: "pull to refresh", status: "unverified" },
+      // Demoted from unverified to planned: there is no PullToRefreshBox on this
+      // screen and never was. The list is a Room flow, so it updates itself and a
+      // gesture would refresh nothing the seller can see — اليوم carries the pull
+      // because its plan usage genuinely comes from the network.
+      { do: "pull to refresh", status: "planned", why: "the list is a Room flow; no refresh gesture exists" },
     ],
     states: ["loading", "content", "empty", "error"],
     offline: true,
@@ -218,10 +259,11 @@ export const CONTRACTS = [
     exit: ["CustomerRoute", "رجوع"],
     data: ["order", "line items", "customer", "status history", "payment state"],
     actions: [
-      { do: "advance status", status: "unverified" },
+      // Both were real and had simply never been traced to a symbol.
+      { do: "advance status", via: "advance" },
       { do: "reject", via: "cancel" },
-      { do: "mark paid", status: "unverified" },
-      { do: "open customer", status: "unverified" },
+      { do: "mark paid", via: "markPaidManually" },
+      { do: "open customer", via: "onOpenCustomer" },
     ],
     states: ["loading", "content", "error"],
     offline: true,
@@ -301,7 +343,11 @@ export const CONTRACTS = [
     data: ["categories", "category limit usage"],
     actions: [
       { do: "add", via: "create" },
-      { do: "rename", status: "unverified" },
+      // Was unverified, and the doubt was earned: `rename` existed on the view
+      // model since it was written and no screen ever offered it, so a typo in a
+      // category name was permanent — the only way out was deleting the
+      // category, which takes its products' filing with it.
+      { do: "rename", via: "pendingRename" },
       { do: "reorder", status: "planned", why: "no ordering control exists on the screen" },
       { do: "delete", via: "delete" },
     ],
@@ -322,7 +368,10 @@ export const CONTRACTS = [
     actions: [
       { do: "save", via: "save" },
       { do: "upload logo", via: "uploadImage" },
-      { do: "copy link", status: "unverified" },
+      // Was unverified while the copy control sat inside the Scaffold body.
+      // Splitting StoreInfoContent out left `copyLink` in StoreInfoScreen's own
+      // body, wired into the callback the content calls.
+      { do: "copy link", via: "copyLink" },
     ],
     states: ["loading", "content", "error"],
     offline: false,
@@ -340,8 +389,9 @@ export const CONTRACTS = [
     data: ["translations", "provenance", "supported locales"],
     actions: [
       { do: "approve", via: "saveTranslation" },
-      { do: "edit translation", status: "unverified" },
-      { do: "request retranslation", status: "unverified" },
+      { do: "edit translation", via: "saveTranslation" },
+      // No control, no view-model call, no endpoint reached from here.
+      { do: "request retranslation", status: "planned", why: "no retranslation control exists on the screen" },
     ],
     states: ["loading", "content", "empty", "error"],
     offline: false,
@@ -415,9 +465,11 @@ export const CONTRACTS = [
     actions: [
       { do: "open group entry", via: "onOpenStoreInfo" },
       { do: "save payout and slug", via: "savePayout" },
-      { do: "switch language", status: "unverified" },
+      // Both were real and untraced: the language sheet is behind `showLanguage`
+      // and account deletion behind `requestAccountDeletion`.
+      { do: "switch language", via: "showLanguage" },
       { do: "purchase plan", via: "purchase" },
-      { do: "delete account", status: "unverified" },
+      { do: "delete account", via: "requestAccountDeletion" },
       { do: "sign out", via: "onLogout" },
     ],
     states: ["content", "loading"],
@@ -454,7 +506,11 @@ export const CONTRACTS = [
     data: ["devices", "passkeys", "device limit usage"],
     actions: [
       { do: "revoke device", via: "revokeDevice" },
-      { do: "add passkey", via: "onAdd" },
+      // Was via "onAdd", a parameter name of the header composable rather than
+      // the operation. Splitting DevicesContent out moved that parameter, and
+      // the guard caught it. `createPasskey` is what actually carries the
+      // action and is what its two siblings above and below already name.
+      { do: "add passkey", via: "createPasskey" },
       { do: "remove passkey", via: "deletePasskey" },
     ],
     states: ["loading", "content", "error"],
@@ -491,7 +547,9 @@ export const CONTRACTS = [
     data: ["ticket", "messages"],
     actions: [
       { do: "reply", via: "reply" },
-      { do: "close", status: "unverified" },
+      // The screen only HIDES the reply box when a ticket is already closed;
+      // nothing on it closes one. Reading a status is not an action.
+      { do: "close", status: "planned", why: "the screen reads closed status but offers no control to close" },
     ],
     states: ["loading", "content", "error"],
     offline: false,
@@ -509,7 +567,8 @@ export const CONTRACTS = [
     data: ["announcements", "read state"],
     actions: [
       { do: "mark read", via: "markAnnouncementRead" },
-      { do: "open link", status: "unverified" },
+      // Announcements carry no link control — tapping one marks it read.
+      { do: "open link", status: "planned", why: "announcements render text only; no link affordance exists" },
     ],
     states: ["loading", "content", "empty", "error"],
     offline: false,
@@ -563,8 +622,16 @@ export const CONTRACTS = [
     exit: ["PlansRoute", "رجوع"],
     data: ["subscription status", "entitlement usage", "billing flag state"],
     actions: [
-      { do: "view plans", status: "planned", why: "PlansRoute does not exist yet — work item 08" },
-      { do: "register interest", status: "unverified" },
+      // The `planned` reason had gone stale: PlansRoute was built and wired, and
+      // PaywallScreen reached it — but this screen, which declares it as an exit,
+      // never did. Its purchase-closed banner told a seller purchasing was shut
+      // and offered nothing, while the plans comparison exists precisely to be
+      // read in that state.
+      { do: "view plans", via: "onViewPlans" },
+      // Demoted from unverified to planned: there is no control, no string and
+      // no backend endpoint. Collecting interest means contacting those sellers
+      // later, which is a product decision rather than a wiring gap.
+      { do: "register interest", status: "planned", why: "no notify-me control or endpoint exists" },
       { do: "restore purchase", via: "recoverPurchases" },
     ],
     states: ["loading", "content", "error"],
@@ -631,43 +698,49 @@ export const CONTRACTS = [
  *   `status: "unverified"` with `via: "thatSymbol"`. If the handler does not
  *   exist, it is `status: "planned"` with a reason, not an unverified entry.
  */
-export const UNVERIFIED_ACTIONS = new Set([
-  "auth:request OTP",
-  "auth:verify OTP",
-  "auth:change number",
-  "auth:resend",
-  "auth:switch language",
-  "shop-setup:save account step",
-  "shop-setup:check slug",
-  "shop-setup:select city",
-  "restricted-account:contact support",
-  "version-governance:update",
-  "version-governance:dismiss — التحذير فقط",
-  "today:open order",
-  "orders:pull to refresh",
-  "order-details:advance status",
-  "order-details:mark paid",
-  "order-details:open customer",
-  "categories:rename",
-  "store-info:copy link",
-  "catalog-languages:edit translation",
-  "catalog-languages:request retranslation",
-  "account:switch language",
-  "account:delete account",
-  "support-ticket:close",
-  "announcements:open link",
-  "subscription:register interest",
-]);
+/**
+ * Empty, and kept so it can stay that way.
+ *
+ * It held six entries, every one of them the same shape: a real control that
+ * lived in a CHILD composable, so no symbol in the named screen's own body
+ * carried it. Five were resolved by the work that made those screens
+ * renderable — splitting a screen into `XxxContent(state, ...)` plus a
+ * Hilt-wired wrapper moved the callbacks into a body the check can see, and
+ * ACTION_SOURCE names the child where that is where the decision lives.
+ *
+ * The sixth was resolved by reading it again rather than by moving anything:
+ * `shop-setup:see slug availability` described what the seller SEES, and this
+ * list is what they DO. Naming the shop is the action; availability is its
+ * feedback.
+ *
+ * This set may shrink and never grow. An action that cannot be anchored is
+ * either `planned` with a reason, or it is not an action.
+ */
+export const UNVERIFIED_ACTIONS = new Set([]);
 
 /**
  * Composables that do not follow the id-to-ScreenName convention, so the
  * verifier cannot find them by name alone. Tabs have no route and no screen of
  * their own; the version gate is a private composable inside the shell.
  */
+/**
+ * Where a contract's actions actually live, when that is not `<Id>Screen`.
+ *
+ * These are not aliases for convenience. Each one records that the screen a
+ * seller reaches is a Hilt-wired wrapper, and the composable that decides what
+ * is drawn — and therefore the one whose body can be checked — is somewhere
+ * else. `store` moved here when `ProductsScreen` was split so its states could
+ * be rendered by a preview at all; the guard caught the move on the same
+ * commit, which is the behaviour worth keeping.
+ */
 export const ACTION_SOURCE = {
   "main-shell": "MainScreen",
   "version-governance": "VersionBlockingScreen",
+  auth: "AuthScreenContent",
   today: "DashboardTab",
-  store: "ProductsScreen",
+  store: "StoreContent",
+  customers: "CustomersContent",
+  "restricted-account": "RestrictedAccountContent",
+  plans: "PlansContent",
   account: "SettingsScreen",
 };

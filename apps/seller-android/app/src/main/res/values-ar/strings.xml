@@ -21,7 +21,7 @@
     <string name="auth_verify_code">تأكيد الكود</string>
     <string name="auth_otp_title">تأكيد الرقم</string>
     <string name="auth_otp_sent_to">تم الإرسال إلى %1$s</string>
-    <string name="auth_resend_in">إعادة طلب خلال %1$d ثانية</string>
+    <string name="auth_resend_in">إعادة طلب خلال %1$s ثانية</string>
     <string name="auth_resend">إعادة إرسال الكود</string>
     <string name="auth_change_number">غيّر الرقم</string>
     <string name="auth_otp_invalid">كود غير صحيح، جرب تاني.</string>
@@ -49,7 +49,7 @@
     <string name="cd_valid_number">رقم هاتف صحيح</string>
 
     <!-- S2 Shop setup -->
-    <string name="setup_step_indicator">خطوة %1$d من ٢</string>
+    <string name="setup_step_indicator">خطوة %1$s من ٢</string>
     <string name="setup_shop_name_label">اسم المتجر (الاسم اللي هيظهر للعملاء)</string>
     <string name="setup_category_label">نوع النشاط</string>
     <string name="setup_subcategory_label">التصنيف الفرعي</string>
@@ -162,6 +162,7 @@
     <string name="customer_note">ملاحظة</string>
     <string name="customer_contact">راسل</string>
     <string name="customer_save">حفظ</string>
+    <string name="customer_open">افتح العميل</string>
     <string name="customer_saved">اتحفظ</string>
     <string name="customer_edit_locked">تعديل بيانات العملاء متاح في الباقات المدفوعة</string>
     <string name="customer_orders_heading">الأوردرات</string>
@@ -169,9 +170,9 @@
         <item quantity="zero">مفيش أوردرات</item>
         <item quantity="one">أوردر واحد</item>
         <item quantity="two">أوردرين</item>
-        <item quantity="few">%d أوردرات</item>
-        <item quantity="many">%d أوردر</item>
-        <item quantity="other">%d أوردر</item>
+        <item quantity="few">%s أوردرات</item>
+        <item quantity="many">%s أوردر</item>
+        <item quantity="other">%s أوردر</item>
     </plurals>
 
     <!-- S13 Settings -->
@@ -210,14 +211,15 @@
     <string name="link_copied">تم نسخ اللينك</string>
     <string name="categories_title">الأقسام</string>
     <string name="categories_new">قسم جديد</string>
+    <string name="categories_empty">لسه مفيش أقسام — ضيف واحد فوق عشان ترتب منتجاتك.</string>
     <string name="categories_add">إضافة</string>
     <plurals name="categories_product_count">
         <item quantity="zero">لا توجد منتجات</item>
         <item quantity="one">منتج واحد</item>
         <item quantity="two">منتجان</item>
-        <item quantity="few">%d منتجات</item>
-        <item quantity="many">%d منتجًا</item>
-        <item quantity="other">%d منتج</item>
+        <item quantity="few">%s منتجات</item>
+        <item quantity="many">%s منتجًا</item>
+        <item quantity="other">%s منتج</item>
     </plurals>
     <string name="common_delete">حذف</string>
     <string name="plan_free">مجاني</string>
@@ -244,13 +246,13 @@
     <string name="usage_ai_requests">طلبات الذكاء الاصطناعي هذا الشهر</string>
     <string name="usage_categories">الفئات</string>
     <string name="usage_devices">الأجهزة</string>
-    <string name="usage_value">%1$d / %2$d</string>
-    <string name="usage_value_unlimited">%1$d / غير محدود</string>
-    <string name="products_usage_unlimited">المنتجات (%1$d / غير محدود)</string>
+    <string name="usage_value">%1$s / %2$s</string>
+    <string name="usage_value_unlimited">%1$s / غير محدود</string>
+    <string name="products_usage_unlimited">المنتجات (%1$s / غير محدود)</string>
     <string name="products_limit_title">تم بلوغ حد المنتجات</string>
-    <string name="products_limit_body">لقد وصلت إلى حد %1$d منتجًا. قم بالترقية إلى %2$s للحصول على حد أعلى.</string>
-    <string name="products_limit_body_over">تسمح خطتك بـ %1$d منتجًا ولديك حاليًا %2$d. يمكنك تعديل المنتجات الحالية أو حذفها، ولكن يجب خفض العدد إلى أقل من %1$d قبل إضافة منتج آخر.</string>
-    <string name="products_limit_body_max_plan">لقد وصلت إلى حد %1$d منتجًا. تواصل مع الدعم إذا كنت تحتاج إلى سعة أكبر.</string>
+    <string name="products_limit_body">لقد وصلت إلى حد %1$s منتجًا. قم بالترقية إلى %2$s للحصول على حد أعلى.</string>
+    <string name="products_limit_body_over">تسمح خطتك بـ %1$s منتجًا ولديك حاليًا %2$s. يمكنك تعديل المنتجات الحالية أو حذفها، ولكن يجب خفض العدد إلى أقل من %1$s قبل إضافة منتج آخر.</string>
+    <string name="products_limit_body_max_plan">لقد وصلت إلى حد %1$s منتجًا. تواصل مع الدعم إذا كنت تحتاج إلى سعة أكبر.</string>
     <string name="product_add_locked">تم بلوغ حد المنتجات. اضغط لمراجعة خيارات الترقية.</string>
     <string name="upgrade_now">الترقية الآن</string>
     <string name="plan_paid1">المدفوعة 1</string>
@@ -262,10 +264,11 @@
     <string name="order_cancel_confirm">تلغي الأوردر وترجّع كمياته للمخزون؟</string>
     <string name="product_delete_confirm">تحذف المنتج؟ مش هينفع ترجّعه بعد كده.</string>
     <string name="product_stock_conflict_title">المخزون اتغيّر</string>
-    <string name="product_stock_conflict_body">انت كتبت %1$d، والمحل دلوقتي عنده %2$d — جه طلب وانت بتعدّل. باقي تعديلاتك اتحفظت.</string>
-    <string name="product_stock_conflict_use_shop">خليها %1$d</string>
-    <string name="product_stock_conflict_keep_mine">اكتب %1$d برضه</string>
+    <string name="product_stock_conflict_body">انت كتبت %1$s، والمحل دلوقتي عنده %2$s — جه طلب وانت بتعدّل. باقي تعديلاتك اتحفظت.</string>
+    <string name="product_stock_conflict_use_shop">خليها %1$s</string>
+    <string name="product_stock_conflict_keep_mine">اكتب %1$s برضه</string>
     <string name="category_delete_confirm">تحذف التصنيف؟ المنتجات هتفضل من غير تصنيف.</string>
+    <string name="category_rename">غيّر اسم الفئة</string>
     <string name="categories_error">ماقدرناش نحدّث التصنيفات. حاول تاني.</string>
     <string name="settings_delete_confirm">تبعت طلب حذف حساب متأكد منه؟ الطلب هيتنفذ حسب المدة المنشورة.</string>
     <string name="settings_logout_confirm">تسجل خروج وتمسح بيانات الشغل المحلية من الجهاز ده؟</string>
@@ -279,7 +282,7 @@
     <string name="support_subject">الموضوع</string>
     <string name="support_message">الرسالة</string>
     <string name="announcements_title">الإعلانات</string>
-    <string name="announcements_unread">الإعلانات (%1$d جديدة)</string>
+    <string name="announcements_unread">الإعلانات (%1$s جديدة)</string>
     <string name="announcement_new">جديد</string>
     <string name="catalog_languages_title">لغات الكتالوج</string>
     <string name="translation_missing">الترجمة غير موجودة</string>
@@ -301,6 +304,7 @@
     <string name="ai_you">أنت</string>
     <string name="ai_message">اسأل عن متجرك</string>
     <string name="ai_reset">بدء محادثة جديدة</string>
+    <string name="ai_empty_hint">لسه مفيش أسئلة — اسأل عن منتجاتك أو أوردراتك أو عملائك.</string>
     <string name="deletion_status_title">حالة طلب الحذف</string>
     <string name="deletion_status_none">لا يوجد طلب حذف</string>
     <string name="deletion_status_help">يُنفذ الطلب المتحقق منه وفق الموعد المنشور. تواصل مع الدعم إذا كانت الحالة غير صحيحة.</string>
@@ -400,6 +404,7 @@
     <string name="setup_city_country_from_phone">نعرض مدن %1$s بناءً على رقم هاتفك.</string>
     <string name="setup_city_search">اكتب اسم المدينة</string>
     <string name="setup_city_search_error">تعذر تحميل اقتراحات المدن.</string>
+    <string name="setup_category_load_error">تعذر تحميل أنواع النشاط. دوس عشان تجرب تاني.</string>
     <string name="setup_city_no_results">لم نجد مدينة مطابقة. يمكنك استخدام الإدخال اليدوي أدناه.</string>
     <string name="setup_city_use_manual">استخدم «%1$s» كما كتبته</string>
     <string name="setup_city_data_attribution">بيانات المدن: Countries States Cities Database (ODbL)</string>
@@ -410,9 +415,9 @@
     <string name="gate_not_built_body">الخاصية دي مش جاهزة. مفيش تغيير خطة بيفتحها.</string>
     <string name="gate_not_built_badge">قريباً</string>
     <string name="nav_account">حسابي</string>
-    <string name="products_limit_body_purchase_closed">وصلت لـ %1$d منتج. الخطط المدفوعة لسه مفتحتش للشراء — منتجاتك الحالية زي ما هي.</string>
+    <string name="products_limit_body_purchase_closed">وصلت لـ %1$s منتج. الخطط المدفوعة لسه مفتحتش للشراء — منتجاتك الحالية زي ما هي.</string>
     <string name="product_stock_out">نفد المخزون</string>
-    <string name="product_stock_low">فاضل %1$d</string>
+    <string name="product_stock_low">فاضل %1$s</string>
     <string name="categories_limit_title">وصلت لحد التصنيفات</string>
     <string name="categories_limit_body">تصنيفاتك الحالية زي ما هي. الخطة الأعلى بترفع الحد.</string>
     <string name="categories_limit_body_purchase_closed">تصنيفاتك الحالية زي ما هي. الخطط المدفوعة لسه مفتحتش للشراء.</string>
@@ -438,6 +443,7 @@
     <string name="search_clear_action">امسح البحث</string>
     <string name="plans_title">الباقات</string>
     <string name="plans_feature_column">الميزة</string>
+    <string name="plans_included">متاح</string>
     <string name="plans_unavailable">تفاصيل الباقات مش متاحة دلوقتي</string>
     <string name="plans_purchase_closed">الترقية لسه مش مفتوحة. الصفحة دي عشان تشوف كل باقة فيها إيه.</string>
     <string name="plans_price_note">الأسعار هتظهر من Google Play بعملتك لما الترقية تفتح.</string>
@@ -448,8 +454,8 @@
     <string name="paywall_limit_devices">وصلت لأقصى عدد أجهزة في باقتك</string>
     <string name="paywall_limit_ai">وصلت لأقصى عدد طلبات الذكاء الاصطناعي الشهر ده</string>
     <string name="paywall_limit_generic">وصلت لحد من حدود باقتك</string>
-    <string name="paywall_usage_of_limit">مستخدم %1$d من %2$d.</string>
-    <string name="paywall_limit_only">باقتك بتسمح بـ %1$d.</string>
+    <string name="paywall_usage_of_limit">مستخدم %1$s من %2$s.</string>
+    <string name="paywall_limit_only">باقتك بتسمح بـ %1$s.</string>
     <string name="paywall_limit_unknown">باقتك مش بتسمح بأكتر من كده دلوقتي.</string>
     <string name="paywall_next_plan">%1$s بتديك %2$s.</string>
     <string name="paywall_dismiss">رجوع</string>
@@ -488,9 +494,9 @@
         <item quantity="zero">مفيش منتجات متسجلة على الموبايل ده بس.</item>
         <item quantity="one">فيه منتج متسجل على الموبايل ده بس. الكتالوج مش هيتحدّث لحد ما يتبعت أو يتمسح.</item>
         <item quantity="two">فيه منتجين متسجلين على الموبايل ده بس. الكتالوج مش هيتحدّث لحد ما يتبعتوا أو يتمسحوا.</item>
-        <item quantity="few">فيه %d منتجات متسجلة على الموبايل ده بس. الكتالوج مش هيتحدّث لحد ما يتبعتوا أو يتمسحوا.</item>
-        <item quantity="many">فيه %d منتجًا متسجلة على الموبايل ده بس. الكتالوج مش هيتحدّث لحد ما يتبعتوا أو يتمسحوا.</item>
-        <item quantity="other">فيه %d منتج متسجل على الموبايل ده بس. الكتالوج مش هيتحدّث لحد ما يتبعتوا أو يتمسحوا.</item>
+        <item quantity="few">فيه %s منتجات متسجلة على الموبايل ده بس. الكتالوج مش هيتحدّث لحد ما يتبعتوا أو يتمسحوا.</item>
+        <item quantity="many">فيه %s منتجًا متسجلة على الموبايل ده بس. الكتالوج مش هيتحدّث لحد ما يتبعتوا أو يتمسحوا.</item>
+        <item quantity="other">فيه %s منتج متسجل على الموبايل ده بس. الكتالوج مش هيتحدّث لحد ما يتبعتوا أو يتمسحوا.</item>
     </plurals>
     <string name="products_stuck_action">اعرضهم</string>
     <string name="products_stuck_dialog_title">مش على حسابك</string>

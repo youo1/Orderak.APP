@@ -84,10 +84,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.orderak.seller.R
+import app.orderak.seller.core.text.formatCount
+import app.orderak.seller.data.remote.BusinessCategoryDto
+import app.orderak.seller.data.remote.CityCatalogSuggestionDto
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -120,6 +124,68 @@ fun ShopSetupScreen(
         )
     }
 
+    ShopSetupContent(
+        state = state,
+        actions = ShopSetupActions(
+            onFullNameChanged = viewModel::onFullNameChanged,
+            onEmailChanged = viewModel::onEmailChanged,
+            onBirthYearChanged = viewModel::onBirthYearChanged,
+            onNameChanged = viewModel::onNameChanged,
+            onCategorySelected = viewModel::onCategorySelected,
+            retryTaxonomy = viewModel::retryTaxonomy,
+            onCityChanged = viewModel::onCityChanged,
+            onCitySelected = viewModel::onCitySelected,
+            useManualCity = viewModel::useManualCity,
+            retryCitySearch = viewModel::retryCitySearch,
+            next = viewModel::next,
+            finish = viewModel::finish,
+            back = viewModel::back,
+        ),
+        onExit = onExit,
+    )
+}
+
+/**
+ * Everything the two setup steps can ask for, as data.
+ *
+ * Thirteen separate lambda parameters threaded through two step composables is
+ * a signature nobody reads, so this is one value instead. Every field defaults
+ * to a no-op, which is what makes `ShopSetupActions()` enough to render either
+ * step — and the reason this type exists at all is that both steps took a
+ * `ShopSetupViewModel` directly, so the second screen a new seller ever sees
+ * could not be drawn without a Hilt graph.
+ */
+data class ShopSetupActions(
+    val onFullNameChanged: (String) -> Unit = {},
+    val onEmailChanged: (String) -> Unit = {},
+    val onBirthYearChanged: (Int) -> Unit = {},
+    val onNameChanged: (String) -> Unit = {},
+    val onCategorySelected: (BusinessCategoryDto) -> Unit = {},
+    val retryTaxonomy: () -> Unit = {},
+    val onCityChanged: (String) -> Unit = {},
+    val onCitySelected: (CityCatalogSuggestionDto) -> Unit = {},
+    val useManualCity: () -> Unit = {},
+    val retryCitySearch: () -> Unit = {},
+    val next: () -> Unit = {},
+    val finish: () -> Unit = {},
+    val back: () -> Unit = {},
+)
+
+/**
+ * The two-step setup, as a function of its state.
+ *
+ * The locale effect, the completion and reauthentication effects, the back
+ * handler and the passkey sheet stay in [ShopSetupScreen]: each is a transition
+ * or a conversation, and none of them is a state of this page.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ShopSetupContent(
+    state: ShopSetupUiState,
+    actions: ShopSetupActions,
+    onExit: () -> Unit,
+) {
+    val locale = LocalConfiguration.current.locales[0]
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
@@ -134,7 +200,7 @@ fun ShopSetupScreen(
                 },
                 navigationIcon = {
                     IconButton(
-                        onClick = if (state.step == 2) viewModel::back else onExit,
+                        onClick = if (state.step == 2) actions.back else onExit,
                     ) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
@@ -155,7 +221,7 @@ fun ShopSetupScreen(
                     contentAlignment = Alignment.Center,
                 ) {
                     Button(
-                        onClick = if (state.step == 1) viewModel::next else viewModel::finish,
+                        onClick = if (state.step == 1) actions.next else actions.finish,
                         enabled = if (state.step == 1) {
                             !state.saving
                         } else {
@@ -200,7 +266,9 @@ fun ShopSetupScreen(
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    stringResource(R.string.setup_step_indicator, state.step),
+                    // The Arabic string writes its “of 2” as ٢, so the step has to
+                    // be Arabic-Indic too or one sentence carries both forms.
+                    stringResource(R.string.setup_step_indicator, formatCount(state.step, locale)),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold,
@@ -208,9 +276,9 @@ fun ShopSetupScreen(
                 Spacer(Modifier.height(28.dp))
 
                 if (state.step == 1) {
-                    AccountInformationStep(state, viewModel)
+                    AccountInformationStep(state, actions)
                 } else {
-                    StoreInformationStep(state, viewModel)
+                    StoreInformationStep(state, actions)
                 }
             }
         }
@@ -221,7 +289,7 @@ fun ShopSetupScreen(
 @Composable
 private fun AccountInformationStep(
     state: ShopSetupUiState,
-    viewModel: ShopSetupViewModel,
+    actions: ShopSetupActions,
 ) {
     var showYearDialog by rememberSaveable { mutableStateOf(false) }
 
@@ -233,12 +301,12 @@ private fun AccountInformationStep(
     Spacer(Modifier.height(28.dp))
     OutlinedTextField(
         value = state.fullName,
-        onValueChange = viewModel::onFullNameChanged,
+        onValueChange = actions.onFullNameChanged,
         label = { Text(stringResource(R.string.setup_full_name_label)) },
         singleLine = true,
         modifier = Modifier.fillMaxWidth().onboardingAutofill(
             listOf(AutofillType.PersonFullName),
-            viewModel::onFullNameChanged,
+            actions.onFullNameChanged,
         ),
         isError = state.fullName.isNotBlank() && state.fullName.trim().length !in 3..80,
     )
@@ -270,14 +338,14 @@ private fun AccountInformationStep(
     Spacer(Modifier.height(16.dp))
     OutlinedTextField(
         value = state.email,
-        onValueChange = viewModel::onEmailChanged,
+        onValueChange = actions.onEmailChanged,
         label = { Text(stringResource(R.string.setup_email_label)) },
         supportingText = { Text(stringResource(R.string.setup_email_private_help)) },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
         singleLine = true,
         modifier = Modifier.fillMaxWidth().onboardingAutofill(
             listOf(AutofillType.EmailAddress),
-            viewModel::onEmailChanged,
+            actions.onEmailChanged,
         ),
         isError = !state.emailValid,
     )
@@ -291,7 +359,7 @@ private fun AccountInformationStep(
             selectedYear = state.birthYear,
             onDismiss = { showYearDialog = false },
             onSelected = {
-                viewModel.onBirthYearChanged(it)
+                actions.onBirthYearChanged(it)
                 showYearDialog = false
             },
         )
@@ -351,7 +419,7 @@ internal fun onboardingStoreLinkPreview(countryIso: String, slug: String): Strin
 @Composable
 private fun StoreInformationStep(
     state: ShopSetupUiState,
-    viewModel: ShopSetupViewModel,
+    actions: ShopSetupActions,
 ) {
     var categoryExpanded by rememberSaveable { mutableStateOf(false) }
     var cityExpanded by rememberSaveable { mutableStateOf(false) }
@@ -374,7 +442,7 @@ private fun StoreInformationStep(
     Spacer(Modifier.height(24.dp))
     OutlinedTextField(
         value = state.name,
-        onValueChange = viewModel::onNameChanged,
+        onValueChange = actions.onNameChanged,
         label = { Text(stringResource(R.string.setup_shop_name_label)) },
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
@@ -388,7 +456,14 @@ private fun StoreInformationStep(
     )
     Text(
         text = onboardingStoreLinkPreview(state.country.iso, state.slug),
-        style = MaterialTheme.typography.bodyMedium,
+        style = MaterialTheme.typography.bodyMedium.copy(
+            // A URL is LTR wherever it appears. Without this the trailing
+            // •••••••• placeholder — which stands for the store id the link has
+            // not been given yet — was reordered to the visual start under `ar`,
+            // so a seller setting up their shop read their own link as
+            // "••••••••-https://orderak.app/EG-mona-boutique".
+            textDirection = TextDirection.Ltr,
+        ),
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
     )
@@ -427,6 +502,16 @@ private fun StoreInformationStep(
                 ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryExpanded)
             },
             isError = state.taxonomyError,
+            // The only retry lives inside the menu, and this field is
+            // read-only — so a seller whose taxonomy call failed saw a red box
+            // with no reason to open it, on the one step that cannot be
+            // finished without a category. The city field below is editable, so
+            // typing opens its menu and finds its error; this one had nothing.
+            supportingText = if (state.taxonomyError) {
+                { Text(stringResource(R.string.setup_category_load_error)) }
+            } else {
+                null
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .menuAnchor(MenuAnchorType.PrimaryNotEditable, true),
@@ -452,7 +537,7 @@ private fun StoreInformationStep(
                 DropdownMenuItem(
                     text = { Text(category.name) },
                     onClick = {
-                        viewModel.onCategorySelected(category)
+                        actions.onCategorySelected(category)
                         categoryExpanded = false
                     },
                     contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
@@ -460,8 +545,13 @@ private fun StoreInformationStep(
             }
             if (state.taxonomyError) {
                 DropdownMenuItem(
-                    text = { Text(stringResource(R.string.common_retry)) },
-                    onClick = viewModel::retryTaxonomy,
+                    text = {
+                        Text(
+                            stringResource(R.string.setup_category_load_error),
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    },
+                    onClick = actions.retryTaxonomy,
                 )
             }
         }
@@ -479,7 +569,7 @@ private fun StoreInformationStep(
                 state.citySuggestions.isEmpty() &&
                 !state.citySearching
             ) {
-                viewModel.retryCitySearch()
+                actions.retryCitySearch()
             }
         },
         modifier = Modifier.fillMaxWidth(),
@@ -488,7 +578,7 @@ private fun StoreInformationStep(
             value = state.city,
             onValueChange = {
                 cityExpanded = true
-                viewModel.onCityChanged(it)
+                actions.onCityChanged(it)
             },
             singleLine = true,
             label = { Text(stringResource(R.string.setup_city_label)) },
@@ -524,7 +614,7 @@ private fun StoreInformationStep(
                             color = MaterialTheme.colorScheme.error,
                         )
                     },
-                    onClick = viewModel::retryCitySearch,
+                    onClick = actions.retryCitySearch,
                 )
                 state.city.trim().length >= 2 &&
                     state.citySuggestions.isEmpty() &&
@@ -553,7 +643,7 @@ private fun StoreInformationStep(
                             }
                         }
                     },
-                    onClick = { viewModel.onCitySelected(suggestion) },
+                    onClick = { actions.onCitySelected(suggestion) },
                     contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
                 )
             }
@@ -565,7 +655,7 @@ private fun StoreInformationStep(
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.setup_city_use_manual, state.city.trim())) },
                     onClick = {
-                        viewModel.useManualCity()
+                        actions.useManualCity()
                         cityExpanded = false
                     },
                 )

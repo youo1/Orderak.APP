@@ -1,6 +1,7 @@
 package app.orderak.seller.feature.products
 
 import app.orderak.seller.data.billing.FeatureKeys
+import app.orderak.seller.data.db.CategoryEntity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -53,9 +54,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.orderak.seller.core.ui.FullScreenLoading
 import app.orderak.seller.R
+import app.orderak.seller.core.text.formatCount
 import coil3.compose.AsyncImage
 import java.io.File
 
@@ -74,6 +78,71 @@ fun ProductEditScreen(
         viewModel.onImagePicked(it)
     }
 
+    ProductEditContent(
+        state = state,
+        categories = categories,
+        confirmDelete = confirmDelete,
+        actions = ProductEditActions(
+            onName = viewModel::onName,
+            onDescription = viewModel::onDescription,
+            onPrice = viewModel::onPrice,
+            onStock = viewModel::onStock,
+            onAvailable = viewModel::onAvailable,
+            onCategory = viewModel::onCategory,
+            save = viewModel::save,
+            delete = viewModel::delete,
+            acceptShopStock = viewModel::acceptShopStock,
+            reapplyMyStock = viewModel::reapplyMyStock,
+        ),
+        onPickImage = {
+            picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        },
+        onConfirmDelete = { confirmDelete = it },
+        onBack = onBack,
+        onLimitReached = onLimitReached,
+    )
+}
+
+/**
+ * Everything the product form can ask the view model to do, as data.
+ *
+ * Ten lambdas in one value rather than ten parameters, each defaulting to a
+ * no-op so `ProductEditActions()` is enough to render the form.
+ */
+data class ProductEditActions(
+    val onName: (String) -> Unit = {},
+    val onDescription: (String) -> Unit = {},
+    val onPrice: (String) -> Unit = {},
+    val onStock: (String) -> Unit = {},
+    val onAvailable: (Boolean) -> Unit = {},
+    val onCategory: (String?) -> Unit = {},
+    val save: (() -> Unit) -> Unit = {},
+    val delete: (() -> Unit) -> Unit = {},
+    val acceptShopStock: () -> Unit = {},
+    val reapplyMyStock: (() -> Unit) -> Unit = {},
+)
+
+/**
+ * The product form, as a function of its state.
+ *
+ * `state.loaded` is the whole reason this screen has a loading state: it was
+ * computed in three places in the view model and read in none, so opening an
+ * existing product drew an empty form first — blank name, stock "1" — and
+ * swapped in the real values when Room answered, overwriting anything the seller
+ * had typed in between.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ProductEditContent(
+    state: ProductEditUiState,
+    categories: List<CategoryEntity>,
+    confirmDelete: Boolean,
+    actions: ProductEditActions,
+    onPickImage: () -> Unit,
+    onConfirmDelete: (Boolean) -> Unit,
+    onBack: () -> Unit,
+    onLimitReached: (String) -> Unit,
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -88,6 +157,15 @@ fun ProductEditScreen(
             )
         }
     ) { padding ->
+        // `loaded` was computed in three places in the view model and read in
+        // none. Opening an existing product therefore drew an empty form first —
+        // blank name, stock "1" — and swapped in the real values when Room
+        // answered, so anything the seller typed in between was overwritten by
+        // the product they had opened to edit.
+        if (!state.loaded) {
+            FullScreenLoading(Modifier.padding(padding))
+            return@Scaffold
+        }
         Column(
             Modifier.fillMaxSize().padding(padding).padding(16.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -98,7 +176,7 @@ fun ProductEditScreen(
                     .height(180.dp)
                     .clip(RoundedCornerShape(16.dp))
                     .clickable {
-                        picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        onPickImage()
                     },
                 contentAlignment = Alignment.Center
             ) {
@@ -116,13 +194,13 @@ fun ProductEditScreen(
             }
 
             OutlinedTextField(
-                value = state.name, onValueChange = viewModel::onName,
+                value = state.name, onValueChange = actions.onName,
                 label = { Text(stringResource(R.string.product_name_label)) },
                 singleLine = true, modifier = Modifier.fillMaxWidth()
             )
 
             OutlinedTextField(
-                value = state.description, onValueChange = viewModel::onDescription,
+                value = state.description, onValueChange = actions.onDescription,
                 label = { Text(stringResource(R.string.product_description_label)) },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 2
@@ -132,14 +210,14 @@ fun ProductEditScreen(
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
-                        value = state.priceText, onValueChange = viewModel::onPrice,
+                        value = state.priceText, onValueChange = actions.onPrice,
                         label = { Text(stringResource(R.string.product_price_label)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.weight(1f)
                     )
                     OutlinedTextField(
-                        value = state.stockText, onValueChange = viewModel::onStock,
+                        value = state.stockText, onValueChange = actions.onStock,
                         label = { Text(stringResource(R.string.product_stock_label)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -148,7 +226,7 @@ fun ProductEditScreen(
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Switch(checked = state.available, onCheckedChange = viewModel::onAvailable)
+                Switch(checked = state.available, onCheckedChange = actions.onAvailable)
                 Text(stringResource(R.string.product_available), Modifier.padding(start = 8.dp))
             }
 
@@ -161,13 +239,13 @@ fun ProductEditScreen(
                 ) {
                     FilterChip(
                         selected = state.categoryCode == null,
-                        onClick = { viewModel.onCategory(null) },
+                        onClick = { actions.onCategory(null) },
                         label = { Text(stringResource(R.string.product_discount_none)) }
                     )
                     categories.forEach { c ->
                         FilterChip(
                             selected = state.categoryCode == c.categoryCode,
-                            onClick = { viewModel.onCategory(c.categoryCode) },
+                            onClick = { actions.onCategory(c.categoryCode) },
                             label = {
                                 Text(
                                     c.name,
@@ -224,14 +302,14 @@ fun ProductEditScreen(
             }
 
             Button(
-                onClick = { viewModel.save(onBack) },
+                onClick = { actions.save(onBack) },
                 enabled = state.canSave && !state.saving,
                 modifier = Modifier.fillMaxWidth()
             ) { Text(stringResource(R.string.product_save)) }
 
             if (state.id > 0) {
                 TextButton(
-                    onClick = { confirmDelete = true },
+                    onClick = { onConfirmDelete(true) },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
@@ -245,15 +323,15 @@ fun ProductEditScreen(
 
     if (confirmDelete) {
         AlertDialog(
-            onDismissRequest = { confirmDelete = false },
+            onDismissRequest = { onConfirmDelete(false) },
             title = { Text(stringResource(R.string.product_delete)) },
             text = { Text(stringResource(R.string.product_delete_confirm)) },
             confirmButton = {
-                TextButton(onClick = { confirmDelete = false; viewModel.delete(onBack) }) {
+                TextButton(onClick = { onConfirmDelete(false); actions.delete(onBack) }) {
                     Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error)
                 }
             },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.common_cancel)) } },
+            dismissButton = { TextButton(onClick = { onConfirmDelete(false) }) { Text(stringResource(R.string.common_cancel)) } },
         )
     }
 
@@ -270,20 +348,37 @@ fun ProductEditScreen(
     // tapping away, and it is the half of the choice that cannot destroy
     // anything — their number is still in the field afterwards, unsaved.
     state.stockConflict?.let { conflict ->
+        val locale = LocalConfiguration.current.locales[0]
         AlertDialog(
-            onDismissRequest = { viewModel.acceptShopStock() },
+            onDismissRequest = { actions.acceptShopStock() },
             title = { Text(stringResource(R.string.product_stock_conflict_title)) },
             text = {
-                Text(stringResource(R.string.product_stock_conflict_body, conflict.yours, conflict.shop))
+                Text(
+                    stringResource(
+                        R.string.product_stock_conflict_body,
+                        formatCount(conflict.yours, locale),
+                        formatCount(conflict.shop, locale),
+                    ),
+                )
             },
             confirmButton = {
-                TextButton(onClick = { viewModel.acceptShopStock() }) {
-                    Text(stringResource(R.string.product_stock_conflict_use_shop, conflict.shop))
+                TextButton(onClick = { actions.acceptShopStock() }) {
+                    Text(
+                        stringResource(
+                            R.string.product_stock_conflict_use_shop,
+                            formatCount(conflict.shop, locale),
+                        ),
+                    )
                 }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.reapplyMyStock(onBack) }) {
-                    Text(stringResource(R.string.product_stock_conflict_keep_mine, conflict.yours))
+                TextButton(onClick = { actions.reapplyMyStock(onBack) }) {
+                    Text(
+                        stringResource(
+                            R.string.product_stock_conflict_keep_mine,
+                            formatCount(conflict.yours, locale),
+                        ),
+                    )
                 }
             },
         )

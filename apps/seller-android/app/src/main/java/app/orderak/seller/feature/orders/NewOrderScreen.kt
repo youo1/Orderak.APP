@@ -45,12 +45,15 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.orderak.seller.core.ui.FullScreenLoading
 import app.orderak.seller.R
+import app.orderak.seller.data.db.ProductEntity
 import app.orderak.seller.core.ui.NoticeBanner
 import app.orderak.seller.core.ui.SemanticRole
 import app.orderak.seller.core.money.DEFAULT_CURRENCY
 import app.orderak.seller.core.money.formatAmount
 import app.orderak.seller.core.money.formatAmountLabel
+import app.orderak.seller.core.text.formatCount
 import app.orderak.seller.domain.PayMethod
 
 /** S7 — convert a chat into a structured order in <30s (quick form + qty steppers). */
@@ -64,7 +67,60 @@ fun NewOrderScreen(
     val locale = LocalConfiguration.current.locales[0]
     val state by viewModel.state.collectAsStateWithLifecycle()
     val products by viewModel.products.collectAsStateWithLifecycle()
+    val catalogue = products
 
+    NewOrderContent(
+        state = state,
+        products = products,
+        totalMinor = viewModel.totalMinor(),
+        selectedCurrency = viewModel.selectedCurrency(),
+        actions = NewOrderActions(
+            onPhone = viewModel::onPhone,
+            onName = viewModel::onName,
+            onNote = viewModel::onNote,
+            onPayMethod = viewModel::onPayMethod,
+            changeQty = viewModel::changeQty,
+            save = viewModel::save,
+        ),
+        onBack = onBack,
+        onCreated = onCreated,
+    )
+}
+
+/** What the new-order form can ask the view model to do, as data. */
+data class NewOrderActions(
+    val onPhone: (String) -> Unit = {},
+    val onName: (String) -> Unit = {},
+    val onNote: (String) -> Unit = {},
+    val onPayMethod: (PayMethod) -> Unit = {},
+    val changeQty: (ProductEntity, Int) -> Unit = { _, _ -> },
+    val save: ((Long) -> Unit) -> Unit = {},
+)
+
+/**
+ * The manual order form, as a function of its state.
+ *
+ * This screen was already honest about loading — `products` is nullable and it
+ * branches on null before deciding the catalogue is empty — so the split here
+ * buys renders rather than a fix.
+ *
+ * [totalMinor] and [selectedCurrency] arrive already computed. The second is
+ * nullable on purpose: minor units only add up within one currency, so a basket
+ * spanning two has no total to show rather than a wrong one.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NewOrderContent(
+    state: NewOrderUiState,
+    products: List<ProductEntity>?,
+    totalMinor: Long,
+    selectedCurrency: String?,
+    actions: NewOrderActions,
+    onBack: () -> Unit,
+    onCreated: (Long) -> Unit,
+) {
+    val locale = LocalConfiguration.current.locales[0]
+    val catalogue = products
     Scaffold(
         topBar = {
             TopAppBar(
@@ -84,7 +140,7 @@ fun NewOrderScreen(
         ) {
             item { CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                 OutlinedTextField(
-                    value = state.phone, onValueChange = viewModel::onPhone,
+                    value = state.phone, onValueChange = actions.onPhone,
                     label = { Text(stringResource(R.string.order_buyer_phone)) },
                     singleLine = true, isError = state.phone.isNotEmpty() && !state.phoneValid,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
@@ -92,16 +148,20 @@ fun NewOrderScreen(
                 )
             } }
             item { OutlinedTextField(
-                value = state.name, onValueChange = viewModel::onName,
+                value = state.name, onValueChange = actions.onName,
                 label = { Text(stringResource(R.string.order_buyer_name_opt)) },
                 singleLine = true, modifier = Modifier.fillMaxWidth()
             ) }
 
             item { Text(stringResource(R.string.order_items_title), style = MaterialTheme.typography.titleMedium) }
-            if (products.isEmpty()) {
+            if (catalogue == null) {
+                // Not read yet. Saying "you have no products" here would tell a
+                // seller mid-sale that they have nothing to sell.
+                item { FullScreenLoading() }
+            } else if (catalogue.isEmpty()) {
                 item { Text(stringResource(R.string.products_empty), style = MaterialTheme.typography.bodyMedium) }
             }
-            items(products, key = { it.id }) { p ->
+            items(catalogue.orEmpty(), key = { it.id }) { p ->
                 val q = state.qty[p.id] ?: 0
                 Card {
                     Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -122,15 +182,18 @@ fun NewOrderScreen(
                         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 val decLabel = stringResource(R.string.order_qty_decrease, p.name)
-                                IconButton(onClick = { viewModel.changeQty(p, -1) }, enabled = q > 0) {
+                                IconButton(onClick = { actions.changeQty(p, -1) }, enabled = q > 0) {
                                     Text("−", style = MaterialTheme.typography.titleLarge,
                                         modifier = Modifier.semantics {
                                             contentDescription = decLabel
                                         })
                                 }
-                                Text("$q", style = MaterialTheme.typography.titleMedium)
+                                Text(
+                                    formatCount(q, locale),
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
                                 val incLabel = stringResource(R.string.order_qty_increase, p.name)
-                                IconButton(onClick = { viewModel.changeQty(p, +1) }, enabled = q < p.stock) {
+                                IconButton(onClick = { actions.changeQty(p, +1) }, enabled = q < p.stock) {
                                     Text("+", style = MaterialTheme.typography.titleLarge,
                                         modifier = Modifier.semantics {
                                             contentDescription = incLabel
@@ -147,14 +210,14 @@ fun NewOrderScreen(
                 state.payMethods.forEach { m ->
                     FilterChip(
                         selected = state.payMethod == m,
-                        onClick = { viewModel.onPayMethod(m) },
+                        onClick = { actions.onPayMethod(m) },
                         label = { Text(payMethodLabel(m)) }
                     )
                 }
             } }
 
             item { OutlinedTextField(
-                value = state.note, onValueChange = viewModel::onNote,
+                value = state.note, onValueChange = actions.onNote,
                 label = { Text(stringResource(R.string.order_note_opt)) },
                 modifier = Modifier.fillMaxWidth()
             ) }
@@ -176,8 +239,8 @@ fun NewOrderScreen(
                 Spacer(Modifier.width(8.dp))
                 Text(
                     // No total across currencies: see NewOrderViewModel.selectedCurrency.
-                    viewModel.selectedCurrency()
-                        ?.let { formatAmountLabel(viewModel.totalMinor(), it, locale) }
+                    selectedCurrency
+                        ?.let { formatAmountLabel(totalMinor, it, locale) }
                         ?: "—",
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.primary
@@ -185,7 +248,7 @@ fun NewOrderScreen(
             } }
 
             item { Button(
-                onClick = { viewModel.save(onCreated) },
+                onClick = { actions.save(onCreated) },
                 enabled = state.canSave && !state.saving,
                 modifier = Modifier.fillMaxWidth()
             ) { Text(stringResource(R.string.order_save)) } }
