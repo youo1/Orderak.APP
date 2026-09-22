@@ -110,19 +110,40 @@ class PurchaseEntryPointsTest {
     fun `the account surface gates the button and the action behind it`() {
         val root = sourceRoot()
         assumeTrue("app sources not reachable from the test working directory", root != null)
-        val source = read("feature/settings/SettingsScreen.kt")!!
+        val screen = read("feature/settings/SettingsScreen.kt")!!
+        val content = read("feature/settings/AccountContent.kt")!!
 
-        // The button, so nothing is offered that cannot complete.
+        // The gate used to be one expression, `if (purchaseOpen && activity !=
+        // null`, in SettingsScreen. Splitting the surface so its states could be
+        // rendered moved the two halves apart, and this test failed on the same
+        // commit — correctly, because a text match is all it has. It now follows
+        // the gate rather than being relaxed to stop noticing.
+        //
+        // Half one: an Activity is what a purchase NEEDS, not what permits one,
+        // so the screen folds it into the same boolean the permission lives in
+        // and the surface below reads a single answer.
+        assertTrue(
+            "SettingsScreen no longer folds the Activity into purchaseOpen",
+            screen.contains("purchaseOpen = purchaseOpen && activity != null"),
+        )
+        // Half two: the buttons render only behind that boolean, so nothing is
+        // offered that cannot complete.
         assertTrue(
             "the plan buttons render without checking purchaseOpen",
-            source.contains("if (purchaseOpen && activity != null"),
+            content.contains("if (state.purchaseOpen"),
         )
         // And the action, because the composition that drew the button can be
         // older than the snapshot that closed purchasing.
         assertTrue(
             "purchase() launches the billing flow without checking",
-            source.substringAfter("fun purchase(").substringBefore("}")
+            screen.substringAfter("fun purchase(").substringBefore("}")
                 .contains("isPurchaseOpen()"),
+        )
+        // The callback between them keeps the Activity null-check, so a purchase
+        // cannot be launched from a composition with no Activity attached.
+        assertTrue(
+            "the purchase callback no longer null-checks the Activity",
+            screen.contains("activity?.let { viewModel.purchase(it,"),
         )
     }
 }

@@ -300,7 +300,23 @@ for (const [relative, expectedServers] of Object.entries(serverExpectations)) {
 // profiles at paid1 while CustomerDetailsScreen had nowhere to put an edit.
 // GET /api/v1/customers, GET and PATCH /api/v1/customers/{customer_key} are the
 // resource that edit goes into.
-if (operationCount !== 248) fail(`OpenAPI operation inventory changed: expected 248, found ${operationCount}.`);
+// Raised to 252 on 2026-09-13 for product CRUD: POST /api/v1/products, PUT and
+// DELETE /api/v1/products/{product_code}, PATCH on that code's /stock. Until
+// now the only way to write the catalogue was POST /api/v1/products/sync, which
+// mirrors it — the device sends what it holds and the server deletes whatever
+// the payload omits, so absence has to be told apart from a device that has not
+// looked yet, and three guards exist to do it. These four say what they mean
+// instead. The mirror is deliberately still counted here: both surfaces are
+// served while the app moves across, and this number drops by one when it goes.
+// Lowered to 251 on 2026-09-15: POST /api/v1/products/sync is gone. It mirrored
+// the catalogue — the device sent the products it held and the server deleted
+// the rest — so absence meant deletion, and three guards existed to decide when
+// to believe it. The four product routes that replaced it say what they mean,
+// and the app stopped calling this one in the cutover. Deleted on evidence
+// rather than on a grep: the endpoint announced every call with the build that
+// made it, and seven days of Workers logs across production and staging showed
+// none. See ADR-012.
+if (operationCount !== 251) fail(`OpenAPI operation inventory changed: expected 251, found ${operationCount}.`);
 const seller = JSON.parse(read("contracts/openapi/src/seller-v1.json"));
 for (const [route, pathItem] of Object.entries(seller.paths)) {
   for (const method of ["get", "post", "put", "patch", "delete"]) {

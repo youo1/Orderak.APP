@@ -90,7 +90,7 @@ class ConfigEntitlementPassthroughTest {
 
     @Test
     fun `the fallback conversion carries the map into BackendConfig`() {
-        // Mirrors the conversion in SyncRepository. The map used to be omitted
+        // Mirrors the conversion in SellerRefresher. The map used to be omitted
         // here, so even a complete server response reached the resolver empty.
         val c = json.decodeFromString<ConfigRes>(payload)
         val config = BackendConfig(

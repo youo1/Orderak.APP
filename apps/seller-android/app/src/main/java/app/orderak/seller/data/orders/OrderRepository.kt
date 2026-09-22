@@ -36,6 +36,15 @@ import javax.inject.Singleton
  */
 data class NewOrderLine(
     val productId: Long,
+    /**
+     * The server's code for this product, when it has one.
+     *
+     * Null for a product this device created and has not synced. The order is
+     * still recorded — losing a sale because a product has not reached the server
+     * yet would be the wrong trade — and it stays pending until the
+     * reconciliation gives the product a code and stamps it here.
+     */
+    val productCode: String? = null,
     val name: String,
     val qty: Int,
     val priceMinor: Long,
@@ -71,7 +80,7 @@ class OrderRepository @Inject constructor(
      * reinstall and is not counted against the plan.
      *
      * A post that FAILED is not an error the seller has to act on. The row keeps
-     * its idempotency key, [SyncRepository] retries it on the next sync, and the
+     * its idempotency key, the order command queue retries it, and the
      * screens say plainly that it is not on the account yet — see
      * LocalOnlyOrder.kt. The key is what makes that retry safe: the server
      * returns the order already written rather than creating a second one.
@@ -123,8 +132,14 @@ class OrderRepository @Inject constructor(
                 )
             )
             orderDao.insertItems(lines.map {
-                OrderItemEntity(orderId = id, productId = it.productId,
-                    productName = it.name, qty = it.qty, priceMinor = it.priceMinor)
+                OrderItemEntity(
+                    orderId = id,
+                    productId = it.productId,
+                    // Captured now rather than resolved later. A product with no
+                    // code yet leaves this null and the reconciliation fills it.
+                    productCode = it.productCode,
+                    productName = it.name, qty = it.qty, priceMinor = it.priceMinor,
+                )
             })
             lines.forEach { db.productDao().decrementStock(it.productId, it.qty) }
             id
@@ -170,13 +185,21 @@ class OrderRepository @Inject constructor(
         val secret = sessionStore.getOrCreateSecret()
         val lines = orderDao.itemsOf(orderId)
         val items = lines.mapNotNull { item ->
-            // The server addresses products by their immutable public code. A
-            // line whose product has never synced has none, so the order cannot
-            // be expressed yet; it stays pending and the next sync, which pushes
-            // the catalogue first, gives it one.
-            db.productDao().byId(item.productId)?.productCode?.let { code ->
-                NewOrderLineDto(product_code = code, qty = item.qty)
-            }
+            // The code the item carries first, and the cache only as a fallback.
+            //
+            // The item's own copy is what makes this command durable: resolving
+            // through `productId` alone meant an order could be stranded by the
+            // cache being rebuilt underneath it, which is exactly what happens
+            // when the reconciliation converts a legacy product and the refresh
+            // then deletes the row it came from.
+            //
+            // The fallback covers a row the Room 11 backfill could not fill,
+            // which is a product this device created and never synced. Such a
+            // line has no code anywhere yet; the order stays pending and the
+            // reconciliation stamps one when it converts the product.
+            val code = item.productCode
+                ?: db.productDao().byId(item.productId)?.productCode
+            code?.let { NewOrderLineDto(product_code = it, qty = item.qty) }
         }
         if (items.size != lines.size) return OrderPushOutcome.NotReady
         val response = api.createOrder(
@@ -231,27 +254,6 @@ class OrderRepository @Inject constructor(
         val removed = orderDao.deleteLocalOnly(orderId) > 0
         if (removed) _refusedPushes.update { it - orderId }
         removed
-    }
-
-    /**
-     * Apply a seller's edit to a customer.
-     *
-     * Written locally and marked dirty, not posted here. The seller is often
-     * offline, and an edit that failed because of that would either be lost or
-     * would have to block the screen on a network call. [SyncRepository] posts
-     * every dirty row on the next sync and clears the flag on acknowledgement;
-     * until then the local value is the one shown.
-     *
-     * The phone is not a parameter. It is the identity — see CustomerDao.
-     */
-    suspend fun editCustomer(customerKey: String, name: String, altContact: String, note: String) {
-        db.customerDao().applyEdit(
-            key = customerKey,
-            name = name.trim().ifBlank { null },
-            altContact = altContact.trim().ifBlank { null },
-            note = note.trim().ifBlank { null },
-            updatedAt = System.currentTimeMillis(),
-        )
     }
 
     /**

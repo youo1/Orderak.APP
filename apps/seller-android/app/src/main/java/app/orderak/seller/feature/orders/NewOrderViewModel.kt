@@ -50,8 +50,16 @@ class NewOrderViewModel @Inject constructor(
     private val sessionStore: SessionStore,
 ) : ViewModel() {
 
-    val products: StateFlow<List<ProductEntity>> =
-        catalogRepo.products.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    /**
+     * The catalogue to pick from, or null while Room is still answering.
+     *
+     * Seeded `emptyList()` before, which on this screen reads as "you have
+     * nothing to sell" — the same message a seller with no products sees, shown
+     * to one who has forty. The totals below use `.orEmpty()`: an unread
+     * catalogue contributes nothing to a sum, which is arithmetic, not a claim.
+     */
+    val products: StateFlow<List<ProductEntity>?> =
+        catalogRepo.products.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val _state = MutableStateFlow(NewOrderUiState())
     val state: StateFlow<NewOrderUiState> = _state.asStateFlow()
@@ -100,7 +108,7 @@ class NewOrderViewModel @Inject constructor(
     }
 
     fun totalMinor(): Long =
-        products.value.sumOf { p -> (( _state.value.qty[p.id] ?: 0) * p.priceMinor) }
+        products.value.orEmpty().sumOf { p -> (( _state.value.qty[p.id] ?: 0) * p.priceMinor) }
 
     /**
      * The currency of the selected lines, or null when they do not agree.
@@ -112,7 +120,7 @@ class NewOrderViewModel @Inject constructor(
      * honest answer rather than a plausible one.
      */
     fun selectedCurrency(): String? =
-        products.value
+        products.value.orEmpty()
             .filter { (_state.value.qty[it.id] ?: 0) > 0 }
             .map { it.currency }
             .distinct()
@@ -123,7 +131,7 @@ class NewOrderViewModel @Inject constructor(
         if (!s.canSave || s.saving) return
         _state.value = s.copy(saving = true)
         viewModelScope.launch {
-            val selected = products.value.mapNotNull { p ->
+            val selected = products.value.orEmpty().mapNotNull { p ->
                 val q = s.qty[p.id] ?: 0
                 if (q <= 0) null else Triple(p, q, q > p.stock)
             }
@@ -131,7 +139,7 @@ class NewOrderViewModel @Inject constructor(
                 _state.value = s.copy(saving = false, stockError = true)
                 return@launch
             }
-            val lines = selected.map { (p, q, _) -> NewOrderLine(p.id, p.name, q, p.priceMinor, p.currency) }
+            val lines = selected.map { (p, q, _) -> NewOrderLine(p.id, p.productCode, p.name, q, p.priceMinor, p.currency) }
             val id = orderRepo.create(
                 buyerPhone = s.phone, buyerName = s.name.ifBlank { null },
                 payMethod = s.payMethod, note = s.note.ifBlank { null }, lines = lines

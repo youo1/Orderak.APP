@@ -39,15 +39,22 @@ data class ProductEntity(
     // local image has been uploaded; reset to null when the image changes.
     val imageUrl: String? = null,
     val available: Boolean = true,
-    // Immutable public code + server UUID assigned on first sync (for share links).
+    /**
+     * The server's identity for this product, and the only one that travels.
+     *
+     * Still nullable, deliberately. A product created before the product routes
+     * has none until the reconciliation converts it, and that job runs after Room
+     * has opened the database — so a migration that required a code here would
+     * throw before the code that supplies one could run, on exactly the devices
+     * that need it most.
+     */
     val productCode: String? = null,
-    val remoteUuid: String? = null,
     // Optimistic stock revision returned by the backend. Only explicit local
     // stock edits are pushed; ordinary mirror syncs cannot overwrite orders.
     val syncedStockVersion: Long? = null,
     @ColumnInfo(defaultValue = "0") val stockDirty: Boolean = false,
-    // Optional category: local FK (categories.id) + the server category_code.
-    val categoryId: Long? = null,
+    // The server's category code is what travels; the local foreign key it used
+    // to sit beside went with Room 11, unread by anything.
     val categoryCode: String? = null,
     val createdAt: Long = System.currentTimeMillis()
 )
@@ -94,16 +101,6 @@ data class CustomerEntity(
     val note: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
-    /**
-     * Set when the device has an edit the server has not acknowledged.
-     *
-     * The editor writes locally first so a seller at a stall with no signal can
-     * still correct a name. Sync posts every dirty row and clears the flag on
-     * acknowledgement; until then the local value is the one displayed, because
-     * showing the seller their own unsaved edit reverted is worse than showing
-     * it unsynced.
-     */
-    val dirty: Boolean = false
 )
 
 @Entity(
@@ -152,7 +149,37 @@ data class OrderEntity(
 data class OrderItemEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val orderId: Long,
+    /**
+     * This device's row id for the product, and a link that can go stale.
+     *
+     * Kept because cancelling an order restores stock through it, and because it
+     * is the only way to reach a row whose [productCode] the backfill could not
+     * resolve. It is not how an order reaches the server — see [productCode].
+     */
     val productId: Long,
+    /**
+     * The server's identity for the product, carried so an unsent order does not
+     * depend on the cache still holding the row it was created from.
+     *
+     * WHAT THIS FIXES
+     *   Posting an order used to resolve `productId` through the product cache to
+     *   find a code. A legacy product — one created before the product routes,
+     *   with no code yet — is converted by the reconciliation, which POSTs it and
+     *   writes the server's answer as a NEW cache row, because nothing matched
+     *   the code it had never had. The catalogue refresh then deletes rows with
+     *   no code, which is the original row. Its id is now unreachable, so the
+     *   unsent order resolves to nothing and stays `NotReady` for ever.
+     *
+     *   A command that needs the cache to be interpretable is not durable. This
+     *   is denormalised for the same reason [productName] already is, and the
+     *   reconciliation stamps it when it converts a product so a legacy order
+     *   acquires one too.
+     *
+     * Nullable because the backfill cannot invent one: an order whose product was
+     * deleted before Room 11 has no code to find, and that row is history rather
+     * than a command — it must not fail the migration.
+     */
+    val productCode: String? = null,
     val productName: String,        // denormalized: order history survives product edits
     val qty: Int,
     val priceMinor: Long

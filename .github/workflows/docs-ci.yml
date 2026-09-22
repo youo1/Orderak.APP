@@ -82,6 +82,23 @@ jobs:
       - name: Verify no hand-written colour in the Android app
         run: node tooling/repository/verify-no-hardcoded-colors.mjs
 
+      # D1 is the system of record and Room is a cache of it (ADR-012). That rule
+      # is only as strong as the narrowest place it can be broken, which is one
+      # productDao().upsert() in a view model written by someone reasonably
+      # assuming the local database is where products live. Nothing would fail;
+      # the seller would see their edit and a later refresh would replace it.
+      - name: Verify only the cache writers write the cache
+        run: node tooling/repository/verify-cache-write-boundary.mjs
+
+      # Room threw the database away on every schema change up to version 10, and
+      # that was fine while it held nothing the server did not already have. It
+      # now holds orders the server has not acknowledged. A declared version with
+      # no exported schema beside it builds, ships, and throws on a phone; a
+      # column removed without anyone meaning to is invisible unless someone
+      # reads the exported JSON, which nobody does.
+      - name: Verify the Room schema history
+        run: node tooling/repository/verify-room-schema-history.mjs
+
       # formatAmount defaults to the ambient locale, which is right for a library
       # and wrong for a screen: the order list shipped Latin-digit money beside
       # Arabic-Indic dates in the same row until a greyscale screenshot put them
@@ -110,6 +127,21 @@ jobs:
 
       - name: Verify every declared screen state has a design
         run: node tooling/ux/design-coverage.mjs
+
+      # design-coverage checks that an artboard NAME appears in its own object
+      # literal, so it cannot fail when a state is undrawn or unbuilt — it
+      # reported the today contract fully designed while two of its four states
+      # did not exist. A screenshot reference PNG cannot be written down: it is
+      # there only because a @PreviewTest composed that state and the renderer
+      # produced pixels. This guard counts those, and only when the render is of
+      # the screen rather than of a component the screen might not even call.
+      #
+      # Its own tests run first, for the same reason the audit's do.
+      - name: Test the render coverage guard
+        run: node --test tooling/ux/render-coverage.test.mjs
+
+      - name: Verify every claimed render has pixels behind it
+        run: node tooling/ux/render-coverage.mjs
 
       # The plan asks for a generated-doc drift check and there was none. Its
       # absence let a real break go unnoticed: database-migrations.md is

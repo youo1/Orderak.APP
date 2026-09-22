@@ -281,15 +281,23 @@ pnpm install --frozen-lockfile
 pnpm run check
 ```
 
-For Android parallel development, start Prism from the repository root:
+Prism serves mock responses from the contract on `http://localhost:4010`:
 
 ```cmd
 pnpm run mock:seller-v1
 ```
 
-Prism listens on `http://localhost:4010`; the Android `mockDebug` variant uses
-`http://10.0.2.2:4010`. That flavor has no release variant, and cleartext is
-enabled only by its manifest overlay.
+It is a contract-testing target — Schemathesis runs against it in
+`openapi-ci.yml`. No Android variant points at it. There used to be a `mock`
+flavour that did, and it was removed on 2026-09-13: it could not sign in, so
+none of the authenticated screens were reachable in it. Firebase resolved to
+the CI placeholder config, `verifyPhoneNumber` failed with "API key not valid",
+and the app showed "Failed to send code."
+
+Android development goes through the `staging` flavour, against
+`api.staging.orderak.app`. There is no variant pointing at the local Worker
+from §3.6 either — that gap is real, and the fix would be a flavour with its
+own Firebase configuration, not a revived Prism one.
 
 ### 3.6 Start the local Worker
 

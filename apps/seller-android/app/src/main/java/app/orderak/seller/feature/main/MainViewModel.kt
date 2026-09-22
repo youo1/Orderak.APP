@@ -7,7 +7,6 @@ import app.orderak.seller.data.remote.BackendApi
 import app.orderak.seller.data.remote.StoreIdentityResolver
 import app.orderak.seller.data.catalog.CatalogRepository
 import app.orderak.seller.data.orders.OrderRepository
-import app.orderak.seller.data.demo.DemoDataSeeder
 import app.orderak.seller.data.session.SessionStore
 import app.orderak.seller.data.billing.EntitlementRepository
 import app.orderak.seller.data.billing.EntitlementRefreshResult
@@ -34,15 +33,7 @@ class MainViewModel @Inject constructor(
     private val catalogRepo: CatalogRepository,
     private val entitlementRepository: EntitlementRepository,
     orderRepo: OrderRepository,
-    demoDataSeeder: DemoDataSeeder,
 ) : ViewModel() {
-
-    init {
-        // Seeds a local shop the first time the demo account opens the shell.
-        // No-ops on every other account, and in production the constant it
-        // matches against is empty, so it can never fire there.
-        viewModelScope.launch { demoDataSeeder.seedIfNeeded() }
-    }
 
     /**
      * Whether the store has any products (drives the dashboard empty/share
@@ -50,9 +41,15 @@ class MainViewModel @Inject constructor(
      * a second ViewModel — avoids a standing full-list Room subscription and
      * the recomposition churn it caused on every catalog change.
      */
-    val hasProducts: StateFlow<Boolean> =
+    /**
+     * Nullable for the same reason the counters are: `false` seeded before the
+     * count was read, so اليوم told a seller with a full catalogue that their
+     * store was empty and invited them to add their first product. `null` is
+     * "not read yet"; the first Room emission settles it.
+     */
+    val hasProducts: StateFlow<Boolean?> =
         catalogRepo.productCount.map { it > 0 }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** Full product list, read once at share time (only when there's no catalog link). */
     suspend fun productsForShare(): List<ProductEntity> = catalogRepo.productsOnce()
@@ -91,12 +88,21 @@ class MainViewModel @Inject constructor(
     }
 
 
-    val todayCount: StateFlow<Int> =
-        orderRepo.countToday(startOfToday()).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
-    val unpaidCount: StateFlow<Int> =
-        orderRepo.countUnpaid().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
-    val toShipCount: StateFlow<Int> =
-        orderRepo.countToShip().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+    /**
+     * The three اليوم counters, nullable so that "not read yet" is expressible.
+     *
+     * They seeded at `0` before, which made a shop whose orders had not loaded
+     * yet look exactly like a shop with no orders — and `0` is a figure a seller
+     * acts on. `null` is the loading state the screen contract has always
+     * declared and the surface never had; the first Room emission replaces it,
+     * which on a local COUNT(*) is immediate.
+     */
+    val todayCount: StateFlow<Int?> =
+        orderRepo.countToday(startOfToday()).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    val unpaidCount: StateFlow<Int?> =
+        orderRepo.countUnpaid().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    val toShipCount: StateFlow<Int?> =
+        orderRepo.countToShip().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     val entitlementState = entitlementRepository.state
     private val _planRefreshEvents = MutableSharedFlow<EntitlementRefreshResult>(extraBufferCapacity = 1)

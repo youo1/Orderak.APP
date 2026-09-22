@@ -89,7 +89,10 @@ private fun ComponentGallery() {
             )
             PriorityListRow(
                 title = "أحمد يسري",
-                subtitle = "من الكتالوج · 24 أغسطس",
+                // ٢٤, not 24: the real subtitle comes from DateFormat with the composition
+                // locale, so a Latin fixture date renders a row this component never
+                // produces — beside three meters that are now Arabic-Indic.
+                subtitle = "من الكتالوج · ٢٤ أغسطس",
                 needsAction = false,
                 trailing = { SemanticChip(SemanticRole.Neutral, "مكتمل") },
             )

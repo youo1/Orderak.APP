@@ -47,7 +47,30 @@ fun FeatureGate(
         resolver.log(featureKey, decision)
     }
 
-    when (decision.availability) {
+    FeatureGate(
+        availability = decision.availability,
+        modifier = modifier,
+        onUpgrade = onUpgrade,
+        content = content,
+    )
+}
+
+/**
+ * The same three branches, given the decision instead of the resolver.
+ *
+ * The resolver needs an EntitlementManager and therefore a Hilt graph, so a
+ * screen that took one could not be rendered in any of its gate states — which
+ * is how a three-state rule ends up with nobody having looked at two of them.
+ * The overload above keeps the logging and the lookup; this one is the drawing.
+ */
+@Composable
+fun FeatureGate(
+    availability: FeatureAvailability,
+    modifier: Modifier = Modifier,
+    onUpgrade: (() -> Unit)? = null,
+    content: @Composable () -> Unit,
+) {
+    when (availability) {
         FeatureAvailability.Available -> content()
         FeatureAvailability.LockedByPlan -> LockedByPlanNotice(modifier, onUpgrade)
         FeatureAvailability.NotBuilt -> NotBuiltNotice(modifier)

@@ -164,17 +164,45 @@ class FirebaseAuthRepository @Inject constructor() : AuthRepository {
             is FirebaseNetworkException -> AuthFailure.NETWORK_UNAVAILABLE
             is FirebaseAuthMissingActivityForRecaptchaException -> AuthFailure.APP_VERIFICATION_FAILED
             is FirebaseAuthInvalidCredentialsException -> AuthFailure.INVALID_PHONE
-            is FirebaseAuthException -> when (error.errorCode) {
-                "ERROR_INVALID_PHONE_NUMBER" -> AuthFailure.INVALID_PHONE
-                "ERROR_TOO_MANY_REQUESTS", "ERROR_QUOTA_EXCEEDED" -> AuthFailure.TOO_MANY_REQUESTS
-                "ERROR_APP_NOT_AUTHORIZED", "ERROR_CAPTCHA_CHECK_FAILED", "ERROR_MISSING_CLIENT_IDENTIFIER" ->
-                    AuthFailure.APP_VERIFICATION_FAILED
-                else -> AuthFailure.GENERIC
-            }
+            is FirebaseAuthException -> mapAuthErrorCode(error.errorCode)
             else -> AuthFailure.GENERIC
         }
         return AuthFailureException(failure)
     }
+}
+
+/**
+ * Firebase's error code for a send failure, as one of our own failures.
+ *
+ * Lifted out of [FirebaseAuthRepository.mapFailure] so it can be tested without
+ * constructing Firebase exceptions, the same way [mapOtpCredentialErrorCode] is.
+ *
+ * The app-verification group is the one worth naming. Before a code can be sent,
+ * the SDK must prove the request comes from this app: Play Integrity first, and
+ * a reCAPTCHA page in the browser when that is unavailable. Both legs fail on an
+ * emulator whose Play Store is too old to bind the Integrity service, and the
+ * browser leg then fails again if the browser is sitting on its own first-run
+ * screens — the challenge never renders, so verification never completes.
+ *
+ * Every one of those used to land on GENERIC, which reaches the seller as
+ * "Failed to send code. Try again." — advice that is wrong twice over. Trying
+ * again cannot help, and the message points at the phone number, which is fine.
+ * They are app-verification failures and say so now.
+ */
+internal fun mapAuthErrorCode(errorCode: String): AuthFailure = when (errorCode) {
+    "ERROR_INVALID_PHONE_NUMBER" -> AuthFailure.INVALID_PHONE
+    "ERROR_TOO_MANY_REQUESTS", "ERROR_QUOTA_EXCEEDED" -> AuthFailure.TOO_MANY_REQUESTS
+    "ERROR_APP_NOT_AUTHORIZED",
+    "ERROR_CAPTCHA_CHECK_FAILED",
+    "ERROR_MISSING_CLIENT_IDENTIFIER",
+    // Play Integrity and the reCAPTCHA fallback both refused to vouch for the app.
+    "ERROR_APP_NOT_VERIFIED",
+    // The reCAPTCHA page was dismissed or never became visible. A browser stuck
+    // on its own setup screens produces this, and so does a seller who backs out.
+    "ERROR_WEB_CONTEXT_CANCELED",
+    "ERROR_WEB_CONTEXT_ALREADY_PRESENTED",
+    -> AuthFailure.APP_VERIFICATION_FAILED
+    else -> AuthFailure.GENERIC
 }
 
 internal fun mapOtpCredentialFailure(error: Exception): Exception? =

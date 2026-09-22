@@ -101,6 +101,9 @@ trigger's final semicolon when replaying a fresh remote D1 database.
 - [054_play_mappings_per_package.sql](#054_play_mappings_per_packagesql)
 - [055_media_objects.sql](#055_media_objectssql)
 - [056_subscription_idempotency.sql](#056_subscription_idempotencysql)
+- [057_product_discounts.sql](#057_product_discountssql)
+- [058_product_client_request_id.sql](#058_product_client_request_idsql)
+- [059_stock_movements_product_code_not_null.sql](#059_stock_movements_product_code_not_nullsql)
 
 ## 001_init.sql
 
@@ -647,3 +650,37 @@ trigger's final semicolon when replaying a fresh remote D1 database.
 - Two requests carrying one key both saw no row and both inserted. Because `createOrReplaceSubscription` cancels a seller's prior active rows before inserting, the loser of that race could cancel the winner, so which row the seller ended up on depended on how two transactions interleaved. The charge itself was never exposed - the gateway takes the same idempotency key and dedupes on it - what was exposed was the record of the charge.
 - Partial, on `idempotency_key IS NOT NULL`. Rows written before `subscribe()` generated a fallback key have NULL there, and SQLite treats NULLs as distinct in a unique index anyway; stating it makes the intent explicit rather than inherited, and matches how 026 indexed `orders(store_id, idempotency_key)`.
 - Dedupes before it indexes. A duplicate pair can already exist - that is the defect - and the index cannot be created while one does. The older rows of any duplicate group are marked `superseded` and their key cleared, which takes them out of the index without deleting a record of money; the newest row of each group keeps its key, since that is the one the cancel-then-insert leaves active. On a database that never hit the race this updates nothing.
+
+## 057_product_discounts.sql
+
+**Source:** `services/backend/migrations/057_product_discounts.sql`
+
+### What it does
+
+- Gives a product's discount somewhere to live on the server. `ProductEntity` has carried `discountType` and `discountValue` since the Room schema was first written and nothing on this side ever knew about them: the catalogue mirror binds thirteen columns and none is a discount, so a value set on a phone stayed on that phone and no buyer saw it. In practice no value was ever set - the editor round-trips whatever the row already held and the controls that would write a new one have no caller in any screen. The comment above that line names the precondition exactly: hidden until backend and public catalog share one discount contract. This is the backend half.
+- One integer column carries both kinds and the type column says how to read it: basis points when `discount_type` is PERCENTAGE (1000 = 10.00%, ceiling 10000), minor units of the product's own currency when AMOUNT. Integer rather than the Android column's `Double`, because ADR-009 settles that money is integer minor units and floating point is not revisited. There is no data to convert, so the contract is chosen rather than inherited.
+- Enforced with triggers rather than a CHECK or a partial index. SQLite cannot add a CHECK to an existing table without the twelve-step recreate, and `products` is the busiest table in the schema with the 052 trigger set attached to it. A partial UNIQUE index over a constant expression looks like it would work and does not - it makes the second violating row collide while the first is admitted, and a constraint that allows one bad row is not a constraint.
+- The pair is only meaningful together, so both halves are asserted: a type with no value renders nothing, and a value with no type cannot be interpreted at all. The percentage ceiling is 100.00% because a discount larger than the price is not a discount, it is a refund, and this column is not how a refund is recorded. `stock_movements` is untouched - a discount changes what a buyer pays, never how many units exist.
+
+## 058_product_client_request_id.sql
+
+**Source:** `services/backend/migrations/058_product_client_request_id.sql`
+
+### What it does
+
+- Makes creating a product safe to retry. `POST /api/v1/products` is the only non-idempotent verb in the product API: `PUT` replaces and can be repeated, `DELETE` is idempotent by semantics, and stock is protected by compare-and-set so replaying the same `expected_stock_version` is rejected rather than applied twice. Without a key the classic failure lands - D1 commits, the response is lost, the seller taps retry, and a second product appears.
+- The catalogue mirror this API replaces never had the problem, because it sent the whole catalogue keyed by identity and a replay converged. A create diverges, so it needs the key the mirror got for free. The same shape bites the migration itself: a device reconciling rows the mirror never acknowledged cannot tell 'never sent' from 'sent, response lost', because `product_code` and `remote_uuid` are written together only after the response arrives and the retry interceptor deliberately does not replay the mirror.
+- Copies `orders`, which has carried `idempotency_key` since 026 indexed as (store_id, idempotency_key) - deliberately the same shape so there is one pattern to learn rather than two. Named `client_request_id` rather than `idempotency_key` because it is scoped to a request retry, not to a durable command: the device is not queuing product creates for later, it is repeating one that may already have landed.
+- Partial, on `client_request_id IS NOT NULL`. Every product written before this migration has NULL and the mirror keeps writing NULL for as long as it exists; SQLite treats NULLs as distinct in a unique index, which is the behaviour wanted here. A caller that sends no key has not asked for deduplication and must not silently get it.
+
+## 059_stock_movements_product_code_not_null.sql
+
+**Source:** `services/backend/migrations/059_stock_movements_product_code_not_null.sql`
+
+### What it does
+
+- Finishes the argument 052 started. That migration gave `stock_movements` a denormalised `product_code` beside a deliberately unconstrained `product_id`, and said why: deleting a product is routine, and a ledger whose history is rewritten by a later deletion is not a ledger. But the column was nullable, so nothing enforced the attribution it existed to preserve - a write path that forgot it would record history nobody can attribute, and the row would look ordinary until someone tried to read the ledger back.
+- The deletions 052 anticipated stopped being the mirror's side effect and became their own endpoint, `DELETE /api/v1/products/{product_code}`. A routine, deliberate deletion is exactly the case the denormalised code protects against, so the constraint that makes it true should land before those deletions are common rather than after.
+- Nothing needs repairing. Every writer resolves the code through `products`, where `product_code` has been NOT NULL since 009: the seller's adjustment matches a row BY that code, both triggers select it from the joined product row, and all three of 052's backfills inner-join `products` so a row whose product was already gone was never inserted rather than inserted blank. Checked rather than assumed on 2026-09-15 - staging held zero movement rows and production had not reached 052 at all, so the rebuild is as cheap as it will ever be.
+- The one branch the plan left open is answered in the copy itself. A row that lost its code but whose product survives has it restored by COALESCE; a row with neither hits NOT NULL and aborts the migration. Aborting is the decision, not an oversight: dropping the row destroys a financial record and inventing a placeholder makes unattributable history look attributed, which is the failure 052 wrote the table to avoid.
+- Both triggers are dropped first and recreated verbatim last. They are declared ON `order_items` and ON `orders`, so DROP TABLE does not take them - but `ALTER TABLE ... RENAME TO` reparses every trigger in the schema, both name `stock_movements` in their bodies, and at that moment the old table is gone and the new one is not yet in place. The first attempt skipped them and failed with 'error in trigger trg_order_items_claim_stock: no such table: main.stock_movements'.

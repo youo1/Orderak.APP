@@ -1,16 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { SELF, env, createSchema, registerStore, authHeaders, type Registered } from "./helpers";
+import { SELF, env, createSchema, registerStore, authHeaders, seedStockedProduct, type Registered } from "./helpers";
 
 const SITE = "https://orderak.app";
 
-async function seedProduct(r: Registered, appId = 1, name = "Cola"): Promise<string> {
-	const res = await SELF.fetch("https://api.orderak.app/api/v1/products/sync", {
-		method: "POST",
-		headers: authHeaders(r),
-		body: JSON.stringify({ products: [{ app_id: appId, name, price: { amount_minor: 1500, currency: "EGP" }, stock: 10, available: true }] }),
-	});
-	const body = (await res.json()) as { products: { product_code: string }[] };
-	return body.products[0].product_code;
+async function seedProduct(r: Registered, _appId = 1, name = "Cola"): Promise<string> {
+	const product = await seedStockedProduct(r, 10, { name, price: { amount_minor: 1500, currency: "EGP" } });
+	return String(product.product_code);
 }
 
 async function createCategory(r: Registered, name = "Drinks"): Promise<string> {

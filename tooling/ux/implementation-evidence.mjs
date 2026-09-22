@@ -80,15 +80,36 @@ export const EVIDENCE = {
   "products_catalog.product_creation_and_editing": {
     kind: "screen",
     value: "ProductEditScreen",
-    behaviour: { layer: "backend", file: "store.spec.ts", test: "assigns product codes and links categories" },
+    // Repointed on 2026-09-15. The named test lived in the catalogue mirror's
+    // suite and went with the endpoint; its successor asserts the same thing
+    // about the route that replaced it — a created product comes back with the
+    // code the server assigned and the category it was filed under.
+    behaviour: { layer: "backend", file: "product-crud.spec.ts", test: "creates a product and returns it in the shape the pull uses" },
   },
-  "products_catalog.product_descriptions": { kind: "screen", value: "ProductEditScreen" },
+  "products_catalog.product_descriptions": {
+    kind: "screen",
+    value: "ProductEditScreen",
+    // There was already a test that an OMITTED description is cleared, which is
+    // the PUT-is-a-replacement rule. Nothing proved the opposite — that one the
+    // seller typed survives create, pull and replace. A field with a test only
+    // for its disappearance is a field whose persistence nobody checked.
+    behaviour: { layer: "backend", file: "product-crud.spec.ts", test: "carries a description through create, pull and replace" },
+  },
   "products_catalog.public_orderak_catalog": { kind: "endpoint", value: "/api/v1/store", integration: "/api/v1/store" },
 
   // ---- orders & fulfilment ----
   "orders_fulfilment.manual_order_creation": { kind: "screen", value: "NewOrderScreen" },
   "orders_fulfilment.public_catalog_orders": { kind: "endpoint", value: "/api/v1/orders", integration: "/api/v1/orders" },
-  "orders_fulfilment.order_history":         { kind: "screen", value: "OrdersScreen" },
+  "orders_fulfilment.order_history": {
+    kind: "screen",
+    value: "OrdersScreen",
+    // The debt was specifically about states: the old screenshot test rendered
+    // OrderCards in a hand-built Column and covered none of the screen's own.
+    // OrdersContent(state) is the screen, so these are its loading, content,
+    // empty and error branches. See render-coverage.mjs for why a component
+    // render would not have counted.
+    behaviour: { layer: "android", file: "OrdersScreenshotTest.kt", test: "ordersEmptyLight" },
+  },
   "orders_fulfilment.order_status_updates": {
     kind: "screen",
     value: "OrderDetailsScreen",
@@ -125,7 +146,16 @@ export const EVIDENCE = {
   },
 
   // ---- team & security ----
-  "team_security.owner_account": { kind: "screen", value: "SellerProfileScreen" },
+  "team_security.owner_account": {
+    kind: "screen",
+    value: "SellerProfileScreen",
+    // saveShop takes the SHOP's name, category, city, country and logo beside
+    // the seller's own details, and none of those five are on this screen —
+    // they are re-supplied from the session snapshot. Getting one wrong means a
+    // birth-year edit erases a shop name. The decision is `profileSave` now, so
+    // it can be asserted.
+    behaviour: { layer: "android", file: "SellerProfileSaveTest.kt", test: "the shop is carried through untouched" },
+  },
   "team_security.multiple_owner_devices": {
     kind: "route",
     value: "DevicesRoute",
@@ -143,19 +173,38 @@ export const EVIDENCE = {
   "language_localization.english_public_storefront": { kind: "endpoint", value: "/api/v1/store" },
 
   // ---- promoted in an earlier pass; evidence retained ----
-  "customers_crm.customer_list_and_order_history":   { kind: "screen", value: "CustomersScreen" },
+  "customers_crm.customer_list_and_order_history": {
+    kind: "screen",
+    value: "CustomersScreen",
+    // The debt named two gaps, the aggregation and the screen. The screen is
+    // covered by CustomersScreenshotTest; this names the aggregation, because
+    // it is the half that can be wrong silently. The test runs the DAO's own
+    // statement through Room's exported schema — CANCELLED excluded, the
+    // customer kept anyway, and currencyCount reported so the screen can
+    // withhold a total it cannot add.
+    behaviour: { layer: "android", file: "CustomerSummariesTest.kt", test: "a cancelled order counts for nothing" },
+  },
   "customers_crm.editable_customer_profiles": {
     kind: "screen",
     value: "CustomerDetailsScreen",
     behaviour: {
       layer: "android",
-      file: "CustomerMergeTest.kt",
-      test: "an edit the server has not acknowledged survives the next pull",
+      file: "CustomerWriteDecisionTest.kt",
+      test: "no failure of any shape is reported as saved",
     },
     integration: "/api/v1/customers",
-    note: "Promoted with the editor, not with the screen. This row is why the behaviour axis exists: the screen resolved for months while rendering an order list with no edit control, no save and no write path, and the catalogue sold it at paid1 the whole time. The named test asserts the property that makes the editor worth having — an edit the server has not acknowledged is never overwritten by the value it replaced.",
+    note: "Promoted with the editor, not with the screen. This row is why the behaviour axis exists: the screen resolved for months while rendering an order list with no edit control, no save and no write path, and the catalogue sold it at paid1 the whole time. The named test changed with ADR-012 and the property changed with it. It used to be that an edit the server had not acknowledged was never overwritten by the value it replaced; there is no unacknowledged edit any more, because a customer edit is Class A and either reaches the server or does not happen. What is asserted now is the harm arriving by the opposite route — the screen reporting \"saved\" for a write that never left the device.",
   },
-  "analytics_reporting.operational_dashboard":       { kind: "screen", value: "MainScreen" },
+  "analytics_reporting.operational_dashboard": {
+    kind: "screen",
+    value: "TodayScreen",
+    behaviour: {
+      layer: "android",
+      file: "OrdersFilterTest.kt",
+      test: "the three counters are three different questions",
+    },
+    note: "Promoted when the surface stopped lying in two directions. The counters are Room COUNT(*) queries and the list they open is an in-memory predicate, so the named test pins the two definitions together — all three counters used to open the same unfiltered list, which is a control that misreports where it goes. The surface was also extracted out of MainScreen: as a private DashboardTab behind a Hilt view model it could not be rendered by anything, which is why two of the four states its contract declares had no code at all. TodayScreen takes a TodayUiState, so loading, content, empty, error and offline-over-content are each a literal in TodayScreenshotTest.",
+  },
   "support_service.in_app_support_tickets":          { kind: "endpoint", value: "/api/v1/support/tickets", integration: "/api/v1/support/tickets" },
   "team_security.session_and_device_management":     { kind: "endpoint", value: "/api/v1/devices", integration: "/api/v1/devices" },
   "language_localization.seller_translation_review": { kind: "endpoint", value: "/api/v1/catalog/translations", integration: "/api/v1/catalog/translations" },
@@ -195,18 +244,8 @@ export const KINDS_REQUIRING_BEHAVIOUR = ["screen", "route", "module"];
  *   purpose, and work item 11 is what resolves it.
  */
 export const BEHAVIOUR_BASELINE = {
-  "products_catalog.product_descriptions":
-    "Descriptions persist through the catalogue mirror, but nothing asserts that a description survives the round trip.",
   "orders_fulfilment.manual_order_creation":
     "Cannot be tested honestly yet. The order is written to Room and never reaches the server, so there is no server behaviour to assert and no client harness for the screen. Work item 05 makes this testable.",
-  "orders_fulfilment.order_history":
-    "The order list renders from Room. A screenshot test covers the list component; nothing covers the screen's own loading, empty and error states.",
-  "customers_crm.customer_list_and_order_history":
-    "Customers are derived on-device by aggregating orders. Neither the aggregation nor the screen is covered.",
-  "analytics_reporting.operational_dashboard":
-    "The Today surface composes its counters from local queries. Neither the counters nor the surface is covered.",
   "ai_capabilities.basic_ai_assistance":
     "Fail-closed behind AI_ASSISTANT_ENABLED in both environments, so there is no reachable path to exercise. The gate is reported separately; this entry is the test gap, not the gate.",
-  "team_security.owner_account":
-    "The profile screen edits seller details. Onboarding validation is tested; this screen's own save path is not.",
 };

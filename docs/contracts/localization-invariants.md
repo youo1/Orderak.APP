@@ -2,7 +2,7 @@
 status: current
 generated: false
 owner: product
-last_verified: 2026-08-21
+last_verified: 2026-09-16
 applies_to: [production, staging]
 authoritative_for: [localization-invariants]
 ---
@@ -35,6 +35,13 @@ locale API profile is documented in
    product-readiness decision.
 8. Locale preferences contain no authentication authority and cannot change
    tenant, entitlement, or data ownership.
+9. Quantities follow the locale's numeral system. Every amount, count, limit
+   and date a seller reads uses the digits the active locale writes numbers
+   with — Arabic-Indic under `ar` — and no surface shows two numeral systems
+   for quantities. Figures that are not quantities (an order number, a dial
+   code, a one-time code, the contents of an editable field) are outside this
+   invariant and follow their own screen; no single string may mix the two
+   forms.
 
 ## Change procedure
 

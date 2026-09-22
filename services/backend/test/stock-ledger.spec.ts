@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from "vitest";
-import { BASE, SELF, authHeaders, createSchema, env, registerStore } from "./helpers";
+import { BASE, SELF, authHeaders, createSchema, env, registerStore, seedStockedProduct } from "./helpers";
 import type { Registered } from "./helpers";
 
 /**
@@ -28,19 +28,12 @@ describe("stock movements", () => {
 		return results as never;
 	}
 
-	async function baselineVersion(r: Registered): Promise<number> {
-		const res = await SELF.fetch(`${BASE}/api/v1/products`, { headers: authHeaders(r) });
-		return ((await res.json()) as { catalog_version: number }).catalog_version;
-	}
 
 	async function seed(r: Registered, stock = 10): Promise<string> {
-		const res = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
-			method: "POST", headers: authHeaders(r),
-			body: JSON.stringify({
-				products: [{ app_id: 1, name: "Cola", price: { amount_minor: 1500, currency: "EGP" }, stock, available: true }],
-			}),
+		const product = await seedStockedProduct(r, stock, {
+			name: "Cola", price: { amount_minor: 1500, currency: "EGP" },
 		});
-		return ((await res.json()) as { products: { product_code: string }[] }).products[0].product_code;
+		return String(product.product_code);
 	}
 
 	async function order(r: Registered, code: string, qty: number, key: string): Promise<number> {
@@ -131,24 +124,25 @@ describe("stock movements", () => {
 		const code = await seed(r, 10);
 		const storeId = await storeIdOf(r);
 		const pulled = (await (await SELF.fetch(`${BASE}/api/v1/products`, { headers: authHeaders(r) })).json()) as {
-			products: { app_id: number; stock_version: number }[];
+			products: { stock_version: number }[];
 		};
-		await SELF.fetch(`${BASE}/api/v1/products/sync`, {
-			method: "POST", headers: authHeaders(r),
-			body: JSON.stringify({
-				baseline_version: await baselineVersion(r),
-				products: [{
-					app_id: 1, name: "Cola", price: { amount_minor: 1500, currency: "EGP" },
-					stock: 25, available: true, stock_dirty: true,
-					expected_stock_version: pulled.products[0].stock_version,
-				}],
-			}),
+		// Counted as a difference rather than an absolute, because seeding is
+		// itself a seller setting a figure: `seed()` creates the product at zero
+		// and adjusts it to ten, which is a MANUAL_ADJUSTMENT of its own.
+		const before = (await movements(storeId)).filter((m) => m.cause === "MANUAL_ADJUSTMENT").length;
+
+		const res = await SELF.fetch(`${BASE}/api/v1/products/${code}/stock`, {
+			method: "PATCH",
+			headers: authHeaders(r),
+			body: JSON.stringify({ stock: 25, expected_stock_version: pulled.products[0].stock_version }),
 		});
+		expect(res.status).toBe(200);
 
 		const adjustments = (await movements(storeId)).filter((m) => m.cause === "MANUAL_ADJUSTMENT");
-		expect(adjustments).toHaveLength(1);
-		expect(adjustments[0]).toMatchObject({ delta: 15, actor: "seller", balance_after: 25, reconstructed: 0 });
-		expect(code).toBeTruthy();
+		expect(adjustments).toHaveLength(before + 1);
+		const written = adjustments.filter((m) => m.balance_after === 25);
+		expect(written).toHaveLength(1);
+		expect(written[0]).toMatchObject({ delta: 15, actor: "seller", balance_after: 25, reconstructed: 0 });
 	});
 
 	it("writes nothing when a stale revision means the adjustment did not apply", async () => {
@@ -161,18 +155,15 @@ describe("stock movements", () => {
 		// freshly created product is already at 0, and sending 0 then would be
 		// current rather than stale — which is what this test needs to avoid.
 		await order(r, code, 1, "ledger-stale-setup");
-		const stale = await SELF.fetch(`${BASE}/api/v1/products/sync`, {
-			method: "POST", headers: authHeaders(r),
-			body: JSON.stringify({
-				baseline_version: await baselineVersion(r),
-				products: [{
-					app_id: 1, name: "Cola", price: { amount_minor: 1500, currency: "EGP" },
-					stock: 99, available: true, stock_dirty: true, expected_stock_version: 0,
-				}],
-			}),
+		const before = (await movements(storeId)).filter((m) => m.cause === "MANUAL_ADJUSTMENT").length;
+
+		const stale = await SELF.fetch(`${BASE}/api/v1/products/${code}/stock`, {
+			method: "PATCH",
+			headers: authHeaders(r),
+			body: JSON.stringify({ stock: 99, expected_stock_version: 0 }),
 		});
 		expect(stale.status).toBe(409);
-		expect((await movements(storeId)).filter((m) => m.cause === "MANUAL_ADJUSTMENT")).toHaveLength(0);
+		expect((await movements(storeId)).filter((m) => m.cause === "MANUAL_ADJUSTMENT")).toHaveLength(before);
 	});
 
 	it("sums to the stock the product actually holds", async () => {
@@ -232,5 +223,55 @@ describe("stock movements", () => {
 			"SELECT COUNT(*) AS c FROM stock_movements WHERE store_id = ?",
 		).bind(storeId).first<{ c: number }>();
 		expect(remaining?.c).toBeGreaterThan(0);
+	});
+
+	it("refuses a movement that cannot say which product it belonged to", async () => {
+		// The constraint migration 059 added, tested by violating it.
+		//
+		// Every write path reaches `product_code` through `products`, where the
+		// column is NOT NULL, so none of them can produce a blank one today. That
+		// is exactly why this is asserted directly against the table rather than
+		// through an endpoint: the constraint exists to stop a write path that
+		// does not exist yet, and a test that can only reach it through today's
+		// paths would pass just as well without the constraint.
+		const r = await registerStore();
+		const storeId = await storeIdOf(r);
+
+		await expect(
+			env.orderak_db.prepare(
+				`INSERT INTO stock_movements
+				   (id, store_id, product_id, product_code, delta, balance_after,
+				    cause, cause_id, actor, reconstructed)
+				 VALUES ('m-unattributed', ?, 'p-gone', NULL, -1, 0,
+				         'MANUAL_ADJUSTMENT', NULL, 'seller', 0)`,
+			).bind(storeId).run(),
+		).rejects.toThrow(/NOT NULL/i);
+
+		const rows = await movements(storeId);
+		expect(rows).toEqual([]);
+	});
+
+	it("still records a sale through the triggers the rebuild recreated", async () => {
+		// Migration 059 rebuilt this table, which meant dropping and recreating
+		// both triggers: ALTER TABLE ... RENAME reparses every trigger in the
+		// schema, and both name `stock_movements` in their bodies. A rebuild that
+		// forgot to restore one would not fail the migration — it would silently
+		// stop recording, and the tests above would still pass for the
+		// adjustment path. This asserts both survived.
+		const r = await registerStore();
+		const code = await seed(r, 10);
+		const storeId = await storeIdOf(r);
+
+		const orderNo = await order(r, code, 2, "ledger-after-rebuild");
+		const sales = (await movements(storeId)).filter((m) => m.cause === "SALE");
+		expect(sales).toHaveLength(1);
+		expect(sales[0]).toMatchObject({ delta: -2, balance_after: 8 });
+
+		await SELF.fetch(`${BASE}/api/v1/orders/${orderNo}/status`, {
+			method: "PATCH", headers: authHeaders(r), body: JSON.stringify({ status: "CANCELLED" }),
+		});
+		const returned = (await movements(storeId)).filter((m) => m.cause === "SALE_CANCELLED");
+		expect(returned).toHaveLength(1);
+		expect(returned[0]).toMatchObject({ delta: 2, balance_after: 10 });
 	});
 });
