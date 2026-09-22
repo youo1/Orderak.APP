@@ -224,6 +224,37 @@ interface OrderDao {
     suspend fun deletePaymentsOf(orderId: Long)
 }
 
+/**
+ * The customer list aggregation, as one string.
+ *
+ * Declared here rather than inline in the `@Query` so `CustomerSummariesTest`
+ * executes the statement the app executes. The migration harness next door makes
+ * the same point about its own SQL: a test that runs a second copy tests the
+ * copy.
+ *
+ * Four things this query decides, each of which was wrong at some point:
+ *
+ *   - CANCELLED orders are excluded, so a cancelled order does not count toward
+ *     a customer's history or their total.
+ *   - LEFT JOIN, so a customer with no surviving orders still appears — their
+ *     row exists because an order arrived, and deleting them from the list
+ *     because it was cancelled would lose the person.
+ *   - currencyCount is selected so the screen can tell "one currency, and this
+ *     is it" from "more than one, so there is no such number". SUM over minor
+ *     units across currencies is 30000 of nothing.
+ *   - ORDER BY totalMinor, which is only meaningful for the same reason.
+ */
+const val CUSTOMER_SUMMARIES_SQL =
+    """SELECT c.customerKey AS customerKey, c.phone AS phone, c.name AS name,
+              COUNT(o.id) AS ordersCount,
+              COALESCE(SUM(o.totalMinor), 0) AS totalMinor,
+              COUNT(DISTINCT o.currency) AS currencyCount,
+              MAX(o.currency) AS currency
+       FROM customers c
+       LEFT JOIN orders o ON o.buyerPhone = c.phone AND o.status != 'CANCELLED'
+       GROUP BY c.customerKey ORDER BY totalMinor DESC"""
+
+
 @Dao
 interface CustomerDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
@@ -255,16 +286,7 @@ interface CustomerDao {
      * it" from "more than one, so there is no such number" — rather than the
      * screen guessing, or the query silently picking a winner.
      */
-    @Query(
-        """SELECT c.customerKey AS customerKey, c.phone AS phone, c.name AS name,
-                  COUNT(o.id) AS ordersCount,
-                  COALESCE(SUM(o.totalMinor), 0) AS totalMinor,
-                  COUNT(DISTINCT o.currency) AS currencyCount,
-                  MAX(o.currency) AS currency
-           FROM customers c
-           LEFT JOIN orders o ON o.buyerPhone = c.phone AND o.status != 'CANCELLED'
-           GROUP BY c.customerKey ORDER BY totalMinor DESC"""
-    )
+    @Query(CUSTOMER_SUMMARIES_SQL)
     fun summaries(): Flow<List<CustomerSummary>>
 
     @Query("SELECT * FROM customers WHERE customerKey = :key")

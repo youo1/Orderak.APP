@@ -24,11 +24,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
+import app.orderak.seller.core.text.formatCountOfLimit
 import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 
 /** Fraction of a plan limit at which usage starts warning. */
@@ -69,6 +71,8 @@ fun UsageMeter(
     role: SemanticRole = usageRole(used, limit),
 ) {
     val spacing = LocalOrderakSpacing.current
+    val locale = LocalConfiguration.current.locales[0]
+    val pair = formatCountOfLimit(used, limit, locale)
     val warn = role != SemanticRole.Neutral
     val colors = role.colors()
     val track = MaterialTheme.colorScheme.surfaceVariant
@@ -76,7 +80,10 @@ fun UsageMeter(
     val fraction = if (limit <= 0) 0f else (used.toFloat() / limit).coerceIn(0f, 1f)
 
     Column(
-        modifier = modifier.semantics { contentDescription = "$label $used / $limit" },
+        // The same digits the row shows. A screen reader reading Latin digits
+        // back to a seller whose screen says ٤ / ٢٠ is the mixed row again, in
+        // the one place nobody screenshots.
+        modifier = modifier.semantics { contentDescription = "$label $pair" },
         verticalArrangement = Arrangement.spacedBy(spacing.space1 + 2.dp),
     ) {
         Row(
@@ -106,8 +113,10 @@ fun UsageMeter(
             Text(
                 // "14 / 20" is a left-to-right run. Left to the paragraph it
                 // reorders inside Arabic and renders as "20 / 14", which reads as
-                // twenty of fourteen — the count and the limit swapped.
-                text = "$used / $limit",
+                // twenty of fourteen — the count and the limit swapped. The
+                // direction below is not enough once the digits are Arabic-Indic;
+                // formatCountOfLimit carries the marks that are, and says why.
+                text = pair,
                 style = MaterialTheme.typography.labelMedium.copy(
                     textDirection = TextDirection.Ltr,
                     fontWeight = if (warn) FontWeight.Bold else null,

@@ -52,6 +52,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import java.util.Locale
+import app.orderak.seller.core.ui.FullScreenLoading
 import app.orderak.seller.R
 import app.orderak.seller.data.remote.BusinessSubcategoryDto
 import app.orderak.seller.data.remote.StoreDto
@@ -104,7 +105,11 @@ class StoreInfoViewModel @Inject constructor(
     init { refresh() }
 
     fun refresh() = viewModelScope.launch {
-        val phone = sessionStore.phone.first() ?: return@launch
+        // No phone means no session, and the screen is unreachable without one —
+        // but returning here left `_store` null for ever, and the screen reads
+        // null as "still loading". A state nothing can leave is worse than an
+        // empty form, so fall through to the cached view instead.
+        val phone = sessionStore.phone.first() ?: run { _store.value = cachedStore(); return@launch }
         val secret = sessionStore.getOrCreateSecret()
         val res = api.getStore(phone, secret)
         val s = res.store
@@ -113,25 +118,28 @@ class StoreInfoViewModel @Inject constructor(
             cache(s)
         } else {
             // Offline fallback: build the view from cached values.
-            _store.value = StoreDto(
-                store_name = sessionStore.shopName.first(),
-                slug = sessionStore.slug.first(),
-                country_code = sessionStore.countryIso.first(),
-                store_code = sessionStore.storeCode.first(),
-                public_identifier = sessionStore.publicIdentifier.first(),
-                description = sessionStore.description.first(),
-                phone = sessionStore.phone.first(),
-                whatsapp = sessionStore.whatsapp.first(),
-                email = sessionStore.storeEmail.first(),
-                website = sessionStore.website.first(),
-                address = sessionStore.address.first(),
-                instapay = sessionStore.instapay.first(),
-                vfcash = sessionStore.vfcash.first(),
-                logo_url = sessionStore.logoUrl.first(),
-                cover_url = sessionStore.coverUrl.first(),
-            )
+            _store.value = cachedStore()
         }
     }
+
+    /** The store as this device last knew it. Used offline and when unauthenticated. */
+    private suspend fun cachedStore() = StoreDto(
+        store_name = sessionStore.shopName.first(),
+        slug = sessionStore.slug.first(),
+        country_code = sessionStore.countryIso.first(),
+        store_code = sessionStore.storeCode.first(),
+        public_identifier = sessionStore.publicIdentifier.first(),
+        description = sessionStore.description.first(),
+        phone = sessionStore.phone.first(),
+        whatsapp = sessionStore.whatsapp.first(),
+        email = sessionStore.storeEmail.first(),
+        website = sessionStore.website.first(),
+        address = sessionStore.address.first(),
+        instapay = sessionStore.instapay.first(),
+        vfcash = sessionStore.vfcash.first(),
+        logo_url = sessionStore.logoUrl.first(),
+        cover_url = sessionStore.coverUrl.first(),
+    )
 
     fun save(req: StoreUpdateReq, onDone: () -> Unit) = viewModelScope.launch {
         _busy.value = true
@@ -276,6 +284,96 @@ fun StoreInfoScreen(
     }
 
 
+    StoreInfoContent(
+        store = store,
+        draft = StoreInfoDraft(
+            name = name,
+            slug = slug,
+            description = description,
+            whatsapp = whatsapp,
+            email = email,
+            website = website,
+            address = address,
+            logoUrl = logoUrl,
+            coverUrl = coverUrl,
+            businessSubcategoryId = businessSubcategoryId,
+        ),
+        onDraft = { d ->
+            name = d.name; slug = d.slug; description = d.description
+            whatsapp = d.whatsapp; email = d.email; website = d.website
+            address = d.address; logoUrl = d.logoUrl; coverUrl = d.coverUrl
+            businessSubcategoryId = d.businessSubcategoryId
+        },
+        phone = phone,
+        busy = busy,
+        slugState = slugState,
+        storeUrl = storeUrl,
+        storeCode = storeCode,
+        country = country,
+        businessSubcategories = businessSubcategories,
+        businessSubcategoryExpanded = businessSubcategoryExpanded,
+        onSubcategoryExpanded = { businessSubcategoryExpanded = it },
+        onSave = { req, onDone -> viewModel.save(req, onDone) },
+        onPickLogo = { pickLogo.launch("image/*") },
+        onPickCover = { pickCover.launch("image/*") },
+        onCopyLink = { copyLink(context, it) },
+        onShareLink = { shareStoreLink(context, name, it) },
+        onBack = onBack,
+    )
+}
+
+/**
+ * The ten editable fields of the store form, as one value.
+ *
+ * Ten values and ten setters threaded separately would be twenty parameters on a
+ * composable nobody would read. They are seeded and owned by [StoreInfoScreen] —
+ * each is `rememberSaveable(store)`, KEYED on the loaded store — and this type is
+ * only how they travel.
+ */
+data class StoreInfoDraft(
+    val name: String = "",
+    val slug: String = "",
+    val description: String = "",
+    val whatsapp: String = "",
+    val email: String = "",
+    val website: String = "",
+    val address: String = "",
+    val logoUrl: String = "",
+    val coverUrl: String = "",
+    val businessSubcategoryId: String? = null,
+)
+
+/**
+ * The store form, as a function of its state.
+ *
+ * `store == null` is the loading state, and it is load-bearing rather than
+ * cosmetic: the ten draft fields are keyed on the loaded store, so rendering the
+ * form before it arrived let a seller start typing their shop name into an empty
+ * field and have the whole form reset under them the moment the network
+ * answered. Waiting composes the form once, with the values already in hand.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun StoreInfoContent(
+    store: StoreDto?,
+    draft: StoreInfoDraft,
+    onDraft: (StoreInfoDraft) -> Unit,
+    phone: String,
+    busy: Boolean,
+    slugState: String?,
+    storeUrl: String?,
+    storeCode: String?,
+    country: String?,
+    businessSubcategories: List<BusinessSubcategoryDto>,
+    businessSubcategoryExpanded: Boolean,
+    onSubcategoryExpanded: (Boolean) -> Unit,
+    onSave: (StoreUpdateReq, (() -> Unit)) -> Unit,
+    onPickLogo: () -> Unit,
+    onPickCover: () -> Unit,
+    onCopyLink: (String) -> Unit,
+    onShareLink: (String) -> Unit,
+    onBack: () -> Unit,
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -288,6 +386,16 @@ fun StoreInfoScreen(
             )
         }
     ) { padding ->
+        // Ten fields above are `rememberSaveable(store)` — KEYED on the loaded
+        // store — so every change to it re-seeds them. Rendering the form before
+        // the store arrived meant a seller could start typing their shop name
+        // into an empty field and have the whole form reset under them the
+        // moment the network answered. Waiting here closes that window: the form
+        // is composed once, with the values already in hand.
+        if (store == null) {
+            FullScreenLoading(Modifier.padding(padding))
+            return@Scaffold
+        }
         Column(
             Modifier.fillMaxSize().padding(padding).padding(16.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -301,11 +409,11 @@ fun StoreInfoScreen(
                         ReadOnlyRow(stringResource(R.string.store_info_public_id), url)
                         Text(url, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(onClick = { copyLink(context, url) }) {
+                            OutlinedButton(onClick = { onCopyLink(url) }) {
                                 Icon(Icons.Outlined.ContentCopy, contentDescription = null)
                                 Text(stringResource(R.string.action_copy_url), Modifier.padding(start = 6.dp))
                             }
-                            OutlinedButton(onClick = { shareStoreLink(context, name, url) }) {
+                            OutlinedButton(onClick = { onShareLink(url) }) {
                                 Icon(Icons.Outlined.Share, contentDescription = null)
                                 Text(stringResource(R.string.action_share_store), Modifier.padding(start = 6.dp))
                             }
@@ -319,15 +427,17 @@ fun StoreInfoScreen(
 
             // ---- Editable fields ----
             Text(stringResource(R.string.store_info_title), style = MaterialTheme.typography.titleMedium)
-            Field(name, { name = it.take(60) }, R.string.store_info_name)
+            Field(draft.name, { onDraft(draft.copy(name = it.take(60))) }, R.string.store_info_name)
             OutlinedTextField(
-                value = slug,
-                onValueChange = { v -> slug = v.lowercase(Locale.ROOT).filter { it.isLetterOrDigit() || it == '-' }.take(40) },
+                value = draft.slug,
+                onValueChange = { v ->
+                    onDraft(draft.copy(slug = v.lowercase(Locale.ROOT).filter { it.isLetterOrDigit() || it == '-' }.take(40)))
+                },
                 label = { Text(stringResource(R.string.store_info_slug)) },
                 supportingText = { slugState?.let { Text(stringResource(when(it){"loading"->R.string.slug_loading;"available"->R.string.slug_available;"taken"->R.string.slug_taken;"reserved"->R.string.slug_reserved;"network"->R.string.slug_network;else->R.string.slug_invalid})) } },
                 singleLine = true, modifier = Modifier.fillMaxWidth()
             )
-            Field(description, { description = it.take(300) }, R.string.store_info_description)
+            Field(draft.description, { onDraft(draft.copy(description = it.take(300))) }, R.string.store_info_description)
             OutlinedTextField(
                 value = phone,
                 onValueChange = {},
@@ -337,22 +447,22 @@ fun StoreInfoScreen(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            Field(whatsapp, { whatsapp = it.take(20) }, R.string.store_info_whatsapp)
-            Field(email, { email = it.take(80) }, R.string.store_info_email)
-            Field(website, { website = it.take(120) }, R.string.store_info_website)
-            Field(address, { address = it.take(200) }, R.string.store_info_address)
+            Field(draft.whatsapp, { onDraft(draft.copy(whatsapp = it.take(20))) }, R.string.store_info_whatsapp)
+            Field(draft.email, { onDraft(draft.copy(email = it.take(80))) }, R.string.store_info_email)
+            Field(draft.website, { onDraft(draft.copy(website = it.take(120))) }, R.string.store_info_website)
+            Field(draft.address, { onDraft(draft.copy(address = it.take(200))) }, R.string.store_info_address)
 
             ExposedDropdownMenuBox(
                 expanded = businessSubcategoryExpanded,
                 onExpandedChange = {
                     if (!store?.business_category_id.isNullOrBlank()) {
-                        businessSubcategoryExpanded = it
+                        onSubcategoryExpanded(it)
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 val selectedName = businessSubcategories
-                    .firstOrNull { it.id == businessSubcategoryId }
+                    .firstOrNull { it.id == draft.businessSubcategoryId }
                     ?.name
                     .orEmpty()
                 OutlinedTextField(
@@ -373,15 +483,15 @@ fun StoreInfoScreen(
                 )
                 ExposedDropdownMenu(
                     expanded = businessSubcategoryExpanded,
-                    onDismissRequest = { businessSubcategoryExpanded = false },
+                    onDismissRequest = { onSubcategoryExpanded(false) },
                     modifier = Modifier.heightIn(max = 360.dp),
                 ) {
                     businessSubcategories.forEach { subcategory ->
                         DropdownMenuItem(
                             text = { Text(subcategory.name) },
                             onClick = {
-                                businessSubcategoryId = subcategory.id
-                                businessSubcategoryExpanded = false
+                                onDraft(draft.copy(businessSubcategoryId = subcategory.id))
+                                onSubcategoryExpanded(false)
                             },
                             contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
                         )
@@ -390,31 +500,31 @@ fun StoreInfoScreen(
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { pickLogo.launch("image/*") }) { Text(stringResource(R.string.store_info_logo)) }
-                OutlinedButton(onClick = { pickCover.launch("image/*") }) { Text(stringResource(R.string.store_info_cover)) }
+                OutlinedButton(onClick = { onPickLogo() }) { Text(stringResource(R.string.store_info_logo)) }
+                OutlinedButton(onClick = { onPickCover() }) { Text(stringResource(R.string.store_info_cover)) }
             }
 
             Spacer(Modifier.height(8.dp))
             Button(
                 onClick = {
-                    viewModel.save(
+                    onSave(
                         StoreUpdateReq(
-                            store_name = name.trim(),
-                            slug = slug.trim().ifBlank { null },
-                            description = description.trim(),
-                            whatsapp = whatsapp.trim(),
-                            email = email.trim(),
-                            website = website.trim(),
-                            address = address.trim(),
-                            logo_url = logoUrl.ifBlank { null },
-                            cover_url = coverUrl.ifBlank { null },
+                            store_name = draft.name.trim(),
+                            slug = draft.slug.trim().ifBlank { null },
+                            description = draft.description.trim(),
+                            whatsapp = draft.whatsapp.trim(),
+                            email = draft.email.trim(),
+                            website = draft.website.trim(),
+                            address = draft.address.trim(),
+                            logo_url = draft.logoUrl.ifBlank { null },
+                            cover_url = draft.coverUrl.ifBlank { null },
                             business_category_id = store?.business_category_id,
-                            business_subcategory_id = businessSubcategoryId,
+                            business_subcategory_id = draft.businessSubcategoryId,
                         ),
-                        onDone = onBack,
+                        onBack,
                     )
                 },
-                enabled = !busy && (slugState == "available" || slug == store?.slug),
+                enabled = !busy && (slugState == "available" || draft.slug == store?.slug),
                 modifier = Modifier.fillMaxWidth()
             ) { Text(stringResource(R.string.settings_save)) }
         }

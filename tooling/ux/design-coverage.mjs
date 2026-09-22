@@ -2,16 +2,41 @@
  * PHASE 0 exit condition, made checkable.
  *
  * Maps every screen contract to the artboards that design it, and asserts that
- * each contract's DECLARED states are all drawn. Without this, "the designs are
- * done" is a claim; with it, it is a check.
+ * each contract's DECLARED states are all drawn.
  *
  *   node tooling/ux/design-coverage.mjs
  *
  * The canvas lives at the artifact below; artboard names are its file stems.
+ *
+ * WHAT THIS CAN AND CANNOT TELL YOU
+ *   It compares two object literals in this file. That catches a real class of
+ *   mistake — a contract gaining a state nobody designed for, an artboard
+ *   mapped to a state the contract does not declare — and it caught several.
+ *
+ *   It cannot tell you a state was drawn, and it cannot tell you a state was
+ *   built, because no artboard NAME here is checked against anything outside
+ *   this file. It reported the `today` contract fully designed for months while
+ *   two of its four states did not exist in the app at all.
+ *
+ *   `render-coverage.mjs` is the one that answers the question this file looks
+ *   like it answers. Read its number, not this one's, for "is it built".
  */
 import { CONTRACTS } from "./screen-contracts.mjs";
 
-export const CANVAS = "https://claude.ai/code/artifact/9f8f095e-2578-4a7f-80e6-2fa6e9014c18";
+/**
+ * The canvases, one per surface. Artboard names above are their file stems.
+ *
+ * These are external artifacts: nothing in CI can open them, so a wrong URL here
+ * fails silently and a deleted canvas fails not at all. They are a pointer for a
+ * human, not evidence — which is the whole reason render-coverage.mjs exists.
+ */
+export const CANVASES = {
+  today:     "https://claude.ai/artifact/9dTQcffReAoJuvsb11bwJf",
+  store:     "https://claude.ai/artifact/KrmanUyKpdmMSxpAF9w4JB",
+  orders:    "https://claude.ai/artifact/T9nKAZqC67qKmi83Z2CGvX",
+  customers: "https://claude.ai/artifact/F9vcRNCudwC2dJstJCr7cp",
+  account:   "https://claude.ai/artifact/M6S9zLqWNBUp35GHhuxHBg",
+};
 
 /** contract id -> { state: artboard }. "content" is the primary artboard. */
 export const DESIGNS = {
@@ -86,8 +111,9 @@ if (problems.length) {
 
 const distinct = new Set(Object.values(DESIGNS).flatMap(d => Object.values(d)));
 const cases = CONTRACTS.reduce((a, c) => a + c.states.length, 0);
-console.log(`OK — ${CONTRACTS.length} contracts, every declared state has an artboard.`);
+console.log(`OK — ${CONTRACTS.length} contracts, every declared state is MAPPED to an artboard name.`);
+console.log(`  (a name, in this file. For what is actually rendered: node tooling/ux/render-coverage.mjs)`);
 console.log(`  distinct artboards used by contracts: ${distinct.size}`);
-console.log(`  offline surfaces proven: ${[...offlineSurfaces].filter(s => OFFLINE_ARTBOARDS[s]).join(", ")}`);
+console.log(`  offline surfaces with an artboard named: ${[...offlineSurfaces].filter(s => OFFLINE_ARTBOARDS[s]).join(", ")}`);
 console.log(`  screenshot cases implied: ${cases} states x 2 themes = ${cases * 2}`);
-console.log(`  canvas: ${CANVAS}`);
+for (const [surface, url] of Object.entries(CANVASES)) console.log(`  canvas ${surface.padEnd(10)} ${url}`);

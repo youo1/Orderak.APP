@@ -109,7 +109,25 @@ fun PlansScreen(
     viewModel: PlansViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    PlansContent(state = state, onBack = onBack, onRetry = viewModel::load)
+}
 
+/**
+ * The plan comparison, as a function of its state.
+ *
+ * Split from [PlansScreen] only so its four branches can be rendered. This
+ * screen was already honest — [PlansUiState] seeds `loading = true`, so it never
+ * claimed an empty plan list it had not fetched — and it is the page a seller is
+ * sent to while buying is closed, so what it says in each branch is worth
+ * looking at.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PlansContent(
+    state: PlansUiState,
+    onBack: () -> Unit,
+    onRetry: () -> Unit,
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -126,7 +144,7 @@ fun PlansScreen(
             state.loading -> FullScreenLoading()
             state.error != null -> FullScreenError(
                 message = stringResource(backendErrorResource(state.error)),
-                onRetry = viewModel::load,
+                onRetry = onRetry,
             )
             state.plans.isEmpty() -> Column(
                 Modifier.fillMaxSize().padding(padding).padding(32.dp),
@@ -202,10 +220,23 @@ private fun PlanComparison(state: PlansUiState, padding: PaddingValues) {
                     modifier = Modifier.width(160.dp).padding(vertical = 8.dp),
                 )
                 state.plans.forEach { plan ->
+                    val raw = row.values[plan.plan_key]
                     Text(
                         // An em dash is the catalogue's own "not included". A
                         // blank cell would read as missing data.
-                        text = row.values[plan.plan_key] ?: "—",
+                        //
+                        // A boolean row carried the backend's own literal, so an
+                        // Arabic comparison table printed "true" and "false" in
+                        // the cells whose entire job is to be read at a glance.
+                        // True becomes the word; false becomes the same em dash
+                        // every other "not included" cell already uses.
+                        text = when {
+                            raw == null -> "—"
+                            row.value_type != "boolean" -> raw
+                            raw.equals("true", ignoreCase = true) ->
+                                stringResource(R.string.plans_included)
+                            else -> "—"
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.width(110.dp).padding(vertical = 8.dp),
                     )

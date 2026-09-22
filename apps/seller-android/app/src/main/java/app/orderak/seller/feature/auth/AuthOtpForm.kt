@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
@@ -39,6 +40,7 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalAutofill
 import androidx.compose.ui.platform.LocalAutofillTree
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -48,6 +50,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import app.orderak.seller.R
+import app.orderak.seller.core.text.formatCount
 
 /**
  * OTP entry form — title, subtitle, 6-digit code input, inline error,
@@ -139,7 +142,10 @@ fun AuthOtpForm(
                     text = if (canResend) {
                         stringResource(R.string.auth_resend)
                     } else {
-                        stringResource(R.string.auth_resend_in, secondsLeft)
+                        stringResource(
+                            R.string.auth_resend_in,
+                            formatCount(secondsLeft, LocalConfiguration.current.locales[0]),
+                        )
                     },
                     style = MaterialTheme.typography.labelLarge,
                     color = if (canResend) {
@@ -186,7 +192,15 @@ private fun OtpCodeInput(
                 onCodeChanged(raw.filter(Char::isDigit))
             }
         },
-        textStyle = TextStyle(color = MaterialTheme.colorScheme.background), // invisible underlying text
+        // Transparent, not `background`.
+        //
+        // Painting the real text in the background colour hides it only where
+        // the backdrop IS that colour, and none of the four box fills are: the
+        // boxes are tinted errorContainer, primaryContainer or surfaceVariant.
+        // In the error state the typed code was legibly visible through its own
+        // boxes — found by rendering that state for the first time. Transparent
+        // hides it against anything.
+        textStyle = TextStyle(color = Color.Transparent),
         keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.NumberPassword,
             imeAction = ImeAction.Done,

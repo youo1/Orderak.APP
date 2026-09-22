@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -34,6 +35,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import app.orderak.seller.R
+import app.orderak.seller.core.text.formatCount
 import app.orderak.seller.app.navigation.PaywallRoute
 import app.orderak.seller.data.billing.EntitlementManager
 import app.orderak.seller.data.remote.BackendApi
@@ -118,7 +120,23 @@ fun PaywallScreen(
     viewModel: PaywallViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    PaywallContent(state = state, onBack = onBack, onViewPlans = onViewPlans)
+}
 
+/**
+ * The limit-reached page, as a function of its state.
+ *
+ * Its contract declares `content` and nothing else, which is right: everything
+ * here comes from the entitlement snapshot the caller already had in hand when
+ * it decided to show this page at all.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PaywallContent(
+    state: PaywallUiState,
+    onBack: () -> Unit,
+    onViewPlans: () -> Unit,
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -151,11 +169,16 @@ fun PaywallScreen(
             // only that something is full cannot.
             val limit = state.limit
             val used = state.used
+            val locale = LocalConfiguration.current.locales[0]
             Text(
                 text = when {
                     limit != null && used != null ->
-                        stringResource(R.string.paywall_usage_of_limit, used, limit)
-                    limit != null -> stringResource(R.string.paywall_limit_only, limit)
+                        stringResource(
+                            R.string.paywall_usage_of_limit,
+                            formatCount(used, locale),
+                            formatCount(limit, locale),
+                        )
+                    limit != null -> stringResource(R.string.paywall_limit_only, formatCount(limit, locale))
                     else -> stringResource(R.string.paywall_limit_unknown)
                 },
                 style = MaterialTheme.typography.bodyLarge,
