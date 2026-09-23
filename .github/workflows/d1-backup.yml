@@ -161,11 +161,28 @@ jobs:
 
       - name: Compute exportable table allowlist
         working-directory: services/backend
+        # Not `set -e` on the wrangler line itself. `--json` makes wrangler put
+        # error responses on stdout as JSON, same as a successful result, and
+        # `> /tmp/schema.json` sends both to the same place — a failure exits
+        # non-zero having printed nothing to the log at all, leaving only "exit
+        # code 1" with the actual Cloudflare error sitting in a file on a
+        # runner that is already gone by the time anyone looks. This is what
+        # happened on 2026-09-23: `Preflight required production credentials`
+        # passed, the token's permissions were confirmed correct, and the job
+        # still failed here with zero diagnostic output. Checking the exit code
+        # explicitly and printing the file on failure is the fix.
         run: |
-          set -euo pipefail
+          set -uo pipefail
           npx wrangler d1 execute "$DB" --remote --json \
             --command "SELECT name, sql FROM sqlite_master WHERE type='table'" \
             > /tmp/schema.json
+          STATUS=$?
+          if [ "$STATUS" -ne 0 ]; then
+            echo "ERROR: wrangler d1 execute failed (exit $STATUS). Its output, captured instead of printed because --json sends errors to the same stream as results:"
+            cat /tmp/schema.json
+            exit "$STATUS"
+          fi
+          set -e
           TABLES=$(node scripts/d1-exportable-tables.mjs < /tmp/schema.json)
           echo "TABLE_ARGS=$TABLES" >> "$GITHUB_ENV"
 
