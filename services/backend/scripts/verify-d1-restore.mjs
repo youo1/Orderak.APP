@@ -26,6 +26,10 @@
 //                       may lose between two backups before that is treated as
 //                       loss rather than pruning (default 0.25).
 //
+// Lock/lease tables (ALWAYS_MAY_EMPTY_TABLES below) may drop to zero rows
+// between any two backups regardless of --max-prune-drop — their count is
+// "held or not," not a population retention prunes a slice of.
+//
 // Exit code 0 means the export restored cleanly; non-zero means the backup is
 // not recoverable and the run should fail loudly.
 // ============================================================
@@ -68,6 +72,29 @@ function prunedTables() {
 		return new Set();
 	}
 }
+
+/**
+ * Tables that are locks or leases rather than records: a row exists only
+ * while something holds it, so the table going to zero between two backups
+ * is the lock being free, not loss. `operational_leases` failed a backup on
+ * 2026-09-23 with `lost rows: 1 -> 0` — a completed admin-audit-archive lease
+ * releasing normally (see admin-control-plane.ts, which deletes the row the
+ * moment the holder releases it).
+ *
+ * Not folded into prunedTables(): that set is bounded by --max-prune-drop
+ * because retention removes an aged slice of a population, so a drop past
+ * some fraction is still worth a human's attention. A lock has no
+ * population to take a slice of — it is held or it is not — so there is no
+ * fraction of "1 -> 0" that would ever mean something other than "released."
+ * Bounding it the same way would still fail this exact case at the default
+ * 0.25, since 100% > 25%, on any ordinary night a lease happens to be
+ * outstanding at one backup and gone by the next.
+ *
+ * A fixed list rather than derived from code, because "this table's rows
+ * are locks" is a design fact about its shape, stated once — not a rule
+ * that moves with a retention window the way prunedTables() tracks.
+ */
+const ALWAYS_MAY_EMPTY_TABLES = new Set(["operational_leases"]);
 
 function parseArgs(argv) {
 	const [file, ...rest] = argv;
@@ -235,7 +262,9 @@ try {
 				// and is worth a human deciding rather than a note.
 				const dropped = before - now;
 				const fraction = before === 0 ? 0 : dropped / before;
-				if (!pruned.has(table)) {
+				if (ALWAYS_MAY_EMPTY_TABLES.has(table)) {
+					console.log(`  note: "${table}" ${before} -> ${now}; a lock/lease table, expected to reach zero between any two backups.`);
+				} else if (!pruned.has(table)) {
 					console.error(`FAIL: table "${table}" lost rows: ${before} -> ${now}.`);
 					failed = true;
 				} else if (fraction > options.maxPruneDrop) {
