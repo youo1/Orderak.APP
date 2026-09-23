@@ -56,6 +56,18 @@ on:
         default: production
         options:
           - production
+      max_prune_drop:
+        description: >-
+          Largest fraction of a retention-pruned table's rows the restore
+          drill will accept as lost versus the previous manifest (0-1).
+          Leave at the default for a routine run. Raise it only to get past
+          a comparison against an abnormally old previous manifest — for
+          example after a gap in backups longer than a retention window,
+          where ordinary pruning can look like total loss. Confirm the drop
+          is explained by a retention rule (services/backend/src/domains/identity/retention.ts)
+          before raising this, not just to make the check pass.
+        type: string
+        default: "0.25"
 
 permissions:
   contents: read
@@ -68,7 +80,24 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    environment: production
+    # Not `environment: production`. That environment requires a reviewer, which
+    # a schedule trigger can never satisfy — a run just sits in `waiting`
+    # forever. On 2026-08-27 exactly one of those runs did, and because this
+    # job's concurrency group never cancels an in-progress run, every scheduled
+    # backup since queued behind that one zombie and was eventually cancelled
+    # unrun. 27 nights with no backup taken, and a green run history the whole
+    # time because "cancelled" and "no backup" look nothing alike in the
+    # workflow list.
+    #
+    # `backup-production` holds the same three values (AGE_RECIPIENT,
+    # CLOUDFLARE_ACCOUNT_ID, ORDERAK_BACKUP_PRODUCTION) with only a
+    # protected-branches restriction, no required reviewer. The credential this
+    # job holds can only ever read and write the backups bucket and read D1 —
+    # see the encryption note at the top of this file for why that scope is
+    # deliberately narrower than a deploy credential. The reviewer gate stays
+    # on `production` for the jobs that actually mutate it: Deploy Production
+    # and the restore drill.
+    environment: backup-production
     # A manual dispatch used to run the production backup unconditionally, with staging
     # merely added on top. That made it impossible to exercise the staging path — for
     # example when testing backup encryption — without also touching production. The
@@ -88,6 +117,10 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.ORDERAK_BACKUP_PRODUCTION }}
       AGE_RECIPIENT: ${{ vars.AGE_RECIPIENT }}
       DB: ${{ matrix.database }}
+      # The schedule trigger has no `inputs`, so this falls through to the
+      # script's own default (0.25) on every nightly run. Only a manual
+      # dispatch can set it to anything else.
+      MAX_PRUNE_DROP: ${{ inputs.max_prune_drop || '0.25' }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -222,7 +255,7 @@ jobs:
           # shellcheck disable=SC2086
           node scripts/verify-d1-restore.mjs "/tmp/${DB}.sql" \
             --manifest "/tmp/${DB}.manifest.json" \
-            --min-tables 1 $ARGS
+            --min-tables 1 --max-prune-drop "$MAX_PRUNE_DROP" $ARGS
 
       - name: Encrypt export
         run: |
