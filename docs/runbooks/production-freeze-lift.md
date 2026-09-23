@@ -25,8 +25,8 @@ Facts below were true as of `last_verified`. Re-check every one immediately
 before dispatch; several are time-sensitive.
 
 - Production has been frozen since 2026-08-24 by `PRODUCTION_DEPLOYS_ENABLED`
-  in [production-deploy.yml](../../.github/workflows/production-deploy.yml) —
-  the gate fails closed when the repository variable is unset.
+  in `.github/workflows/production-deploy.yml` — the gate fails closed when
+  the repository variable is unset.
 - The last successful **Deploy Production** run was 2026-08-16, deploying
   `21bd46e56aafb9058ca03bb1e0a6f2ab3ce0f5b9`. No `production/*` git tag exists
   for it despite that run succeeding — nothing durable records it as the
@@ -84,7 +84,7 @@ Without this, "what's live right now" exists only in this document.
 
 ### 4a. What's already enforced automatically — don't redo this by hand
 
-[`services/backend/scripts/verify-migrations.mjs`](../../services/backend/scripts/verify-migrations.mjs)
+`services/backend/scripts/verify-migrations.mjs`
 runs in both Backend CI and Deploy Production. It requires any migration that
 renames, drops, or rebuilds a table to carry a
 `-- rollout: expand-contract` marker stating *why the previous Worker still
