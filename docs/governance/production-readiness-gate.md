@@ -2,7 +2,7 @@
 status: current
 generated: false
 owner: governance
-last_verified: 2026-09-06
+last_verified: 2026-09-24
 applies_to: [production]
 ---
 # Production readiness gate
@@ -23,9 +23,9 @@ with a physical device or a Cloudflare account, and are marked accordingly.
 
 | Area | Required proof | State |
 |---|---|---|
-| **Migrations** | Staging applied and tested. Production applied by the deploy workflow and **verified read-only**. | **Open** — needs `wrangler d1 migrations list orderak-db --remote`. See the note below; this row is not a licence to mutate production |
-| **Rollback** | Rehearsed for every irreversible step; 02 and 07b documented as *partially* irreversible | **Partial** — both documented ([auth cutover](../runbooks/production-auth-cutover.md), [billing rollout](../runbooks/play-billing-rollout.md)); neither rehearsed |
-| **Backup / restore** | Restore drill against the production database | **Open** — runbook exists, drill unrecorded |
+| **Migrations** | Staging applied and tested. Production applied by the deploy workflow and **verified read-only**. | **Closed** — `wrangler d1 migrations list orderak-db --remote` run 2026-09-24: `No migrations to apply!`, all 16 (044-059) confirmed landed by the 2026-09-23 production deploy |
+| **Rollback** | Rehearsed for every irreversible step; 02 and 07b documented as *partially* irreversible | **Partial** — both documented ([auth cutover](../runbooks/production-auth-cutover.md), [billing rollout](../runbooks/play-billing-rollout.md)); neither rehearsed. The 2026-09-23 migration rehearsal (disposable DB, real production data, all 16 migrations) rehearsed forward application, not rollback — those remain separate exercises |
+| **Backup / restore** | Restore drill against the production database | **Closed** — `restore-drill.yml` run 2026-09-23 against a fresh production backup (`orderak-db`, `2026-09-23T1721Z`), all steps passed |
 | **Auth** | Physical-device sign-up, sign-in, passkey register, passkey sign-in, wrong-code refusal | **Open** — device only |
 | **Billing** | Purchase → server verification → entitlement applied; full 07b matrix | **Open** — needs Play Console setup, then the matrix in the rollout runbook |
 | **Sync** | Device A → server → Device B, including the stale and concurrent cases (I-1) | **Code closed, evidence open** — `cross-store-isolation.spec.ts`, `store.spec.ts`; two-device evidence outstanding |
@@ -36,9 +36,9 @@ with a physical device or a Cloudflare account, and are marked accordingly.
 | **Money** | EGP plus one non-2-decimal currency, through the receipt path | **Closed in code** — `money.spec.ts`, `money-wire.spec.ts`, and the Android exponent guard |
 | **Cross-store isolation** | A suite proving no seller-facing route crosses a store boundary | **Closed** — `cross-store-isolation.spec.ts` covers reads, store-scoped writes and the admin boundary; `product-crud.spec.ts` covers the product routes that replaced the mirror; `customers.spec.ts` covers the customers resource |
 | **API contract** | Route inventory = OpenAPI = implementation, with the scanner failing closed (I-7) | **Closed** — `pnpm -C contracts/openapi run check`, 100% over 257 operations, scanner fails on an expression it cannot read |
-| **Observability** | `SENTRY_DSN` required and present in both environments; Crashlytics proven from a release build; detection responsibility named | **Partial** — see below |
+| **Observability** | `SENTRY_DSN` required and present in both environments; Crashlytics proven from a release build; detection responsibility named | **Partial** — see below. `SENTRY_DSN` presence confirmed 2026-09-24 via `wrangler secret list` on all four (public/admin Worker × production/staging); zero errors in the 24h spanning the 2026-09-23 production deploy, confirmed via the Sentry MCP connector. Crashlytics-from-a-release-build and the named on-call person remain open — neither is closable from this repository |
 | **Release artifact** | Signed AAB, verified signature, installs and runs | **Pipeline closed, artifact open** — `android-release.yml` builds and verifies the signature; no key material yet |
-| **Data integrity** | Reconciliation reports clean on staging | **Open** — the script runs; it has not been run against staging |
+| **Data integrity** | Reconciliation reports clean on staging | **Closed** — `reconcile-stock.mjs --remote --env staging` run 2026-09-24: "Every product's stock is explained by its movements" |
 
 ## Three rows that need expanding
 
@@ -141,7 +141,9 @@ property, not on the filename.
 
 ## What "yes" costs
 
-Nine of the sixteen rows are closed or closed-in-code. The remainder need a
-physical device, a Cloudflare account, a Play Console, or a decision about who
-is responsible — and none of them can be closed by writing more code, which is
-the useful thing this table says.
+Ten of the sixteen rows are closed or closed-in-code, as of 2026-09-24 (up
+from nine: Migrations, Backup/restore and Data integrity closed this pass —
+all three were already-written scripts nobody had pointed at real data yet).
+The remainder need a physical device, a Cloudflare account, a Play Console, or
+a decision about who is responsible — and none of them can be closed by
+writing more code, which is the useful thing this table says.
