@@ -2,7 +2,7 @@
 status: current
 generated: false
 owner: backend
-last_verified: 2026-08-25
+last_verified: 2026-09-23
 applies_to: [production, staging]
 authoritative_for: [deployment-environments]
 ---
@@ -10,7 +10,11 @@ authoritative_for: [deployment-environments]
 
 **Status:** source-of-truth for repository deployment names
 **Source audit:** verified from repository configuration on 2026-08-24
-**Live audit:** blocked until GitHub CLI and Wrangler are re-authenticated
+**Live audit (GitHub environments/protection rules only):** re-confirmed
+2026-09-23 via `gh api`, which is authenticated in CI and in this session —
+the four environments, their protection rules, and their variables (not
+secrets, which the API never returns) match this document. Cloudflare-side
+resources below this point were not re-audited on that date.
 
 This map records names only. Secret values must never be copied into documentation,
 logs, issues, or CI artifacts. A live read-only audit must confirm the configured
@@ -66,8 +70,9 @@ deployment to branch protection: `staging-deploy.yml` runs on the `staging`
 branch, and if that branch loses its protection the deploy fails at the
 environment gate rather than deploying from an unprotected ref.
 
-Workflows in this repository reference **three** environments — `staging`,
-`production`, and `backup-restore-production`.
+Workflows in this repository reference **four** environments — `staging`,
+`production`, `backup-restore-production`, and `backup-production` (added
+2026-09-23; see "D1 Backup moved off the reviewer gate" below).
 
 Two were deleted on 2026-08-25. `staging-contract-tests` had never held a single
 secret or variable, so the nightly contract suite failed its preflight every
@@ -152,7 +157,7 @@ answer 200 — but nothing new ships to it.
 | Mechanism | First step of `production-deploy.yml` requires repository variable `PRODUCTION_DEPLOYS_ENABLED` to equal `true` |
 | Default | **Frozen.** The variable is absent, so the expression is empty and the gate fails closed |
 | To lift | Set `PRODUCTION_DEPLOYS_ENABLED` to `true`; to re-freeze, unset it or set any other value |
-| Not affected | The running production Workers, the production D1/R2/Queues, the nightly production backup, and the daily production drift check |
+| Not affected | The running production Workers, the production D1/R2/Queues, and the daily production drift check |
 
 The freeze is a variable rather than a code edit so that lifting and re-applying
 it are both single auditable settings changes, and neither requires a commit.
@@ -186,6 +191,43 @@ Until 2026-08-24 the nightly `d1-backup.yml` cron backed up **production only**
 on staging, that left the active environment with no recent restore point for
 `restore-drill.yml` to exercise. The nightly run now covers both, and the
 dispatch default is `staging`.
+
+By the next entry, the staging half of this had already been removed again —
+see the top-of-file comment in `d1-backup.yml`, which is now production-only.
+This document was not updated at the time; the live workflow file is
+authoritative for what the schedule currently backs up.
+
+## D1 Backup moved off the reviewer gate, 2026-09-23
+
+The "Production approval: automated gates, not a second reviewer" section
+above analyzed `required_reviewers` on `production` for a **manual dispatch**
+and concluded the gate degrades to a self-confirmation, not a real second
+reviewer, but is otherwise harmless. It did not consider a **schedule**
+trigger, which never has a change author to prompt at all — the run just
+enters `waiting` and sits there.
+
+One did. `d1-backup.yml`'s 2026-08-27 scheduled run went to `waiting` and was
+never approved or rejected. Its concurrency group (`d1-backup`,
+`cancel-in-progress: false`) does not cancel an in-progress run to start a new
+one, and a run stuck in `waiting` counts as in-progress — so every scheduled
+backup after it queued behind that one run and was eventually cancelled
+unrun. **27 consecutive nights produced no backup**, and the workflow run
+history showed a plausible-looking `cancelled` each time rather than anything
+that read as an outage.
+
+| | |
+|---|---|
+| Found | 2026-09-23, while preparing to lift the production deploy freeze and checking backup freshness as a precondition |
+| Fix | `d1-backup.yml`'s job now runs under a new `backup-production` environment instead of `production` |
+| `backup-production` | Same three values as `production` (`AGE_RECIPIENT`, `CLOUDFLARE_ACCOUNT_ID`, secret `ORDERAK_BACKUP_PRODUCTION`), `deployment_branch_policy: {protected_branches: true}`, **no** `required_reviewers` |
+| Unchanged | `production` keeps `required_reviewers` for the jobs that actually mutate it — `production-deploy.yml` and `restore-drill.yml` |
+| Residual risk | The credential this job now holds without a reviewer gate can write to the backups R2 bucket and read D1. It cannot deploy, and cannot read the AGE private key (see the encryption note at the top of `d1-backup.yml`) — the scope a compromise of this job's runner could reach is bounded to "write bad backups," not "reach production." |
+
+The general lesson generalizes past this one workflow: a `required_reviewers`
+gate is only a control for triggers that have someone to prompt.
+Anything on `schedule` (or `push`) sharing an environment with a
+reviewer-gated job needs its own environment, or it can fail exactly this way
+— quietly, and indistinguishably from a normal cancellation.
 
 ## Cloudflare configuration to verify live
 
