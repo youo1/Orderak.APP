@@ -53,17 +53,26 @@ class LocaleUiTest {
     @Test fun rtlPseudoLocale() = verifyLocale("ar-XB", LayoutDirection.Rtl)
 
     /**
-     * Arabic is the one shipped locale whose digits actually differ from
-     * Latin — CLDR gives `ar` (Egypt) Arabic-Indic digits and `ar-XB` is a
-     * pseudo-locale built from it. Asserted apart from [verifyLocale] because
+     * Arabic is the one shipped, real-user-selectable locale whose digits
+     * actually differ from Latin. Asserted apart from [verifyLocale] because
      * the interesting claim here is not "matches what the same API would
      * produce" (every locale would trivially pass that) but "differs from the
      * plain Latin string a raw `Int.toString()` would have rendered" — which
      * is exactly the regression this app has shipped before (see Counts.kt's
      * own history) and the one Layoutlib cannot catch.
+     *
+     * Deliberately not asserted for `ar-XB`. It looks like it should hold —
+     * `ar-XB` is built from `ar` — but a real device run of this exact
+     * assertion proved otherwise: `NumberFormat.getIntegerInstance` renders
+     * `ar-XB` in plain Latin digits with grouping ("1,234"), not Arabic-Indic.
+     * `ar-XB` is Android's synthetic pseudo-locale for RTL *layout* testing —
+     * text expansion and mirroring — and CLDR does not carry a distinct
+     * Arabic numbering system for it the way it does for `ar`/`ar-EG`. No
+     * real seller can select it, so this is a fact about the test locale, not
+     * a product gap; asserting it anyway is exactly how a CI-discovered
+     * finding becomes a permanent regression test.
      */
     @Test fun arabicDigitsAreShapedNotLatin() = verifyDigitsDifferFromLatin("ar")
-    @Test fun arabicPseudoLocaleDigitsAreShapedNotLatin() = verifyDigitsDifferFromLatin("ar-XB")
 
     private fun verifyLocale(tag: String, expectedDirection: LayoutDirection) {
         val locale = Locale.forLanguageTag(tag)
