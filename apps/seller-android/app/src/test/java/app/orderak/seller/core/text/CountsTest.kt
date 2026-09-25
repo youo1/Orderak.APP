@@ -50,6 +50,33 @@ class CountsTest {
     }
 
     /**
+     * This assertion is real and was already green before `arabicIndicLocale`
+     * existed — the JVM's own CLDR data resolves bare `ar` to Arabic-Indic on
+     * its own. It is exactly why this suite could not have caught the device
+     * defect: Android's ICU resolves the identical tag differently. See
+     * `LocaleUiTest.bareArabicTagRendersEasternArabicIndicDigits`, which
+     * pins the on-device behavior this file cannot observe.
+     */
+    @Test
+    fun `arabicIndicLocale forces the numbering system explicitly rather than trusting inference`() {
+        val forced = arabicIndicLocale(arabic)
+        assertEquals("arab", forced.getUnicodeLocaleType("nu"))
+    }
+
+    @Test
+    fun `arabicIndicLocale requests arab, not arabext`() {
+        // arabext is Persian/Urdu's extended Arabic-Indic digits (۰-۹);
+        // this app ships Egyptian/Gulf Arabic, which uses arab (٠-٩).
+        assertNotEquals("arabext", arabicIndicLocale(arabic).getUnicodeLocaleType("nu"))
+    }
+
+    @Test
+    fun `arabicIndicLocale leaves non-arabic locales untouched`() {
+        assertEquals(Locale.US, arabicIndicLocale(Locale.US))
+        assertEquals(Locale.FRANCE, arabicIndicLocale(Locale.FRANCE))
+    }
+
+    /**
      * The defect, stated as a test.
      *
      * A product card draws the price with `formatAmountLabel` and the stock with

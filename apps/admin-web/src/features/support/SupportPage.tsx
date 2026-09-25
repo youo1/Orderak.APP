@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { CanAccess, useList } from '@refinedev/core';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { ArrowLeft, MessageSquareReply, RefreshCw } from 'lucide-react';
 import { api, format } from '@/shared/api/client';
@@ -9,10 +10,18 @@ import { useAuth } from '@/features/auth/auth-context';
 
 type Row = Record<string, unknown>;
 
+// Phase 4 of the Refine install plan: only the list moves to `useList` —
+// TicketDetailPage stays plain React (a threaded conversation view plus an
+// assignment sidebar, not a generic show/edit form).
 export function SupportPage() {
   const navigate = useNavigate();
-  const query = useQuery({ queryKey: ['support'], queryFn: () => api<{ tickets: Row[] }>('/api/admin/v1/support/tickets') });
-  return <><PageHeader title="Support" description="A focused queue for assignment, priority and threaded seller replies." actions={<button className="button" onClick={() => query.refetch()}><RefreshCw size={16} /> Refresh</button>} />{query.isLoading && <LoadingState />}{query.error && <ErrorState error={query.error} retry={() => query.refetch()} />}{query.data && <DataTable rows={query.data.tickets} onSelect={row => navigate(`/support/${row.id}`)} preferred={['id', 'subject', 'store_name', 'status', 'priority', 'assigned_email', 'updated_at']} />}</>;
+  const { result, query } = useList<Row>({ resource: 'support', pagination: { mode: 'off' } });
+  return <CanAccess resource="support" action="list">
+    <PageHeader title="Support" description="A focused queue for assignment, priority and threaded seller replies." actions={<button className="button" onClick={() => query.refetch()}><RefreshCw size={16} /> Refresh</button>} />
+    {query.isLoading && <LoadingState />}
+    {query.error && <ErrorState error={query.error} retry={() => query.refetch()} />}
+    {!query.isLoading && !query.error && <DataTable rows={result.data} onSelect={row => navigate(`/support/${row.id}`)} preferred={['id', 'subject', 'store_name', 'status', 'priority', 'assigned_email', 'updated_at']} />}
+  </CanAccess>;
 }
 
 export function TicketDetailPage() {
