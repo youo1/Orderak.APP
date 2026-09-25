@@ -47,16 +47,32 @@ abstract class CatalogModule {
             LegacyProductSource { catalog.productsOnce() }
 
         /**
-         * Creating a product, which is all the reconciliation may do.
+         * Creating a product, which is almost all the reconciliation may do.
          *
          * Narrowed on purpose. [ProductWriteRepository] can also replace, delete
-         * and adjust stock, and none of those is something a one-time migration
-         * of rows the server has never seen should be able to reach.
+         * and adjust the stock of any product, and none of those is something a
+         * one-time migration of rows the server has never seen should be able to
+         * reach — except adjusting the stock of a product this same job just
+         * created, which [provideLegacyProductStockSeeding] below narrows to on
+         * its own.
          */
         @Provides
         @Singleton
         fun provideProductCreating(writes: ProductWriteRepository): ProductCreating =
             ProductCreating { draft, key -> writes.create(draft, key) }
+
+        /**
+         * Setting the stock of a product the reconciliation just created —
+         * nothing else. See [LegacyProductStockSeeding] for why this one
+         * exception exists: the create call above has no stock field to carry it
+         * in the first place.
+         */
+        @Provides
+        @Singleton
+        fun provideLegacyProductStockSeeding(writes: ProductWriteRepository): LegacyProductStockSeeding =
+            LegacyProductStockSeeding { productCode, stock, expectedStockVersion ->
+                writes.adjustStock(productCode, stock, expectedStockVersion)
+            }
 
         /**
          * Filling in a converted product's code on the orders that name it.
