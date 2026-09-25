@@ -1,5 +1,6 @@
 package app.orderak.seller.core.money
 
+import app.orderak.seller.core.text.arabicIndicLocale
 import java.text.NumberFormat
 import java.util.Locale
 import java.text.ParsePosition
@@ -126,7 +127,7 @@ fun majorUnitsText(money: Money): String {
  */
 fun formatMoney(money: Money, locale: Locale = Locale.getDefault()): String {
     val exponent = exponentOf(money.currency)
-    val nf = NumberFormat.getNumberInstance(locale)
+    val nf = NumberFormat.getNumberInstance(arabicIndicLocale(locale))
     nf.minimumFractionDigits = 0
     nf.maximumFractionDigits = exponent
     return nf.format(money.amountMinor / pow10(exponent))
@@ -161,7 +162,7 @@ fun formatAmount(
  * three places when it needs them.
  */
 fun formatMoneyLabel(money: Money, locale: Locale = Locale.getDefault()): String {
-    val nf = NumberFormat.getCurrencyInstance(locale)
+    val nf = NumberFormat.getCurrencyInstance(arabicIndicLocale(locale))
     nf.currency = JavaCurrency.getInstance(money.currency)
     nf.minimumFractionDigits = 0
     nf.maximumFractionDigits = exponentOf(money.currency)

@@ -58,9 +58,30 @@ import java.util.Locale
  *
  *   Pass the locale the screen is drawing with:
  *     val locale = LocalConfiguration.current.locales[0]
+ *
+ * THE BARE "ar" TAG
+ *   `AppLocales.set("ar")` — what the in-app language sheet actually applies —
+ *   carries no region and no `-u-nu-` extension. On the JVM, `NumberFormat`
+ *   resolves that tag's default numbering system to Arabic-Indic, which is
+ *   what every test in this file and in `MoneyLocaleTest` observes and why
+ *   they were trusted. On-device, Android's ICU resolves the same bare tag to
+ *   Latin digits instead — confirmed 2026-09-25 on a real emulator with the
+ *   picker's own override applied, screens rendering "1 / 20" instead of
+ *   "١ / ٢٠". No JVM test can see this: it is not the string being wrong, it
+ *   is the two runtimes disagreeing about what the tag means. [arabicIndicLocale]
+ *   closes that by requesting the numbering system explicitly instead of
+ *   leaving it to inference, so both runtimes are told the same thing rather
+ *   than asked to agree by coincidence.
  */
+fun arabicIndicLocale(locale: Locale): Locale =
+    if (locale.language == "ar") {
+        Locale.Builder().setLocale(locale).setUnicodeLocaleKeyword("nu", "arab").build()
+    } else {
+        locale
+    }
+
 fun formatCount(value: Int, locale: Locale): String =
-    NumberFormat.getIntegerInstance(locale).format(value.toLong())
+    NumberFormat.getIntegerInstance(arabicIndicLocale(locale)).format(value.toLong())
 
 /**
  * Left-to-right mark. Invisible, and strong enough to stop the bidi algorithm
