@@ -116,6 +116,112 @@ test('support agent opens a ticket and sends an audited CSRF-protected reply', a
   expect(csrf).toBe('csrf-e2e-token');
 });
 
+test('audit log renders through the Refine data provider, and only a 401 ends the session', async ({ page }) => {
+  let auditMode: 'ok' | 'forbidden' | 'unauthorized' = 'ok';
+  await routeDashboard(page);
+  await page.route('**/api/admin/v1/auth/me', route => json(route, session('owner', ['dashboard:view', 'audit:view'])));
+  await page.route('**/api/admin/v1/audit', route => {
+    if (auditMode === 'forbidden') return json(route, { code: 'forbidden', detail: 'Not permitted' }, 403);
+    if (auditMode === 'unauthorized') return json(route, { code: 'unauthorized' }, 401);
+    return json(route, { audit: [{ id: 1, admin_email: 'owner@orderak.app', action: 'theme.publish', entity: 'design_system_revisions', entity_id: '2', ip: '10.0.0.1', created_at: '2026-07-21 00:00:00' }] });
+  });
+
+  await page.goto('/system/audit');
+  await expect(page.getByRole('heading', { name: 'Audit log' })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'owner@orderak.app' })).toBeVisible();
+
+  // A 403 (RBAC-denied) must show an in-place error without ending the
+  // session — see the Refine install plan's non-goal against conflating a
+  // 401 with a 403.
+  auditMode = 'forbidden';
+  await page.getByRole('button', { name: 'Refresh' }).click();
+  await expect(page.getByRole('heading', { name: 'Could not load this section' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Dashboard', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Orderak Control Center' })).toHaveCount(0);
+
+  // A 401 (session invalid) must still end the session, exactly as it did
+  // before Refine was introduced.
+  auditMode = 'unauthorized';
+  await page.getByRole('button', { name: 'Refresh' }).click();
+  await expect(page.getByRole('heading', { name: 'Orderak Control Center' })).toBeVisible();
+});
+
+test('tasks: create, edit, and delete a record through the Refine data provider', async ({ page }) => {
+  let tasks: Array<Record<string, unknown>> = [];
+  let nextId = 1;
+  await routeDashboard(page);
+  await page.route('**/api/admin/v1/auth/me', route => json(route, session('owner', ['dashboard:view', 'tasks:view', 'tasks:manage'])));
+  await page.route('**/api/admin/v1/tasks', async route => {
+    if (route.request().method() === 'POST') {
+      const body = route.request().postDataJSON();
+      const id = nextId++;
+      tasks.push({ id, title: body.title, description: body.description ?? '', status: body.status ?? 'todo', priority: body.priority ?? 'medium', assigned_to: body.assigned_to ?? '', related_area: body.related_area ?? '' });
+      return json(route, { ok: true, id }, 201);
+    }
+    return json(route, { ok: true, tasks });
+  });
+  await page.route('**/api/admin/v1/tasks/*', async route => {
+    const id = Number(new URL(route.request().url()).pathname.split('/').pop());
+    if (route.request().method() === 'PUT') {
+      const body = route.request().postDataJSON();
+      tasks = tasks.map(task => task.id === id ? { ...task, ...body, id } : task);
+      return json(route, { ok: true });
+    }
+    if (route.request().method() === 'DELETE') {
+      tasks = tasks.filter(task => task.id !== id);
+      return json(route, { ok: true });
+    }
+    return json(route, { ok: true });
+  });
+
+  await page.goto('/internal/tasks');
+  await expect(page.getByRole('heading', { name: 'Tasks' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'New task' }).click();
+  await page.getByLabel('Title *').fill('Verify Refine write path');
+  await page.getByLabel('Assignee').fill('owner@orderak.app');
+  await page.getByRole('button', { name: 'Add task' }).click();
+  await expect(page.getByRole('cell', { name: 'Verify Refine write path' })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'owner@orderak.app' })).toBeVisible();
+
+  await page.getByRole('cell', { name: 'Verify Refine write path' }).click();
+  await expect(page.getByRole('heading', { name: 'Edit task' })).toBeVisible();
+  await page.getByLabel('Status').selectOption('done');
+  await page.getByRole('button', { name: 'Save changes' }).click();
+  await expect(page.getByRole('cell', { name: 'done' })).toBeVisible();
+
+  await page.getByRole('cell', { name: 'Verify Refine write path' }).click();
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: 'Delete' }).click();
+  await expect(page.getByRole('cell', { name: 'Verify Refine write path' })).toHaveCount(0);
+});
+
+test('translations: approving a row refetches the Refine-backed list, not a stale query key', async ({ page }) => {
+  let status = 'pending';
+  await routeDashboard(page);
+  await page.route('**/api/admin/v1/auth/me', route => json(route, session('owner', ['dashboard:view', 'translations:view', 'translations:manage'])));
+  await page.route('**/api/admin/v1/product-translations', route => json(route, { translations: [{ product_code: 'PRD-1', lang: 'ar', status, title: 'Sample product', updated_at: '2026-07-21 00:00:00' }] }));
+  await page.route('**/api/admin/v1/product-translations/PRD-1/ar', async route => {
+    const body = route.request().postDataJSON();
+    status = body.status;
+    return json(route, { ok: true });
+  });
+
+  await page.goto('/communication/translations');
+  await expect(page.getByRole('heading', { name: 'Translations' })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'pending' })).toBeVisible();
+
+  await page.getByRole('cell', { name: 'PRD-1' }).click();
+  await page.getByRole('button', { name: 'Approve current translation' }).click();
+  // This is the regression the Refine migration could have introduced:
+  // TranslationActions used to invalidate the old `['resource','translations']`
+  // TanStack Query key after mutating, which nothing subscribes to any more
+  // now that the list is fetched through Refine's own (differently-keyed)
+  // query — it must call the passed-down `refetch` instead, or this row
+  // would silently stay on "pending" forever after a successful approval.
+  await expect(page.getByRole('cell', { name: 'reviewed' })).toBeVisible();
+});
+
 test('theme manager previews and applies an immutable generated checkpoint', async ({ page }) => {
   const artifact = JSON.parse(readFileSync(resolve(process.cwd(), '..', 'design', 'design-system.default.json'), 'utf8'));
   const snapshot = artifact.snapshot;
