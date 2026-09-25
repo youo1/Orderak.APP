@@ -1,5 +1,6 @@
 package app.orderak.seller.feature.products
 
+import app.orderak.seller.core.share.shareStoreLink
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -47,6 +48,7 @@ fun ProductsScreen(
 ) {
     val spacing = LocalOrderakSpacing.current
     val products by viewModel.products.collectAsStateWithLifecycle()
+    val loadError by viewModel.loadError.collectAsStateWithLifecycle()
     // Survives rotation but not the surface switch, which is right: a search is
     // how the seller is reading the list right now, not a setting.
     var query by rememberSaveable { mutableStateOf("") }
@@ -203,6 +205,7 @@ fun ProductsScreen(
             products = products,
             quota = quota,
             stuckCount = stuck.size,
+            loadError = loadError,
         ),
         query = query,
         onQueryChange = { query = it },

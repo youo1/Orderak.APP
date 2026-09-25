@@ -2,12 +2,12 @@
 status: current
 generated: false
 owner: backend
-last_verified: 2026-08-21
+last_verified: 2026-09-23
 applies_to: [production, staging]
 ---
 # ADR-009: Store monetary values as integer minor units with an explicit currency
 
-**Status:** accepted; implemented in staging, production migration pending
+**Status:** accepted; implemented in staging and production
 
 **Date:** 2026-08-21 (proposed) / 2026-08-21 (accepted)
 
@@ -21,24 +21,28 @@ applies_to: [production, staging]
 
 Recorded 2026-08-21, measured against the live databases rather than the
 migration file. The register's completion rule requires evidence, and "the
-migration exists in the repository" is not evidence that it ran.
+migration exists in the repository" is not evidence that it ran. Updated
+2026-09-23 with the production measurement that closes this decision.
 
 | Check | Result |
 | --- | --- |
 | `044_money_minor_units_with_currency.sql` in `main` | Yes, merged in `6cc7410` |
 | Applied to `orderak-db-staging` | Yes — `2026-08-21 12:51:15` |
-| Applied to `orderak-db` (production) | **No** — production is at `043` |
+| Applied to `orderak-db` (production) | Yes — confirmed 2026-09-23, when the production freeze lifted and production deployed through migration `059` |
 | Staging `orders` columns | `total_minor`, `currency` |
-| Production `orders` columns | `total_piasters`, no `currency` |
+| Production `orders` columns | `total_minor`, `currency` |
 | Backend code | 76 `_minor` references; the 3 remaining `piasters` mentions are comments explaining the old name |
 
-Production deploys are `workflow_dispatch` only behind a required reviewer, so
-044 reaches production on the next deliberate deploy. Until then the two
-environments hold different schemas; that skew is tracked in
-[database topology](../data/database.md#staging-and-production-are-on-different-schemas-right-now).
+Production deploys were `workflow_dispatch` only, frozen from 2026-08-24 while
+the project was in testing. The freeze lifted 2026-09-23 and that deploy
+carried production through every pending migration, including 044. The
+historical skew this section used to track is closed; see
+[database topology](../data/database.md#staging-and-production-schemas-are-in-sync)
+for the current state and `docs/runbooks/production-freeze-lift.md` for the
+deploy that closed it.
 
-**This decision is accepted, not complete.** It closes when production runs
-migration 044 and this table is updated to say so.
+**This decision is complete.** Production ran migration 044 (and every
+migration through 059) on 2026-09-23.
 
 ## Context
 

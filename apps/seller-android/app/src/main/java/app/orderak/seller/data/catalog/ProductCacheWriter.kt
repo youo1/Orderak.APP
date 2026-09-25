@@ -61,13 +61,28 @@ class ProductCacheWriter @Inject constructor(
      * removed, because this is the server stating the complete set — which is
      * safe here for the reason it was never safe in the mirror: the server is
      * saying it, not a device.
+     *
+     * Refused, not applied, when the response is empty and this device already
+     * holds synced products (a `productCode` is what "synced" means here — a
+     * legacy row awaiting conversion is not what this guard is about, and
+     * [LegacyCatalogueReconciler] gates this method from ever running while one
+     * is outstanding anyway). "The seller genuinely has zero products" and "the
+     * response was empty or wrong for a store that is not empty" are the same
+     * payload, and deleting a whole catalogue on the second reading of it is
+     * exactly the failure mode the removed mirror shipped. Returns false so the
+     * caller treats the refresh as incomplete rather than as the catalogue
+     * having actually gone to zero.
      */
-    suspend fun replaceAll(remote: List<RemoteProductDto>) = db.withTransaction {
+    suspend fun replaceAll(remote: List<RemoteProductDto>): Boolean = db.withTransaction {
+        if (refusesEmptyProductReplacement(remote, db.productDao().allOnce())) {
+            return@withTransaction false
+        }
         val keep = remote.map { it.product_code }.toSet()
         db.productDao().allOnce()
             .filter { it.productCode == null || it.productCode !in keep }
             .forEach { db.productDao().delete(it.id) }
         remote.forEach { put(it) }
+        true
     }
 
     /** Forget one product, after the server has confirmed it is gone. */
@@ -113,7 +128,7 @@ class ProductCacheWriter @Inject constructor(
         currency = remote.price.currency,
         stock = remote.stock,
         discountType = remote.discount_type,
-        discountValue = remote.discount_value?.toDouble(),
+        discountValue = remote.discount_value,
         imagePath = this?.imagePath,
         imageUrl = remote.image_url,
         available = remote.available,
@@ -124,3 +139,16 @@ class ProductCacheWriter @Inject constructor(
         createdAt = this?.createdAt ?: System.currentTimeMillis(),
     )
 }
+
+/**
+ * DATA-001/DATA-002's guard, as a pure question: does an empty server response
+ * over an already-synced local catalogue look like "this store has nothing"
+ * or like "this response is empty or wrong"?
+ *
+ * Split out from [ProductCacheWriter.replaceAll] because that method needs a
+ * real Room database to exercise and this decision does not — the boundary
+ * itself (empty response, non-empty synced cache) is exactly where an
+ * off-by-one would hide, and it is real to test without one.
+ */
+internal fun refusesEmptyProductReplacement(remote: List<RemoteProductDto>, existing: List<ProductEntity>): Boolean =
+    remote.isEmpty() && existing.any { !it.productCode.isNullOrBlank() }

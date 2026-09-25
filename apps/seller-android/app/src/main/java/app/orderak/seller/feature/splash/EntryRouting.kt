@@ -6,6 +6,7 @@ import app.orderak.seller.data.remote.BackendApi
 import app.orderak.seller.data.session.AccountStage
 import app.orderak.seller.data.session.LocalSessionSnapshot
 import app.orderak.seller.data.session.OnboardingStage
+import app.orderak.seller.data.session.SessionLogoutManager
 import app.orderak.seller.data.session.SessionRouteMonitor
 import app.orderak.seller.data.session.SessionRouteSignal
 import app.orderak.seller.data.session.SessionRouteSignalType
@@ -91,11 +92,31 @@ internal object EntryDecisionPolicy {
         !isNullOrBlank() && !equals("active", ignoreCase = true)
 }
 
+/**
+ * Whether a rejected credential must clear this device's local session before
+ * routing to Auth.
+ *
+ * `decide()` only returns [EntryDecision.Auth] for a [RemoteAccountState.CredentialRejected]
+ * remote when it also holds [hasExistingSecret] true (see `decide()`'s first
+ * line — a blank/missing local secret already short-circuits to Auth before
+ * `remote` is ever computed by [EntryRouteResolver]). So an Auth decision
+ * reached alongside a rejected credential means the local session *looked*
+ * valid to this device right up to the point the server disagreed — exactly
+ * the case where stale Room/DataStore data must not survive into whichever
+ * account signs in next. A pre-registration credential rejection (still
+ * [EntryDecision.ShopSetup]) and a plain missing-secret Auth (no `remote` to
+ * speak of) both correctly evaluate to `false` here — there is nothing
+ * account-scoped to clear in either case.
+ */
+internal fun shouldClearLocalSession(decision: EntryDecision, remote: RemoteAccountState): Boolean =
+    decision is EntryDecision.Auth && remote is RemoteAccountState.CredentialRejected
+
 @Singleton
 class EntryRouteResolver @Inject constructor(
     private val sessionStore: SessionStore,
     private val backendApi: BackendApi,
     private val sessionRouteMonitor: SessionRouteMonitor,
+    private val sessionLogoutManager: SessionLogoutManager,
 ) {
     suspend fun resolve(trigger: EntryTrigger): EntryDecision {
         val startedAt = SystemClock.elapsedRealtime()
@@ -138,7 +159,7 @@ class EntryRouteResolver @Inject constructor(
                     RemoteAccountState.Restricted(status)
                 }
             }
-            return EntryDecisionPolicy.decide(local, hasExistingSecret = true, remote = signaledRemote)
+            return decideAndClearIfRejected(local, signaledRemote)
         }
 
         val response = try {
@@ -165,7 +186,34 @@ class EntryRouteResolver @Inject constructor(
             else -> RemoteAccountState.Unavailable
         }
 
-        return EntryDecisionPolicy.decide(local, hasExistingSecret = true, remote = remote)
+        return decideAndClearIfRejected(local, remote)
+    }
+
+    /**
+     * Auth contract v8, guarantee 10: every account state routes through the
+     * one protected logout sequence. `CREDENTIAL_REJECTED` used to be the one
+     * state that reached [EntryDecision.Auth] by navigation alone, leaving
+     * Room/DataStore/images/entitlements intact for whichever seller signs in
+     * next on this device. Clearing here, before the decision is returned,
+     * means it always runs before Auth can be reached — not after, and not
+     * only if the next sign-in remembers to.
+     */
+    private suspend fun decideAndClearIfRejected(local: LocalSessionSnapshot, remote: RemoteAccountState): EntryDecision {
+        val decision = EntryDecisionPolicy.decide(local, hasExistingSecret = true, remote = remote)
+        if (shouldClearLocalSession(decision, remote)) {
+            try {
+                sessionLogoutManager.logout()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (e: Exception) {
+                // Best-effort, like every other step of this sequence: a failed
+                // local clear must not trap the seller on a rejected credential
+                // with no way back to Auth. The next successful logout (explicit
+                // or another rejection) clears whatever this one could not.
+                Log.w(TAG, "Local session clear after a rejected credential failed.", e)
+            }
+        }
+        return decision
     }
 
     private suspend fun cacheStatus(status: String) {

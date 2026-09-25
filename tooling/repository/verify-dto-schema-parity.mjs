@@ -197,6 +197,78 @@ const PAIRS = [
 		pointer: ["components", "schemas", "Product"],
 		clientOnly: [],
 	},
+
+	// NET-1: these five operations carried only the generic bootstrap schema
+	// (GenericSuccess / additionalProperties:true) until this pass — the
+	// highest-risk gap the 2026-09-24 review found, since auth, registration,
+	// store, onboarding and billing-verify are exactly the surfaces where a
+	// silent server change would do the most damage.
+	{
+		dto: "RegisterReq",
+		pointer: ["components", "schemas", "RegisterRequest"],
+		clientOnly: [],
+	},
+	{
+		dto: "RegisterRes",
+		pointer: ["components", "schemas", "RegisterResult"],
+		clientOnly: ["code"],
+	},
+	{
+		dto: "StoreDto",
+		pointer: ["components", "schemas", "Store"],
+		clientOnly: [],
+	},
+	{
+		dto: "StoreUpdateReq",
+		pointer: ["components", "schemas", "StoreUpdate"],
+		clientOnly: [],
+	},
+	{
+		dto: "StoreRes",
+		pointer: ["components", "schemas", "StoreResult"],
+		clientOnly: ["code"],
+	},
+	{
+		dto: "PhoneCompleteReq",
+		pointer: ["components", "schemas", "PhoneComplete"],
+		clientOnly: [],
+	},
+	{
+		// Shared by /auth/phone/complete and /onboarding/complete — see
+		// AuthComplete's own description for why one Kotlin type covers both.
+		dto: "AuthCompleteRes",
+		pointer: ["components", "schemas", "AuthComplete"],
+		clientOnly: ["code"],
+	},
+	{
+		dto: "OnboardingAccountReq",
+		pointer: ["components", "schemas", "OnboardingAccount"],
+		clientOnly: [],
+	},
+	{
+		dto: "OnboardingAccountRes",
+		pointer: ["components", "schemas", "OnboardingAccountResult"],
+		clientOnly: ["code"],
+	},
+	{
+		dto: "OnboardingCompleteReq",
+		pointer: ["components", "schemas", "OnboardingComplete"],
+		clientOnly: [],
+	},
+	{
+		dto: "VerifyPlayPurchaseReq",
+		pointer: ["components", "schemas", "PlayPurchaseVerify"],
+		clientOnly: [],
+	},
+	{
+		// Points at the 200 (succeeded) shape. Android decodes the 202
+		// (pending) shape into the same Kotlin type, so pending/status/
+		// verification_id/retry_after_seconds are real wire fields — just on
+		// PlayPurchaseVerificationPending, a different schema — not absent.
+		dto: "VerifyPlayPurchaseRes",
+		pointer: ["components", "schemas", "PlayPurchaseVerification"],
+		clientOnly: ["code", "pending", "status", "verification_id", "retry_after_seconds"],
+	},
 ];
 
 const problems = [];
