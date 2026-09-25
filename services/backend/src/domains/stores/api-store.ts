@@ -34,7 +34,6 @@ import { auditDb } from "../admin/admin-auth";
 import { requireTenantWrite, resolveTenantContextForStore, tenantUnavailableResponse } from "../../platform/tenancy/tenant-routing";
 import {
 	newUuid,
-	newResourceCode,
 	uniqueStoreCode,
 	uniqueResourceCode,
 	slugify,
