@@ -124,6 +124,40 @@ class EntryDecisionPolicyTest {
         assertFalse((result as EntryDecision.Main).offline)
     }
 
+    // shouldClearLocalSession — SEC-1: a rejected credential must clear the
+    // local session before Auth is reached, so no stale account data survives
+    // into whichever seller signs in next on this device.
+
+    @Test
+    fun `registered credential rejection must clear the local session`() {
+        val result = decide(local(accountStage = AccountStage.REGISTERED), RemoteAccountState.CredentialRejected)
+        assertTrue(shouldClearLocalSession(result, RemoteAccountState.CredentialRejected))
+    }
+
+    @Test
+    fun `pre-registration credential rejection must not clear setup progress`() {
+        val remote = RemoteAccountState.CredentialRejected
+        val result = decide(
+            local(accountStage = AccountStage.PRE_REGISTRATION, onboardingStage = OnboardingStage.IN_PROGRESS, onboardingStep = 2),
+            remote,
+        )
+        assertFalse(shouldClearLocalSession(result, remote))
+    }
+
+    @Test
+    fun `missing local identity has nothing account-scoped to clear`() {
+        val remote = RemoteAccountState.Restricted("suspended")
+        val result = decide(local(phone = null), remote)
+        assertEquals(EntryDecision.Auth, result)
+        assertFalse(shouldClearLocalSession(result, remote))
+    }
+
+    @Test
+    fun `an active or restricted remote never triggers a clear`() {
+        assertFalse(shouldClearLocalSession(EntryDecision.Main(offline = false), RemoteAccountState.Active))
+        assertFalse(shouldClearLocalSession(EntryDecision.Restricted("banned"), RemoteAccountState.Restricted("banned")))
+    }
+
     private fun decide(
         local: LocalSessionSnapshot,
         remote: RemoteAccountState,

@@ -94,13 +94,35 @@ class LegacyCatalogueReconcilerTest {
         }
     }
 
+    /**
+     * A server that answers a stock push however the test says, and remembers
+     * every call — succeeds by default so the tests above this section, which
+     * do not care about stock, do not have to configure it.
+     */
+    private class Seeder(
+        private val answer: (call: Int) -> ProductWriteDecision = {
+            // A nested (non-inner) class cannot call the outer class's stored()
+            // directly, so this repeats its shape rather than sharing it — any
+            // non-Unreachable decision satisfies the default "just succeed".
+            ProductWriteDecision.Store(RemoteProductDto(app_id = 1, product_code = "p-SEEDED", name = "Cola", price = MoneyDto(0, "EGP")))
+        },
+    ) : LegacyProductStockSeeding {
+        val calls = mutableListOf<Triple<String, Int, Long>>()
+
+        override suspend fun seedStock(productCode: String, stock: Int, expectedStockVersion: Long): ProductWriteDecision {
+            calls += Triple(productCode, stock, expectedStockVersion)
+            return answer(calls.size)
+        }
+    }
+
     private fun reconciler(
         products: List<ProductEntity>,
         creator: Creator,
         records: Records = Records(),
         stamps: Stamps = Stamps(),
+        seeder: Seeder = Seeder(),
     ) = Triple(
-        LegacyCatalogueReconciler({ products }, creator, records, stamps),
+        LegacyCatalogueReconciler({ products }, creator, records, stamps, seeder),
         creator,
         records,
     )
@@ -292,6 +314,78 @@ class LegacyCatalogueReconcilerTest {
 
         assertTrue(job.reconcile())
         assertEquals(0, creator.calls)
+    }
+
+    // ---- 5. Stock survives the conversion --------------------------------
+    //
+    // DATA-001: `POST /api/v1/products` has no stock field, so a converted
+    // product used to land on the server with whatever it defaults a new
+    // product's stock to (effectively zero) while this device's real count
+    // — the only copy of it that ever existed — was deleted by the next
+    // catalogue refresh. Silently, with nothing for the seller to notice.
+
+    @Test
+    fun `a converted product's real stock is pushed to the server it was just created on`() = runTest {
+        val seeder = Seeder()
+        val (job, _, _) = reconciler(listOf(legacyProduct(1).copy(stock = 7)), Creator { stored("p-XYZ") }, seeder = seeder)
+
+        assertTrue(job.reconcile())
+
+        assertEquals("the code from the create response, the stock this device held", Triple("p-XYZ", 7, 0L), seeder.calls.single())
+    }
+
+    @Test
+    fun `a legacy product with no stock needs no stock call at all`() = runTest {
+        val seeder = Seeder()
+        val (job, _, records) = reconciler(listOf(legacyProduct(1).copy(stock = 0)), Creator { stored() }, seeder = seeder)
+
+        assertTrue(job.reconcile())
+
+        assertTrue("nothing to push, nothing pushed", seeder.calls.isEmpty())
+        assertEquals(LegacyReconcileState.CONVERTED, records.rows[1]?.state)
+    }
+
+    @Test
+    fun `an unreachable stock push retries the whole attempt under the same key`() = runTest {
+        // The create already succeeded and must not be repeated as a distinct
+        // product — it is repeated under the same idempotency key, which the
+        // server resolves back to the product it already made.
+        val seeder = Seeder { call -> if (call == 1) ProductWriteDecision.Unreachable else stored("p-XYZ") }
+        val creator = Creator { stored("p-XYZ") }
+        val (job, _, records) = reconciler(listOf(legacyProduct(1).copy(stock = 5)), creator, seeder = seeder)
+
+        assertFalse("an unpushed stock figure must hold the gate shut", job.reconcile())
+        assertEquals(LegacyReconcileState.UNSENT, records.rows[1]?.state)
+
+        assertTrue(job.reconcile())
+        assertEquals(LegacyReconcileState.CONVERTED, records.rows[1]?.state)
+        assertEquals("both attempts must carry the one key the product was created under", 1, creator.keys.toSet().size)
+        assertEquals(2, seeder.calls.size)
+    }
+
+    @Test
+    fun `a stale stock version after seeding still counts as converted`() = runTest {
+        // Stale here means some write already reached this product since the
+        // create response — an earlier push whose own response was lost, or a
+        // buyer's order. Either way a real server figure is already in place,
+        // and retrying with a newer version risks clobbering it.
+        val seeder = Seeder { ProductWriteDecision.StaleStock(serverStock = 4, serverStockVersion = 2) }
+        val (job, _, records) = reconciler(listOf(legacyProduct(1).copy(stock = 5)), Creator { stored() }, seeder = seeder)
+
+        assertTrue(job.reconcile())
+        assertEquals(LegacyReconcileState.CONVERTED, records.rows[1]?.state)
+    }
+
+    @Test
+    fun `a refused stock push still lets the product convert`() = runTest {
+        // The server has an opinion about the number, not about whether the
+        // product should exist. Losing the product over a rejected stock figure
+        // would be worse than the figure being wrong for the seller to notice.
+        val seeder = Seeder { ProductWriteDecision.Refused("stock_out_of_range") }
+        val (job, _, records) = reconciler(listOf(legacyProduct(1).copy(stock = 5)), Creator { stored() }, seeder = seeder)
+
+        assertTrue(job.reconcile())
+        assertEquals(LegacyReconcileState.CONVERTED, records.rows[1]?.state)
     }
 
     @Test

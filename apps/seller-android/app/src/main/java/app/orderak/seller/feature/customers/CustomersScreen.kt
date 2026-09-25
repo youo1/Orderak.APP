@@ -26,13 +26,22 @@ import app.orderak.seller.core.ui.PriorityListRow
 import app.orderak.seller.data.db.CustomerSummary
 import app.orderak.seller.data.orders.OrderRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
 @HiltViewModel
 class CustomersViewModel @Inject constructor(repo: OrderRepository) : ViewModel() {
+    /** True after [customers] falls back to empty because its Room `Flow` threw. */
+    private val _loadError = MutableStateFlow(false)
+    val loadError: StateFlow<Boolean> = _loadError.asStateFlow()
+
     /**
      * The customer list, or null while it is still being derived.
      *
@@ -41,7 +50,14 @@ class CustomersViewModel @Inject constructor(repo: OrderRepository) : ViewModel(
      * device, so it is the slowest of the three to arrive.
      */
     val customers: StateFlow<List<CustomerSummary>?> =
-        repo.customers.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+        repo.customers
+            .onEach { _loadError.value = false }
+            .catch { e ->
+                if (e is CancellationException) throw e
+                _loadError.value = true
+                emit(emptyList())
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 }
 
 /** S11 — phone-keyed customer list with LTV. */
@@ -52,10 +68,11 @@ fun CustomersScreen(
 ) {
     val spacing = LocalOrderakSpacing.current
     val customers by viewModel.customers.collectAsStateWithLifecycle()
+    val loadError by viewModel.loadError.collectAsStateWithLifecycle()
     var query by rememberSaveable { mutableStateOf("") }
 
     CustomersContent(
-        state = CustomersUiState(customers = customers),
+        state = CustomersUiState(customers = customers, loadError = loadError),
         query = query,
         onQueryChange = { query = it },
         onOpen = onOpen,

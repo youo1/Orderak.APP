@@ -4880,16 +4880,15 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": true
+                "$ref": "#/components/schemas/PhoneComplete"
               },
               "examples": {
                 "valid": {
-                  "value": {}
-                },
-                "validation_failure": {
                   "value": {
-                    "unexpected": "review-schema"
+                    "id_token": "firebase-id-token",
+                    "phone": "+201000000000",
+                    "device_secret": "device-secret-abc123",
+                    "phone_country_iso": "EG"
                   }
                 }
               }
@@ -4907,31 +4906,49 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "./components/common.json#/schemas/GenericSuccess"
+                  "$ref": "#/components/schemas/AuthComplete"
                 },
                 "examples": {
                   "success": {
                     "value": {
-                      "ok": true
-                    }
-                  },
-                  "empty": {
-                    "value": {
                       "ok": true,
-                      "items": [],
-                      "has_more": false
-                    }
-                  },
-                  "pagination": {
-                    "value": {
-                      "ok": true,
-                      "items": [
-                        {
-                          "id": "example"
-                        }
-                      ],
-                      "next_cursor": "opaque-cursor",
-                      "has_more": true
+                      "exists": true,
+                      "phone": "+201000000000",
+                      "store": {
+                        "store_name": "متجري",
+                        "slug": "my-shop",
+                        "country_code": "EG",
+                        "store_code": "S-000123",
+                        "public_identifier": "eg-my-shop-s000123",
+                        "store_url": "https://orderak.app/eg-my-shop-s000123",
+                        "description": "",
+                        "phone": "+201000000000",
+                        "whatsapp": "",
+                        "email": "",
+                        "website": "",
+                        "address": "",
+                        "instapay": "",
+                        "vfcash": "",
+                        "logo_url": "",
+                        "cover_url": "",
+                        "business_category": "",
+                        "business_category_id": null,
+                        "business_subcategory_id": null,
+                        "business_taxonomy_version": null,
+                        "city_geoname_id": null,
+                        "city_catalog_id": null,
+                        "city_catalog_version": null,
+                        "city_name": ""
+                      },
+                      "onboarding_token": null,
+                      "expires_at": null,
+                      "absolute_expires_at": null,
+                      "recent_auth_token": "recent-auth-token",
+                      "recent_auth_expires_at": "2026-09-25T12:05:00Z",
+                      "passkey_invite": false,
+                      "passkey_registration_available": true,
+                      "email_verification_pending": false,
+                      "idempotent": false
                     }
                   }
                 }
@@ -5578,16 +5595,12 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": true
+                "$ref": "#/components/schemas/PlayPurchaseVerify"
               },
               "examples": {
                 "valid": {
-                  "value": {}
-                },
-                "validation_failure": {
                   "value": {
-                    "unexpected": "review-schema"
+                    "purchase_token": "opaque-play-purchase-token"
                   }
                 }
               }
@@ -5605,31 +5618,212 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "./components/common.json#/schemas/GenericSuccess"
+                  "$ref": "#/components/schemas/PlayPurchaseVerification"
                 },
                 "examples": {
                   "success": {
                     "value": {
-                      "ok": true
-                    }
-                  },
-                  "empty": {
-                    "value": {
                       "ok": true,
-                      "items": [],
-                      "has_more": false
+                      "purchase_status": "active",
+                      "entitlements": {
+                        "ok": true,
+                        "schema_version": 1,
+                        "organization_id": null,
+                        "plan_id": "free",
+                        "plan_key": "free",
+                        "plan_name": "Free",
+                        "plan_revision_id": "legacy:free",
+                        "plan_version": 0,
+                        "subscription_status": "active",
+                        "current_period_end": null,
+                        "pending_revision_id": null,
+                        "pending_effective_at": null,
+                        "entitlements": {
+                          "max_products": {
+                            "key": "max_products",
+                            "category": "Plan limits",
+                            "name": "max_products",
+                            "description": "Legacy compatibility entitlement",
+                            "value_type": "integer",
+                            "unit": null,
+                            "reset_period": "none",
+                            "implementation_status": "implemented",
+                            "admin_configurable": true,
+                            "mode": "value",
+                            "value": 20,
+                            "display_value": "20",
+                            "available": true,
+                            "used": 3,
+                            "remaining": 17,
+                            "reset_at": null,
+                            "custom_required": false
+                          },
+                          "max_categories": {
+                            "key": "max_categories",
+                            "category": "Plan limits",
+                            "name": "max_categories",
+                            "description": "Legacy compatibility entitlement",
+                            "value_type": "integer",
+                            "unit": null,
+                            "reset_period": "none",
+                            "implementation_status": "implemented",
+                            "admin_configurable": true,
+                            "mode": "value",
+                            "value": 5,
+                            "display_value": "5",
+                            "available": true,
+                            "used": 1,
+                            "remaining": 4,
+                            "reset_at": null,
+                            "custom_required": false
+                          },
+                          "max_orders_per_month": {
+                            "key": "max_orders_per_month",
+                            "category": "Plan limits",
+                            "name": "max_orders_per_month",
+                            "description": "Legacy compatibility entitlement",
+                            "value_type": "integer",
+                            "unit": null,
+                            "reset_period": "calendar_month_utc",
+                            "implementation_status": "implemented",
+                            "admin_configurable": true,
+                            "mode": "value",
+                            "value": 50,
+                            "display_value": "50",
+                            "available": true,
+                            "used": 12,
+                            "remaining": 38,
+                            "reset_at": "2026-10-01T00:00:00.000Z",
+                            "custom_required": false
+                          },
+                          "max_ai_requests_per_month": {
+                            "key": "max_ai_requests_per_month",
+                            "category": "Plan limits",
+                            "name": "max_ai_requests_per_month",
+                            "description": "Legacy compatibility entitlement",
+                            "value_type": "integer",
+                            "unit": null,
+                            "reset_period": "calendar_month_utc",
+                            "implementation_status": "implemented",
+                            "admin_configurable": true,
+                            "mode": "value",
+                            "value": 20,
+                            "display_value": "20",
+                            "available": true,
+                            "used": null,
+                            "remaining": null,
+                            "reset_at": "2026-10-01T00:00:00.000Z",
+                            "custom_required": false
+                          },
+                          "max_concurrent_devices": {
+                            "key": "max_concurrent_devices",
+                            "category": "Plan limits",
+                            "name": "max_concurrent_devices",
+                            "description": "Legacy compatibility entitlement",
+                            "value_type": "integer",
+                            "unit": null,
+                            "reset_period": "none",
+                            "implementation_status": "implemented",
+                            "admin_configurable": true,
+                            "mode": "value",
+                            "value": 1,
+                            "display_value": "1",
+                            "available": true,
+                            "used": 1,
+                            "remaining": 0,
+                            "reset_at": null,
+                            "custom_required": false
+                          },
+                          "max_team_members": {
+                            "key": "max_team_members",
+                            "category": "Plan limits",
+                            "name": "max_team_members",
+                            "description": "Legacy compatibility entitlement",
+                            "value_type": "integer",
+                            "unit": null,
+                            "reset_period": "none",
+                            "implementation_status": "planned",
+                            "admin_configurable": true,
+                            "mode": "value",
+                            "value": 1,
+                            "display_value": "1",
+                            "available": true,
+                            "used": null,
+                            "remaining": null,
+                            "reset_at": null,
+                            "custom_required": false
+                          },
+                          "orders_fulfilment.order_history": {
+                            "key": "orders_fulfilment.order_history",
+                            "category": "Orders & fulfilment",
+                            "name": "Order history",
+                            "description": null,
+                            "value_type": "boolean",
+                            "unit": null,
+                            "reset_period": "none",
+                            "implementation_status": "implemented",
+                            "admin_configurable": false,
+                            "mode": "value",
+                            "value": true,
+                            "display_value": "Included",
+                            "available": true,
+                            "used": null,
+                            "remaining": null,
+                            "reset_at": null,
+                            "custom_required": false
+                          },
+                          "team_security.multiple_owner_devices": {
+                            "key": "team_security.multiple_owner_devices",
+                            "category": "Team & security",
+                            "name": "Multiple owner devices",
+                            "description": null,
+                            "value_type": "boolean",
+                            "unit": null,
+                            "reset_period": "none",
+                            "implementation_status": "implemented",
+                            "admin_configurable": false,
+                            "mode": "disabled",
+                            "value": false,
+                            "display_value": "—",
+                            "available": false,
+                            "used": null,
+                            "remaining": null,
+                            "reset_at": null,
+                            "custom_required": false
+                          }
+                        },
+                        "server_time": "2026-09-05T09:00:00.000Z",
+                        "etag": "\"3f1c8a2be4d95077\""
+                      }
                     }
-                  },
-                  "pagination": {
+                  }
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Verification could not complete synchronously and was queued for retry.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              },
+              "Retry-After": {
+                "$ref": "./components/common.json#/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayPurchaseVerificationPending"
+                },
+                "examples": {
+                  "pending": {
                     "value": {
-                      "ok": true,
-                      "items": [
-                        {
-                          "id": "example"
-                        }
-                      ],
-                      "next_cursor": "opaque-cursor",
-                      "has_more": true
+                      "ok": false,
+                      "pending": true,
+                      "status": "verification_pending",
+                      "verification_id": "018f-job-example",
+                      "retry_after_seconds": 15
                     }
                   }
                 }
@@ -5712,6 +5906,33 @@
                       "title": "Forbidden",
                       "status": 403,
                       "code": "forbidden",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The purchase token was considered and refused — not retryable by asking again unchanged.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/play_verification_failed",
+                      "title": "Play Verification Failed",
+                      "status": 409,
+                      "code": "play_verification_failed",
                       "detail": "The request could not be completed.",
                       "request_id": "018f-example"
                     }
@@ -11059,16 +11280,16 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": true
+                "$ref": "#/components/schemas/OnboardingAccount"
               },
               "examples": {
                 "valid": {
-                  "value": {}
-                },
-                "validation_failure": {
                   "value": {
-                    "unexpected": "review-schema"
+                    "full_name": "Mariam Ali",
+                    "birth_year": 1995,
+                    "email": null,
+                    "terms_accepted": true,
+                    "app_version": "1.2.0"
                   }
                 }
               }
@@ -11086,31 +11307,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "./components/common.json#/schemas/GenericSuccess"
+                  "$ref": "#/components/schemas/OnboardingAccountResult"
                 },
                 "examples": {
                   "success": {
                     "value": {
-                      "ok": true
-                    }
-                  },
-                  "empty": {
-                    "value": {
                       "ok": true,
-                      "items": [],
-                      "has_more": false
-                    }
-                  },
-                  "pagination": {
-                    "value": {
-                      "ok": true,
-                      "items": [
-                        {
-                          "id": "example"
-                        }
-                      ],
-                      "next_cursor": "opaque-cursor",
-                      "has_more": true
+                      "step": 2,
+                      "completed": false
                     }
                   }
                 }
@@ -11302,16 +11506,21 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": true
+                "$ref": "#/components/schemas/OnboardingComplete"
               },
               "examples": {
                 "valid": {
-                  "value": {}
-                },
-                "validation_failure": {
                   "value": {
-                    "unexpected": "review-schema"
+                    "device_secret": "device-secret-abc123",
+                    "store_name": "متجري",
+                    "slug": "my-shop",
+                    "business_category": "grocery",
+                    "business_category_id": "cat-groceries",
+                    "business_subcategory_id": null,
+                    "country_iso": "EG",
+                    "city_geoname_id": null,
+                    "city_catalog_id": 41505,
+                    "city_name": "Cairo"
                   }
                 }
               }
@@ -11329,31 +11538,49 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "./components/common.json#/schemas/GenericSuccess"
+                  "$ref": "#/components/schemas/AuthComplete"
                 },
                 "examples": {
                   "success": {
                     "value": {
-                      "ok": true
-                    }
-                  },
-                  "empty": {
-                    "value": {
                       "ok": true,
-                      "items": [],
-                      "has_more": false
-                    }
-                  },
-                  "pagination": {
-                    "value": {
-                      "ok": true,
-                      "items": [
-                        {
-                          "id": "example"
-                        }
-                      ],
-                      "next_cursor": "opaque-cursor",
-                      "has_more": true
+                      "exists": true,
+                      "phone": null,
+                      "store": {
+                        "store_name": "متجري",
+                        "slug": "my-shop",
+                        "country_code": "EG",
+                        "store_code": "S-000123",
+                        "public_identifier": "eg-my-shop-s000123",
+                        "store_url": "https://orderak.app/eg-my-shop-s000123",
+                        "description": "",
+                        "phone": "+201000000000",
+                        "whatsapp": "",
+                        "email": "",
+                        "website": "",
+                        "address": "",
+                        "instapay": "",
+                        "vfcash": "",
+                        "logo_url": "",
+                        "cover_url": "",
+                        "business_category": "",
+                        "business_category_id": null,
+                        "business_subcategory_id": null,
+                        "business_taxonomy_version": null,
+                        "city_geoname_id": null,
+                        "city_catalog_id": null,
+                        "city_catalog_version": null,
+                        "city_name": ""
+                      },
+                      "onboarding_token": null,
+                      "expires_at": null,
+                      "absolute_expires_at": null,
+                      "recent_auth_token": "recent-auth-token",
+                      "recent_auth_expires_at": "2026-09-25T12:05:00Z",
+                      "passkey_invite": false,
+                      "passkey_registration_available": true,
+                      "email_verification_pending": false,
+                      "idempotent": false
                     }
                   }
                 }
@@ -13731,16 +13958,19 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": true
+                "$ref": "#/components/schemas/RegisterRequest"
               },
               "examples": {
                 "valid": {
-                  "value": {}
-                },
-                "validation_failure": {
                   "value": {
-                    "unexpected": "review-schema"
+                    "phone": "+201000000000",
+                    "secret": "device-secret-abc123",
+                    "shop_name": "متجري",
+                    "instapay": null,
+                    "vfcash": null,
+                    "slug": null,
+                    "country_iso": "EG",
+                    "id_token": null
                   }
                 }
               }
@@ -13758,31 +13988,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "./components/common.json#/schemas/GenericSuccess"
+                  "$ref": "#/components/schemas/RegisterResult"
                 },
                 "examples": {
                   "success": {
                     "value": {
-                      "ok": true
-                    }
-                  },
-                  "empty": {
-                    "value": {
                       "ok": true,
-                      "items": [],
-                      "has_more": false
-                    }
-                  },
-                  "pagination": {
-                    "value": {
-                      "ok": true,
-                      "items": [
-                        {
-                          "id": "example"
-                        }
-                      ],
-                      "next_cursor": "opaque-cursor",
-                      "has_more": true
+                      "slug": "my-shop",
+                      "store_code": "S-000123",
+                      "country_code": "EG",
+                      "public_identifier": "eg-my-shop-s000123",
+                      "store_url": "https://orderak.app/eg-my-shop-s000123"
                     }
                   }
                 }
@@ -14192,31 +14408,38 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "./components/common.json#/schemas/GenericSuccess"
+                  "$ref": "#/components/schemas/StoreResult"
                 },
                 "examples": {
                   "success": {
                     "value": {
-                      "ok": true
-                    }
-                  },
-                  "empty": {
-                    "value": {
                       "ok": true,
-                      "items": [],
-                      "has_more": false
-                    }
-                  },
-                  "pagination": {
-                    "value": {
-                      "ok": true,
-                      "items": [
-                        {
-                          "id": "example"
-                        }
-                      ],
-                      "next_cursor": "opaque-cursor",
-                      "has_more": true
+                      "store": {
+                        "store_name": "متجري",
+                        "slug": "my-shop",
+                        "country_code": "EG",
+                        "store_code": "S-000123",
+                        "public_identifier": "eg-my-shop-s000123",
+                        "store_url": "https://orderak.app/eg-my-shop-s000123",
+                        "description": "",
+                        "phone": "+201000000000",
+                        "whatsapp": "",
+                        "email": "",
+                        "website": "",
+                        "address": "",
+                        "instapay": "",
+                        "vfcash": "",
+                        "logo_url": "",
+                        "cover_url": "",
+                        "business_category": "",
+                        "business_category_id": null,
+                        "business_subcategory_id": null,
+                        "business_taxonomy_version": null,
+                        "city_geoname_id": null,
+                        "city_catalog_id": null,
+                        "city_catalog_version": null,
+                        "city_name": ""
+                      }
                     }
                   }
                 }
@@ -14403,16 +14626,13 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": true
+                "$ref": "#/components/schemas/StoreUpdate"
               },
               "examples": {
                 "valid": {
-                  "value": {}
-                },
-                "validation_failure": {
                   "value": {
-                    "unexpected": "review-schema"
+                    "whatsapp": "+201000000000",
+                    "description": "بيع أدوات منزلية"
                   }
                 }
               }
@@ -14430,31 +14650,38 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "./components/common.json#/schemas/GenericSuccess"
+                  "$ref": "#/components/schemas/StoreResult"
                 },
                 "examples": {
                   "success": {
                     "value": {
-                      "ok": true
-                    }
-                  },
-                  "empty": {
-                    "value": {
                       "ok": true,
-                      "items": [],
-                      "has_more": false
-                    }
-                  },
-                  "pagination": {
-                    "value": {
-                      "ok": true,
-                      "items": [
-                        {
-                          "id": "example"
-                        }
-                      ],
-                      "next_cursor": "opaque-cursor",
-                      "has_more": true
+                      "store": {
+                        "store_name": "متجري",
+                        "slug": "my-shop",
+                        "country_code": "EG",
+                        "store_code": "S-000123",
+                        "public_identifier": "eg-my-shop-s000123",
+                        "store_url": "https://orderak.app/eg-my-shop-s000123",
+                        "description": "",
+                        "phone": "+201000000000",
+                        "whatsapp": "",
+                        "email": "",
+                        "website": "",
+                        "address": "",
+                        "instapay": "",
+                        "vfcash": "",
+                        "logo_url": "",
+                        "cover_url": "",
+                        "business_category": "",
+                        "business_category_id": null,
+                        "business_subcategory_id": null,
+                        "business_taxonomy_version": null,
+                        "city_geoname_id": null,
+                        "city_catalog_id": null,
+                        "city_catalog_version": null,
+                        "city_name": ""
+                      }
                     }
                   }
                 }
@@ -19119,6 +19346,578 @@
         "required": [
           "ok"
         ]
+      },
+      "Store": {
+        "type": "object",
+        "description": "A seller's full store profile: the read-only identity block plus every editable field. fullStore() always includes every key below in its response; the string fields default to \"\" rather than being omitted, so every property here is required even though several may be empty or null.",
+        "required": [
+          "store_name",
+          "slug",
+          "country_code",
+          "store_code",
+          "public_identifier",
+          "store_url",
+          "description",
+          "phone",
+          "whatsapp",
+          "email",
+          "website",
+          "address",
+          "instapay",
+          "vfcash",
+          "logo_url",
+          "cover_url",
+          "business_category",
+          "business_category_id",
+          "business_subcategory_id",
+          "business_taxonomy_version",
+          "city_geoname_id",
+          "city_catalog_id",
+          "city_catalog_version",
+          "city_name"
+        ],
+        "properties": {
+          "store_name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "country_code": {
+            "type": "string"
+          },
+          "store_code": {
+            "type": "string",
+            "description": "Permanent once assigned; never reissued."
+          },
+          "public_identifier": {
+            "type": "string"
+          },
+          "store_url": {
+            "type": "string",
+            "description": "The canonical public storefront URL, computed server-side."
+          },
+          "description": {
+            "type": "string",
+            "description": "Empty string, never absent, when not set."
+          },
+          "phone": {
+            "type": "string"
+          },
+          "whatsapp": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "website": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "instapay": {
+            "type": "string"
+          },
+          "vfcash": {
+            "type": "string"
+          },
+          "logo_url": {
+            "type": "string"
+          },
+          "cover_url": {
+            "type": "string"
+          },
+          "business_category": {
+            "type": "string",
+            "description": "Legacy free-text category key; empty string when unset."
+          },
+          "business_category_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "business_subcategory_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "business_taxonomy_version": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "city_geoname_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "city_catalog_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "city_catalog_version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "city_name": {
+            "type": "string"
+          }
+        }
+      },
+      "StoreUpdate": {
+        "type": "object",
+        "description": "PUT /api/v1/store's body. Every field is optional: a field the caller omits keeps its current value (see handleStoreUpdate's `pick()`), it is not cleared. store_code, public_identifier, store_url and country_code are not here because they are not editable through this route.",
+        "additionalProperties": false,
+        "properties": {
+          "store_name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string",
+            "description": "A manual slug wins over one derived from store_name; must be free or the request is refused with 409."
+          },
+          "description": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "whatsapp": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "website": {
+            "type": "string",
+            "description": "http(s) only; a bare domain is prefixed with https:// server-side."
+          },
+          "address": {
+            "type": "string"
+          },
+          "instapay": {
+            "type": "string"
+          },
+          "vfcash": {
+            "type": "string"
+          },
+          "logo_url": {
+            "type": "string"
+          },
+          "cover_url": {
+            "type": "string"
+          },
+          "business_category_id": {
+            "type": "string"
+          },
+          "business_subcategory_id": {
+            "type": "string"
+          }
+        }
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "required": [
+          "phone",
+          "secret",
+          "shop_name"
+        ],
+        "description": "Claims a phone as a store's identity (new store) or re-establishes an existing one under the same phone. id_token is required to create a NEW store — verified Firebase OTP proof — and ignored when the phone already has a store.",
+        "properties": {
+          "phone": {
+            "type": "string"
+          },
+          "secret": {
+            "type": "string",
+            "description": "The device credential this session will authenticate with from here on."
+          },
+          "shop_name": {
+            "type": "string"
+          },
+          "instapay": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "vfcash": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "slug": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "country_iso": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id_token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Verified Firebase ID token; required to create a new store, ignored for an existing one."
+          }
+        }
+      },
+      "RegisterResult": {
+        "type": "object",
+        "description": "Identical shape whether this created a new store or re-established an existing one — the identity block, nothing more.",
+        "required": [
+          "ok",
+          "slug",
+          "store_code",
+          "country_code",
+          "public_identifier",
+          "store_url"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "slug": {
+            "type": "string"
+          },
+          "store_code": {
+            "type": "string"
+          },
+          "country_code": {
+            "type": "string"
+          },
+          "public_identifier": {
+            "type": "string"
+          },
+          "store_url": {
+            "type": "string"
+          }
+        }
+      },
+      "StoreResult": {
+        "type": "object",
+        "description": "The envelope GET and PUT /api/v1/store both answer with.",
+        "required": [
+          "ok",
+          "store"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "store": {
+            "$ref": "#/components/schemas/Store"
+          }
+        }
+      },
+      "PhoneComplete": {
+        "type": "object",
+        "required": [
+          "id_token",
+          "phone",
+          "device_secret"
+        ],
+        "description": "Completes phone verification and either signs in an existing seller or opens an onboarding session for a new one.",
+        "properties": {
+          "id_token": {
+            "type": "string",
+            "description": "Verified Firebase ID token for the phone just confirmed by OTP."
+          },
+          "phone": {
+            "type": "string"
+          },
+          "device_secret": {
+            "type": "string",
+            "description": "The device credential this session will authenticate with going forward."
+          },
+          "phone_country_iso": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AuthComplete": {
+        "type": "object",
+        "description": "Shared by POST /api/v1/auth/phone/complete and POST /api/v1/onboarding/complete (the Android client decodes both into one type). `exists` discriminates the two shapes: true means a seller session was established (store present, recent_auth_token present); false means a new onboarding session opened instead (onboarding_token/expires_at present, store absent). `idempotent` appears only when a completed onboarding session's request is safely replayed.",
+        "required": [
+          "ok",
+          "exists"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "exists": {
+            "type": "boolean"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Present when exists=true and this came from /auth/phone/complete; the onboarding/complete success shape does not carry it."
+          },
+          "store": {
+            "$ref": "#/components/schemas/Store"
+          },
+          "onboarding_token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Present only when exists=false — a new onboarding session's bearer token."
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "absolute_expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "recent_auth_token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Present when exists=true — a short-lived step-up token for sensitive actions."
+          },
+          "recent_auth_expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "passkey_invite": {
+            "type": "boolean",
+            "description": "True on a fresh onboarding session when passkeys are enabled."
+          },
+          "passkey_registration_available": {
+            "type": "boolean",
+            "description": "True on an established session when passkeys are enabled."
+          },
+          "email_verification_pending": {
+            "type": "boolean"
+          },
+          "idempotent": {
+            "type": "boolean",
+            "description": "True when this reply replayed an already-completed onboarding session rather than completing a new one."
+          }
+        }
+      },
+      "OnboardingAccount": {
+        "type": "object",
+        "required": [
+          "full_name",
+          "birth_year",
+          "terms_accepted",
+          "app_version"
+        ],
+        "description": "Step 1 of onboarding: the account details, recorded against the session opened by /auth/phone/complete.",
+        "properties": {
+          "full_name": {
+            "type": "string"
+          },
+          "birth_year": {
+            "type": "integer"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "terms_accepted": {
+            "type": "boolean",
+            "description": "Must be true — the request is refused otherwise."
+          },
+          "app_version": {
+            "type": "string"
+          }
+        }
+      },
+      "OnboardingAccountResult": {
+        "type": "object",
+        "required": [
+          "ok"
+        ],
+        "description": "step=2 on a fresh save. A session already past this step (status=completed) instead answers completed=true with no step.",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "step": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "completed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "OnboardingComplete": {
+        "type": "object",
+        "required": [
+          "device_secret",
+          "store_name",
+          "slug",
+          "business_category",
+          "business_category_id",
+          "country_iso",
+          "city_name"
+        ],
+        "description": "Step 2 of onboarding: creates the store and the seller account from the session's saved details.",
+        "properties": {
+          "device_secret": {
+            "type": "string",
+            "description": "Must match the secret hash recorded when the onboarding session opened."
+          },
+          "store_name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "business_category": {
+            "type": "string"
+          },
+          "business_category_id": {
+            "type": "string"
+          },
+          "business_subcategory_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "country_iso": {
+            "type": "string"
+          },
+          "city_geoname_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "city_catalog_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "city_name": {
+            "type": "string"
+          }
+        }
+      },
+      "PlayPurchaseVerify": {
+        "type": "object",
+        "required": [
+          "purchase_token"
+        ],
+        "properties": {
+          "purchase_token": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        }
+      },
+      "PlayPurchaseVerification": {
+        "type": "object",
+        "description": "The 200 (succeeded) shape. A still-processing verification answers 202 instead (verification_id + retry_after_seconds, no entitlements yet); a refused one answers 409. Both are real response codes this operation returns but the generic bootstrap 200/400/401/403/429/503 set has not modelled until now — see this operation's 202/409 responses below.",
+        "required": [
+          "ok",
+          "purchase_status",
+          "entitlements"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "purchase_status": {
+            "type": "string",
+            "description": "The Play purchase's state at the moment this verification applied it, e.g. \"active\"."
+          },
+          "entitlements": {
+            "$ref": "#/components/schemas/EntitlementSnapshot"
+          }
+        }
+      },
+      "PlayPurchaseVerificationPending": {
+        "type": "object",
+        "required": [
+          "ok",
+          "pending",
+          "status",
+          "verification_id",
+          "retry_after_seconds"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "pending": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "verification_pending"
+            ]
+          },
+          "verification_id": {
+            "type": "string"
+          },
+          "retry_after_seconds": {
+            "type": "integer"
+          }
+        }
       }
     },
     "securitySchemes": {

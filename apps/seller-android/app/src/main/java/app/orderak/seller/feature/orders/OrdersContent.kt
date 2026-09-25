@@ -24,6 +24,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.orderak.seller.R
 import app.orderak.seller.core.ui.FullScreenEmpty
+import app.orderak.seller.core.ui.FullScreenError
 import app.orderak.seller.core.ui.FullScreenLoading
 import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 import app.orderak.seller.data.db.OrderEntity
@@ -46,6 +47,8 @@ data class OrdersUiState(
     val filter: OrdersFilter = OrdersFilter.All,
     /** Orders the server refused, so the list can separate them from the ones still on their way. */
     val refusedPushes: Set<Long> = emptySet(),
+    /** True when the local Room read itself failed, not merely "not read yet". */
+    val loadError: Boolean = false,
 )
 
 @Composable
@@ -61,7 +64,13 @@ fun OrdersContent(
     val filter = state.filter
 
     Box(modifier.fillMaxSize()) {
-        if (list == null) {
+        if (state.loadError) {
+            // The one case list==null cannot distinguish on its own: a Room read
+            // that actually threw, rather than one still in flight. Falls back to
+            // an empty list upstream so this does not fight the loading check
+            // below for the same null.
+            FullScreenError(message = stringResource(R.string.error_unknown))
+        } else if (list == null) {
             // The state this screen declared and never had. An empty list stood
             // in for "not read yet", so the empty state — whose action is
             // "record an order" — greeted a seller who already had some.

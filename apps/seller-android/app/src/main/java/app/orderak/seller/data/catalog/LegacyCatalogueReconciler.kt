@@ -1,6 +1,7 @@
 package app.orderak.seller.data.catalog
 
 import app.orderak.seller.data.db.ProductEntity
+import app.orderak.seller.data.remote.RemoteProductDto
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -75,6 +76,7 @@ class LegacyCatalogueReconciler @Inject constructor(
     private val writes: ProductCreating,
     private val store: LegacyReconcileRecords,
     private val orderLines: OrderLineStamping,
+    private val stockSeeding: LegacyProductStockSeeding,
 ) {
 
     /**
@@ -174,7 +176,16 @@ class LegacyCatalogueReconciler @Inject constructor(
                 // lines point at — so a line left unstamped here can never be
                 // resolved again.
                 orderLines.stamp(product.id, decision.product.product_code)
-                LegacyAttempt.CONVERTED
+                // Same urgency as the order-line stamp above, and for the same
+                // reason: the create response is the only moment this device
+                // knows both the new product_code and the stock it needs to
+                // carry across. Miss it here and the next catalogue refresh
+                // deletes the local row this device's real count lived on.
+                if (seedStock(product.stock, decision.product)) {
+                    LegacyAttempt.CONVERTED
+                } else {
+                    LegacyAttempt.RETRY
+                }
             }
             // The server's opinion is unknown, so nothing has been ruled out.
             is ProductWriteDecision.Unreachable -> LegacyAttempt.RETRY
@@ -182,6 +193,47 @@ class LegacyCatalogueReconciler @Inject constructor(
             is ProductWriteDecision.StaleStock -> LegacyAttempt.RETRY
             is ProductWriteDecision.Deleted -> LegacyAttempt.RETRY
             is ProductWriteDecision.Refused -> LegacyAttempt.TERMINAL
+        }
+    }
+
+    /**
+     * Push this device's real stock onto a product the create call above just
+     * made, and report whether the server now holds a real figure — which is
+     * not the same question as whether this specific push succeeded.
+     *
+     * Nothing to push is success: the server already defaults a fresh product's
+     * stock to zero, so a legacy row with none needs no call, and treating zero
+     * as "done" is what keeps a re-attempt after some other step's failure from
+     * re-sending a push that already landed.
+     *
+     * A version mismatch ([ProductWriteDecision.StaleStock]) also counts as
+     * done, never as a reason to retry — the create response's version is only
+     * ever stale here because *some* write already reached this product since
+     * it was made: an earlier attempt's push whose response this device never
+     * saw, or a buyer's order. Either way a real, server-authoritative number is
+     * now in place, which is what this exists to guarantee. Retrying it with a
+     * newer version would risk clobbering exactly that write — the same reason
+     * [ProductWriteRepository.adjustStock] never retries a stale write itself.
+     *
+     * A refusal is likewise not retried: the server has considered the number
+     * this device holds and rejected it (a validation rule this call cannot
+     * satisfy by asking again), which is a reason to let the seller notice a
+     * wrong-looking stock figure post-conversion, not a reason to leave the
+     * product itself unconverted forever.
+     *
+     * Only [ProductWriteDecision.Unreachable] is a real retry: the server's
+     * opinion of this specific push is unknown, and the create call it follows
+     * is safe to repeat under the same idempotency key regardless.
+     */
+    private suspend fun seedStock(localStock: Int, created: RemoteProductDto): Boolean {
+        if (localStock <= 0) return true
+        return when (stockSeeding.seedStock(created.product_code, localStock, created.stock_version)) {
+            is ProductWriteDecision.Unreachable -> false
+            is ProductWriteDecision.Store,
+            is ProductWriteDecision.StaleStock,
+            is ProductWriteDecision.Refused,
+            is ProductWriteDecision.Deleted,
+            -> true
         }
     }
 

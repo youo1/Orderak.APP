@@ -123,9 +123,9 @@ the `_minor` suffix — `price_minor`, `total_minor`, `amount_minor`,
 An amount is meaningless without its currency, because the number of minor
 units per major unit differs: EGP and SAR use 100, KWD and BHD use 1000, JPY
 uses 1. Migration `044_money_minor_units_with_currency.sql` renamed the
-former `_piasters` columns and added `currency`; it is applied in staging but
-**not yet in production** — see
-[schema skew](../data/database.md#staging-and-production-are-on-different-schemas-right-now). See
+former `_piasters` columns and added `currency`; it is applied in both
+staging and production as of 2026-09-23 — see
+[database topology](../data/database.md#staging-and-production-schemas-are-in-sync). See
 [ADR-009](../decisions/adr-009-minor-units-with-explicit-currency.md), which
 supersedes ADR-002.
 

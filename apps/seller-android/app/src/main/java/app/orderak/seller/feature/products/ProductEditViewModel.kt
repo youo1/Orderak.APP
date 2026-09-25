@@ -73,7 +73,7 @@ data class ProductEditUiState(
         get() = (name.trim().length >= 2) &&
                 (parseMoney(priceText, currency) != null) &&
                 ((stockText.toIntOrNull() ?: -1) >= 0) &&
-                (discountValueText.isEmpty() || (discountValueText.toDoubleOrNull() ?: -1.0) >= 0)
+                (discountValueText.isEmpty() || (discountValueText.toLongOrNull() ?: -1L) >= 0)
 }
 
 /** Why a product write did not happen, in terms a screen can render. */
@@ -114,7 +114,7 @@ class ProductEditViewModel @Inject constructor(
                         priceText = majorUnitsText(Money(p.priceMinor, p.currency)),
                         stockText = p.stock.toString(),
                         discountType = p.discountType,
-                        discountValueText = p.discountValue?.let { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString() }.orEmpty(),
+                        discountValueText = p.discountValue?.toString().orEmpty(),
                         imagePath = p.imagePath, imageUrl = p.imageUrl, available = p.available,
                         categoryCode = p.categoryCode, loaded = true
                     )
@@ -183,8 +183,15 @@ class ProductEditViewModel @Inject constructor(
                 available = s.available,
                 imageUrl = s.imageUrl ?: existing?.imageUrl,
                 categoryCode = s.categoryCode,
-                discountType = existing?.discountType,
-                discountValue = existing?.discountValue?.toLong(),
+                // From the seller's own edit state, not `existing` — no screen
+                // currently renders a control bound to onDiscountType()/
+                // onDiscountValue(), so this is not observably different
+                // today, but reading the stale pre-edit value here was a
+                // second bug stacked on top of the missing UI: the day a
+                // discount editor is added to this screen, saving would have
+                // kept silently discarding it.
+                discountType = s.discountType,
+                discountValue = s.discountValueText.toLongOrNull(),
             )
 
             val code = existing?.productCode

@@ -79,9 +79,9 @@ support, country-scoped city data, global taxonomy, localized country names,
 and country-bearing public identifiers are already portable. Money became
 portable in migration `044_money_minor_units_with_currency.sql`, which renamed
 the `*_piasters` columns to `*_minor` and added an explicit `currency` to every
-table holding an amount. That migration is live in staging and **has not been
-applied to production yet** — see
-[schema skew](../data/database.md#staging-and-production-are-on-different-schemas-right-now).
+table holding an amount. That migration is live in both staging and
+production as of 2026-09-23 — see
+[database topology](../data/database.md#staging-and-production-schemas-are-in-sync).
 
 What remains Egypt-specific: public catalog rendering still assumes EGP, payout
 fields (InstaPay, Vodafone Cash) are Egyptian instruments, and there is no
