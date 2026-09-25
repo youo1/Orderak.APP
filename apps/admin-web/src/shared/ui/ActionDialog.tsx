@@ -4,7 +4,7 @@ import { X } from 'lucide-react';
 import { api } from '@/shared/api/client';
 import type { ActionConfig, Field } from '@/app/config/actions';
 
-export function ActionDialog({ config, resourceKey, close }: { config: ActionConfig; resourceKey: string; close: () => void }) {
+export function ActionDialog({ config, resourceKey, close, onSuccess }: { config: ActionConfig; resourceKey: string; close: () => void; onSuccess?: () => void }) {
   const client = useQueryClient();
   const initial = useMemo(() => Object.fromEntries(config.fields.map(field => [field.name, field.defaultValue ?? (field.type === 'checkbox' ? false : '')])), [config]);
   const [values, setValues] = useState<Record<string, unknown>>(initial);
@@ -21,7 +21,7 @@ export function ActionDialog({ config, resourceKey, close }: { config: ActionCon
       headers.set('x-admin-action-authorization', authorization.authorization_id);
     }
     return api(endpoint, { method: config.method || 'POST', headers, body: JSON.stringify(payload) });
-  }, onSuccess: () => { client.invalidateQueries({ queryKey: ['resource', resourceKey] }); close(); } });
+  }, onSuccess: () => { client.invalidateQueries({ queryKey: ['resource', resourceKey] }); onSuccess?.(); close(); } });
   const valid = config.fields.filter(field => field.required).every(field => String(values[field.name] ?? '').trim()) && (!sensitiveExport || (freshPassword.length >= 12 && /^\d{6}$/.test(totpCode)));
   return <div className="modal-backdrop" onMouseDown={event => { if (event.currentTarget === event.target) close(); }}><section className="modal" role="dialog" aria-modal="true"><header><div><p className="eyebrow">AUDITED ACTION</p><h2>{config.label}</h2><p>{config.description}</p></div><button className="icon-button" onClick={close} aria-label="Close"><X size={18} /></button></header><div className="form-grid">{config.fields.map(field => <FormField field={field} value={values[field.name]} set={value => setValues(current => ({ ...current, [field.name]: value }))} key={field.name} />)}{sensitiveExport && <><label className="field"><span>Owner password *</span><input type="password" autoComplete="current-password" value={freshPassword} onChange={event => setFreshPassword(event.target.value)} /></label><label className="field"><span>Fresh TOTP *</span><input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={totpCode} onChange={event => setTotpCode(event.target.value.replace(/\D/g, '').slice(0, 6))} /></label></>}</div>{mutation.error && <p className="error-text">{mutation.error.message}</p>}<footer><button className="button" onClick={close}>Cancel</button><button className="button primary" disabled={!valid || mutation.isPending} onClick={() => { if (!config.confirm || confirm(config.confirm)) mutation.mutate(); }}>{mutation.isPending ? 'Applying…' : config.label}</button></footer></section></div>;
 }
