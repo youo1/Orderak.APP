@@ -192,8 +192,61 @@ jobs:
           echo "All locales match base key set."
         shell: bash
 
-  # connectedStagingDebugAndroidTest — instrumented locale matrix (ar, en, fr, en-XA, ar-XB).
-  # Not currently run in CI — requires an Android emulator. This is a local-only gate
-  # documented in AGENTS.md. To enable: add an emulator job with
-  # reactivecircus/android-emulator-runner and run:
-  #   bash ./gradlew :app:connectedStagingDebugAndroidTest --stacktrace
+  # connectedStagingDebugAndroidTest — instrumented locale matrix (ar, en, fr,
+  # en-XA, ar-XB), plus the digit-formatting assertions LocaleUiTest carries
+  # (UI-05/UI-06: the one check in this repo that exercises real on-device
+  # Arabic-Indic digit shaping — Layoutlib's screenshot-test pipeline renders
+  # digits in Latin form regardless of locale, so it cannot catch a regression
+  # here the way this job now can).
+  #
+  # Added 2026-09-25, not yet proven by a real run in this repository's own
+  # history — the emulator-boot and KVM-acceleration steps below follow
+  # reactivecircus/android-emulator-runner's own documented usage for
+  # ubuntu-latest runners, but the first PR that actually triggers this job is
+  # the real verification. It is intentionally not yet a required status
+  # check (see branch protection settings) until it has been observed to pass
+  # reliably — this repository treats a check that blocks merges before it is
+  # trusted as worse than one that does not exist yet.
+  instrumented-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-provider: basic
+      - name: Create CI Firebase configuration
+        run: bash .github/scripts/write-ci-google-services.sh
+      # GitHub-hosted ubuntu-latest runners provide /dev/kvm but not always
+      # with group permissions the emulator needs to use hardware
+      # acceleration. This is the action's own documented workaround; without
+      # it the emulator falls back to software rendering and can time out.
+      - name: Enable KVM group perms
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Run instrumented locale tests
+        uses: reactivecircus/android-emulator-runner@c9c93e6ba9c4194322e114c40970d5983d9a07cc # v2.38.0
+        with:
+          api-level: 30
+          target: default
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: cd apps/seller-android && bash ./gradlew :app:connectedStagingDebugAndroidTest --stacktrace
+      - name: Upload instrumented test report
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: instrumented-test-report
+          path: |
+            apps/seller-android/app/build/reports/androidTests/connected/**
+            apps/seller-android/app/build/outputs/androidTest-results/connected/**
+          if-no-files-found: warn
+          retention-days: 7

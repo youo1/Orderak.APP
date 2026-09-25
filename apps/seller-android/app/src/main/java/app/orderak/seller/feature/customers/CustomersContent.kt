@@ -10,6 +10,7 @@ import androidx.compose.ui.res.stringResource
 import app.orderak.seller.R
 import app.orderak.seller.core.text.SearchText
 import app.orderak.seller.core.ui.FullScreenEmpty
+import app.orderak.seller.core.ui.FullScreenError
 import app.orderak.seller.core.ui.FullScreenLoading
 import app.orderak.seller.core.ui.SearchField
 import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
@@ -31,6 +32,8 @@ data class CustomersUiState(
      * customers", which is a claim, not a placeholder.
      */
     val customers: List<CustomerSummary>? = null,
+    /** True when the local Room read itself failed, not merely "not read yet". */
+    val loadError: Boolean = false,
 )
 
 @Composable
@@ -51,6 +54,12 @@ fun CustomersContent(
     //
     // Checked before the search box is drawn, so a seller with no customers is
     // not handed something to search through nothing with.
+    if (state.loadError) {
+        // The one case `list == null` cannot distinguish on its own: a Room
+        // read that actually threw, rather than one still in flight.
+        FullScreenError(message = stringResource(R.string.error_unknown), modifier = modifier)
+        return
+    }
     if (list == null) {
         FullScreenLoading(modifier)
         return

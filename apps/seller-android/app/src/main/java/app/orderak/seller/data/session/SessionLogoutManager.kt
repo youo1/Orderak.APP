@@ -6,7 +6,6 @@ import app.orderak.seller.data.billing.EntitlementRepository
 import app.orderak.seller.core.images.ImageStore
 import app.orderak.seller.data.db.OrderakDatabase
 import app.orderak.seller.data.remote.BackendApi
-import app.orderak.seller.feature.settings.runLogoutSequence
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first

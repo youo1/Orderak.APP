@@ -1,4 +1,4 @@
-package app.orderak.seller.feature.settings
+package app.orderak.seller.data.session
 
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals

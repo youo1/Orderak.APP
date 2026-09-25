@@ -207,7 +207,8 @@
 				"services/backend/src/domains/catalog/geo.ts",
 				"services/backend/src/domains/commerce/billing.ts",
 				"services/backend/src/domains/identity/auth-v2.ts",
-				"services/backend/src/entrypoints/public-worker.ts"
+				"services/backend/src/entrypoints/public-worker.ts",
+				"services/backend/src/integrations/google-play/google-play.ts"
 			]
 		},
 		{

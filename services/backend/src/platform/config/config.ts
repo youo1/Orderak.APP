@@ -9,6 +9,7 @@
 
 import { jsonResponse, authSeller, clientIpOf, type AuthenticatedSeller } from "../http/shared";
 import { keyedHash, sha256Hex } from "../../domains/identity/auth";
+import { runtimeControlEnabled } from "./runtime-config";
 import { FREE_LIMITS } from "../../domains/commerce/plan-limits";
 import { LEGACY_LIMIT_KEYS } from "../../domains/commerce/legacy-entitlements";
 import {
@@ -164,7 +165,7 @@ export async function loadClientConfig(env: Env, seller: Record<string, unknown>
 	const actorKey = String(seller.id);
 	const features = {
 		ai_assistant: await effectiveFeature(env, "ai_assistant", actorKey, country, versionCode, planId, actorKey, Boolean((planConfig.features as Record<string, unknown> | undefined)?.ai_assistant)),
-		billing: await effectiveFeature(env, "billing", actorKey, country, versionCode, planId, actorKey, true),
+		billing: await effectiveBillingFeature(env, actorKey, country, versionCode, planId),
 		first_party_ads: await effectiveFeature(env, "first_party_ads", actorKey, country, versionCode, planId, actorKey, Boolean(planConfig.ads_enabled)),
 		referrals: await effectiveFeature(env, "referrals", actorKey, country, versionCode, planId, actorKey, true),
 	};
@@ -408,6 +409,33 @@ async function cachedFlagRead<T>(key: string, load: () => Promise<T>): Promise<T
 /** Drop the cached flag definitions — for tests, and for an admin write path. */
 export function invalidateFeatureFlagCache(): void {
 	flagCache.clear();
+}
+
+/**
+ * `billing`'s `env_gate` (`BILLING_ENABLED`) is one of two independent
+ * acquisition kill switches — `settings.billing_enabled` in D1 (checked by
+ * `/api/v1/subscribe`, the Play catalogue, and the Play verify route via
+ * `runtimeControlEnabled()`/`acquisitionEnabled()`) is the other, and it is
+ * the one an admin actually flips at runtime, without a deploy, mid-incident.
+ *
+ * `governance.features.billing` is the only signal the Android paywall reads
+ * (`isPurchaseOpen()`). Before this, it never consulted the D1 control, so
+ * the client could show "purchase open" while the acquisition routes it
+ * would call were already closed — or the reverse, hide it while they were
+ * open. Layering the same D1 check on top of `effectiveFeature()`'s result
+ * means both gates now have to agree before a seller sees a buy affordance.
+ */
+async function effectiveBillingFeature(
+	env: Env,
+	actorKey: string,
+	country: string | null,
+	versionCode: number,
+	plan: string,
+): Promise<Record<string, unknown>> {
+	const feature = await effectiveFeature(env, "billing", actorKey, country, versionCode, plan, actorKey, true);
+	if (feature.enabled !== true) return feature;
+	if (await runtimeControlEnabled(env, "billing_enabled", true)) return feature;
+	return { enabled: false, source: "runtime_control:billing_enabled" };
 }
 
 async function effectiveFeature(

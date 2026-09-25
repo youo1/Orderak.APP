@@ -32,15 +32,31 @@ class CategoryCacheWriter @Inject constructor(
      * the reason a mirror never was: the server is stating what exists, not a
      * device guessing. `replaceAll` is one transaction, so a crash halfway
      * cannot leave a seller looking at a partial list.
+     *
+     * Refused, not applied, when the response is empty and this device already
+     * holds categories. "The server genuinely has zero categories for this
+     * store" and "the response was empty or wrong for a store that is not
+     * empty" read identically from the payload alone, and only the first is
+     * safe to act on by deleting everything. Returns false so the caller
+     * treats the refresh as incomplete rather than as a seller's categories
+     * having actually gone to zero.
      */
-    suspend fun replaceAll(remote: List<CategoryDto>) = categoryDao.replaceAll(
-        remote.map {
-            CategoryEntity(
-                name = it.name,
-                categoryCode = it.category_code,
-                slug = it.slug,
-                sortOrder = it.sort_order,
-            )
-        },
-    )
+    suspend fun replaceAll(remote: List<CategoryDto>): Boolean {
+        if (refusesEmptyCategoryReplacement(remote, categoryDao.allOnce())) return false
+        categoryDao.replaceAll(
+            remote.map {
+                CategoryEntity(
+                    name = it.name,
+                    categoryCode = it.category_code,
+                    slug = it.slug,
+                    sortOrder = it.sort_order,
+                )
+            },
+        )
+        return true
+    }
 }
+
+/** Same guard as `refusesEmptyProductReplacement` for products; see there for why. */
+internal fun refusesEmptyCategoryReplacement(remote: List<CategoryDto>, existing: List<CategoryEntity>): Boolean =
+    remote.isEmpty() && existing.isNotEmpty()

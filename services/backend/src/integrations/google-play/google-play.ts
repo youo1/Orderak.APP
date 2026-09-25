@@ -1083,6 +1083,18 @@ export async function handleGooglePlayRoutes(
 
 	if (url.pathname === "/api/v1/billing/google/verify" && request.method === "POST") {
 		if (!lifecycleEnabled(env)) return jsonResponse({ error: "billing_lifecycle_disabled" }, 403);
+		// Acquisition, not just lifecycle: this is where a NEW purchase token is
+		// first verified and its entitlement first granted. `acquisitionEnabled()`
+		// is the same runtime kill switch that gates the catalogue and /subscribe
+		// (env.BILLING_ENABLED and the D1 `billing_enabled` control) — without this
+		// check, an admin closing that switch mid-incident does not stop an
+		// already-open app session (catalogue already fetched) from completing a
+		// real Play charge and having it granted here. Deliberately NOT applied to
+		// reconcileGooglePlayPurchases() or the verification-status GET below: an
+		// existing, already-granted subscription must keep renewing/reconciling
+		// through an acquisition freeze; only a token never verified before is new
+		// acquisition.
+		if (!(await acquisitionEnabled(env))) return jsonResponse({ error: "feature_disabled", feature: "billing" }, 403);
 		const { phone, secret } = readCreds(request, url);
 		const seller = authenticatedSeller !== undefined ? authenticatedSeller : await authSeller(env, phone, secret, clientIpOf(request));
 		if (!seller) return jsonResponse({ error: "auth" }, 401);

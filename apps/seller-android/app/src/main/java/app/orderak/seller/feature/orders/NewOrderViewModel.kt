@@ -1,5 +1,6 @@
 package app.orderak.seller.feature.orders
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.orderak.seller.core.phone.Countries
@@ -48,6 +49,7 @@ class NewOrderViewModel @Inject constructor(
     catalogRepo: CatalogRepository,
     private val orderRepo: OrderRepository,
     private val sessionStore: SessionStore,
+    private val savedState: SavedStateHandle,
 ) : ViewModel() {
 
     /**
@@ -61,7 +63,24 @@ class NewOrderViewModel @Inject constructor(
     val products: StateFlow<List<ProductEntity>?> =
         catalogRepo.products.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    private val _state = MutableStateFlow(NewOrderUiState())
+    /**
+     * Restored from [savedState] rather than seeded empty, so a process death
+     * mid-entry — the seller filled in a phone, picked products, switched to
+     * WhatsApp to confirm an address, and Android reclaimed the memory — does
+     * not silently discard everything typed so far. Every setter below writes
+     * back to [savedState] as the state changes; [clearDraft] drops it once
+     * the order this draft describes actually exists.
+     */
+    private val _state = MutableStateFlow(
+        NewOrderUiState(
+            phone = savedState[KEY_PHONE] ?: "",
+            name = savedState[KEY_NAME] ?: "",
+            note = savedState[KEY_NOTE] ?: "",
+            qty = savedState.get<HashMap<Long, Int>>(KEY_QTY)?.toMap() ?: emptyMap(),
+            payMethod = savedState.get<String>(KEY_PAY_METHOD)
+                ?.let { name -> PayMethod.entries.find { it.name == name } } ?: PayMethod.COD,
+        ),
+    )
     val state: StateFlow<NewOrderUiState> = _state.asStateFlow()
 
     init {
@@ -91,20 +110,33 @@ class NewOrderViewModel @Inject constructor(
      */
     fun onPhone(v: String) {
         val max = Countries.nationalDigitsMax(Countries.byIso(_state.value.countryIso))
-        _state.value = _state.value.copy(phone = v.filter(Char::isDigit).take(max))
+        val next = v.filter(Char::isDigit).take(max)
+        _state.value = _state.value.copy(phone = next)
+        savedState[KEY_PHONE] = next
     }
-    fun onName(v: String) { _state.value = _state.value.copy(name = v.take(40)) }
-    fun onNote(v: String) { _state.value = _state.value.copy(note = v.take(200)) }
+    fun onName(v: String) {
+        val next = v.take(40)
+        _state.value = _state.value.copy(name = next)
+        savedState[KEY_NAME] = next
+    }
+    fun onNote(v: String) {
+        val next = v.take(200)
+        _state.value = _state.value.copy(note = next)
+        savedState[KEY_NOTE] = next
+    }
     /** Ignores a method this store cannot use, so the UI cannot outrun the rule. */
     fun onPayMethod(m: PayMethod) {
         if (m !in _state.value.payMethods) return
         _state.value = _state.value.copy(payMethod = m)
+        savedState[KEY_PAY_METHOD] = m.name
     }
 
     fun changeQty(product: ProductEntity, delta: Int) {
         val current = _state.value.qty[product.id] ?: 0
         val next = (current + delta).coerceIn(0, product.stock)
-        _state.value = _state.value.copy(qty = _state.value.qty + (product.id to next), stockError = false)
+        val nextQty = _state.value.qty + (product.id to next)
+        _state.value = _state.value.copy(qty = nextQty, stockError = false)
+        savedState[KEY_QTY] = HashMap(nextQty)
     }
 
     fun totalMinor(): Long =
@@ -144,7 +176,25 @@ class NewOrderViewModel @Inject constructor(
                 buyerPhone = s.phone, buyerName = s.name.ifBlank { null },
                 payMethod = s.payMethod, note = s.note.ifBlank { null }, lines = lines
             )
+            clearDraft()
             onDone(id)
         }
+    }
+
+    /** The order this draft described now exists — nothing left to recover. */
+    private fun clearDraft() {
+        savedState.remove<String>(KEY_PHONE)
+        savedState.remove<String>(KEY_NAME)
+        savedState.remove<String>(KEY_NOTE)
+        savedState.remove<HashMap<Long, Int>>(KEY_QTY)
+        savedState.remove<String>(KEY_PAY_METHOD)
+    }
+
+    private companion object {
+        const val KEY_PHONE = "new_order_phone"
+        const val KEY_NAME = "new_order_name"
+        const val KEY_NOTE = "new_order_note"
+        const val KEY_QTY = "new_order_qty"
+        const val KEY_PAY_METHOD = "new_order_pay_method"
     }
 }

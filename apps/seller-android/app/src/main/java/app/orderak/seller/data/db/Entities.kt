@@ -12,8 +12,16 @@ import androidx.room.Relation
 
 @Entity(
     tableName = "products",
-    // all() sorts by createdAt DESC on the products list + dashboard.
-    indices = [androidx.room.Index(value = ["createdAt"])]
+    indices = [
+        // all() sorts by createdAt DESC on the products list + dashboard.
+        androidx.room.Index(value = ["createdAt"]),
+        // Defensive depth (not a live exploit path — every write path already
+        // looks up a product by its code before upserting): turns a future
+        // write path that skips that lookup into a loud failure instead of a
+        // silent duplicate. Multiple NULLs (unconverted legacy rows) are not
+        // a violation — SQLite does not treat them as equal to each other.
+        androidx.room.Index(value = ["productCode"], unique = true),
+    ]
 )
 @Immutable
 data class ProductEntity(
@@ -31,7 +39,10 @@ data class ProductEntity(
     val currency: String,
     val stock: Int,
     val discountType: String? = null, // "PERCENTAGE", "AMOUNT", or null
-    val discountValue: Double? = null,
+    // Integer, matching the wire contract and ADR-009 — money and
+    // percentage-like fields are minor units or whole points, never
+    // floating point. This column was the one place that was not yet true.
+    val discountValue: Long? = null,
     val imagePath: String? = null,
     // Public R2 URL returned by /api/v1/media/upload. Sent to the backend as
     // image_url so catalog pages embed a real image (imagePath is a local,
@@ -59,7 +70,11 @@ data class ProductEntity(
     val createdAt: Long = System.currentTimeMillis()
 )
 
-@Entity(tableName = "categories")
+@Entity(
+    tableName = "categories",
+    // Same defensive depth as products.productCode; see there for why.
+    indices = [androidx.room.Index(value = ["categoryCode"], unique = true)],
+)
 @Immutable
 data class CategoryEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
