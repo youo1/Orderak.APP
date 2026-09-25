@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { CanAccess, useList } from '@refinedev/core';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Ban, KeyRound, RefreshCw, ShieldCheck, Smartphone, Store } from 'lucide-react';
 import { api, format } from '@/shared/api/client';
@@ -9,10 +10,24 @@ import { useAuth } from '@/features/auth/auth-context';
 
 type Row = Record<string, unknown>;
 
+// Phase 4 of the Refine install plan (bespoke pages, selectively): only the
+// list here moves to Refine's `useList` — it was already a thin wrapper
+// around a plain fetch, so swapping the data source is a like-for-like
+// consistency win. StoreDetailPage below stays plain React: it's a rich,
+// store-specific dashboard (subscription panel, device revocation, an
+// audited status-change form with its own confirm/reason workflow), not a
+// generic show/edit view, and useShow/useForm wouldn't reduce its
+// complexity — per the plan, a page doesn't move just because Refine has a
+// hook for it.
 export function StoresPage() {
   const navigate = useNavigate();
-  const query = useQuery({ queryKey: ['stores'], queryFn: () => api<{ stores: Row[] }>('/api/admin/v1/stores') });
-  return <><PageHeader title="Stores" description="Seller lifecycle, catalog health, subscription and trust state." actions={<button className="button" onClick={() => query.refetch()}><RefreshCw size={16} /> Refresh</button>} />{query.isLoading && <LoadingState />}{query.error && <ErrorState error={query.error} retry={() => query.refetch()} />}{query.data && <DataTable rows={query.data.stores} onSelect={row => navigate(`/stores/${row.id}`)} preferred={['store_name', 'store_code', 'country_code', 'status', 'product_count', 'category_count', 'created_at']} />}</>;
+  const { result, query } = useList<Row>({ resource: 'stores', pagination: { mode: 'off' } });
+  return <CanAccess resource="stores" action="list">
+    <PageHeader title="Stores" description="Seller lifecycle, catalog health, subscription and trust state." actions={<button className="button" onClick={() => query.refetch()}><RefreshCw size={16} /> Refresh</button>} />
+    {query.isLoading && <LoadingState />}
+    {query.error && <ErrorState error={query.error} retry={() => query.refetch()} />}
+    {!query.isLoading && !query.error && <DataTable rows={result.data} onSelect={row => navigate(`/stores/${row.id}`)} preferred={['store_name', 'store_code', 'country_code', 'status', 'product_count', 'category_count', 'created_at']} />}
+  </CanAccess>;
 }
 
 export function StoreDetailPage() {

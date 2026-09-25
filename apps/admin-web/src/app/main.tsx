@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter } from 'react-router-dom'
 import '../index.css'
 import App from './App.tsx'
+import { RefineRoot } from './RefineRoot.tsx'
 
 // Sentry: error monitoring with sourcemap support.
 // Set the DSN via VITE_SENTRY_DSN env var (e.g. in .env.production).
@@ -45,7 +46,9 @@ createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AuthProvider>
-          <App />
+          <RefineRoot>
+            <App />
+          </RefineRoot>
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
