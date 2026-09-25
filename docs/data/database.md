@@ -2,7 +2,7 @@
 status: current
 generated: false
 owner: backend
-last_verified: 2026-08-21
+last_verified: 2026-09-23
 applies_to: [production, staging]
 authoritative_for: [database-topology]
 ---
@@ -37,36 +37,29 @@ cadence, and ODbL attribution obligations that should not be entangled with
 business data in backup and restore. See
 [catalog](../domains/catalog.md#geography).
 
-## Staging and production are on different schemas right now
+## Staging and production schemas are in sync
 
-> **Measured 2026-08-21 against both live databases.** Staging is at migration
-> `044`. Production is at `043`. This is the single place that fact is
-> recorded; other documents point here rather than repeating it.
+> **Confirmed 2026-09-23 against both live databases**, when the production
+> freeze lifted and production deployed straight through to current `main`.
+> Both are at migration `059_stock_movements_product_code_not_null.sql`;
+> production's migration ledger reported "No migrations to apply!" This is the
+> single place that fact is recorded; other documents point here rather than
+> repeating it.
 
 | | Staging | Production |
 | --- | --- | --- |
-| Latest migration | `044_money_minor_units_with_currency.sql` | `043_audit_signing_key_version.sql` |
-| Money columns | `*_minor` | `*_piasters` |
-| `currency` column | Present | **Absent** |
+| Latest migration | `059_stock_movements_product_code_not_null.sql` | `059_stock_movements_product_code_not_null.sql` |
+| Money columns | `*_minor` | `*_minor` |
+| `currency` column | Present | Present |
 
-Migration 044 merged to `main` in `6cc7410` and reached staging automatically on
-the merge, under the pre-2026-08-24 model in which `main` was the Staging
-trigger. That branch is now `staging`. Production deploys are
-`workflow_dispatch` only — gated by the automated checks in
-`production-deploy.yml`, not by a required reviewer, which is unavailable on
-this plan and withdrawn as a plan — so it has not run; production was last
-deployed on 2026-08-17.
-
-**What this means when reading the rest of the documentation.** Money columns
-are described by their post-044 names, because that is what the code in `main`
-expects and what the next production deploy will create. Until that deploy
-runs, a query written against production must still use `total_piasters`,
-`price_minor` does not exist there, and there is no `currency` column to read.
-
-This skew closes the moment production deploys. It is recorded rather than
-smoothed over because a document that says "money has a currency column" is
-wrong in production today, and someone debugging a production query needs to
-know that before they trust it.
+**History.** From 2026-08-17 to 2026-09-23, production sat on migration `043`
+(`*_piasters` columns, no `currency` column) while `main`/staging moved through
+`044` (`6cc7410`, renaming money to `*_minor` and adding `currency`) and on to
+`059`. Production deploys are `workflow_dispatch` only, gated by the automated
+checks in `production-deploy.yml`, and were frozen from 2026-08-24 pending
+testing; see `docs/runbooks/production-freeze-lift.md` for the deploy that
+closed the gap. If this section's date drifts far behind the latest migration
+file in `services/backend/migrations/`, re-measure before trusting it.
 
 ## The tenant key
 
