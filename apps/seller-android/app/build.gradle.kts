@@ -428,7 +428,7 @@ val verifyAuthPhase1Contract by tasks.registering {
             "java/app/orderak/seller/feature/settings/SettingsScreen.kt"
         ).readText()
         val logoutSequence = mainRoot.resolve(
-            "java/app/orderak/seller/feature/settings/LogoutSequence.kt"
+            "java/app/orderak/seller/data/session/LogoutSequence.kt"
         ).readText()
         val sessionLogoutManager = mainRoot.resolve(
             "java/app/orderak/seller/data/session/SessionLogoutManager.kt"
@@ -441,6 +441,9 @@ val verifyAuthPhase1Contract by tasks.registering {
         ).readText()
         val sessionStore = mainRoot.resolve(
             "java/app/orderak/seller/data/session/SessionStore.kt"
+        ).readText()
+        val entryRouting = mainRoot.resolve(
+            "java/app/orderak/seller/feature/splash/EntryRouting.kt"
         ).readText()
         val contract = workspaceRoot.resolve("docs/contracts/auth-phase1-contract.md")
         val securityInvariants = workspaceRoot.resolve(
@@ -535,6 +538,22 @@ val verifyAuthPhase1Contract by tasks.registering {
                 "backendApi.logout(" in sessionLogoutManager &&
                 "fun clearDeviceSecret()" in sessionStore,
             "Logout must revoke the credential, keep provider-first local cleanup, drop the device secret, and exist in exactly one place."
+        )
+        requireContract(
+            // Guarantee 10, the gap that actually shipped: CREDENTIAL_REJECTED
+            // used to reach EntryDecision.Auth by navigation alone, leaving
+            // Room/DataStore/images/entitlements intact across an account
+            // boundary. This is the second, and now only other, place local
+            // session state can be abandoned — the check above pins the
+            // explicit-logout call site (SettingsScreen); this one pins the
+            // rejected-credential call site (EntryRouteResolver), so a future
+            // resolver that stops calling the manager here cannot satisfy every
+            // check above while quietly reopening exactly this gap.
+            "sessionLogoutManager: SessionLogoutManager" in entryRouting &&
+                "fun shouldClearLocalSession(" in entryRouting &&
+                "decision is EntryDecision.Auth && remote is RemoteAccountState.CredentialRejected" in entryRouting &&
+                "sessionLogoutManager.logout()" in entryRouting,
+            "A rejected credential must clear the local session (via SessionLogoutManager) before EntryRouteResolver reaches Auth."
         )
         requireContract(
             "completePhoneAuth(" in authViewModel &&
