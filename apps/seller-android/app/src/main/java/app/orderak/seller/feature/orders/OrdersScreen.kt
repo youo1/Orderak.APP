@@ -52,9 +52,10 @@ fun OrdersScreen(
     val orders by viewModel.orders.collectAsStateWithLifecycle()
     val filter by viewModel.filter.collectAsStateWithLifecycle()
     val refusedPushes by viewModel.refusedPushes.collectAsStateWithLifecycle()
+    val loadError by viewModel.loadError.collectAsStateWithLifecycle()
 
     OrdersContent(
-        state = OrdersUiState(orders = orders, filter = filter, refusedPushes = refusedPushes),
+        state = OrdersUiState(orders = orders, filter = filter, refusedPushes = refusedPushes, loadError = loadError),
         onOpen = onOpen,
         onNew = onNew,
         // The view model still keeps a status-shaped setter for the chips that

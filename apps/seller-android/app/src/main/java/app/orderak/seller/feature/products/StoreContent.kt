@@ -43,6 +43,7 @@ import app.orderak.seller.core.money.formatAmountLabel
 import app.orderak.seller.core.text.SearchText
 import app.orderak.seller.core.text.formatCount
 import app.orderak.seller.core.ui.FullScreenEmpty
+import app.orderak.seller.core.ui.FullScreenError
 import app.orderak.seller.core.ui.FullScreenLoading
 import app.orderak.seller.core.ui.NoticeBanner
 import app.orderak.seller.core.ui.SearchField
@@ -77,6 +78,8 @@ data class StoreUiState(
     val quota: ProductQuotaUiState = ProductQuotaUiState(),
     /** Saved here, never reached the account. Blocks the catalogue refresh. */
     val stuckCount: Int = 0,
+    /** True when the local Room read itself failed, not merely "not read yet". */
+    val loadError: Boolean = false,
 )
 
 @Composable
@@ -96,6 +99,12 @@ fun StoreContent(
     val catalogue = state.products
     val quota = state.quota
 
+    if (state.loadError) {
+        // The one case `catalogue == null` cannot distinguish on its own: a
+        // Room read that actually threw, rather than one still in flight.
+        FullScreenError(message = stringResource(R.string.error_unknown), modifier = modifier)
+        return
+    }
     if (catalogue == null) {
         // The state this screen declared and never had. The catalogue seeded as
         // an empty list, so a seller with products met the "add your first

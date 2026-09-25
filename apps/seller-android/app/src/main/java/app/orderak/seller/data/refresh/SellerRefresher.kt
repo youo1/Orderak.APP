@@ -237,12 +237,12 @@ class SellerRefresher @Inject constructor(
      */
     private suspend fun refreshCatalogue(phone: String, secret: String): Boolean {
         val categories = api.listCategories(phone, secret)
-        if (categories.ok) categoryCache.replaceAll(categories.categories)
+        val categoriesApplied = categories.ok && categoryCache.replaceAll(categories.categories)
 
         val pulled = api.fetchProducts(phone, secret)
         if (!pulled.ok) return false
-        productCache.replaceAll(pulled.products)
-        return categories.ok
+        val productsApplied = productCache.replaceAll(pulled.products)
+        return categories.ok && categoriesApplied && productsApplied
     }
 
     /**

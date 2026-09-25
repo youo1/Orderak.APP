@@ -59,8 +59,8 @@ import app.orderak.seller.data.remote.StoreDto
 import app.orderak.seller.data.remote.StoreUpdateReq
 import app.orderak.seller.data.remote.BackendApi
 import app.orderak.seller.data.session.SessionStore
-import app.orderak.seller.feature.products.copyLink
-import app.orderak.seller.feature.products.shareStoreLink
+import app.orderak.seller.core.share.copyLink
+import app.orderak.seller.core.share.shareStoreLink
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -255,18 +255,24 @@ fun StoreInfoScreen(
     val businessSubcategories by viewModel.businessSubcategories.collectAsStateWithLifecycle()
     val appLanguage = LocalConfiguration.current.locales[0].language
 
-    // Editable fields, re-seeded whenever the loaded store changes.
-    var name by rememberSaveable(store) { mutableStateOf(store?.store_name.orEmpty()) }
-    var slug by rememberSaveable(store) { mutableStateOf(store?.slug.orEmpty()) }
-    var description by rememberSaveable(store) { mutableStateOf(store?.description.orEmpty()) }
+    // Editable fields, seeded once when the store first loads — keyed on
+    // whether it has loaded at all (null -> non-null, exactly once), not on
+    // the store object itself. Keying on `store` re-seeded every field from
+    // the server on every subsequent change to *any* field, including one a
+    // background refresh made while the seller was mid-edit on an unrelated
+    // field — silently discarding whatever they had typed so far.
+    val loaded = store != null
+    var name by rememberSaveable(loaded) { mutableStateOf(store?.store_name.orEmpty()) }
+    var slug by rememberSaveable(loaded) { mutableStateOf(store?.slug.orEmpty()) }
+    var description by rememberSaveable(loaded) { mutableStateOf(store?.description.orEmpty()) }
     val phone = store?.phone.orEmpty()
-    var whatsapp by rememberSaveable(store) { mutableStateOf(store?.whatsapp.orEmpty()) }
-    var email by rememberSaveable(store) { mutableStateOf(store?.email.orEmpty()) }
-    var website by rememberSaveable(store) { mutableStateOf(store?.website.orEmpty()) }
-    var address by rememberSaveable(store) { mutableStateOf(store?.address.orEmpty()) }
-    var logoUrl by rememberSaveable(store) { mutableStateOf(store?.logo_url.orEmpty()) }
-    var coverUrl by rememberSaveable(store) { mutableStateOf(store?.cover_url.orEmpty()) }
-    var businessSubcategoryId by rememberSaveable(store) {
+    var whatsapp by rememberSaveable(loaded) { mutableStateOf(store?.whatsapp.orEmpty()) }
+    var email by rememberSaveable(loaded) { mutableStateOf(store?.email.orEmpty()) }
+    var website by rememberSaveable(loaded) { mutableStateOf(store?.website.orEmpty()) }
+    var address by rememberSaveable(loaded) { mutableStateOf(store?.address.orEmpty()) }
+    var logoUrl by rememberSaveable(loaded) { mutableStateOf(store?.logo_url.orEmpty()) }
+    var coverUrl by rememberSaveable(loaded) { mutableStateOf(store?.cover_url.orEmpty()) }
+    var businessSubcategoryId by rememberSaveable(loaded) {
         mutableStateOf(store?.business_subcategory_id)
     }
     var businessSubcategoryExpanded by rememberSaveable { mutableStateOf(false) }

@@ -11,7 +11,12 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
-/** Room = single source of truth (Plan §3.4). Backend sync joins in the backend stage. */
+/**
+ * Server-authoritative, not a mirror: Room caches products/categories/customers
+ * the server owns, and holds orders recorded offline as a durable command log
+ * until the server acknowledges them (see `verifyDataAuthorityContract` in
+ * `app/build.gradle.kts` for the guard this model is built and checked against).
+ */
 @Database(
     entities = [
         ProductEntity::class, CategoryEntity::class, CustomerEntity::class,
@@ -27,7 +32,10 @@ import javax.inject.Singleton
     //     longer depends on the product cache still holding the row it was
     //     created from. Also drops three columns nothing reads: products'
     //     remoteUuid and categoryId, and customers' dirty.
-    version = 11,
+    // v12: products.discountValue becomes an integer (ADR-009), and
+    //     products.productCode / categories.categoryCode each get a
+    //     defensive unique index.
+    version = 12,
     // Exported so the next schema change has something to write a migration
     // against, and so the migration can be tested rather than asserted.
     exportSchema = true,
@@ -77,7 +85,7 @@ object DbModule {
             // 10 is not in the list above and must never be: from here the
             // database holds orders the server has not acknowledged, so a
             // mismatch has to fail loudly rather than quietly discard a sale.
-            .addMigrations(OrderakMigrations.MIGRATION_10_11)
+            .addMigrations(OrderakMigrations.MIGRATION_10_11, OrderakMigrations.MIGRATION_11_12)
             .build()
 
     @Provides fun productDao(db: OrderakDatabase) = db.productDao()

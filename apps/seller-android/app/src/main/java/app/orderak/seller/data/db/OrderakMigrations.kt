@@ -147,4 +147,93 @@ object OrderakMigrations {
             for (statement in MIGRATION_10_11_SQL) db.execSQL(statement)
         }
     }
+
+    /**
+     * `discountValue` becomes an integer (ADR-009 — money and percentage-like
+     * fields are minor units or whole points, never floating point; this
+     * column was the one place that had not caught up), and `productCode` /
+     * `categoryCode` each get a defensive unique index.
+     *
+     * The indices are not closing a live exploit: every write path already
+     * looks up a product or category by its code before upserting, so nothing
+     * today should ever hit them. They exist so a future write path that
+     * skips that lookup fails loudly instead of quietly duplicating a row —
+     * see [ProductCacheWriter.refusesEmptyProductReplacement] and
+     * [CategoryCacheWriter] for the sibling guard against the same class of
+     * defect from the read side.
+     *
+     * The `DELETE` immediately before each index is defensive in the other
+     * direction: if a duplicate somehow already exists on some device, the
+     * index creation below must not be the thing that throws and bricks the
+     * app on open. It keeps the row with the lowest `id` — the one every
+     * order_items reference not pointing at that exact row already treats as
+     * "the product is gone" (see the migration 10→11 test on that tolerance),
+     * which is the existing, accepted behaviour for a missing product, not a
+     * new one this migration introduces.
+     */
+    val MIGRATION_11_12_SQL: List<String> = listOf(
+        // 1. products: discountValue REAL -> INTEGER. Same twelve-step
+        //    recreate as migration 10->11, for the same reason: Room compares
+        //    the table it finds against the one it expects, and SQLite has no
+        //    ALTER COLUMN. CAST truncates any stray fractional value rather
+        //    than leaving it stored as REAL under an INTEGER-affinity column,
+        //    which is what SQLite would otherwise do silently.
+        """
+        CREATE TABLE `products_new` (
+          `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+          `name` TEXT NOT NULL,
+          `description` TEXT,
+          `priceMinor` INTEGER NOT NULL,
+          `currency` TEXT NOT NULL,
+          `stock` INTEGER NOT NULL,
+          `discountType` TEXT,
+          `discountValue` INTEGER,
+          `imagePath` TEXT,
+          `imageUrl` TEXT,
+          `available` INTEGER NOT NULL,
+          `productCode` TEXT,
+          `syncedStockVersion` INTEGER,
+          `stockDirty` INTEGER NOT NULL DEFAULT 0,
+          `categoryCode` TEXT,
+          `createdAt` INTEGER NOT NULL
+        )
+        """.trimIndent(),
+        """
+        INSERT INTO `products_new` (
+          `id`, `name`, `description`, `priceMinor`, `currency`, `stock`,
+          `discountType`, `discountValue`, `imagePath`, `imageUrl`, `available`,
+          `productCode`, `syncedStockVersion`, `stockDirty`, `categoryCode`, `createdAt`
+        )
+        SELECT
+          `id`, `name`, `description`, `priceMinor`, `currency`, `stock`,
+          `discountType`, CAST(`discountValue` AS INTEGER), `imagePath`, `imageUrl`, `available`,
+          `productCode`, `syncedStockVersion`, `stockDirty`, `categoryCode`, `createdAt`
+        FROM `products`
+        """.trimIndent(),
+        "DROP TABLE `products`",
+        "ALTER TABLE `products_new` RENAME TO `products`",
+        // DROP TABLE takes the table's indices with it.
+        "CREATE INDEX IF NOT EXISTS `index_products_createdAt` ON `products` (`createdAt`)",
+        """
+        DELETE FROM `products`
+        WHERE `productCode` IS NOT NULL
+          AND `id` NOT IN (SELECT MIN(`id`) FROM `products` WHERE `productCode` IS NOT NULL GROUP BY `productCode`)
+        """.trimIndent(),
+        "CREATE UNIQUE INDEX IF NOT EXISTS `index_products_productCode` ON `products` (`productCode`)",
+
+        // 2. categories: no column change, so no rebuild — just the same
+        //    defensive de-dup and unique index.
+        """
+        DELETE FROM `categories`
+        WHERE `categoryCode` IS NOT NULL
+          AND `id` NOT IN (SELECT MIN(`id`) FROM `categories` WHERE `categoryCode` IS NOT NULL GROUP BY `categoryCode`)
+        """.trimIndent(),
+        "CREATE UNIQUE INDEX IF NOT EXISTS `index_categories_categoryCode` ON `categories` (`categoryCode`)",
+    )
+
+    val MIGRATION_11_12: Migration = object : Migration(11, 12) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            for (statement in MIGRATION_11_12_SQL) db.execSQL(statement)
+        }
+    }
 }
