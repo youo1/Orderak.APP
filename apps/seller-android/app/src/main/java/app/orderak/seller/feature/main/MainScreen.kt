@@ -82,7 +82,7 @@ import app.orderak.seller.data.remote.AppVersionPolicy
 import app.orderak.seller.data.billing.EntitlementFreshness
 import app.orderak.seller.data.billing.EntitlementRefreshResult
 import app.orderak.seller.data.billing.EntitlementSyncState
-import app.orderak.seller.feature.products.shareStoreLink
+import app.orderak.seller.core.share.shareStoreLink
 import app.orderak.seller.feature.products.shareCatalogText
 import app.orderak.seller.feature.operations.AnnouncementsDashboardIndicator
 import app.orderak.seller.core.ui.theme.LocalOrderakExtendedColors
@@ -487,18 +487,6 @@ private fun PlanUsageCard(config: BackendConfig) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(R.string.plan_usage_title), style = MaterialTheme.typography.titleMedium)
             rows.forEach { row -> PlanUsageRowItem(row) }
-        }
-    }
-}
-
-@Composable
-private fun StatCard(label: String, value: Int, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Card(modifier.clickable(onClick = onClick)) {
-        Column(Modifier.padding(12.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("$value", style = MaterialTheme.typography.headlineMedium,
-                color = if (value > 0) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurface)
-            Text(label, style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center)
         }
     }
 }

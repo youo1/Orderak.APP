@@ -105,6 +105,12 @@ the test.
 
 Runs on an attached emulator or physical device. Covers the locale matrix:
 
+Since 2026-09-25, `android-ci.yml` also runs this on every PR, in an
+`instrumented-test` job via `reactivecircus/android-emulator-runner`. It is
+deliberately not yet a required status check — see that job's own comment in
+the workflow file for why — so a local run with a real device or emulator is
+still the way to be sure before relying on it.
+
 | Locale | What it tests |
 |--------|--------------|
 | `en` | English LTR resources |

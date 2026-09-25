@@ -61,8 +61,8 @@ import app.orderak.seller.data.remote.BackendApi
 import app.orderak.seller.data.remote.CategoryDto
 import app.orderak.seller.data.remote.CategoryReq
 import app.orderak.seller.data.session.SessionStore
-import app.orderak.seller.feature.products.copyLink
-import app.orderak.seller.feature.products.shareCategoryLink
+import app.orderak.seller.core.share.copyLink
+import app.orderak.seller.core.share.shareCategoryLink
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted

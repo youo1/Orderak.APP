@@ -3,7 +3,6 @@ package app.orderak.seller.feature.main
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.orderak.seller.data.db.ProductEntity
-import app.orderak.seller.data.remote.BackendApi
 import app.orderak.seller.data.remote.StoreIdentityResolver
 import app.orderak.seller.data.catalog.CatalogRepository
 import app.orderak.seller.data.orders.OrderRepository
@@ -12,13 +11,10 @@ import app.orderak.seller.data.billing.EntitlementRepository
 import app.orderak.seller.data.billing.EntitlementRefreshResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -28,7 +24,6 @@ import javax.inject.Inject
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val sessionStore: SessionStore,
-    private val backendApi: BackendApi,
     private val storeIdentityResolver: StoreIdentityResolver,
     private val catalogRepo: CatalogRepository,
     private val entitlementRepository: EntitlementRepository,
@@ -114,34 +109,4 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    private val _aiTestState = MutableStateFlow(AiTestState())
-    val aiTestState: StateFlow<AiTestState> = _aiTestState.asStateFlow()
-
-    fun testAiChat(message: String) {
-        val trimmedMessage = message.trim()
-        if (trimmedMessage.isEmpty() || _aiTestState.value.loading) return
-
-        _aiTestState.value = AiTestState(loading = true)
-
-        viewModelScope.launch {
-            val phone = sessionStore.phone.first()
-            if (phone.isNullOrBlank()) {
-                _aiTestState.value = AiTestState(error = "auth")
-                return@launch
-            }
-            val secret = sessionStore.getOrCreateSecret()
-            val response = backendApi.chat(phone, secret, trimmedMessage)
-            _aiTestState.value = if (response.error != null) {
-                AiTestState(error = response.error)
-            } else {
-                AiTestState(reply = response.reply.orEmpty())
-            }
-        }
-    }
 }
-
-data class AiTestState(
-    val loading: Boolean = false,
-    val reply: String? = null,
-    val error: String? = null,
-)

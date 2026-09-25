@@ -4,8 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,8 +52,8 @@ class AdManagerImpl @Inject constructor(
 
     @Composable
     override fun Banner(modifier: Modifier) {
-        val remoteAdsEnabled by remoteConfig.adsEnabled.collectAsState()
-        val config by entitlementManager.config.collectAsState()
+        val remoteAdsEnabled by remoteConfig.adsEnabled.collectAsStateWithLifecycle()
+        val config by entitlementManager.config.collectAsStateWithLifecycle()
         val context = LocalContext.current
         val scope = rememberCoroutineScope()
         var ad by remember { mutableStateOf<app.orderak.seller.data.remote.AdDto?>(null) }
