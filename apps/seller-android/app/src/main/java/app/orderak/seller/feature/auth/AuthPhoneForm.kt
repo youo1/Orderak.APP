@@ -59,8 +59,10 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import app.orderak.seller.R
+import app.orderak.seller.core.ui.theme.LocalOrderakMotion
 import app.orderak.seller.core.phone.Country
 import com.google.i18n.phonenumbers.PhoneNumberUtil
+import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 
 /**
  * Phone stage shared by editable entry and the locked inline-OTP state:
@@ -82,6 +84,7 @@ fun AuthPhoneForm(
     onShowCountryPicker: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val spacing = LocalOrderakSpacing.current
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
     var phoneHintFailed by rememberSaveable { mutableStateOf(false) }
@@ -127,8 +130,8 @@ fun AuthPhoneForm(
                 trailingIcon = {
                     AnimatedVisibility(
                         visible = isValid && error == null,
-                        enter = fadeIn(tween(300)) + expandVertically(),
-                        exit = fadeOut(tween(300)) + shrinkVertically(),
+                        enter = fadeIn(tween(LocalOrderakMotion.current.short)) + expandVertically(),
+                        exit = fadeOut(tween(LocalOrderakMotion.current.short)) + shrinkVertically(),
                     ) {
                         Icon(
                             imageVector = Icons.Default.CheckCircle,
@@ -143,7 +146,7 @@ fun AuthPhoneForm(
                     phoneNumberVisualTransformation(country.iso)
                 },
                 singleLine = true,
-                shape = RoundedCornerShape(20.dp),
+                shape = MaterialTheme.shapes.extraLarge,
                 colors = OutlinedTextFieldDefaults.colors(
                     unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                     focusedContainerColor = MaterialTheme.colorScheme.surface,
@@ -159,7 +162,7 @@ fun AuthPhoneForm(
         AuthErrorText(error = error)
 
         if (enabled) {
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(spacing.space6))
             TextButton(
                 onClick = {
                     PhoneHintHelper.show(
@@ -176,7 +179,7 @@ fun AuthPhoneForm(
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.primary,
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(spacing.space2))
                 Text(
                     text = stringResource(R.string.auth_use_my_number),
                     style = MaterialTheme.typography.labelLarge,
@@ -190,7 +193,7 @@ fun AuthPhoneForm(
                     color = MaterialTheme.colorScheme.error,
                 )
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(spacing.space3))
             TextButton(
                 onClick = { uriHandler.openUri("mailto:support@orderak.app") },
                 enabled = !isSending,
@@ -202,7 +205,7 @@ fun AuthPhoneForm(
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(spacing.space2))
                 Text(
                     text = stringResource(R.string.auth_trouble),
                     style = MaterialTheme.typography.labelSmall,
@@ -249,26 +252,27 @@ private fun CountryCodeChip(
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
+    val spacing = LocalOrderakSpacing.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
-            .padding(start = 6.dp, end = 6.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .padding(start = spacing.space2, end = spacing.space2)
+            .clip(MaterialTheme.shapes.large)
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f))
             .clickable(enabled = enabled) { onClick() }
             .sizeIn(minHeight = 44.dp)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = spacing.space3, vertical = spacing.space2),
     ) {
         Text(
             text = "${country.flag} +${country.dialCode}",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface,
         )
-        Spacer(Modifier.width(4.dp))
+        Spacer(Modifier.width(spacing.space1))
         Icon(
             imageVector = Icons.Default.ArrowDropDown,
             contentDescription = null,
-            modifier = Modifier.size(20.dp),
+            modifier = Modifier.size(spacing.iconMedium),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
@@ -279,19 +283,20 @@ private fun MarketingOptInSwitch(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
+    val spacing = LocalOrderakSpacing.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
             .sizeIn(minHeight = 56.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .clip(MaterialTheme.shapes.large)
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
             .toggleable(
                 value = checked,
                 onValueChange = onCheckedChange,
                 role = Role.Switch,
             )
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = spacing.space4, vertical = spacing.space2),
     ) {
         Text(
             text = stringResource(R.string.auth_marketing_opt_in),
@@ -299,7 +304,7 @@ private fun MarketingOptInSwitch(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
         )
-        Spacer(Modifier.width(16.dp))
+        Spacer(Modifier.width(spacing.space4))
         Switch(
             checked = checked,
             onCheckedChange = null,

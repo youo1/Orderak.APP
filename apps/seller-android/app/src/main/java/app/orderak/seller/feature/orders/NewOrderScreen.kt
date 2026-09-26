@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -50,6 +51,8 @@ import app.orderak.seller.R
 import app.orderak.seller.data.db.ProductEntity
 import app.orderak.seller.core.ui.NoticeBanner
 import app.orderak.seller.core.ui.SemanticRole
+import app.orderak.seller.core.ui.theme.LocalOrderakMotion
+import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 import app.orderak.seller.core.money.DEFAULT_CURRENCY
 import app.orderak.seller.core.money.formatAmount
 import app.orderak.seller.core.money.formatAmountLabel
@@ -120,7 +123,16 @@ fun NewOrderContent(
     onCreated: (Long) -> Unit,
 ) {
     val locale = LocalConfiguration.current.locales[0]
+    // The screen's rhythm, from the system. Every padding and gap below was a
+    // hand-written dp value — 8, 12 and 24, which happen to be tokens, and were
+    // still the reason a change to the spacing scale would not have reached here.
+    val spacing = LocalOrderakSpacing.current
     val catalogue = products
+    // `selectedCurrency` is null for a mixed selection once anything is picked —
+    // see NewOrderViewModel.selectedCurrency. The total already renders "—" in
+    // that case, and Save must not stay live beside it: it used to be the live
+    // control on a mixed selection, and pressing it crashed the screen.
+    val mixedCurrency = state.hasItems && selectedCurrency == null
     Scaffold(
         topBar = {
             TopAppBar(
@@ -134,9 +146,13 @@ fun NewOrderContent(
         }
     ) { padding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
+            // `imePadding` so the keyboard lifts the form instead of covering the
+            // field being typed into — and the Save button under it. This screen
+            // is a form with three text fields and a submit button at the bottom
+            // of the scroll, which is the exact shape that needs it.
+            modifier = Modifier.fillMaxSize().padding(padding).imePadding(),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(spacing.space3),
         ) {
             item { CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                 OutlinedTextField(
@@ -164,7 +180,7 @@ fun NewOrderContent(
             items(catalogue.orEmpty(), key = { it.id }) { p ->
                 val q = state.qty[p.id] ?: 0
                 Card {
-                    Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.fillMaxWidth().padding(spacing.space3), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(
                                 p.name,
@@ -206,7 +222,7 @@ fun NewOrderContent(
             }
 
             item { Text(stringResource(R.string.order_pay_method), style = MaterialTheme.typography.titleMedium) }
-            item { FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            item { FlowRow(horizontalArrangement = Arrangement.spacedBy(spacing.space2)) {
                 state.payMethods.forEach { m ->
                     FilterChip(
                         selected = state.payMethod == m,
@@ -234,9 +250,33 @@ fun NewOrderContent(
                 }
             }
 
+            if (mixedCurrency) {
+                // The "—" total says something is wrong without saying what. This
+                // says what, and what to do about it.
+                item {
+                    NoticeBanner(
+                        role = SemanticRole.Danger,
+                        title = stringResource(R.string.order_mixed_currency_title),
+                        message = stringResource(R.string.order_mixed_currency_body),
+                    )
+                }
+            }
+
+            if (state.saveFailed) {
+                // The write failed and the draft survived, so the honest thing to
+                // say is that nothing was lost and the button is still there.
+                item {
+                    NoticeBanner(
+                        role = SemanticRole.Danger,
+                        title = stringResource(R.string.order_save_failed_title),
+                        message = stringResource(R.string.order_save_failed_body),
+                    )
+                }
+            }
+
             item { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(stringResource(R.string.order_total), style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(spacing.space2))
                 Text(
                     // No total across currencies: see NewOrderViewModel.selectedCurrency.
                     selectedCurrency
@@ -249,10 +289,10 @@ fun NewOrderContent(
 
             item { Button(
                 onClick = { actions.save(onCreated) },
-                enabled = state.canSave && !state.saving,
+                enabled = state.canSave && !state.saving && !mixedCurrency,
                 modifier = Modifier.fillMaxWidth()
             ) { Text(stringResource(R.string.order_save)) } }
-            item { Spacer(Modifier.height(24.dp)) }
+            item { Spacer(Modifier.height(spacing.space6)) }
         }
     }
 }

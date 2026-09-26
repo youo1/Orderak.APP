@@ -33,6 +33,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -59,6 +60,7 @@ import androidx.navigation.toRoute
 import app.orderak.seller.R
 import app.orderak.seller.app.navigation.CustomerRoute
 import app.orderak.seller.core.ui.FeatureAvailability
+import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 import app.orderak.seller.data.billing.FeatureAvailabilityResolver
 import app.orderak.seller.data.billing.FeatureKeys.EDITABLE_CUSTOMER_PROFILES
 import app.orderak.seller.data.db.CustomerEntity
@@ -160,6 +162,7 @@ fun CustomerDetailsScreen(
     val orders by viewModel.orders.collectAsStateWithLifecycle()
     val customer by viewModel.customer.collectAsStateWithLifecycle()
     val saved by viewModel.saved.collectAsStateWithLifecycle()
+    val saveFailed by viewModel.saveFailed.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -184,6 +187,37 @@ fun CustomerDetailsScreen(
         if (saved) {
             snackbarHostState.showSnackbar(savedMessage)
             viewModel.savedShown()
+        }
+    }
+
+    // The other half of the same conversation, and it was missing.
+    //
+    // `save` has always reported a refusal through `saveFailed`, and
+    // `saveFailureShown` existed to clear it — with no caller. Nothing collected
+    // the flag, so a refused edit produced no snackbar, no message and no change
+    // on screen: the seller tapped Save, watched nothing happen, and closed the
+    // screen believing the correction was kept. The class comment on `save` says
+    // a customer edit is Class A and that reporting success on a write that never
+    // left the device is the failure it replaced — and the failure path still did
+    // exactly that, by saying nothing at all.
+    //
+    // The action is the remedy, not decoration: the values are still in the
+    // fields, so retrying is the same call with the same arguments.
+    val saveFailedMessage = stringResource(R.string.customer_save_failed)
+    val retryLabel = stringResource(R.string.common_retry)
+    LaunchedEffect(saveFailed) {
+        if (saveFailed) {
+            val result = snackbarHostState.showSnackbar(
+                message = saveFailedMessage,
+                actionLabel = retryLabel,
+            )
+            // Cleared before the retry, not after: a retry that fails again sets
+            // the flag straight back to true, and clearing it afterwards would
+            // swallow that second failure.
+            viewModel.saveFailureShown()
+            if (result == SnackbarResult.ActionPerformed) {
+                viewModel.save(name.orEmpty(), altContact.orEmpty(), note.orEmpty())
+            }
         }
     }
 
@@ -237,6 +271,8 @@ fun CustomerDetailsContent(
     onOpenOrder: (Long) -> Unit,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
+    // The screen's rhythm, from the system rather than written per call site.
+    val spacing = LocalOrderakSpacing.current
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -264,7 +300,7 @@ fun CustomerDetailsContent(
                 start = 16.dp, end = 16.dp, bottom = 16.dp,
                 top = padding.calculateTopPadding() + 8.dp,
             ),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(spacing.space2)
         ) {
             item {
                 CustomerProfileSection(
@@ -285,14 +321,14 @@ fun CustomerDetailsContent(
                 Text(
                     stringResource(R.string.customer_orders_heading),
                     style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(top = 16.dp).semantics { heading() },
+                    modifier = Modifier.padding(top = spacing.space4).semantics { heading() },
                 )
             }
 
             if (orders != null && orders.isEmpty()) {
                 item {
                     Box(
-                        modifier = Modifier.fillMaxWidth().padding(32.dp),
+                        modifier = Modifier.fillMaxWidth().padding(spacing.space8),
                         contentAlignment = Alignment.Center,
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -302,7 +338,7 @@ fun CustomerDetailsContent(
                                 modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            Spacer(Modifier.height(16.dp))
+                            Spacer(Modifier.height(spacing.space4))
                             Text(
                                 stringResource(R.string.orders_empty),
                                 style = MaterialTheme.typography.bodyLarge,
@@ -331,7 +367,10 @@ private fun CustomerProfileSection(
     onSave: () -> Unit,
     onContact: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+
+    // This section is its own composable, so it reads the scale itself.
+    val spacing = LocalOrderakSpacing.current
+    Column(verticalArrangement = Arrangement.spacedBy(spacing.space2)) {
         // The phone is shown, never edited. It is the customer's identity: an
         // edit that changed it would silently be a different customer and would
         // take the order history with it. The server refuses one for the same
@@ -351,7 +390,7 @@ private fun CustomerProfileSection(
         if (customer != null && customer.phoneStatus != "valid") {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(spacing.space2),
             ) {
                 Icon(
                     Icons.Outlined.Info,
@@ -391,13 +430,13 @@ private fun CustomerProfileSection(
             modifier = Modifier.fillMaxWidth(),
         )
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(spacing.space2)) {
             OutlinedButton(onClick = onContact, enabled = customer != null) {
                 Icon(Icons.Outlined.Chat, contentDescription = null)
-                Spacer(Modifier.height(0.dp))
+                Spacer(Modifier.height(spacing.space0))
                 Text(
                     stringResource(R.string.customer_contact),
-                    modifier = Modifier.padding(start = 8.dp),
+                    modifier = Modifier.padding(start = spacing.space2),
                 )
             }
             if (editable) {
@@ -413,7 +452,7 @@ private fun CustomerProfileSection(
         if (!editable) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(spacing.space2),
             ) {
                 Icon(
                     Icons.Outlined.Lock,

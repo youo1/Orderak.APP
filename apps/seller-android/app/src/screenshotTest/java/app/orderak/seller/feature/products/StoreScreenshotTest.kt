@@ -66,6 +66,7 @@ private fun store(
                 onEdit = {},
                 onShare = {},
                 onShowStuck = {},
+                onRetry = {},
             )
         }
     }

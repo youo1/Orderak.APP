@@ -21,26 +21,19 @@ import androidx.lifecycle.viewModelScope
 import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 import app.orderak.seller.R
 import app.orderak.seller.core.money.formatAmountLabel
+import app.orderak.seller.core.read.RestartableRead
 import app.orderak.seller.core.text.formatCount
 import app.orderak.seller.core.ui.PriorityListRow
 import app.orderak.seller.data.db.CustomerSummary
 import app.orderak.seller.data.orders.OrderRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
 @HiltViewModel
 class CustomersViewModel @Inject constructor(repo: OrderRepository) : ViewModel() {
-    /** True after [customers] falls back to empty because its Room `Flow` threw. */
-    private val _loadError = MutableStateFlow(false)
-    val loadError: StateFlow<Boolean> = _loadError.asStateFlow()
 
     /**
      * The customer list, or null while it is still being derived.
@@ -48,16 +41,20 @@ class CustomersViewModel @Inject constructor(repo: OrderRepository) : ViewModel(
      * Seeded `emptyList()` before, which made "not read yet" and "you have no
      * customers" the same value — and this list is AGGREGATED from orders on the
      * device, so it is the slowest of the three to arrive.
+     *
+     * A thrown read used to be terminal: `catch` ended the upstream, so the list
+     * stayed empty and no sync could replace it. See [RestartableRead].
      */
+    private val read = RestartableRead { repo.customers }
+
+    /** True while the local read is failing, so the surface can offer a retry. */
+    val loadError: StateFlow<Boolean> = read.failed
+
     val customers: StateFlow<List<CustomerSummary>?> =
-        repo.customers
-            .onEach { _loadError.value = false }
-            .catch { e ->
-                if (e is CancellationException) throw e
-                _loadError.value = true
-                emit(emptyList())
-            }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+        read.values.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** Run the local read again after it threw. */
+    fun retry() = read.retry()
 }
 
 /** S11 — phone-keyed customer list with LTV. */
@@ -76,6 +73,7 @@ fun CustomersScreen(
         query = query,
         onQueryChange = { query = it },
         onOpen = onOpen,
+        onRetry = viewModel::retry,
     )
 }
 

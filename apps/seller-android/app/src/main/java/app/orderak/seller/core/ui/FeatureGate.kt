@@ -101,11 +101,11 @@ private fun LockedByPlanNotice(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             SemanticRole.Commerce.icon?.let {
-                Icon(imageVector = it, contentDescription = null, modifier = Modifier.size(20.dp))
+                Icon(imageVector = it, contentDescription = null, modifier = Modifier.size(spacing.iconMedium))
             }
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
+                verticalArrangement = Arrangement.spacedBy(spacing.space1),
             ) {
                 Text(
                     text = stringResource(R.string.gate_locked_by_plan_title),
@@ -145,7 +145,7 @@ private fun NotBuiltNotice(modifier: Modifier = Modifier) {
         ) {
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
+                verticalArrangement = Arrangement.spacedBy(spacing.space1),
             ) {
                 Text(
                     text = stringResource(R.string.gate_not_built_title),

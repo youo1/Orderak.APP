@@ -57,6 +57,7 @@ fun OrdersContent(
     onOpen: (Long) -> Unit,
     onNew: () -> Unit,
     onFilter: (OrdersFilter) -> Unit,
+    onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val spacing = LocalOrderakSpacing.current
@@ -69,7 +70,15 @@ fun OrdersContent(
             // that actually threw, rather than one still in flight. Falls back to
             // an empty list upstream so this does not fight the loading check
             // below for the same null.
-            FullScreenError(message = stringResource(R.string.error_unknown))
+            //
+            // The retry is the point. This state used to be a dead end: the read
+            // that failed could not be re-run, so the seller's only way out was
+            // to kill the app. `FullScreenError` had accepted an `onRetry` all
+            // along — nothing passed one.
+            FullScreenError(
+                message = stringResource(R.string.error_unknown),
+                onRetry = onRetry,
+            )
         } else if (list == null) {
             // The state this screen declared and never had. An empty list stood
             // in for "not read yet", so the empty state — whose action is
@@ -147,7 +156,7 @@ fun OrdersContent(
                         items(list, key = { it.id }) { o ->
                             OrderCard(o, refused = o.id in state.refusedPushes, onClick = { onOpen(o.id) })
                         }
-                        item { Spacer(Modifier.height(80.dp)) }
+                        item { Spacer(Modifier.height(spacing.fabClearance)) }
                     }
                 }
             }

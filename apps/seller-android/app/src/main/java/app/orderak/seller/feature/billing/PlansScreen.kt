@@ -50,6 +50,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 
 data class PlansUiState(
     val loading: Boolean = true,
@@ -128,6 +129,7 @@ fun PlansContent(
     onBack: () -> Unit,
     onRetry: () -> Unit,
 ) {
+    val spacing = LocalOrderakSpacing.current
     Scaffold(
         topBar = {
             TopAppBar(
@@ -147,7 +149,7 @@ fun PlansContent(
                 onRetry = onRetry,
             )
             state.plans.isEmpty() -> Column(
-                Modifier.fillMaxSize().padding(padding).padding(32.dp),
+                Modifier.fillMaxSize().padding(padding).padding(spacing.space8),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -160,6 +162,7 @@ fun PlansContent(
 
 @Composable
 private fun PlanComparison(state: PlansUiState, padding: PaddingValues) {
+    val spacing = LocalOrderakSpacing.current
     val columnScroll = rememberScrollState()
     LazyColumn(
         Modifier.fillMaxSize(),
@@ -167,7 +170,7 @@ private fun PlanComparison(state: PlansUiState, padding: PaddingValues) {
             start = 16.dp, end = 16.dp, bottom = 16.dp,
             top = padding.calculateTopPadding() + 8.dp,
         ),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(spacing.space2),
     ) {
         item {
             // Said once, at the top, rather than as a disabled button beside
@@ -176,7 +179,7 @@ private fun PlanComparison(state: PlansUiState, padding: PaddingValues) {
             if (!state.purchaseOpen) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.space2),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Icon(
@@ -198,14 +201,14 @@ private fun PlanComparison(state: PlansUiState, padding: PaddingValues) {
                 Text(
                     stringResource(R.string.plans_feature_column),
                     style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.width(160.dp).padding(vertical = 8.dp),
+                    modifier = Modifier.width(160.dp).padding(vertical = spacing.space2),
                 )
                 state.plans.forEach { plan ->
                     Text(
                         text = plan.name,
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = if (plan.plan_key == state.currentPlanKey) FontWeight.Bold else FontWeight.Normal,
-                        modifier = Modifier.width(110.dp).padding(vertical = 8.dp),
+                        modifier = Modifier.width(110.dp).padding(vertical = spacing.space2),
                     )
                 }
             }
@@ -217,7 +220,7 @@ private fun PlanComparison(state: PlansUiState, padding: PaddingValues) {
                 Text(
                     row.name,
                     style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.width(160.dp).padding(vertical = 8.dp),
+                    modifier = Modifier.width(160.dp).padding(vertical = spacing.space2),
                 )
                 state.plans.forEach { plan ->
                     val raw = row.values[plan.plan_key]
@@ -238,7 +241,7 @@ private fun PlanComparison(state: PlansUiState, padding: PaddingValues) {
                             else -> "—"
                         },
                         style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.width(110.dp).padding(vertical = 8.dp),
+                        modifier = Modifier.width(110.dp).padding(vertical = spacing.space2),
                     )
                 }
             }
@@ -249,7 +252,7 @@ private fun PlanComparison(state: PlansUiState, padding: PaddingValues) {
                 stringResource(R.string.plans_price_note),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 16.dp),
+                modifier = Modifier.padding(top = spacing.space4),
             )
         }
     }

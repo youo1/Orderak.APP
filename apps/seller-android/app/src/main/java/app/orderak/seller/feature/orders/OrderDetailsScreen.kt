@@ -61,6 +61,8 @@ import app.orderak.seller.data.db.OrderWithItems
 import app.orderak.seller.core.money.formatAmountLabel
 import app.orderak.seller.core.text.formatCount
 import app.orderak.seller.core.ui.FeatureGate
+import app.orderak.seller.core.ui.FullScreenEmpty
+import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 import app.orderak.seller.data.billing.FeatureKeys.OCR_RECEIPT_ASSISTANCE
 import app.orderak.seller.data.db.PaymentEntity
 import app.orderak.seller.domain.OrderStatus
@@ -82,6 +84,7 @@ fun OrderDetailsScreen(
     // the screen so money and dates cannot end up on different numeral systems.
     val locale = LocalConfiguration.current.locales[0]
     val orderWithItems by viewModel.order.collectAsStateWithLifecycle()
+    val answered by viewModel.answered.collectAsStateWithLifecycle()
     val payments by viewModel.payments.collectAsStateWithLifecycle()
     val countryIso by viewModel.countryIso.collectAsStateWithLifecycle()
     val proof by viewModel.proof.collectAsStateWithLifecycle()
@@ -103,6 +106,7 @@ fun OrderDetailsScreen(
 
     OrderDetailsContent(
         orderWithItems = orderWithItems,
+        answered = answered,
         payments = payments,
         countryIso = countryIso,
         proof = proof,
@@ -150,6 +154,11 @@ data class OrderDetailsActions(
 @Composable
 fun OrderDetailsContent(
     orderWithItems: OrderWithItems?,
+    /**
+     * True once the query has answered. Without it a missing order is
+     * indistinguishable from an unread one. See `OrderDetailsViewModel.answered`.
+     */
+    answered: Boolean,
     payments: List<PaymentEntity>?,
     countryIso: String?,
     proof: ProofUiState,
@@ -174,9 +183,45 @@ fun OrderDetailsContent(
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     val locale = LocalConfiguration.current.locales[0]
+    // The screen's rhythm, from the system. Two of the values here were off the
+    // 4dp scale - a 6dp gap and a 2dp divider inset - and are the reason this
+    // screen's baselines move; 6 and 2 are not on the scale and never were.
+    val spacing = LocalOrderakSpacing.current
     val data = orderWithItems
     if (data == null) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        if (!answered) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            return
+        }
+        // The query answered and there is no such order. This used to be the same
+        // branch as "not read yet", so the page waited for ever on a row that was
+        // never coming — and there was no top bar to escape with either, because
+        // the Scaffold below is drawn after the null check. The back control is
+        // not decoration here: without it the screen is a trap.
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text(
+                            stringResource(R.string.order_details_missing_title),
+                            modifier = Modifier.semantics { heading() },
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.common_back),
+                            )
+                        }
+                    },
+                )
+            },
+        ) { padding ->
+            Box(Modifier.fillMaxSize().padding(padding)) {
+                FullScreenEmpty(message = stringResource(R.string.order_details_missing_body))
+            }
+        }
         return
     }
     val order = data.order
@@ -211,7 +256,7 @@ fun OrderDetailsContent(
                             color = MaterialTheme.colorScheme.error
                         )
                     }
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(spacing.space2))
                     Text(stringResource(R.string.payment_disclaimer),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -250,8 +295,8 @@ fun OrderDetailsContent(
         }
     ) { padding ->
         Column(
-            Modifier.fillMaxSize().padding(padding).padding(16.dp).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            Modifier.fillMaxSize().padding(padding).padding(spacing.space4).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(spacing.space3)
         ) {
             // Above the order, not below it. A seller who opens this screen to
             // check whether the order is safe should not have to scroll to find
@@ -264,7 +309,7 @@ fun OrderDetailsContent(
             }
 
             Card {
-                Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                Column(Modifier.fillMaxWidth().padding(spacing.space3)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(order.buyerName ?: order.buyerPhone, style = MaterialTheme.typography.titleMedium)
@@ -289,27 +334,27 @@ fun OrderDetailsContent(
                         StatusChip(status)
                     }
                     order.note?.let {
-                        Spacer(Modifier.height(8.dp))
+                        Spacer(Modifier.height(spacing.space2))
                         Text(it, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }
 
             Card {
-                Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                Column(Modifier.fillMaxWidth().padding(spacing.space3)) {
                     data.items.forEach { item ->
-                        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                        Row(Modifier.fillMaxWidth().padding(vertical = spacing.space1)) {
                             Text(
                                 "${formatCount(item.qty, locale)}×",
                                 style = MaterialTheme.typography.bodyMedium,
                             )
-                            Spacer(Modifier.width(8.dp))
+                            Spacer(Modifier.width(spacing.space2))
                             Text(item.productName, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                             Text(formatAmountLabel(item.qty * item.priceMinor, order.currency, locale),
                                 style = MaterialTheme.typography.bodyMedium)
                         }
                     }
-                    HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                    HorizontalDivider(Modifier.padding(vertical = spacing.space2))
                     Row(Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.order_total), Modifier.weight(1f),
                             style = MaterialTheme.typography.titleMedium)
@@ -323,13 +368,13 @@ fun OrderDetailsContent(
             // Payment section (S6a) — only until Paid
             if (status == OrderStatus.NEW || status == OrderStatus.CONFIRMED) {
                 Card {
-                    Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(spacing.space3), verticalArrangement = Arrangement.spacedBy(spacing.space2)) {
                         Text(stringResource(R.string.payment_section_title), style = MaterialTheme.typography.titleMedium)
                         Text(payMethodLabel(runCatching { PayMethod.valueOf(order.payMethod) }.getOrDefault(PayMethod.COD)), style = MaterialTheme.typography.bodyMedium)
                         if (proof is ProofUiState.Running) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 CircularProgressIndicator(Modifier.width(24.dp).height(24.dp))
-                                Spacer(Modifier.width(12.dp))
+                                Spacer(Modifier.width(spacing.space3))
                                 Text(stringResource(R.string.payment_checking))
                             }
                         } else {
@@ -355,7 +400,7 @@ fun OrderDetailsContent(
             // Payment history
             if (!payments.isNullOrEmpty()) {
                 Card {
-                    Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(spacing.space3), verticalArrangement = Arrangement.spacedBy(spacing.space1)) {
                         Text(stringResource(R.string.payment_history_title), style = MaterialTheme.typography.titleMedium)
                         val dateFormat = remember(locale) {
                             SimpleDateFormat("yyyy-MM-dd HH:mm", locale)
@@ -365,7 +410,7 @@ fun OrderDetailsContent(
                                 Column(Modifier.weight(1f)) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Text(stringResource(R.string.payment_ref_label, payment.ref), style = MaterialTheme.typography.bodyMedium)
-                                        Spacer(Modifier.width(6.dp))
+                                        Spacer(Modifier.width(spacing.space1))
                                         Text(
                                             if (payment.verified) stringResource(R.string.payment_verified_badge)
                                             else stringResource(R.string.payment_flagged_badge),
@@ -385,7 +430,7 @@ fun OrderDetailsContent(
                                 }
                             }
                             if (payment != payments.last()) {
-                                HorizontalDivider(Modifier.padding(vertical = 2.dp))
+                                HorizontalDivider(Modifier.padding(vertical = spacing.space1))
                             }
                         }
                     }
@@ -420,7 +465,7 @@ fun OrderDetailsContent(
                     Text(stringResource(R.string.order_cancel), color = MaterialTheme.colorScheme.error)
                 }
             }
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(spacing.space6))
         }
     }
 

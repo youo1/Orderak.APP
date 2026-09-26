@@ -55,7 +55,7 @@ private fun customers(
 ) {
     OrderakTheme(darkTheme = dark) {
         Surface {
-            CustomersContent(state = state, query = query, onQueryChange = {}, onOpen = {})
+            CustomersContent(state = state, query = query, onQueryChange = {}, onOpen = {}, onRetry = {})
         }
     }
 }

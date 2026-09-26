@@ -167,6 +167,10 @@
     <string name="settings_payout_saved">Coordonnées de paiement enregistrées</string>
     <string name="settings_logout">Déconnexion</string>
     <string name="settings_delete_account">Demander la suppression du compte</string>
+    <string name="settings_account_actions">Actions du compte</string>
+    <string name="settings_app_language">Langue de l’application</string>
+    <string name="settings_store_group_title">Boutique et identité</string>
+    <string name="settings_devices_group_title">Appareils et abonnement</string>
     <!-- Backend link -->
     <string name="settings_link_title">Lien de votre catalogue</string>
     <string name="settings_slug_label">Nom du lien (lettres anglaises)</string>
@@ -482,4 +486,17 @@
     <string name="products_stuck_discard">Supprimer</string>
     <string name="products_stuck_discard_title">Supprimer %1$s ?</string>
     <string name="products_stuck_discard_confirm">Ce produit n\'est enregistré que sur ce téléphone et votre compte ne l\'a jamais reçu : le supprimer ici le supprime partout. Cette action est irréversible.</string>
+    <string name="customer_save_failed">Impossible d\'enregistrer le client. Rien n\'a été modifié — réessayez.</string>
+    <string name="device_revoke_title">Révoquer %1$s ?</string>
+    <string name="device_revoke_confirm">Cet appareil est déconnecté immédiatement et devra se reconnecter. Vos autres appareils ne sont pas affectés.</string>
+    <string name="ai_reset_confirm">Cela efface la conversation sur ce téléphone. Rien ne change dans votre boutique, votre catalogue ou vos commandes.</string>
+    <string name="order_mixed_currency_title">Une seule devise par commande</string>
+    <string name="order_mixed_currency_body">Les produits choisis sont facturés dans des devises différentes : ils ne peuvent pas figurer sur une même commande. Retirez les lignes qui ne correspondent pas, ou enregistrez une commande séparée.</string>
+    <string name="order_save_failed_title">Impossible d\'enregistrer la commande</string>
+    <string name="order_save_failed_body">Rien n\'a été enregistré. Votre brouillon est toujours là : réessayez.</string>
+    <string name="order_details_missing_title">Commande introuvable</string>
+    <string name="order_details_missing_body">Cette commande n\'est pas enregistrée sur ce téléphone. Elle a peut-être été supprimée, ou elle n\'est pas encore arrivée de votre compte — revenez et actualisez la liste des commandes.</string>
+    <string name="store_info_save_failed">Impossible d\'enregistrer votre boutique — rien n\'a été modifié</string>
+    <string name="support_reply_failed">Votre réponse n\'a pas été envoyée — elle est toujours dans le champ</string>
+    <string name="store_info_upload_failed">L\'image n\'a pas été téléversée — choisissez-la à nouveau, ou enregistrez sans elle</string>
 </resources>

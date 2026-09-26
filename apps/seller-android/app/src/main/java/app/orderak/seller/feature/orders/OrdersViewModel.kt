@@ -2,19 +2,17 @@ package app.orderak.seller.feature.orders
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.orderak.seller.core.read.RestartableRead
 import app.orderak.seller.data.db.OrderEntity
 import app.orderak.seller.data.orders.OrderRepository
 import app.orderak.seller.domain.OrderStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
@@ -41,19 +39,12 @@ class OrdersViewModel @Inject constructor(
      * than a flicker, because the empty state's action is to create an order —
      * and a seller who takes it has now recorded a duplicate of one they already
      * had.
-     */
-    /**
-     * True after [orders] falls back to empty because its Room `Flow` threw.
      *
-     * Rare in practice — Room rarely throws under normal operation — but
-     * un-guarded before this: an uncaught exception here failed the collector
-     * silently, and the screen was left on its loading spinner with nothing
-     * telling the seller (or a crash report) that anything had gone wrong.
+     * A thrown Room read used to be terminal here: `catch` ended the upstream, so
+     * the empty list it emitted was the last value the surface would ever see and
+     * nothing — no re-read, no sync — could replace it. See [RestartableRead].
      */
-    private val _loadError = MutableStateFlow(false)
-    val loadError: StateFlow<Boolean> = _loadError.asStateFlow()
-
-    val orders: StateFlow<List<OrderEntity>?> =
+    private val read = RestartableRead {
         combine(repo.orders, filter) { list, f ->
             // One evaluation of `now` for the whole list, so a list crossing
             // midnight mid-filter cannot include an order by one row and exclude
@@ -61,13 +52,16 @@ class OrdersViewModel @Inject constructor(
             val now = System.currentTimeMillis()
             list.filter { f.matches(it, now) }
         }
-            .onEach { _loadError.value = false }
-            .catch { e ->
-                if (e is CancellationException) throw e
-                _loadError.value = true
-                emit(emptyList())
-            }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    }
+
+    /** True while the local read is failing, so the surface can offer a retry. */
+    val loadError: StateFlow<Boolean> = read.failed
+
+    val orders: StateFlow<List<OrderEntity>?> =
+        read.values.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** Run the local read again after it threw. */
+    fun retry() = read.retry()
 
     /**
      * Local ids of orders the server refused, so the list can mark them apart

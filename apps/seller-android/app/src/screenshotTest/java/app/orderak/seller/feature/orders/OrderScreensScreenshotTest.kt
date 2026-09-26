@@ -71,6 +71,12 @@ private val PAYMENT = PaymentEntity(
 private fun details(
     order: OrderWithItems?,
     payments: List<PaymentEntity>?,
+    /**
+     * False by default when there is no order, which is the loading state these
+     * renders were written for. A render that wants the "no such order" state
+     * passes `answered = true` with `order = null`.
+     */
+    answered: Boolean = order != null,
     ocr: FeatureAvailability = FeatureAvailability.Available,
     proof: ProofUiState = ProofUiState.Idle,
     refusalCode: String? = null,
@@ -80,6 +86,7 @@ private fun details(
         Surface {
             OrderDetailsContent(
                 orderWithItems = order,
+                answered = answered,
                 payments = payments,
                 countryIso = "EG",
                 proof = proof,

@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -65,8 +66,26 @@ class OrderDetailsViewModel @Inject constructor(
 
     private val orderId: Long = savedStateHandle.toRoute<OrderDetailsRoute>().id
 
+    /**
+     * True once the order query has answered at least once.
+     *
+     * [order] is null both before Room answers and when there is no row with this
+     * id, and the screen treated those as one state: an order that had been
+     * removed — or a deep link to one that never existed on this phone — left the
+     * page on a spinner for ever. It had no message, and it had no top bar
+     * either, because the Scaffold is drawn after the null check, so the seller's
+     * only way back was the system back gesture.
+     *
+     * Room emits `null` for a missing id rather than staying silent, so the first
+     * emission is exactly the moment the two stop being indistinguishable.
+     */
+    private val _answered = MutableStateFlow(false)
+    val answered: StateFlow<Boolean> = _answered.asStateFlow()
+
     val order: StateFlow<OrderWithItems?> =
-        repo.order(orderId).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+        repo.order(orderId)
+            .onEach { _answered.value = true }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /**
      * null until the query answers. NOT emptyList().

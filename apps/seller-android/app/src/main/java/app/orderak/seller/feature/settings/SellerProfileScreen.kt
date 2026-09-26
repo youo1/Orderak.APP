@@ -55,6 +55,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
+import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 
 @HiltViewModel
 class SellerProfileViewModel @Inject constructor(
@@ -296,6 +297,7 @@ fun SellerProfileContent(
     onBack: () -> Unit,
     onReauthenticate: () -> Unit,
 ) {
+    val spacing = LocalOrderakSpacing.current
     Scaffold(
         topBar = {
             TopAppBar(
@@ -322,9 +324,9 @@ fun SellerProfileContent(
             Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp)
+                .padding(spacing.space4)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(spacing.space3),
         ) {
             Text(
                 stringResource(R.string.seller_profile_header),
@@ -388,7 +390,7 @@ fun SellerProfileContent(
             )
 
             Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp)) {
+                Column(Modifier.padding(spacing.space3)) {
                     Text(
                         stringResource(R.string.seller_profile_photo),
                         style = MaterialTheme.typography.titleMedium,
@@ -409,7 +411,7 @@ fun SellerProfileContent(
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(spacing.space2))
             Button(
                 onClick = {
                     onSave(fullName, email, birthYear, profilePhotoUri, onBack)

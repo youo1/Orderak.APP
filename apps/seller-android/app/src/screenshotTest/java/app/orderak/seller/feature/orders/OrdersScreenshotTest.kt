@@ -55,7 +55,7 @@ private fun orders(
 ) {
     OrderakTheme(darkTheme = dark) {
         Surface {
-            OrdersContent(state = state, onOpen = {}, onNew = {}, onFilter = {})
+            OrdersContent(state = state, onOpen = {}, onNew = {}, onFilter = {}, onRetry = {})
         }
     }
 }

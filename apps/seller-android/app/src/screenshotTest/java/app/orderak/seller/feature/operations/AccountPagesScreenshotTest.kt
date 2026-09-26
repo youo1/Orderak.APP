@@ -301,7 +301,7 @@ private fun devices(
                 onSelectPasskey = {},
                 onRename = {},
                 onRevoke = {},
-                onRevokeDevice = {},
+                onRevokeDevice = { _, _ -> },
             )
         }
     }
@@ -372,6 +372,7 @@ private fun assistant(
                 onInputChange = {},
                 onBack = {},
                 onSend = {},
+                onRetry = {},
                 onReset = {},
             )
         }

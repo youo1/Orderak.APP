@@ -165,6 +165,10 @@
     <string name="settings_payout_saved">Payout details saved</string>
     <string name="settings_logout">Log out</string>
     <string name="settings_delete_account">Request account deletion</string>
+    <string name="settings_account_actions">Account actions</string>
+    <string name="settings_app_language">App language</string>
+    <string name="settings_store_group_title">Store and identity</string>
+    <string name="settings_devices_group_title">Devices and subscription</string>
     <!-- Backend link -->
     <string name="settings_link_title">Your catalog link</string>
     <string name="settings_slug_label">Link name (English letters)</string>
@@ -477,4 +481,17 @@
     <string name="products_stuck_discard">Remove</string>
     <string name="products_stuck_discard_title">Remove %1$s?</string>
     <string name="products_stuck_discard_confirm">This product is saved on this phone only and your account never received it, so removing it here removes it everywhere. This cannot be undone.</string>
+    <string name="customer_save_failed">Couldn\'t save the customer. Nothing was changed — try again.</string>
+    <string name="device_revoke_title">Revoke %1$s?</string>
+    <string name="device_revoke_confirm">This device is signed out immediately and has to sign in again. Your other devices are not affected.</string>
+    <string name="ai_reset_confirm">This clears the conversation on this phone. Nothing in your store, catalogue or orders changes.</string>
+    <string name="order_mixed_currency_title">One currency per order</string>
+    <string name="order_mixed_currency_body">The products you picked are priced in different currencies, so they cannot go on one order. Remove the lines that do not match, or record them as a separate order.</string>
+    <string name="order_save_failed_title">Couldn\'t record the order</string>
+    <string name="order_save_failed_body">Nothing was saved. Your draft is still here, so try again.</string>
+    <string name="order_details_missing_title">Order not found</string>
+    <string name="order_details_missing_body">This order is not saved on this phone. It may have been removed, or it may not have arrived from your account yet — go back and refresh the orders list.</string>
+    <string name="store_info_save_failed">Couldn\'t save your store — nothing was changed</string>
+    <string name="support_reply_failed">Your reply wasn\'t sent — it is still in the box</string>
+    <string name="store_info_upload_failed">The image didn\'t upload — pick it again, or save without it</string>
 </resources>

@@ -45,6 +45,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 
 data class PaywallUiState(
     val limitKey: String,
@@ -137,6 +138,7 @@ fun PaywallContent(
     onBack: () -> Unit,
     onViewPlans: () -> Unit,
 ) {
+    val spacing = LocalOrderakSpacing.current
     Scaffold(
         topBar = {
             TopAppBar(
@@ -150,8 +152,8 @@ fun PaywallContent(
         },
     ) { padding ->
         Column(
-            Modifier.fillMaxSize().padding(padding).padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            Modifier.fillMaxSize().padding(padding).padding(spacing.space6),
+            verticalArrangement = Arrangement.spacedBy(spacing.space4),
         ) {
             Icon(
                 Icons.Outlined.Lock,
@@ -193,7 +195,7 @@ fun PaywallContent(
                 )
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(spacing.space2), modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(onClick = onBack) { Text(stringResource(R.string.paywall_dismiss)) }
                 Button(onClick = onViewPlans) { Text(stringResource(R.string.paywall_view_plans)) }
             }
@@ -205,7 +207,7 @@ fun PaywallContent(
             if (!state.purchaseOpen) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.space2),
                 ) {
                     Icon(
                         Icons.Outlined.Info,

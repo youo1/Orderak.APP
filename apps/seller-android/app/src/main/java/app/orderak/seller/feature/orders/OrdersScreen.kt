@@ -61,11 +61,13 @@ fun OrdersScreen(
         // The view model still keeps a status-shaped setter for the chips that
         // speak in statuses; the surface now speaks only OrdersFilter.
         onFilter = viewModel::setFilter,
+        onRetry = viewModel::retry,
     )
 }
 
 @Composable
 fun OrderCard(o: OrderEntity, refused: Boolean = false, onClick: () -> Unit) {
+    val spacing = LocalOrderakSpacing.current
     // Key the formatter by the current app locale. A global formatter would
     // keep displaying the previous language after an in-app locale switch.
     val locale = LocalConfiguration.current.locales[0]
@@ -95,12 +97,12 @@ fun OrderCard(o: OrderEntity, refused: Boolean = false, onClick: () -> Unit) {
                     formatAmountLabel(o.totalMinor, o.currency, locale),
                     style = MaterialTheme.typography.titleMedium,
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(spacing.space1))
                 StatusChip(status)
                 // An order the server has never seen sits in this list beside
                 // ones it has, and nothing else on the row tells them apart.
                 if (o.livesOnlyOnThisPhone) {
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(spacing.space1))
                     // Danger rather than warning when the server refused it:
                     // that one needs the seller and will not clear itself.
                     LocalOnlyOrderChip(refused = refused)

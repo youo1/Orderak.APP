@@ -84,7 +84,7 @@ fun UsageMeter(
         // back to a seller whose screen says ٤ / ٢٠ is the mixed row again, in
         // the one place nobody screenshots.
         modifier = modifier.semantics { contentDescription = "$label $pair" },
-        verticalArrangement = Arrangement.spacedBy(spacing.space1 + 2.dp),
+        verticalArrangement = Arrangement.spacedBy(spacing.space1 + spacing.space1),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -106,7 +106,7 @@ fun UsageMeter(
                         imageVector = glyph,
                         contentDescription = null,
                         tint = colors.solid,
-                        modifier = Modifier.size(14.dp),
+                        modifier = Modifier.size(spacing.iconSmall),
                     )
                 }
             }
@@ -128,14 +128,14 @@ fun UsageMeter(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(6.dp)
-                .clip(RoundedCornerShape(4.dp))
+                .clip(MaterialTheme.shapes.extraSmall)
                 .background(track),
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth(fraction)
                     .fillMaxHeight()
-                    .clip(RoundedCornerShape(4.dp))
+                    .clip(MaterialTheme.shapes.extraSmall)
                     .background(fill),
             )
         }
@@ -175,17 +175,17 @@ fun NoticeBanner(
         border = BorderStroke(1.dp, colors.containerOutline),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = spacing.space3 + 2.dp, vertical = spacing.space3),
-            horizontalArrangement = Arrangement.spacedBy(spacing.space2 + 2.dp),
+            modifier = Modifier.padding(horizontal = spacing.space3 + spacing.space1, vertical = spacing.space3),
+            horizontalArrangement = Arrangement.spacedBy(spacing.space2 + spacing.space1),
         ) {
             if (glyph != null) {
                 Icon(
                     imageVector = glyph,
                     contentDescription = null,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(spacing.iconMedium),
                 )
             }
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(spacing.space1)) {
                 Text(text = title, style = MaterialTheme.typography.labelLarge)
                 Text(text = message, style = MaterialTheme.typography.bodySmall)
                 if (actionLabel != null && onAction != null) {
@@ -227,15 +227,15 @@ fun PriorityListRow(
         Row(
             modifier = Modifier
                 .defaultMinSize(minHeight = spacing.minimumTouchTarget)
-                .padding(horizontal = spacing.space3 + 2.dp, vertical = spacing.space3),
-            horizontalArrangement = Arrangement.spacedBy(spacing.space2 + 2.dp),
+                .padding(horizontal = spacing.space3 + spacing.space1, vertical = spacing.space3),
+            horizontalArrangement = Arrangement.spacedBy(spacing.space2 + spacing.space1),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
                 modifier = Modifier
                     .width(4.dp)
                     .height(spacing.space6 + 8.dp)
-                    .clip(RoundedCornerShape(2.dp))
+                    .clip(MaterialTheme.shapes.extraSmall)
                     .then(
                         if (needsAction) {
                             Modifier.background(MaterialTheme.colorScheme.primary)
@@ -246,7 +246,7 @@ fun PriorityListRow(
             )
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
+                verticalArrangement = Arrangement.spacedBy(spacing.space1),
             ) {
                 Text(text = title, style = MaterialTheme.typography.titleSmall)
                 if (subtitle != null) {

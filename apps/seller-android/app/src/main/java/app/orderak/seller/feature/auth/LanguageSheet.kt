@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -23,6 +24,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.orderak.seller.R
 import app.orderak.seller.core.locale.AppLocales
+import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 
 /**
  * Language selection bottom sheet. System language is the first-launch
@@ -31,23 +33,36 @@ import app.orderak.seller.core.locale.AppLocales
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LanguageSheet(onDismiss: () -> Unit) {
+    val spacing = LocalOrderakSpacing.current
     val currentTag = AppLocales.currentTag()
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        // Only the top corners are drawn: the sheet is attached to the bottom of
+        // the window. Taking the corner from the shape scale rather than writing
+        // 24.dp here is what keeps it in step if the scale moves — a square
+        // bottom is a property of the sheet, not a second radius.
+        //
+        // All four corners are named because the CornerSize overload has no
+        // defaults; the bottom two are square on purpose, not by omission.
+        shape = RoundedCornerShape(
+            topStart = MaterialTheme.shapes.extraLarge.topStart,
+            topEnd = MaterialTheme.shapes.extraLarge.topEnd,
+            bottomEnd = CornerSize(spacing.space0),
+            bottomStart = CornerSize(spacing.space0),
+        ),
     ) {
         Column(
             Modifier
-                .padding(horizontal = 24.dp, vertical = 16.dp)
-                .padding(bottom = 32.dp),
+                .padding(horizontal = spacing.space6, vertical = spacing.space4)
+                .padding(bottom = spacing.space8),
         ) {
             Text(
                 text = stringResource(R.string.language_pick_title),
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.padding(bottom = 24.dp),
+                modifier = Modifier.padding(bottom = spacing.space6),
             )
 
             // The sheet intentionally exposes only explicit app languages.
@@ -71,14 +86,15 @@ private fun LanguageRow(
     isSelected: Boolean,
     onClick: () -> Unit,
 ) {
+    val spacing = LocalOrderakSpacing.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .padding(vertical = spacing.space2)
+            .clip(MaterialTheme.shapes.large)
             .clickable { onClick() }
-            .padding(16.dp),
+            .padding(spacing.space4),
     ) {
         Text(
             text = text,
@@ -91,7 +107,7 @@ private fun LanguageRow(
             modifier = Modifier.weight(1f),
         )
         if (isSelected) {
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(spacing.space3))
             Icon(
                 imageVector = Icons.Default.Check,
                 contentDescription = null,

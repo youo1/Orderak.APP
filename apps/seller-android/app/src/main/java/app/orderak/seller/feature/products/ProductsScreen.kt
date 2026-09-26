@@ -212,6 +212,7 @@ fun ProductsScreen(
         onAdd = onAdd,
         onLimitReached = { showLimitDialog = true },
         onEdit = onEdit,
+        onRetry = viewModel::retry,
         onShare = {
             scope.launch {
                 val url = storeUrl

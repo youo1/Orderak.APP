@@ -268,7 +268,7 @@ private fun CounterCard(
                         TodayCounter.ToShip -> Icons.Outlined.LocalShipping
                     },
                     contentDescription = null,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(spacing.iconSmall),
                 )
                 Spacer(Modifier.weight(1f))
                 // Says the card goes somewhere. Without it the counters read as

@@ -184,6 +184,10 @@
     <string name="settings_payout_saved">تم حفظ بيانات التحصيل</string>
     <string name="settings_logout">تسجيل خروج</string>
     <string name="settings_delete_account">طلب حذف الحساب</string>
+    <string name="settings_account_actions">إجراءات الحساب</string>
+    <string name="settings_app_language">لغة التطبيق</string>
+    <string name="settings_store_group_title">المتجر والهوية</string>
+    <string name="settings_devices_group_title">الأجهزة والاشتراك</string>
     <!-- Backend link -->
     <string name="settings_link_title">لينك الكتالوج بتاعك</string>
     <string name="settings_slug_label">اسم اللينك (حروف إنجليزية)</string>
@@ -505,4 +509,17 @@
     <string name="products_stuck_discard">امسح</string>
     <string name="products_stuck_discard_title">تمسح %1$s؟</string>
     <string name="products_stuck_discard_confirm">المنتج ده متسجل على الموبايل ده بس وحسابك ما استلمهوش، يعني لو مسحته من هنا هيتمسح خالص. مفيش رجوع.</string>
+    <string name="customer_save_failed">مقدرناش نحفظ بيانات العميل. مفيش حاجة اتغيرت — جرّب تاني.</string>
+    <string name="device_revoke_title">تسحب صلاحية %1$s؟</string>
+    <string name="device_revoke_confirm">الجهاز ده هيتسجّل خروجه فورًا وهيلزمه يسجّل دخول تاني. باقي أجهزتك مش هتتأثر.</string>
+    <string name="ai_reset_confirm">ده هيمسح المحادثة على الموبايل ده بس. مفيش حاجة في متجرك أو منتجاتك أو طلباتك هتتغير.</string>
+    <string name="order_mixed_currency_title">عملة واحدة لكل طلب</string>
+    <string name="order_mixed_currency_body">المنتجات اللي اخترتها بأسعار بعملات مختلفة، فمينفعش يبقوا في طلب واحد. شيل السطور اللي مش متوافقة، أو سجّلهم في طلب منفصل.</string>
+    <string name="order_save_failed_title">مقدرناش نسجّل الأوردر</string>
+    <string name="order_save_failed_body">مفيش حاجة اتحفظت. المسودة لسه موجودة زي ما هي، فجرّب تاني.</string>
+    <string name="order_details_missing_title">الطلب مش موجود</string>
+    <string name="order_details_missing_body">الطلب ده مش متسجّل على الموبايل. ممكن يكون اتمسح، أو لسه ما وصلش من حسابك — ارجع وحدّث قايمة الطلبات.</string>
+    <string name="store_info_save_failed">مقدرناش نحفظ بيانات المتجر — مفيش حاجة اتغيرت</string>
+    <string name="support_reply_failed">ردّك ماتبعتش — لسه موجود في الخانة</string>
+    <string name="store_info_upload_failed">الصورة ماترفعتش — اختارها تاني، أو احفظ من غيرها</string>
 </resources>

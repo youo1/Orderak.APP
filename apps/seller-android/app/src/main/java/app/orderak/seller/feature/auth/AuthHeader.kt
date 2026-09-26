@@ -26,7 +26,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.orderak.seller.core.ui.theme.LocalOrderakMotion
 import app.orderak.seller.R
+import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 
 /**
  * AuthHeader — reusable branding header shown at the top of phone entry.
@@ -40,6 +42,11 @@ fun AuthHeader(
     variant: AuthHeaderVariant = AuthHeaderVariant.PhoneEntry,
     modifier: Modifier = Modifier,
 ) {
+    val spacing = LocalOrderakSpacing.current
+    // One duration for the whole header, from the system. It was `tween(300)`
+    // written twice at the call sites — longer than any value the design system
+    // names, and unreadable by the reduced-motion switch this reads.
+    val motion = LocalOrderakMotion.current
     Column(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -48,7 +55,7 @@ fun AuthHeader(
         Box(
             modifier = Modifier
                 .size(88.dp)
-                .clip(RoundedCornerShape(28.dp))
+                .clip(MaterialTheme.shapes.extraLarge)
                 .background(
                     MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
                 ),
@@ -62,13 +69,13 @@ fun AuthHeader(
             )
         }
 
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(spacing.space8))
 
         // ── 2. Title ───────────────────────────────────────────────
         AnimatedVisibility(
             visible = variant == AuthHeaderVariant.PhoneEntry,
-            enter = slideInVertically { 20 } + fadeIn(tween(300)),
-            exit = slideOutVertically { 20 } + fadeOut(tween(300)),
+            enter = slideInVertically { 20 } + fadeIn(tween(motion.long)),
+            exit = slideOutVertically { 20 } + fadeOut(tween(motion.long)),
         ) {
             Text(
                 text = stringResource(R.string.auth_title),
@@ -78,7 +85,7 @@ fun AuthHeader(
             )
         }
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(spacing.space3))
 
         // ── 3. Subtitle ────────────────────────────────────────────
         Text(
@@ -89,7 +96,7 @@ fun AuthHeader(
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 24.dp),
+            modifier = Modifier.padding(horizontal = spacing.space6),
         )
     }
 }
