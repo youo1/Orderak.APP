@@ -76,6 +76,12 @@
     <string name="dash_today_orders">أوردرات النهاردة</string>
     <string name="dash_unpaid">لسه مدفعوش</string>
     <string name="dash_to_ship">جاهز للشحن</string>
+    <string name="dash_needs_you">محتاجك دلوقتي</string>
+    <string name="dash_nothing_needs_you">مفيش حاجة مستنياك دلوقتي</string>
+    <string name="dash_nothing_needs_you_body">الأوردرات الجديدة، واللي لسه مدفعوش، وأي حاجة جاهزة للشحن هتظهر هنا.</string>
+    <string name="dash_day_so_far">النهاردة لحد دلوقتي</string>
+    <string name="dash_count_unknown">لسه</string>
+    <string name="dash_open_orders">افتح الطلبات</string>
     <string name="dash_empty_title">متجرك جاهز!</string>
     <string name="dash_empty_body_v2">ضيف أول منتج من تاب المنتجات وبعدين شارك الكتالوج على واتساب</string>
     <string name="dash_share_catalog">شارك الكتالوج</string>

@@ -72,6 +72,16 @@
     <string name="dash_today_orders">Today\'s orders</string>
     <string name="dash_unpaid">Unpaid</string>
     <string name="dash_to_ship">To ship</string>
+    <!-- The two halves of اليوم: what is waiting on the seller, and what merely
+         happened. G2 asks the surface to answer "what needs me now" at first
+         paint, which is a claim about hierarchy — three equal counters cannot
+         make it, and neither can silence when the answer is "nothing". -->
+    <string name="dash_needs_you">Needs you now</string>
+    <string name="dash_nothing_needs_you">Nothing is waiting on you right now</string>
+    <string name="dash_nothing_needs_you_body">New orders, unpaid orders and anything ready to ship appear here.</string>
+    <string name="dash_day_so_far">Today so far</string>
+    <string name="dash_count_unknown">Not yet</string>
+    <string name="dash_open_orders">Open the orders</string>
     <string name="dash_empty_title">Your shop is ready!</string>
     <string name="dash_empty_body_v2">Add your first product from the Products tab, then share your catalog on WhatsApp</string>
     <string name="dash_share_catalog">Share catalog</string>

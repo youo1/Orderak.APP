@@ -71,6 +71,8 @@ export const RENDERS = {
   todayOfflineDark: { kind: "screen", contract: "today", offline: true, theme: "dark" },
   todayGreyscale: { kind: "component", note: "اليوم counters survive greyscale — colour is never the only carrier" },
   todayContentEnglish: { kind: "component", note: "the اليوم counters in English — the control for the Arabic digits" },
+  todayNothingWaitingLight: { kind: "component", note: "G2's other answer: nothing is waiting, said in words rather than left as three neutral zeros the seller has to add up" },
+  todayNothingWaitingDark: { kind: "component", note: "the same sentence in dark" },
 
   // ---- components, not screens ----
   // Each of these renders a shared component with a surface's copy in it. That

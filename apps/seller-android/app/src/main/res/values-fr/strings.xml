@@ -72,6 +72,12 @@
     <string name="dash_today_orders">Commandes d\'aujourd\'hui</string>
     <string name="dash_unpaid">Non payé</string>
     <string name="dash_to_ship">À expédier</string>
+    <string name="dash_needs_you">Vous attend</string>
+    <string name="dash_nothing_needs_you">Rien ne vous attend pour le moment</string>
+    <string name="dash_nothing_needs_you_body">Les nouvelles commandes, celles non payées et tout ce qui est prêt à expédier apparaîtront ici.</string>
+    <string name="dash_day_so_far">Aujourd’hui jusqu’ici</string>
+    <string name="dash_count_unknown">Pas encore</string>
+    <string name="dash_open_orders">Ouvrir les commandes</string>
     <string name="dash_empty_title">Votre boutique est prête !</string>
     <string name="dash_empty_body_v2">Ajoutez votre premier produit depuis l\'onglet Produits, puis partagez votre catalogue sur WhatsApp</string>
     <string name="dash_share_catalog">Partager le catalogue</string>

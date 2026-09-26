@@ -35,6 +35,8 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.orderak.seller.R
@@ -144,29 +146,113 @@ fun TodayScreen(
             }
         }
 
+        // ── What is waiting on the seller ──
+        //
+        // These three counters were one row of equal weight, so the surface
+        // answered "here are three numbers" rather than this contract's question,
+        // which is "what needs me now". The enum above already ranks them —
+        // Unpaid is "the one worth interrupting a seller for" — and the layout
+        // contradicted the code that draws it. Unpaid and to-ship are the two that
+        // are waiting on somebody; today's total is a figure, not a request, and
+        // it moved below.
         item {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(spacing.space2),
+            Text(
+                stringResource(R.string.dash_needs_you),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.semantics { heading() },
+            )
+        }
+
+        val unpaidValue = state.unpaidCount
+        val toShipValue = state.toShipCount
+        val waiting = buildList {
+            unpaidValue?.takeIf { it > 0 }?.let { add(TodayCounter.Unpaid to it) }
+            toShipValue?.takeIf { it > 0 }?.let { add(TodayCounter.ToShip to it) }
+        }
+        val countsKnown = unpaidValue != null && toShipValue != null
+        item {
+            when {
+                // Still reading. The cards keep their shape with a skeleton inside,
+                // because "not known yet" and "none" are different facts.
+                !countsKnown -> Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.space2),
+                ) {
+                    CounterCard(
+                        counter = TodayCounter.Unpaid,
+                        value = null,
+                        onClick = { onOpenCounter(TodayCounter.Unpaid) },
+                        modifier = Modifier.weight(1f),
+                    )
+                    CounterCard(
+                        counter = TodayCounter.ToShip,
+                        value = null,
+                        onClick = { onOpenCounter(TodayCounter.ToShip) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+
+                // The other half of the criterion, which the surface never said:
+                // "or explicitly shows that there is nothing". Three neutral zeros
+                // said "here are zeros", and a seller had to read all three and
+                // decide for themselves that the answer was nothing.
+                waiting.isEmpty() -> NothingWaiting()
+
+                else -> Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.space2),
+                ) {
+                    waiting.forEach { (counter, value) ->
+                        CounterCard(
+                            counter = counter,
+                            value = value,
+                            onClick = { onOpenCounter(counter) },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            }
+        }
+
+        // ── What merely happened today ──
+        //
+        // Demoted deliberately. It is the one figure on this surface that asks
+        // nothing of the seller, and it used to sit in the same row at the same
+        // size as the two that do.
+        item {
+            val locale = LocalConfiguration.current.locales[0]
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = spacing.minimumTouchTarget)
+                    .clickable { onOpenCounter(TodayCounter.Today) },
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
             ) {
-                CounterCard(
-                    counter = TodayCounter.Today,
-                    value = state.todayCount,
-                    onClick = { onOpenCounter(TodayCounter.Today) },
-                    modifier = Modifier.weight(1f),
-                )
-                CounterCard(
-                    counter = TodayCounter.Unpaid,
-                    value = state.unpaidCount,
-                    onClick = { onOpenCounter(TodayCounter.Unpaid) },
-                    modifier = Modifier.weight(1f),
-                )
-                CounterCard(
-                    counter = TodayCounter.ToShip,
-                    value = state.toShipCount,
-                    onClick = { onOpenCounter(TodayCounter.ToShip) },
-                    modifier = Modifier.weight(1f),
-                )
+                Row(
+                    Modifier.padding(horizontal = spacing.space4, vertical = spacing.space3),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        stringResource(R.string.dash_day_so_far),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        // Same locale-aware digits as every other figure here.
+                        state.todayCount?.let { formatCount(it, locale) }
+                            ?: stringResource(R.string.dash_count_unknown),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Spacer(Modifier.width(spacing.space2))
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                        contentDescription = null,
+                        modifier = Modifier.size(spacing.iconSmall),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
 
@@ -294,6 +380,44 @@ private fun CounterCard(
                 )
             }
             Text(label, style = MaterialTheme.typography.labelMedium)
+        }
+    }
+}
+
+/**
+ * The sentence the surface owed the seller when the answer was "nothing".
+ *
+ * G2 asks for one of two answers at first paint, and this is the second: "or
+ * explicitly shows that there is nothing". Without it, three neutral zeros left
+ * the seller to read all three and conclude it themselves — and the same three
+ * zeros were drawn while the counts were still being read, which is a different
+ * fact that the seller acted on.
+ *
+ * Calm on purpose: `Neutral`, not a success colour. Nothing being owed is the
+ * normal state of a healthy shop, and a green badge for it would make the
+ * exceptional day harder to see when it arrives.
+ */
+@Composable
+private fun NothingWaiting() {
+    val spacing = LocalOrderakSpacing.current
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        Column(
+            Modifier.padding(spacing.space4),
+            verticalArrangement = Arrangement.spacedBy(spacing.space1),
+        ) {
+            Text(
+                stringResource(R.string.dash_nothing_needs_you),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                stringResource(R.string.dash_nothing_needs_you_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
