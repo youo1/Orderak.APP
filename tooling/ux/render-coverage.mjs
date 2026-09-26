@@ -96,6 +96,8 @@ export const RENDERS = {
   ordersErrorDark: { kind: "screen", contract: "orders", state: "error", theme: "dark" },
   ordersFilteredToNone: { kind: "component", note: "filtered to none keeps the chips — the way out is to clear one" },
   ordersFilteredUnpaid: { kind: "component", note: "a اليوم counter's filter arrives visible, so it can be cleared" },
+  ordersBothGroupsLight: { kind: "component", note: "the split the list's own documentation always claimed: what is waiting on the seller, then what is finished — the finished rows carry the newer timestamps, which is where the old chronological order put them" },
+  ordersBothGroupsDark: { kind: "component", note: "the same split in dark" },
 
   // ---- العملاء ----
   customersLoadingLight: { kind: "screen", contract: "customers", state: "loading", theme: "light" },

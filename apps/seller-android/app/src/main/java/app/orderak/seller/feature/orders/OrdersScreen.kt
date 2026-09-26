@@ -112,10 +112,6 @@ fun OrderCard(o: OrderEntity, refused: Boolean = false, onClick: () -> Unit) {
     )
 }
 
-/** True while the order is still the seller's problem. */
-private val OrderStatus.needsSeller: Boolean
-    get() = this != OrderStatus.DONE && this != OrderStatus.CANCELLED
-
 /**
  * One semantic role per meaning, not one hue per status.
  *

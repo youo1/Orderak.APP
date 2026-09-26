@@ -50,7 +50,7 @@ class OrdersViewModel @Inject constructor(
             // midnight mid-filter cannot include an order by one row and exclude
             // it by the next.
             val now = System.currentTimeMillis()
-            list.filter { f.matches(it, now) }
+            list.filter { f.matches(it, now) }.sortedWith(needsSellerFirst)
         }
     }
 
@@ -79,3 +79,30 @@ class OrdersViewModel @Inject constructor(
         filter.value = if (status == null) OrdersFilter.All else OrdersFilter.Status(status)
     }
 }
+
+/**
+ * What is still the seller's problem first; newest first within each group.
+ *
+ * The surface has always described itself this way — `SellerSurface.Orders` says
+ * "Orders, ordered by whether they need the seller", and `OrderCard` says "the
+ * list's job is 'which of these still need me?', not 'what stage is each one at'"
+ * — while the query behind it was `ORDER BY createdAt DESC` (`Daos.kt:136`). The
+ * intent was documented and the behaviour was chronological, which is a different
+ * thing: an unpaid order from three weeks ago sat below twenty orders finished this
+ * morning, and the priority rail on each row was explaining an order the seller had
+ * to scroll to reach.
+ *
+ * The tiebreak is `createdAt` descending, so within "needs you" the oldest waiting
+ * order is *not* on top by accident — it is the most recent one, which is the one
+ * the seller was told about last and is most likely still working on. Changing that
+ * is a product decision, not a sorting detail, so it is named here rather than left
+ * to whichever comparison reads first.
+ *
+ * Written as a plain comparator rather than a Room `ORDER BY CASE` so it can be
+ * tested without a database, and so the DAO keeps returning one list rather than
+ * one list per caller's idea of priority.
+ */
+internal val needsSellerFirst: Comparator<OrderEntity> =
+    compareByDescending<OrderEntity> {
+        runCatching { OrderStatus.valueOf(it.status) }.getOrDefault(OrderStatus.NEW).needsSeller
+    }.thenByDescending { it.createdAt }

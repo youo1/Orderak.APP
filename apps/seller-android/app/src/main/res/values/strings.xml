@@ -108,6 +108,8 @@
     <string name="share_catalog_footer">Order on WhatsApp: %1$s\n— Powered by Orderak.app</string>
 
     <string name="orders_all">All</string>
+    <string name="orders_group_waiting">Waiting on you</string>
+    <string name="orders_group_rest">Everything else</string>
     <string name="orders_empty">No orders yet — tap ➕ and log your first chat order</string>
     <string name="order_new_title">New order</string>
     <string name="order_buyer_phone">Customer phone</string>
