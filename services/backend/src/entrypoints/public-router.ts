@@ -153,8 +153,14 @@ const RESOURCE_REGISTRY: Record<string, ResourceHandler> = {
 // ---- Entry point -----------------------------------------------------------
 
 /**
- * Render a content page (terms, privacy, help) from the content_pages table.
+ * Render a content page (terms, privacy, help) from `content_page_versions`.
  * Falls back to the other language if the requested one has no active row.
+ *
+ * This comment said `content_pages` and was the only mention of that table left
+ * anywhere: migration 012 superseded it, every query here has read the versions
+ * table since, and a reader checking whether the old table was still live found
+ * this line telling them it was. It is retired by
+ * `migrations/060_retire_dead_tables.sql`.
  */
 async function renderContentPage(env: PublicWorkerEnv, slug: string, lang: Locale): Promise<Response> {
 	// Try the requested language first.

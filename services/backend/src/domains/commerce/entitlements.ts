@@ -680,10 +680,6 @@ export async function getIntegerEntitlement(env: Env, storeId: string, key: stri
 	return { kind: "limit", value: Number(item.value ?? 0) };
 }
 
-export async function isEntitlementEnabled(env: Env, storeId: string, key: string): Promise<boolean> {
-	return (await resolveEntitlements(env, storeId)).entitlements[key]?.available === true;
-}
-
 /** Catalogue keys the API itself gates on, named rather than written inline. */
 export const EDITABLE_CUSTOMER_PROFILES = "customers_crm.editable_customer_profiles";
 
@@ -710,23 +706,6 @@ export async function entitlementAllows(env: Env, storeId: string, key: string):
 	} catch {
 		return false;
 	}
-}
-
-export function entitlementDenied(
-	snapshot: EntitlementSnapshot,
-	key: string,
-	status = 403,
-): Response {
-	const item = snapshot.entitlements[key];
-	return jsonResponse({
-		error: "PLAN_FEATURE_REQUIRED",
-		entitlement_key: key,
-		plan_key: snapshot.plan_key,
-		plan_revision_id: snapshot.plan_revision_id,
-		implementation_status: item?.implementation_status ?? "planned",
-		upgrade_plan_keys: snapshot.plan_key === "free" ? ["paid1", "paid2", "paid3"] : ["paid2", "paid3"],
-		request_id: uuid(),
-	}, status);
 }
 
 
