@@ -101,6 +101,7 @@
     <string name="product_price_label">السعر (ج.م)</string>
     <string name="product_stock_label">المخزون</string>
     <string name="product_discount_none">بدون خصم</string>
+    <string name="product_category_none">من غير تصنيف</string>
     <string name="product_available">متاح للبيع</string>
     <string name="product_save">احفظ المنتج</string>
     <string name="product_delete">امسح المنتج</string>
@@ -117,6 +118,7 @@
     <string name="orders_empty">لسه مفيش أوردرات — دوس ➕ وسجّل أول أوردر من الشات</string>
     <string name="order_new_title">أوردر جديد</string>
     <string name="order_buyer_phone">رقم موبايل العميل</string>
+    <string name="order_phone_invalid">اكتب رقم الموبايل كامل — مش هينفع تسجّل الطلب من غيره</string>
     <string name="order_buyer_name_opt">اسم العميل (اختياري)</string>
     <string name="order_note_opt">ملاحظات (اختياري)</string>
     <string name="order_items_title">المنتجات</string>
@@ -124,6 +126,7 @@
     <string name="order_total">الإجمالي:</string>
     <string name="order_save">سجّل الأوردر</string>
     <string name="order_stock_error">الكمية المطلوبة أكبر من المخزون المتاح</string>
+    <string name="order_no_products_body">لسه مفيش منتجات تتباع. ارجع للطلبات، افتح تاب المتجر، وضيف أول منتج — وبعدها ارجع سجّل الطلب من هنا.</string>
     <string name="order_qty_decrease">تقليل كمية %1$s</string>
     <string name="order_qty_increase">زيادة كمية %1$s</string>
 
@@ -195,6 +198,7 @@
     <string name="settings_account_actions">إجراءات الحساب</string>
     <string name="settings_app_language">لغة التطبيق</string>
     <string name="settings_store_group_title">المتجر والهوية</string>
+    <string name="settings_support_group_title">المساعدة والتحديثات</string>
     <string name="settings_devices_group_title">الأجهزة والاشتراك</string>
     <!-- Backend link -->
     <string name="settings_link_title">لينك الكتالوج بتاعك</string>
@@ -341,6 +345,8 @@
 
     <!-- Payment history -->
     <string name="payment_history_title">سجل الدفع</string>
+    <string name="payment_history_none">لسه مفيش دفعة متسجّلة على الطلب ده</string>
+    <string name="payment_proof_attached">صورة إيصال مرفوعة مع الدفعة</string>
     <string name="payment_ref_label">مرجع: %1$s</string>
     <string name="payment_verified_badge">تم التحقق</string>
     <string name="payment_flagged_badge">معلّم</string>
@@ -354,6 +360,7 @@
     <string name="seller_profile_photo">الصورة الشخصية</string>
     <string name="seller_profile_phone">رقم الهاتف (معرف الحساب)</string>
     <string name="seller_profile_photo_set">تم رفع الصورة</string>
+    <string name="seller_profile_photo_failed">الصورة ماترفعتش — اختارها تاني. صورتك الحالية زي ما هي.</string>
 
     <!-- Deletion status expanded -->
     <string name="deletion_status_label">الحالة: %1$s</string>
@@ -458,6 +465,8 @@
     <string name="plans_included">متاح</string>
     <string name="plans_unavailable">تفاصيل الباقات مش متاحة دلوقتي</string>
     <string name="plans_purchase_closed">الترقية لسه مش مفتوحة. الصفحة دي عشان تشوف كل باقة فيها إيه.</string>
+    <string name="plans_purchase_closed_body">باقتك الحالية زي ما هي — مفيش حاجة هتتغير.</string>
+    <string name="plans_current_plan_marked">%1$s (خطتك)</string>
     <string name="plans_price_note">الأسعار هتظهر من Google Play بعملتك لما الترقية تفتح.</string>
     <string name="paywall_title">وصلت لحد الباقة</string>
     <string name="paywall_limit_products">وصلت لأقصى عدد منتجات في باقتك</string>
@@ -473,6 +482,7 @@
     <string name="paywall_dismiss">رجوع</string>
     <string name="paywall_view_plans">شوف الباقات</string>
     <string name="paywall_purchase_closed">الترقية لسه مش مفتوحة، فمفيش حاجة تتشتري من هنا.</string>
+    <string name="paywall_purchase_closed_body">باقتك الحالية زي ما هي، والحد ده هيفضل زي ما هو لحد ما الترقية تفتح.</string>
     <string name="order_refused_chip">ما اتبعتش</string>
     <string name="order_refused_title">الأوردر ده ما اتبعتش</string>
     <string name="order_refused_message">%1$s الأوردر متسجل على الموبايل ده بس: مش هيوصل جهاز تاني، ومش هتقدر تحرّكه في مراحله. امسحه وسجّله تاني بعد ما تظبط المشكلة.</string>

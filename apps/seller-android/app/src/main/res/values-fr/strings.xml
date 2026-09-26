@@ -95,6 +95,7 @@
     <string name="product_price_label">Prix (EGP)</string>
     <string name="product_stock_label">Stock</string>
     <string name="product_discount_none">Aucune</string>
+    <string name="product_category_none">Sans catégorie</string>
     <string name="product_available">Disponible à la vente</string>
     <string name="product_save">Enregistrer le produit</string>
     <string name="product_delete">Supprimer le produit</string>
@@ -109,6 +110,7 @@
     <string name="orders_empty">Aucune commande pour l\'instant — appuyez sur ➕ et enregistrez votre première commande de chat</string>
     <string name="order_new_title">Nouvelle commande</string>
     <string name="order_buyer_phone">Téléphone du client</string>
+    <string name="order_phone_invalid">Saisissez le numéro complet — la commande ne peut pas être enregistrée sans lui</string>
     <string name="order_buyer_name_opt">Nom du client (optionnel)</string>
     <string name="order_note_opt">Notes (optionnel)</string>
     <string name="order_items_title">Articles</string>
@@ -116,6 +118,7 @@
     <string name="order_total">Total :</string>
     <string name="order_save">Enregistrer la commande</string>
     <string name="order_stock_error">La quantité demandée dépasse le stock disponible</string>
+    <string name="order_no_products_body">Aucun produit à vendre pour l’instant. Revenez à la liste des commandes, ouvrez l’onglet Boutique et ajoutez votre premier produit, puis revenez ici enregistrer la commande.</string>
     <string name="order_qty_decrease">Diminuer la quantité de %1$s</string>
     <string name="order_qty_increase">Augmenter la quantité de %1$s</string>
 
@@ -178,6 +181,7 @@
     <string name="settings_account_actions">Actions du compte</string>
     <string name="settings_app_language">Langue de l’application</string>
     <string name="settings_store_group_title">Boutique et identité</string>
+    <string name="settings_support_group_title">Aide et mises à jour</string>
     <string name="settings_devices_group_title">Appareils et abonnement</string>
     <!-- Backend link -->
     <string name="settings_link_title">Lien de votre catalogue</string>
@@ -321,6 +325,8 @@
 
     <!-- Payment history -->
     <string name="payment_history_title">Historique des paiements</string>
+    <string name="payment_history_none">Aucun paiement enregistré sur cette commande pour l’instant</string>
+    <string name="payment_proof_attached">Image du reçu jointe</string>
     <string name="payment_ref_label">Réf : %1$s</string>
     <string name="payment_verified_badge">Vérifié</string>
     <string name="payment_flagged_badge">Signalé</string>
@@ -334,6 +340,7 @@
     <string name="seller_profile_photo">Photo de profil</string>
     <string name="seller_profile_phone">Numéro de téléphone (ID du compte)</string>
     <string name="seller_profile_photo_set">Photo téléchargée</string>
+    <string name="seller_profile_photo_failed">La photo n’a pas été téléversée — choisissez-la à nouveau. Votre photo actuelle reste en place.</string>
 
     <!-- Deletion status expanded -->
     <string name="deletion_status_label">Statut : %1$s</string>
@@ -438,6 +445,8 @@
     <string name="plans_included">Inclus</string>
     <string name="plans_unavailable">Les détails des offres ne sont pas disponibles pour le moment</string>
     <string name="plans_purchase_closed">La mise à niveau n\'est pas encore ouverte. Cette page vous montre ce que contient chaque offre.</string>
+    <string name="plans_purchase_closed_body">Votre offre actuelle reste en place — rien ne change pour vous.</string>
+    <string name="plans_current_plan_marked">%1$s (votre offre)</string>
     <string name="plans_price_note">Les prix seront affichés par Google Play dans votre devise à l\'ouverture des mises à niveau.</string>
     <string name="paywall_title">Limite de l\'offre atteinte</string>
     <string name="paywall_limit_products">Vous avez atteint votre limite de produits</string>
@@ -453,6 +462,7 @@
     <string name="paywall_dismiss">Retour</string>
     <string name="paywall_view_plans">Voir les offres</string>
     <string name="paywall_purchase_closed">La mise à niveau n\'est pas encore ouverte : il n\'y a rien à acheter ici.</string>
+    <string name="paywall_purchase_closed_body">Votre offre actuelle reste en place et cette limite reste la même jusqu’à l’ouverture des mises à niveau.</string>
     <string name="order_refused_chip">Non envoyée</string>
     <string name="order_refused_title">Cette commande n\'a pas pu être envoyée</string>
     <string name="order_refused_message">%1$s La commande n\'existe que sur ce téléphone : elle n\'atteindra pas un autre appareil et ne peut pas avancer dans son cycle. Supprimez-la et enregistrez-la à nouveau une fois le problème résolu.</string>

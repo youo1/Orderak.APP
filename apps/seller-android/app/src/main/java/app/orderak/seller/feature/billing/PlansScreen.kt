@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -30,7 +29,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -39,6 +37,8 @@ import androidx.lifecycle.viewModelScope
 import app.orderak.seller.R
 import app.orderak.seller.core.ui.FullScreenError
 import app.orderak.seller.core.ui.FullScreenLoading
+import app.orderak.seller.core.ui.NoticeBanner
+import app.orderak.seller.core.ui.SemanticRole
 import app.orderak.seller.core.ui.backendErrorResource
 import app.orderak.seller.data.billing.EntitlementManager
 import app.orderak.seller.data.remote.BackendApi
@@ -176,23 +176,19 @@ private fun PlanComparison(state: PlansUiState, padding: PaddingValues) {
             // Said once, at the top, rather than as a disabled button beside
             // every plan. While billing is closed there is nothing to buy, and
             // the honest thing is to say so rather than imply it.
+            //
+            // Said through the shared notice, in the role the semantic layer
+            // keeps for anything monetary — the same role, and the same
+            // component, that the categories limit and the subscription page
+            // already use for this exact fact. The row this replaces borrowed
+            // the Info glyph and drew it in the neutral tone: one meaning with
+            // two roles, in no container at all.
             if (!state.purchaseOpen) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(spacing.space2),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(
-                        Icons.Outlined.Info,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        stringResource(R.string.plans_purchase_closed),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                NoticeBanner(
+                    role = SemanticRole.Commerce,
+                    title = stringResource(R.string.plans_purchase_closed),
+                    message = stringResource(R.string.plans_purchase_closed_body),
+                )
             }
         }
 
@@ -205,9 +201,24 @@ private fun PlanComparison(state: PlansUiState, padding: PaddingValues) {
                 )
                 state.plans.forEach { plan ->
                     Text(
-                        text = plan.name,
+                        // The plan the seller is on is named, not weighted. This
+                        // column carried `FontWeight.Bold` against `labelLarge`'s
+                        // own medium — and the design system states the scale
+                        // plainly: "Weight is 400 or 500 — there is no bold
+                        // display type in this product." 700 was not a role, and
+                        // the "current plan" the contract declares as this
+                        // screen's own data was resting on it.
+                        //
+                        // A word carries it instead, which is how the account
+                        // surface already names the same fact, so nothing the
+                        // contract declares stops being readable — and the name
+                        // is drawn at the one weight its role has.
+                        text = if (plan.plan_key == state.currentPlanKey) {
+                            stringResource(R.string.plans_current_plan_marked, plan.name)
+                        } else {
+                            plan.name
+                        },
                         style = MaterialTheme.typography.labelLarge,
-                        fontWeight = if (plan.plan_key == state.currentPlanKey) FontWeight.Bold else FontWeight.Normal,
                         modifier = Modifier.width(110.dp).padding(vertical = spacing.space2),
                     )
                 }

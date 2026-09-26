@@ -260,7 +260,12 @@ private fun CountryCodeChip(
             .clip(MaterialTheme.shapes.large)
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f))
             .clickable(enabled = enabled) { onClick() }
-            .sizeIn(minHeight = 44.dp)
+            // The system's own floor, not a literal: `docs/domains/design-system-reference.md`
+            // says "48dp minimum touch target everywhere", and this chip is the
+            // control that opens the country picker — the only target on the phone
+            // stage that sat below it. 44dp is `iconHero`, the size of a glyph,
+            // which is the wrong number to have borrowed for a tap.
+            .sizeIn(minHeight = spacing.minimumTouchTarget)
             .padding(horizontal = spacing.space3, vertical = spacing.space2),
     ) {
         Text(

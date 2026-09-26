@@ -71,6 +71,7 @@ import app.orderak.seller.core.ui.FullScreenError
 import app.orderak.seller.core.ui.FullScreenLoading
 import app.orderak.seller.core.ui.backendErrorResource
 import app.orderak.seller.data.billing.EntitlementManager
+import app.orderak.seller.data.billing.FeatureKeys
 import app.orderak.seller.data.billing.BillingManager
 import app.orderak.seller.data.billing.BillingState
 import app.orderak.seller.data.auth.PasskeyClient
@@ -110,6 +111,7 @@ fun DevicesScreen(
     val passkeys by vm.passkeys.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val error by vm.error.collectAsStateWithLifecycle()
+    val config by vm.entitlements.config.collectAsStateWithLifecycle()
     val activity = LocalContext.current.findActivity()
     var renameTarget by remember { mutableStateOf<PasskeyDto?>(null) }
     var deleteTarget by remember { mutableStateOf<PasskeyDto?>(null) }
@@ -141,6 +143,14 @@ fun DevicesScreen(
         onRename = { renameTarget = it },
         onRevoke = { deleteTarget = it },
         onRevokeDevice = { rowId, label -> deviceRevokeTarget = rowId to label },
+        // This screen's contract declares "device limit usage" among its own data
+        // and its entitlement key is `max_concurrent_devices`, and it drew
+        // neither: the count a seller needs at the moment a second phone cannot
+        // sign in was on the subscription page and nowhere near the control that
+        // revokes a device. The row comes from the shared list, so the same limit
+        // reads the same way here as it does on حسابي and on الاشتراك.
+        deviceLimit = config?.let(::planUsageRows)
+            ?.firstOrNull { it.key == FeatureKeys.MAX_CONCURRENT_DEVICES },
     )
 
     // Revoking a device ends a session on hardware the seller may not be holding.
@@ -240,6 +250,13 @@ fun DevicesScreen(
  *
  * [canAddPasskey] is passed in rather than read from Build here, so the render
  * can show both the offered and the withheld control.
+ *
+ * [deviceLimit] is the plan's device allowance, which this contract declares as
+ * this screen's own data ("devices · passkeys · device limit usage") and which
+ * nothing drew. It is a [PlanUsageRow] rather than a pair of numbers so the row
+ * is the shared renderer's, including the count-against-a-limit marks that keep
+ * it in order in Arabic. Null when the snapshot does not carry the figure — the
+ * page then says nothing about a limit rather than drawing an assumed one.
  */
 
 @Composable
@@ -258,6 +275,7 @@ fun DevicesContent(
     onRename: (PasskeyDto) -> Unit,
     onRevoke: (PasskeyDto) -> Unit,
     onRevokeDevice: (Long, String?) -> Unit,
+    deviceLimit: PlanUsageRow? = null,
 ) {
     val layout = LocalOrderakLayout.current
     val spacing = LocalOrderakSpacing.current
@@ -344,6 +362,10 @@ fun DevicesContent(
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.semantics { heading() },
         )
+        // The allowance the devices below are counted against, before the list
+        // that spends it. This is where a seller looks when the next phone will
+        // not sign in, and until now the only answer was on another screen.
+        deviceLimit?.let { PlanUsageRowItem(it) }
         items.orEmpty().forEach { d ->
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(spacing.space4)) {

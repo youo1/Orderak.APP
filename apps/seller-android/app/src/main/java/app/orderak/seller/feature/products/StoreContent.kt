@@ -46,11 +46,13 @@ import app.orderak.seller.core.ui.FullScreenEmpty
 import app.orderak.seller.core.ui.FullScreenError
 import app.orderak.seller.core.ui.FullScreenLoading
 import app.orderak.seller.core.ui.NoticeBanner
+import app.orderak.seller.core.ui.PlanUsageRow
+import app.orderak.seller.core.ui.PlanUsageRowItem
 import app.orderak.seller.core.ui.SearchField
 import app.orderak.seller.core.ui.SemanticChip
 import app.orderak.seller.core.ui.SemanticRole
-import app.orderak.seller.core.ui.UsageMeter
 import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
+import app.orderak.seller.data.billing.FeatureKeys
 import app.orderak.seller.data.db.ProductEntity
 import coil3.compose.AsyncImage
 import java.io.File
@@ -171,21 +173,24 @@ fun StoreContent(
                 // The shared meter rather than a sentence: the same component the
                 // dashboard and the subscription screen use, so "how close am I to
                 // the limit" reads identically wherever a seller meets it.
-                val limitValue = quota.limit
-                if (limitValue != null) {
-                    UsageMeter(
-                        label = stringResource(R.string.nav_products),
+                //
+                // It did not, on two counts. The meter carried this surface's own
+                // label — `nav_products`, "المتجر", beside a dashboard row that
+                // says "المنتجات" — and an unlimited plan was a `titleMedium`
+                // sentence over `products_usage_unlimited`, a string and a type
+                // role no other usage row uses. Going through `PlanUsageRowItem`
+                // for both cases is the row those surfaces already draw, at the
+                // label they already use. `quota.limit` is null when the plan has
+                // no ceiling, which is exactly the case that component branches on.
+                PlanUsageRowItem(
+                    row = PlanUsageRow(
+                        key = FeatureKeys.MAX_PRODUCTS,
+                        label = R.string.usage_products,
                         used = quota.used,
-                        limit = limitValue,
-                        modifier = Modifier.padding(horizontal = spacing.space4, vertical = spacing.space2),
-                    )
-                } else {
-                    Text(
-                        text = stringResource(R.string.products_usage_unlimited, formatCount(quota.used, locale)),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(horizontal = spacing.space4, vertical = spacing.space2),
-                    )
-                }
+                        limit = quota.limit,
+                    ),
+                    modifier = Modifier.padding(horizontal = spacing.space4, vertical = spacing.space2),
+                )
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()

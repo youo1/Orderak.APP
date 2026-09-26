@@ -43,7 +43,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.orderak.seller.core.ui.FullScreenLoading
@@ -126,6 +125,8 @@ fun NewOrderContent(
     // The screen's rhythm, from the system. Every padding and gap below was a
     // hand-written dp value — 8, 12 and 24, which happen to be tokens, and were
     // still the reason a change to the spacing scale would not have reached here.
+    // The note was one short: the list's own gutter is 16, a fourth literal that a
+    // change to the scale could not reach either.
     val spacing = LocalOrderakSpacing.current
     val catalogue = products
     // `selectedCurrency` is null for a mixed selection once anything is picked —
@@ -151,14 +152,27 @@ fun NewOrderContent(
             // is a form with three text fields and a submit button at the bottom
             // of the scroll, which is the exact shape that needs it.
             modifier = Modifier.fillMaxSize().padding(padding).imePadding(),
-            contentPadding = PaddingValues(16.dp),
+            contentPadding = PaddingValues(spacing.space4),
             verticalArrangement = Arrangement.spacedBy(spacing.space3),
         ) {
             item { CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                val phoneInvalid = state.phone.isNotEmpty() && !state.phoneValid
                 OutlinedTextField(
                     value = state.phone, onValueChange = actions.onPhone,
                     label = { Text(stringResource(R.string.order_buyer_phone)) },
-                    singleLine = true, isError = state.phone.isNotEmpty() && !state.phoneValid,
+                    singleLine = true, isError = phoneInvalid,
+                    // `isError` on its own is an outline that turns red and
+                    // nothing more, on a form whose Save button stays dead until
+                    // the number is complete: the reason the order cannot be
+                    // recorded travelled as a colour, which is the one signal the
+                    // system forbids it to rest on. The stock banner below is this
+                    // screen's own argument that red alone leaves the seller
+                    // without the reason.
+                    supportingText = if (phoneInvalid) {
+                        { Text(stringResource(R.string.order_phone_invalid)) }
+                    } else {
+                        null
+                    },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -175,7 +189,18 @@ fun NewOrderContent(
                 // seller mid-sale that they have nothing to sell.
                 item { FullScreenLoading() }
             } else if (catalogue.isEmpty()) {
-                item { Text(stringResource(R.string.products_empty), style = MaterialTheme.typography.bodyMedium) }
+                // `products_empty` is the store surface's copy, and it sends the
+                // seller to a ➕: "tap ➕ and add your first product with a photo".
+                // This screen has no ➕ — the only one is on المتجر, one surface
+                // away behind the back arrow — so the state told a seller to tap
+                // something that is not here, which is a dead end rather than a
+                // next step. The tab that does have the button is the next step.
+                item {
+                    Text(
+                        stringResource(R.string.order_no_products_body),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
             }
             items(catalogue.orEmpty(), key = { it.id }) { p ->
                 val q = state.qty[p.id] ?: 0

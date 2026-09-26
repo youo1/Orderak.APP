@@ -297,8 +297,8 @@ fun CustomerDetailsContent(
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
-                start = 16.dp, end = 16.dp, bottom = 16.dp,
-                top = padding.calculateTopPadding() + 8.dp,
+                start = spacing.space4, end = spacing.space4, bottom = spacing.space4,
+                top = padding.calculateTopPadding() + spacing.space2,
             ),
             verticalArrangement = Arrangement.spacedBy(spacing.space2)
         ) {

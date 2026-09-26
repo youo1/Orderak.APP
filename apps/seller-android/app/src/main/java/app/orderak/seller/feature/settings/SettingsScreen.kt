@@ -96,8 +96,17 @@ class SettingsViewModel @Inject constructor(
 	 * was known: every paying seller opening حسابي was told they were on the free
 	 * plan until the config arrived, and the screen had no way to say "not yet".
 	 * The contract has declared a loading state for this surface all along.
+	 *
+	 * The map carried `?: "Free"` as well, so the sentence above and the behaviour
+	 * still disagreed. `EntitlementManager.config` is null until the snapshot
+	 * answers — and null again when the snapshot is cleared — so a paying seller
+	 * offline, or signed out, read "Current plan: Free" about their own money: the
+	 * same claim, in the same place, one layer down. It also made the state the
+	 * contract declares unreachable: the skeletons in `AccountContent` draw for
+	 * null, and the fallback never produced one. An answered snapshot that carries
+	 * no plan name is still "not known", which is what null means here.
 	 */
-	val planName: StateFlow<String?> = entitlementManager.config.map { it?.plan_name ?: "Free" }
+	val planName: StateFlow<String?> = entitlementManager.config.map { it?.plan_name }
 		.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
 	/**

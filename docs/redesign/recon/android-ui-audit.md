@@ -463,6 +463,36 @@ therefore do not share a spacing vocabulary.
 | The catalog slug is set on the account surface | **Two authorities disagreed, the code broke the tie, and the answer was RD-19.** The feature-surface map files `products_catalog.custom_catalog_slug` under **store**; the `account` contract claimed "public slug" as its own data. Reading the code settled it: there were **two editors and only one could work**. `StoreInfoScreen` queries `/api/v1/slug/check`, reports available / taken / reserved, and keeps Save disabled until the name is free. The account surface's field had no check: it wrote locally, `savePayout` triggered a refresh, and `SellerRefresher` pushed the value through `api.register`, which returns early on `!reg.ok` — so a **taken name failed the whole registration and stopped every pull and push behind it**, while the snackbar said "Payout details saved". The field is gone; the account surface keeps the published link as a read-only display. `verify-slug-authority.mjs` now pins all three facts. |
 | The account surface draws its own app bar inside the shell's | **Confirmed and fixed.** §4.2's table already said hosted surfaces draw no chrome of their own; the account surface drew a `Scaffold` and a `TopAppBar` inside the shell's, so the seller saw the shop's name above the word "Settings", with two snackbar hosts under them. The inner bar is gone, and the one thing it carried — the language switch — is a row in the account-actions group. |
 
+### 4.5 Found by the surface-by-surface redesign pass
+
+Every surface was then rebuilt in one pass under a single rule: **make the rendering
+agree with something already written about it** — a claim in the file's own comments, a
+state its contract declares, or a rule in the design system. No visual novelty was
+allowed, because a redesign whose changes cannot be traced to a written claim cannot be
+reviewed by anyone who did not write it.
+
+Each surface turned out to contradict at least one claim. Those are recorded in the
+commit messages. These are the findings that were **not** fixed, because the fix lies
+outside the screen that revealed it.
+
+| Finding | Evidence | Why it is not fixed |
+| --- | --- | --- |
+| **Three screenshot baselines carry no information.** `authPasskeyInvite`, `authPasskeyCreating` and `authPasskeyDeferred` are byte-identical: one SHA256, 15,540 bytes each, checked with `Get-FileHash`. Three different passkey states render the same image, and it is almost certainly empty — the harness does not capture a `ModalBottomSheet`, and every sheet in the app is rendered through one. | `app/src/screenshotTestStagingDebug/reference/.../AuthScreenshotTestKt/authPasskey*` | Fixing it is a harness change, not a screen change. Recorded so the coverage number is not read as proof. **The same mechanism applies to every other sheet** — `LanguageSheet`, the country picker, the city picker — so their renders should be assumed empty until one is checked. |
+| **The customers list is ordered by a sum it refuses to print.** `Daos.kt:255` ends `GROUP BY c.customerKey ORDER BY totalMinor DESC`, and the row draws an em dash instead of a total when a customer's orders span currencies. A cross-currency customer's position is therefore decided by adding amounts in different currencies — the thing the display layer will not do. | `data/db/Daos.kt:255`; the row's own em-dash branch | Same class as the orders defect fixed in `48bba17`, and the fix is not mechanical: it needs an answer to "what do we sort by when the totals are not comparable", which the em dash answers only for *display*. Recorded rather than guessed. |
+| **The `customers` contract claims data the surface does not have.** Its purpose names `آخر تعامل` — last interaction — and the row shows the customer's value and order count. `CustomerSummary` carries no last-order timestamp, and `customers_crm.last_contact_tracking` is L3/planned in the map. | `tooling/ux/screen-contracts.mjs` (`customers`); `data/db/Entities.kt:224-241`; `docs/ux/feature-surface-map.md` | Serving it is a repository change, not a rendering one. The claim stays so the gap stays visible. |
+| **Two more contract claims with no rendering.** `new-order` declares `data: ["customer lookup", "order limit usage"]` and neither is drawn; `store` declares `"category count"` and nothing counts categories. | `tooling/ux/screen-contracts.mjs` | Both need view-model flows. `data` is validated by no guard, which is how they drifted. |
+| **The paywall declares an entry with no path.** `screen-contracts.mjs` gives `paywall` `entry: [… "devices"]`, and `DevicesScreen` has no route to `PaywallRoute`. | `tooling/ux/screen-contracts.mjs` (`paywall`) | Wiring it is a navigation change; deleting the claim would hide a reachability question worth answering. |
+| **A verified seller can be told a verification email was sent.** `auth-v2.ts:908-911` answers `already_verified`, and `BackendApi.resendAccountEmailVerification` (`BackendApi.kt:1127-1137`) returns the generic `OkRes`, dropping it. | `services/backend/src/domains/identity/auth-v2.ts:908`; `data/remote/BackendApi.kt:1127` | Needs a DTO field, in a file the pass did not own. |
+| **Restricted-account logout states no consequence and asks for no confirmation**, while the same action on the account surface is confirmed with "Log out and remove local business data from this device?". | `feature/operations/RestrictedAccountScreens.kt`; `SettingsScreen.kt` | Logout semantics are approval-gated by the auth contract (guarantee 10), so this is the owner's call rather than a rendering fix. |
+| **Two strings lost their last reader.** `usage_value` (the AI quota pair now goes through `formatCountOfLimit`) and `products_usage_unlimited` (the store row now goes through `PlanUsageRowItem`). | `res/values*/strings.xml` | Removing a key is a deletion, not a rendering change, and `verifyLocalizationContract` compares key *sets*, so nothing fails either way. |
+
+**Two contract errors were fixed** rather than recorded, because they were simply wrong
+and the files are mine: `shop-setup`'s create-store action named `onCreate`, which
+resolves to the **passkey** callback rather than to store creation — the guard passed
+the whole time, because the symbol it looked for did exist, it was just the wrong one —
+and `docs/ux/feature-surface-map.md` said `account` "keeps its four groups" while the
+contract and the screen both have six.
+
 ---
 
 ## 5. Visual / layout quality issues

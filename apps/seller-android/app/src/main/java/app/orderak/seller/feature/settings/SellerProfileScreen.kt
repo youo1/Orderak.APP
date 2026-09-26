@@ -43,6 +43,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import app.orderak.seller.R
 import app.orderak.seller.core.ui.FullScreenLoading
+import app.orderak.seller.core.ui.NoticeBanner
+import app.orderak.seller.core.ui.SemanticRole
 import app.orderak.seller.data.remote.BackendApi
 import app.orderak.seller.data.session.SessionStore
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -232,6 +234,13 @@ fun SellerProfileScreen(
     var email by rememberSaveable { mutableStateOf("") }
     var birthYear by rememberSaveable { mutableStateOf("") }
     var profilePhotoUri by rememberSaveable { mutableStateOf("") }
+    // A picked photo that never reached storage used to leave no trace: the
+    // callback only ran its success branch, so the seller chose an image,
+    // watched the "photo uploaded" line not appear, and could not tell a failed
+    // upload from a slow one. The same shape `store-info` already reports, with
+    // its own state for the same reason — nothing the seller typed is at risk,
+    // so this is not the save error.
+    var photoUploadFailed by rememberSaveable { mutableStateOf(false) }
 
     // Seed from ViewModel on first load
     LaunchedEffect(savedFullName, savedEmail, savedBirthYear, savedPhotoUri) {
@@ -242,7 +251,12 @@ fun SellerProfileScreen(
     }
 
     val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        uri?.let { viewModel.uploadProfilePhoto(it) { url -> if (url != null) profilePhotoUri = url } }
+        uri?.let {
+            photoUploadFailed = false
+            viewModel.uploadProfilePhoto(it) { url ->
+                if (url != null) profilePhotoUri = url else photoUploadFailed = true
+            }
+        }
     }
 
     SellerProfileContent(
@@ -255,6 +269,7 @@ fun SellerProfileScreen(
         email = email,
         birthYear = birthYear,
         profilePhotoUri = profilePhotoUri,
+        photoUploadFailed = photoUploadFailed,
         onFullName = { fullName = it },
         onEmail = { email = it },
         onBirthYear = { birthYear = it },
@@ -274,6 +289,10 @@ fun SellerProfileScreen(
  * view model seeds "" and the session snapshot is read in a suspend call, so the
  * form drew with a blank phone number — the seller's own, and the one read-only
  * identity on this page — and filled it in a beat later.
+ *
+ * [photoUploadFailed] is the failure this page used to swallow. Every other
+ * answer on it is drawn — the save's busy state, the verification mail's outcome
+ * — and a chosen photo that never reached storage drew nothing at all.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -287,6 +306,7 @@ fun SellerProfileContent(
     email: String,
     birthYear: String,
     profilePhotoUri: String,
+    photoUploadFailed: Boolean = false,
     onFullName: (String) -> Unit,
     onEmail: (String) -> Unit,
     onBirthYear: (String) -> Unit,
@@ -406,6 +426,17 @@ fun SellerProfileContent(
                         Text(
                             if (profilePhotoUri.isBlank()) stringResource(R.string.setup_add_photo)
                             else stringResource(R.string.setup_change_photo),
+                        )
+                    }
+                    if (photoUploadFailed) {
+                        // Beside the control that caused it, not at the bottom of
+                        // the form: the remedy is to pick again, and that button
+                        // is here.
+                        NoticeBanner(
+                            role = SemanticRole.Danger,
+                            title = stringResource(R.string.seller_profile_photo_failed),
+                            message = stringResource(R.string.error_unknown),
+                            modifier = Modifier.padding(top = spacing.space3),
                         )
                     }
                 }

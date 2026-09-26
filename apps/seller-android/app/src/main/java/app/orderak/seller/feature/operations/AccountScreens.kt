@@ -66,11 +66,13 @@ import app.orderak.seller.core.ui.planUsageRows
 import app.orderak.seller.core.ui.SemanticRole
 import app.orderak.seller.core.locale.AppLocales
 import app.orderak.seller.core.text.formatCount
+import app.orderak.seller.core.text.formatCountOfLimit
 import app.orderak.seller.core.ui.FullScreenEmpty
 import app.orderak.seller.core.ui.FullScreenError
 import app.orderak.seller.core.ui.FullScreenLoading
 import app.orderak.seller.core.ui.backendErrorResource
 import app.orderak.seller.data.billing.EntitlementManager
+import app.orderak.seller.data.billing.FeatureKeys
 import app.orderak.seller.data.billing.BillingManager
 import app.orderak.seller.data.billing.BillingState
 import app.orderak.seller.data.auth.PasskeyClient
@@ -93,6 +95,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.intOrNull
@@ -341,18 +344,31 @@ fun AiAssistantContent(
         onRetry = onRetry,
     ) {
         Text(stringResource(R.string.ai_disclosure), style = MaterialTheme.typography.bodySmall)
-        entitlements?.get("max_ai_requests_per_month")?.let { quota ->
+        // The quota, as a count against a limit that is drawn the one way this app
+        // draws one. It was the last place that built the pair itself — two
+        // `formatCount` values inside `usage_value` ("%1$s / %2$s") — and that is
+        // the shape `core/text/Counts.kt` exists to replace: an Arabic-Indic digit
+        // is bidi class AN, so a count and a ceiling joined by a plain separator
+        // reorder inside an Arabic paragraph and "٣ / ٢٠" renders as twenty of
+        // three. `formatCountOfLimit` is where those marks live and why — and
+        // `UsageMeter` reads it for the same reason.
+        //
+        // The ceiling follows the same reading the shared usage rows use: mode
+        // "unlimited" — or a value the snapshot does not carry — is a count
+        // without a ceiling, never an assumed zero.
+        entitlements?.get(FeatureKeys.MAX_AI_REQUESTS_PER_MONTH)?.let { quota ->
             quota.used?.let { used ->
+                val limit = if (quota.mode == "unlimited") {
+                    null
+                } else {
+                    (quota.value as? JsonPrimitive)?.intOrNull
+                }
                 Text(
                     stringResource(R.string.usage_ai_requests) + ": " +
-                        if (quota.mode == "unlimited") {
+                        if (limit == null) {
                             stringResource(R.string.usage_value_unlimited, formatCount(used, locale))
                         } else {
-                            stringResource(
-                                R.string.usage_value,
-                                formatCount(used, locale),
-                                formatCount(quota.value?.jsonPrimitive?.intOrNull ?: 0, locale),
-                            )
+                            formatCountOfLimit(used, limit, locale)
                         },
                     style = MaterialTheme.typography.bodySmall,
                 )

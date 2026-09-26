@@ -346,7 +346,12 @@ fun CategoriesContent(
             // read and genuinely empty, the LazyColumn drew nothing and left a
             // seller looking at the add field over blank space, unsure whether
             // it had loaded. The add field stays above it — it is the way out.
-            if (categories?.isEmpty() == true && error == null) {
+            //
+            // "Read" is what `!loading` carries. The list seeds as an emptyList
+            // rather than null, so the first frame — the state the screen really
+            // opens in — drew this message underneath the spinner, claiming an
+            // answer about a read that had not happened yet.
+            if (!loading && categories?.isEmpty() == true && error == null) {
                 Text(
                     stringResource(R.string.categories_empty),
                     style = MaterialTheme.typography.bodyMedium,

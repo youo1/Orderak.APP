@@ -27,6 +27,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -225,6 +226,16 @@ fun CatalogLanguagesScreen(onBack: () -> Unit, vm: OperationsViewModel = hiltVie
 }
 
 /**
+ * The languages the catalogue carries product text for.
+ *
+ * Arabic and English, not the app's three: French is an Android-interface
+ * language only and is not an advertised catalogue language until the Worker
+ * dictionaries and the translation pipeline are extended for it
+ * (docs/architecture/localization-architecture.md, "Cached product translations").
+ */
+private val CATALOGUE_LANGUAGES = listOf("ar", "en")
+
+/**
  * The per-language catalogue list, as a function of its state.
  *
  * This screen's contract declares an empty state and the screen had none: with
@@ -232,6 +243,13 @@ fun CatalogLanguagesScreen(onBack: () -> Unit, vm: OperationsViewModel = hiltVie
  * language buttons over blank space. It says so now — and the language switcher
  * stays visible in that state, because "nothing in Arabic" is a reason to try
  * English, not a dead end.
+ *
+ * That sentence only works if the seller can see WHICH language the list is in,
+ * and [lang] — the language the screen loaded — was a parameter nothing read:
+ * the switcher drew two identical buttons, so the review screen never said what
+ * it was reviewing, and the seller had to infer the language from the product
+ * names. Which of the two is on is a selected state, and a selected state is
+ * what `FilterChip` draws everywhere else in the app that offers one of a set.
  */
 
 @Composable
@@ -254,8 +272,17 @@ fun CatalogLanguagesContent(
         onRetry = onRetry,
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(spacing.space2)) {
-            OutlinedButton(onClick = { onLang("ar") }) { Text("العربية") }
-            OutlinedButton(onClick = { onLang("en") }) { Text("English") }
+            // Named from AppLocales — the app's one list of language names, each
+            // in its own script — rather than from a second pair of literals, and
+            // `selected` is the half this row was missing: a switch that cannot
+            // say which side is on is not a switch.
+            AppLocales.supported.filter { it.tag in CATALOGUE_LANGUAGES }.forEach { locale ->
+                FilterChip(
+                    selected = lang == locale.tag,
+                    onClick = { onLang(locale.tag) },
+                    label = { Text(locale.nativeName) },
+                )
+            }
         }
         if (items?.isEmpty() == true) {
             FullScreenEmpty(message = stringResource(R.string.common_empty))

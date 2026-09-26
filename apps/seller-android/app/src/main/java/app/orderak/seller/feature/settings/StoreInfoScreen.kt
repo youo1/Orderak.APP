@@ -284,6 +284,7 @@ fun StoreInfoScreen(
     val slugState by viewModel.slugState.collectAsStateWithLifecycle()
     val storeUrl by viewModel.storeUrl.collectAsStateWithLifecycle()
     val storeCode by viewModel.storeCode.collectAsStateWithLifecycle()
+    val publicIdentifier by viewModel.publicIdentifier.collectAsStateWithLifecycle()
     val country by viewModel.countryIso.collectAsStateWithLifecycle()
     val businessSubcategories by viewModel.businessSubcategories.collectAsStateWithLifecycle()
     val appLanguage = LocalConfiguration.current.locales[0].language
@@ -363,6 +364,7 @@ fun StoreInfoScreen(
         storeUrl = storeUrl,
         storeCode = storeCode,
         country = country,
+        publicIdentifier = publicIdentifier,
         businessSubcategories = businessSubcategories,
         businessSubcategoryExpanded = businessSubcategoryExpanded,
         onSubcategoryExpanded = { businessSubcategoryExpanded = it },
@@ -417,6 +419,15 @@ fun StoreInfoContent(
     storeUrl: String?,
     storeCode: String?,
     country: String?,
+    /**
+     * The store's public identifier (`EG-store-A1B2C3`), or null before the server
+     * has issued one. Read by the identity card's own "Public identifier" row, which
+     * used to print the store link instead.
+     *
+     * Defaulted so the screenshot fixtures that predate the row keep compiling; the
+     * screen always passes it.
+     */
+    publicIdentifier: String? = null,
     businessSubcategories: List<BusinessSubcategoryDto>,
     businessSubcategoryExpanded: Boolean,
     onSubcategoryExpanded: (Boolean) -> Unit,
@@ -463,9 +474,24 @@ fun StoreInfoContent(
                 Column(Modifier.padding(spacing.space4), verticalArrangement = Arrangement.spacedBy(spacing.space1)) {
                     ReadOnlyRow(stringResource(R.string.store_info_country), country.orEmpty())
                     ReadOnlyRow(stringResource(R.string.store_info_code), storeCode.orEmpty())
+                    // The row this label names, drawn once, with the value it names.
+                    //
+                    // `store_info_public_id` is "المعرّف العام" / "Public identifier",
+                    // and the row carrying it printed the store URL — then the same URL
+                    // again on the line beneath it. Two defects in two lines: a label
+                    // that named one value and a row that showed another, and one value
+                    // drawn twice. The identifier is a different value (`EG-store-A1B2C3`,
+                    // what the storefront and the category links are addressed by), and
+                    // `StoreInfoViewModel.publicIdentifier` has exposed it all along with
+                    // nothing reading it. The published link still renders — once, under
+                    // the name the account surface already gives it — with the copy and
+                    // share controls beside it, and the pending sentence when it has not
+                    // been issued.
+                    publicIdentifier?.takeIf { it.isNotBlank() }?.let {
+                        ReadOnlyRow(stringResource(R.string.store_info_public_id), it)
+                    }
                     storeUrl?.let { url ->
-                        ReadOnlyRow(stringResource(R.string.store_info_public_id), url)
-                        Text(url, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                        ReadOnlyRow(stringResource(R.string.settings_link_title), url)
                         Row(horizontalArrangement = Arrangement.spacedBy(spacing.space2)) {
                             OutlinedButton(onClick = { onCopyLink(url) }) {
                                 Icon(Icons.Outlined.ContentCopy, contentDescription = null)
@@ -483,8 +509,16 @@ fun StoreInfoContent(
                 }
             }
 
-            // ---- Editable fields ----
-            Text(stringResource(R.string.store_info_title), style = MaterialTheme.typography.titleMedium)
+            // ---- The store's own fields, and no second title ----
+            //
+            // A heading stood here printing `store_info_title`, the same string the
+            // bar above the whole screen already carries: the screen named itself
+            // twice, and the second naming told the seller nothing the bar had not
+            // (the fields label themselves, and the card above is what separates
+            // them from the read-only identity block). Every replacement was either
+            // those same words again or false of a row beneath it — the verified
+            // phone number cannot be changed here — so the block carries no heading,
+            // as the sibling pushed form route `SellerProfileScreen` already does.
             Field(draft.name, { onDraft(draft.copy(name = it.take(60))) }, R.string.store_info_name)
             OutlinedTextField(
                 value = draft.slug,

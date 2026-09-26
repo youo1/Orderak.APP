@@ -66,7 +66,13 @@ administration, not "my account".
 API access, `account` splits into `حسابي` (identity, store, plan, support) and
 an organisation-administration surface. Naming the seam now is what stops
 `account` becoming the settings dumping ground the migration exists to remove.
-Until then `account` keeps its four groups and no L4 screen is built.
+Until then `account` keeps its **six** groups and no L4 screen is built.
+
+*(This said "four groups". The `account` contract in
+`tooling/ux/screen-contracts.mjs` states six — الخطة · المتجر والهوية · الدعم ·
+الأجهزة والاشتراك · بيانات التحصيل · إجراءات الحساب — and the surface renders six,
+which the redesign pass verified row by row. The count here was left behind when
+the surface was rebuilt and nothing compares a prose sentence to a contract.)*
 
 ## Surface: today
 

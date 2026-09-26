@@ -94,6 +94,7 @@
     <string name="product_price_label">Price (EGP)</string>
     <string name="product_stock_label">Stock</string>
     <string name="product_discount_none">None</string>
+    <string name="product_category_none">No category</string>
     <string name="product_available">Available for sale</string>
     <string name="product_save">Save product</string>
     <string name="product_delete">Delete product</string>
@@ -108,6 +109,7 @@
     <string name="orders_empty">No orders yet — tap ➕ and log your first chat order</string>
     <string name="order_new_title">New order</string>
     <string name="order_buyer_phone">Customer phone</string>
+    <string name="order_phone_invalid">Enter the full phone number — the order can\'t be saved without it</string>
     <string name="order_buyer_name_opt">Customer name (optional)</string>
     <string name="order_note_opt">Notes (optional)</string>
     <string name="order_items_title">Items</string>
@@ -115,6 +117,7 @@
     <string name="order_total">Total:</string>
     <string name="order_save">Save order</string>
     <string name="order_stock_error">Requested quantity exceeds available stock</string>
+    <string name="order_no_products_body">No products to sell yet — go back and add your first product from the Store tab, then log the order here</string>
     <string name="order_qty_decrease">Decrease %1$s quantity</string>
     <string name="order_qty_increase">Increase %1$s quantity</string>
 
@@ -176,6 +179,7 @@
     <string name="settings_account_actions">Account actions</string>
     <string name="settings_app_language">App language</string>
     <string name="settings_store_group_title">Store and identity</string>
+    <string name="settings_support_group_title">Help and updates</string>
     <string name="settings_devices_group_title">Devices and subscription</string>
     <!-- Backend link -->
     <string name="settings_link_title">Your catalog link</string>
@@ -323,6 +327,8 @@
 
     <!-- Payment history -->
     <string name="payment_history_title">Payment history</string>
+    <string name="payment_history_none">No payment recorded on this order yet</string>
+    <string name="payment_proof_attached">Receipt image attached</string>
     <string name="payment_ref_label">Ref: %1$s</string>
     <string name="payment_verified_badge">Verified</string>
     <string name="payment_flagged_badge">Flagged</string>
@@ -336,6 +342,7 @@
     <string name="seller_profile_photo">Profile Photo</string>
     <string name="seller_profile_phone">Phone Number (Account ID)</string>
     <string name="seller_profile_photo_set">Photo uploaded</string>
+    <string name="seller_profile_photo_failed">The photo didn\'t upload — pick it again. Your current photo is unchanged.</string>
     <!-- Auth and onboarding V2 -->
     <string name="welcome_value">Manage your store with ease</string>
     <string name="welcome_subtitle">Create your store and start selling in a few simple steps.</string>
@@ -433,6 +440,8 @@
     <string name="plans_included">Included</string>
     <string name="plans_unavailable">Plan details aren\'t available right now</string>
     <string name="plans_purchase_closed">Upgrading isn\'t open yet. This is here so you can see what each plan includes.</string>
+    <string name="plans_purchase_closed_body">Your current plan stays as it is — nothing about it changes.</string>
+    <string name="plans_current_plan_marked">%1$s (your plan)</string>
     <string name="plans_price_note">Prices are shown by Google Play in your own currency when upgrading opens.</string>
     <string name="paywall_title">Plan limit reached</string>
     <string name="paywall_limit_products">You\'ve reached your product limit</string>
@@ -448,6 +457,7 @@
     <string name="paywall_dismiss">Go back</string>
     <string name="paywall_view_plans">See plans</string>
     <string name="paywall_purchase_closed">Upgrading isn\'t open yet, so there\'s nothing to buy from here.</string>
+    <string name="paywall_purchase_closed_body">Your current plan stays as it is, and this limit stays where it is until upgrading opens.</string>
     <string name="order_refused_chip">Couldn\'t send</string>
     <string name="order_refused_title">This order couldn\'t be sent</string>
     <string name="order_refused_message">%1$s The order is saved on this phone only: it will not reach another device, and it cannot be moved along its pipeline. Remove it and record it again once that is sorted.</string>

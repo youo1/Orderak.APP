@@ -14,9 +14,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -372,8 +374,16 @@ fun OrderDetailsContent(
                         Text(stringResource(R.string.payment_section_title), style = MaterialTheme.typography.titleMedium)
                         Text(payMethodLabel(runCatching { PayMethod.valueOf(order.payMethod) }.getOrDefault(PayMethod.COD)), style = MaterialTheme.typography.bodyMedium)
                         if (proof is ProofUiState.Running) {
+                            // The system names this size: `iconMedium` is "a
+                            // standalone icon: a leading slot, a control, an inline
+                            // progress spinner", and the app's other four inline
+                            // spinners read it. This one carried a bare 24.dp, the
+                            // size the system gives a navigation glyph.
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                CircularProgressIndicator(Modifier.width(24.dp).height(24.dp))
+                                CircularProgressIndicator(
+                                    Modifier.size(spacing.iconMedium),
+                                    strokeWidth = 2.dp,
+                                )
                                 Spacer(Modifier.width(spacing.space3))
                                 Text(stringResource(R.string.payment_checking))
                             }
@@ -398,6 +408,26 @@ fun OrderDetailsContent(
             }
 
             // Payment history
+            //
+            // Three states, not two. `isNullOrEmpty()` drew one branch for an
+            // unread list and for a read list with nothing in it, so the
+            // nullability the doc comment above asks for had no rendering
+            // consequence at all: a seller could not tell "no transfer has been
+            // recorded" from "nothing has been read yet" — the two answers this
+            // page exists to give. Null says nothing, because it knows nothing;
+            // empty says so.
+            if (payments != null && payments.isEmpty()) {
+                Card {
+                    Column(Modifier.fillMaxWidth().padding(spacing.space3), verticalArrangement = Arrangement.spacedBy(spacing.space2)) {
+                        Text(stringResource(R.string.payment_history_title), style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            stringResource(R.string.payment_history_none),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
             if (!payments.isNullOrEmpty()) {
                 Card {
                     Column(Modifier.fillMaxWidth().padding(spacing.space3), verticalArrangement = Arrangement.spacedBy(spacing.space1)) {
@@ -426,7 +456,19 @@ fun OrderDetailsContent(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                                 if (!payment.proofPath.isNullOrBlank()) {
-                                    Text("📎", style = MaterialTheme.typography.titleMedium)
+                                    // "📎" stood here. Emoji are copy, not
+                                    // iconography, and this is not copy: it is the
+                                    // one mark that a receipt from
+                                    // `payments_finance.receipt_image_attachment`
+                                    // exists, drawn as an unlabelled glyph a screen
+                                    // reader cannot describe and a locale cannot
+                                    // translate. It is a row icon, so `iconSmall`.
+                                    Icon(
+                                        imageVector = Icons.Outlined.AttachFile,
+                                        contentDescription = stringResource(R.string.payment_proof_attached),
+                                        modifier = Modifier.size(spacing.iconSmall),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
                                 }
                             }
                             if (payment != payments.last()) {

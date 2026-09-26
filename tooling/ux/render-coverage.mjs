@@ -73,6 +73,18 @@ export const RENDERS = {
   todayContentEnglish: { kind: "component", note: "the اليوم counters in English — the control for the Arabic digits" },
   todayNothingWaitingLight: { kind: "component", note: "G2's other answer: nothing is waiting, said in words rather than left as three neutral zeros the seller has to add up" },
   todayNothingWaitingDark: { kind: "component", note: "the same sentence in dark" },
+  // Added by the surface-by-surface redesign pass. Each one exists because a
+  // declared state or a claimed structure had no render at all — which is how it
+  // drifted in the first place: a state nobody can see is a state nobody checks.
+  customersLoadError: { kind: "screen", contract: "customers", state: "error", theme: "light" },
+  storeInfoIdentityLight: { kind: "screen", contract: "store-info", state: "content", theme: "light" },
+  orderDetailsPaymentProofAttached: { kind: "screen", contract: "order-details", state: "content", theme: "light" },
+  newOrderPhoneInvalid: { kind: "screen", contract: "new-order", state: "content", theme: "light" },
+  storeUnlimitedPlan: { kind: "component", note: "an unlimited plan draws the shared usage row, not a hand-built sentence under a string no other screen reads" },
+  assistantQuota: { kind: "component", note: "a count against a limit in Arabic, in that order — the pair swaps when it is built from two separate numbers" },
+  devicesAtDeviceLimit: { kind: "component", note: "the device allowance the contract declares as this screen's data, drawn at the ceiling" },
+  categoriesLoadingSeededList: { kind: "component", note: "loading with the seeded empty list production actually passes, which is the frame the empty message used to appear under" },
+  sellerProfilePhotoUploadFailed: { kind: "component", note: "a photo that never reached storage, named beside the control that caused it" },
 
   // ---- components, not screens ----
   // Each of these renders a shared component with a surface's copy in it. That

@@ -158,7 +158,19 @@ fun AccountContent(
         Spacer(Modifier.height(spacing.space2))
 
         // ── Support ──
-        SettingsSectionHeader(stringResource(R.string.support_title))
+        //
+        // Named for the group, for the same reason as the store group above — and
+        // this header was the third one that did not. It read `support_title`, which
+        // is also the label of the Support row directly beneath it, so the group
+        // announced itself and then immediately repeated itself; and the group holds
+        // three rows, not one — the seller's tickets, the platform's announcements
+        // and the AI assistant — so the single member it named was not even the
+        // group. `docs/redesign/recon/android-ui-audit.md` lists this header with
+        // the other two (§4.3 item 4, "support_title heads Support + Announcements
+        // + AI") while §4.4 records only two as fixed. The name now covers every row
+        // beneath it: help is the tickets and the assistant, updates are the
+        // announcements.
+        SettingsSectionHeader(stringResource(R.string.settings_support_group_title))
         SettingsListItem(Icons.Outlined.SupportAgent, stringResource(R.string.support_title), onOpenSupport)
         SettingsListItem(Icons.Outlined.Campaign, stringResource(R.string.announcements_title), onOpenAnnouncements)
         // Withheld while unknown, rather than hidden-as-decided. `true` shows

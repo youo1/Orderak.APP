@@ -407,14 +407,30 @@ private fun PhoneVerificationContent(
             .padding(spacing.space6),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(stringResource(R.string.auth_phone_entry_title), style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(spacing.space2))
-        Text(
-            stringResource(R.string.auth_phone_reason),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(spacing.space8))
+        // Entry copy belongs to the entry stage.
+        //
+        // Phone entry and the OTP are two stages of one screen, and `AuthOtpForm`
+        // renders the OTP stage's own title and subtitle ("Verify your number",
+        // "Sent to …"). Rendered together with these two lines the stage carried two
+        // `headlineMedium` headings — the "two stacked headings on OTP page" the UI
+        // audit recorded — and the upper one told the seller to enter a number the
+        // field below had just been locked against (`enabled = !phoneLocked`),
+        // directly above a promise to text a code that had already been sent. The
+        // locked country and phone stay visible either way, which is what this stage
+        // owes the contract.
+        if (phoneState != null) {
+            Text(
+                stringResource(R.string.auth_phone_entry_title),
+                style = MaterialTheme.typography.headlineMedium,
+            )
+            Spacer(Modifier.height(spacing.space2))
+            Text(
+                stringResource(R.string.auth_phone_reason),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(spacing.space8))
+        }
         AuthPhoneForm(
             phone = phone,
             country = country,

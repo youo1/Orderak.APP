@@ -242,10 +242,15 @@ fun ProductEditContent(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(spacing.space2)
                 ) {
+                    // The chip that means "no category". It borrowed
+                    // `product_discount_none` — "بدون خصم", "no discount" — the
+                    // string written for a discount control this screen does not
+                    // draw (ProductEditViewModel.save says as much), so the picker
+                    // offered "no discount" under a heading that reads «الأقسام».
                     FilterChip(
                         selected = state.categoryCode == null,
                         onClick = { actions.onCategory(null) },
-                        label = { Text(stringResource(R.string.product_discount_none)) }
+                        label = { Text(stringResource(R.string.product_category_none)) }
                     )
                     categories.forEach { c ->
                         FilterChip(

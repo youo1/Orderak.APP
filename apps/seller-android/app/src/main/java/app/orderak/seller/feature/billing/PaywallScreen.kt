@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -21,7 +20,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalConfiguration
@@ -37,6 +35,8 @@ import androidx.navigation.toRoute
 import app.orderak.seller.R
 import app.orderak.seller.core.text.formatCount
 import app.orderak.seller.app.navigation.PaywallRoute
+import app.orderak.seller.core.ui.NoticeBanner
+import app.orderak.seller.core.ui.SemanticRole
 import app.orderak.seller.data.billing.EntitlementManager
 import app.orderak.seller.data.remote.BackendApi
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -204,22 +204,17 @@ fun PaywallContent(
             // than a disabled button when billing is closed. An upgrade path that
             // ends at a control the server refuses is worse than one that ends
             // at an explanation.
+            //
+            // The sentence is a notice now rather than the smallest grey line on
+            // the page, and it carries the role the semantic layer keeps for
+            // anything monetary — the role, and the component, the subscription
+            // page and the limit banners already say this same fact in.
             if (!state.purchaseOpen) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(spacing.space2),
-                ) {
-                    Icon(
-                        Icons.Outlined.Info,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        stringResource(R.string.paywall_purchase_closed),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                NoticeBanner(
+                    role = SemanticRole.Commerce,
+                    title = stringResource(R.string.paywall_purchase_closed),
+                    message = stringResource(R.string.paywall_purchase_closed_body),
+                )
             }
         }
     }

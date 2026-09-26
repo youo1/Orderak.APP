@@ -281,9 +281,15 @@ fun ShopSetupContent(
                     // The Arabic string writes its “of 2” as ٢, so the step has to
                     // be Arabic-Indic too or one sentence carries both forms.
                     stringResource(R.string.setup_step_indicator, formatCount(state.step, locale)),
+                    // Emphasis comes from the role, not from a second weight on top of
+                    // it. `labelLarge` is already the scale's medium (500) and the
+                    // design system states the product has no weight above it —
+                    // "Weight is 400 or 500 — there is no bold display type in this
+                    // product" — so `FontWeight.Bold` was an off-scale emphasis. The
+                    // step is still signalled twice without it: by this line and by
+                    // the progress bar above, never by colour alone.
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
                 )
                 Spacer(Modifier.height(spacing.space8))
 

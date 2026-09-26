@@ -126,7 +126,13 @@ export const CONTRACTS = [
       // ShopSetupContent out put the callback in ShopSetupScreen's own body,
       // where the check can see it.
       { do: "select city", via: "onCitySelected" },
-      { do: "create store", via: "onCreate" },
+      // Was `via: "onCreate"`, which resolves to the passkey callback
+      // (`onCreate = { activity?.let(viewModel::createPasskey) }`) rather than to
+      // store creation, which is the bottom button's `actions.finish` →
+      // `viewModel::finish`. The guard passed the whole time, because the symbol
+      // it looked for did exist — it was just the wrong one. Found while checking
+      // this contract against the screen during the surface redesign.
+      { do: "create store", via: "finish" },
     ],
     states: ["content", "loading", "error"],
     offline: false,
