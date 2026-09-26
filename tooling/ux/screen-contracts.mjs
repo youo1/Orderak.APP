@@ -460,11 +460,16 @@ export const CONTRACTS = [
     ],
     data: [
       "seller profile", "plan summary", "entitlement states for every entry",
-      "public slug", "payout handles (InstaPay, Vodafone Cash)",
+      // "public slug" was listed here as data and was in fact an editable field,
+      // which is how the account surface came to own a second editor for a store
+      // field — the one without the `/api/v1/slug/check` call `StoreInfoScreen`
+      // makes. It is a read-only display of the published link now, so it stays
+      // as data and every `store` entry owns the writing.
+      "published catalogue link (read-only)", "payout handles (InstaPay, Vodafone Cash)",
     ],
     actions: [
       { do: "open group entry", via: "onOpenStoreInfo" },
-      { do: "save payout and slug", via: "savePayout" },
+      { do: "save payout", via: "savePayout" },
       // Both were real and untraced: the language sheet is behind `showLanguage`
       // and account deletion behind `requestAccountDeletion`.
       { do: "switch language", via: "showLanguage" },

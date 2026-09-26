@@ -116,8 +116,10 @@ export const RENDERS = {
   accountLoadingDark: { kind: "screen", contract: "account", state: "loading", theme: "dark" },
   accountContentLight: { kind: "screen", contract: "account", state: "content", theme: "light" },
   accountContentDark: { kind: "screen", contract: "account", state: "content", theme: "dark" },
-  accountFreePlan: { kind: "component", note: "aiAvailable=false omits the entry rather than showing it locked — NotBuilt carries no upgrade affordance" },
+  accountFreePlan: { kind: "component", note: "aiAvailable=false shows the LockedByPlan notice with no upgrade control, because purchaseOpen is false and billing is closed — the notice states the lock, it does not offer a plan change that cannot happen" },
+  accountFreePlanUpgradable: { kind: "component", note: "the same lock with purchaseOpen true, which is the only case where the notice carries an Upgrade — the pair is what makes 'offered only when there is somewhere to go' reviewable" },
   accountLinkPending: { kind: "component", note: "the store link before it has been issued" },
+  accountGroupsTail: { kind: "component", note: "the two groups at the bottom of the scroll, which no full-screen render reaches: the devices header renamed to the contract's own name for that group, deletion status moved into account actions, and the group's two rows at the 48dp floor" },
 
   // المتجر, once StoreContent(state) existed to render. These replace four
   // `products*` renders that called FullScreenEmpty and FullScreenLoading
