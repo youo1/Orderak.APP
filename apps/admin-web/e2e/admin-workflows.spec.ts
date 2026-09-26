@@ -1,6 +1,21 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+/**
+ * The compiled design-system artifact, addressed from this file rather than from
+ * the working directory.
+ *
+ * This suite previously read it as `resolve(process.cwd(), '..', 'design', ...)`.
+ * Playwright runs from `apps/admin-web` — that is where the package script and
+ * the `testDir` are anchored — so `..` landed on `apps/`, and every run died on
+ * its first line with ENOENT on a path that has never existed. A suite that
+ * cannot reach its own fixture tests nothing, and nothing reported it: no
+ * workflow invoked this suite, so the failure lived only in an artifact.
+ */
+const DESIGN_SYSTEM_ARTIFACT = fileURLToPath(
+  new URL('../../../design/design-system.default.json', import.meta.url),
+);
 
 const dashboard = {
   stores: { total: 12, active: 10 },
@@ -117,7 +132,7 @@ test('support agent opens a ticket and sends an audited CSRF-protected reply', a
 });
 
 test('theme manager previews and applies an immutable generated checkpoint', async ({ page }) => {
-  const artifact = JSON.parse(readFileSync(resolve(process.cwd(), '..', 'design', 'design-system.default.json'), 'utf8'));
+  const artifact = JSON.parse(readFileSync(DESIGN_SYSTEM_ARTIFACT, 'utf8'));
   const snapshot = artifact.snapshot;
   let publishedBody: Record<string, unknown> | null = null;
   let csrf = '';
@@ -172,7 +187,7 @@ test('theme manager previews and applies an immutable generated checkpoint', asy
 });
 
 test('revision history groups current, saved, and recent checkpoints with managed actions', async ({ page }) => {
-  const artifact = JSON.parse(readFileSync(resolve(process.cwd(), '..', 'design', 'design-system.default.json'), 'utf8'));
+  const artifact = JSON.parse(readFileSync(DESIGN_SYSTEM_ARTIFACT, 'utf8'));
   const snapshot = artifact.snapshot;
   const active = {
     id: 3,

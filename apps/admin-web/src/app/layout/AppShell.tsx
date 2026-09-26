@@ -2,6 +2,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Bell, ChevronDown, Command, LogOut, Menu, Search, ShieldCheck, X } from 'lucide-react';
 import { sections } from '@/app/config/sections';
+import { ConfirmHost } from '@/shared/ui/confirm';
 import { useAuth } from '@/features/auth/auth-context';
 
 export function AppShell() {
@@ -78,6 +79,11 @@ export function AppShell() {
       <main className="page"><Suspense fallback={<div className="ork-spinner" aria-label="Loading" />}><Outlet /></Suspense></main>
     </div>
     {paletteOpen && <CommandPalette sections={visible} close={() => setPaletteOpen(false)} navigate={path => { navigate(path); setPaletteOpen(false); }} />}
+    {/* One host for every `askConfirm` in the panel. Mounted in the shell rather
+        than inside a page so the dialog outlives the row that raised it: a
+        mutation can invalidate its own query and re-render the page before the
+        operator has answered. */}
+    <ConfirmHost />
   </div>;
 }
 

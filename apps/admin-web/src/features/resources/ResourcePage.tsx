@@ -1,10 +1,18 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, Plus, RefreshCw, X } from 'lucide-react';
+import { Download, Plus, RefreshCw } from 'lucide-react';
 import { api } from '@/shared/api/client';
 import type { Section } from '@/app/config/sections';
 import { DataTable } from '@/shared/ui/DataTable';
 import { DetailPanel, ErrorState, LoadingState, PageHeader } from '@/shared/ui/Page';
+import { Button } from '@/shared/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/dialog';
+import { Field } from '@/shared/ui/field';
+import { Input } from '@/shared/ui/input';
+import { Textarea } from '@/shared/ui/textarea';
+import { STEP_UP_UNAVAILABLE, useStepUp } from '@/shared/api/step-up';
+import { askConfirm } from '@/shared/ui/confirm';
 import { actions } from '@/app/config/actions';
 import { ActionDialog } from '@/shared/ui/ActionDialog';
 import { useAuth } from '@/features/auth/auth-context';
@@ -19,7 +27,7 @@ export function ResourcePage({ section }: { section: Section }) {
   const query = useQuery({ queryKey: ['resource', section.id], queryFn: () => api<Record<string, unknown>>(section.endpoint!) });
   const groups = rowsFromPayload(query.data, section.resultKeys || []);
   return <>
-    <PageHeader title={section.label} description={section.description} actions={<>{action && auth.can(action.permission) && <button className="button primary" onClick={() => setActionOpen(true)}><Plus size={16} /> {action.label}</button>}<button className="button" onClick={() => query.refetch()}><RefreshCw size={16} /> Refresh</button></>} />
+    <PageHeader title={section.label} description={section.description} actions={<>{action && auth.can(action.permission) && <Button onClick={() => setActionOpen(true)}><Plus size={16} /> {action.label}</Button>}<Button variant="outline" onClick={() => query.refetch()}><RefreshCw size={16} /> Refresh</Button></>} />
     {query.isLoading && <LoadingState />}
     {query.error && <ErrorState error={query.error} retry={() => query.refetch()} />}
     {section.id === 'subscriptions' && <BillingLeaseHealth />}
@@ -51,8 +59,9 @@ function BillingLeaseHealth() {
   const p95 = Number(durations.p95_ms ?? 0);
   const review = p95 >= lease * 1000 * 0.8 || Number(durations.exceeded_lease ?? 0) > 0;
   const seconds = (value: unknown) => `${(Number(value ?? 0) / 1000).toFixed(1)} s`;
-  return <section className="panel">
-    <div className="panel-heading"><div><p className="eyebrow">PLAY CLAIM LEASE</p><h2>Verification duration and reclaim health</h2><p>Lease changes require observed percentile evidence. A reclaim can duplicate a non-charging Google verification or acknowledgement call.</p></div><span className={review ? 'status danger' : 'status active'}>{review ? 'Review lease' : 'Within lease'}</span></div>
+  return <Card>
+    <CardHeader className="panel-heading"><div><p className="eyebrow">PLAY CLAIM LEASE</p><CardTitle>Verification duration and reclaim health</CardTitle><CardDescription>Lease changes require observed percentile evidence. A reclaim can duplicate a non-charging Google verification or acknowledgement call.</CardDescription></div><span className={review ? 'status danger' : 'status active'}>{review ? 'Review lease' : 'Within lease'}</span></CardHeader>
+    <CardContent>
     <dl className="snapshot">
       <div><dt>Lease</dt><dd>{lease} s</dd></div>
       <div><dt>p50</dt><dd>{seconds(durations.p50_ms)}</dd></div>
@@ -64,20 +73,21 @@ function BillingLeaseHealth() {
       <div><dt>Jobs reclaimed</dt><dd>{Number(reclaims.jobs_reclaimed ?? 0)}</dd></div>
     </dl>
     {reclaims.last_reclaimed_at && <p className="muted">Last reclaim: {String(reclaims.last_reclaimed_at)}</p>}
-  </section>;
+    </CardContent>
+  </Card>;
 }
 
 function TranslationActions({ row, close }: { row: Row; close: () => void }) {
   const client = useQueryClient();
   const mutation = useMutation({ mutationFn: (status: 'reviewed' | 'rejected') => api(`/api/admin/v1/product-translations/${encodeURIComponent(String(row.product_code))}/${encodeURIComponent(String(row.lang))}`, { method: 'PATCH', body: JSON.stringify({ status }) }), onSuccess: () => { client.invalidateQueries({ queryKey: ['resource', 'translations'] }); close(); } });
-  return <><p className="muted">Rejected or stale content falls back to seller-authored source text at runtime.</p><div className="button-row"><button className="button primary" disabled={mutation.isPending} onClick={() => mutation.mutate('reviewed')}>Approve current translation</button><button className="button danger" disabled={mutation.isPending} onClick={() => { if (confirm('Reject this translation and use seller-authored fallback?')) mutation.mutate('rejected'); }}>Reject and fall back</button></div>{mutation.error && <p className="error-text">{mutation.error.message}</p>}</>;
+  return <><p className="muted">Rejected or stale content falls back to seller-authored source text at runtime.</p><div className="button-row"><Button disabled={mutation.isPending} onClick={() => mutation.mutate('reviewed')}>Approve current translation</Button><Button variant="destructive" disabled={mutation.isPending} onClick={() => { askConfirm('Reject this translation and use seller-authored fallback?', () => mutation.mutate('rejected')); }}>Reject and fall back</Button></div>{mutation.error && <p className="error-text">{mutation.error.message}</p>}</>;
 }
 
 function ContentActions({ row, close }: { row: Row; close: () => void }) {
   const client = useQueryClient();
   const mutation = useMutation({ mutationFn: () => api(`/api/admin/v1/content-configs/${encodeURIComponent(String(row.id))}/publish`, { method: 'POST', body: '{}' }), onSuccess: () => { client.invalidateQueries({ queryKey: ['resource', 'content'] }); close(); } });
   if (row.status !== 'draft') return <p className="muted">Published content remains immutable; create a new version to change it.</p>;
-  return <><p className="muted">Publishing retires the previous version for the same content key and locale.</p><button className="button primary" disabled={mutation.isPending} onClick={() => { if (confirm('Publish this content version?')) mutation.mutate(); }}>Publish version</button>{mutation.error && <p className="error-text">{mutation.error.message}</p>}</>;
+  return <><p className="muted">Publishing retires the previous version for the same content key and locale.</p><Button disabled={mutation.isPending} onClick={() => { askConfirm('Publish this content version?', () => mutation.mutate()); }}>Publish version</Button>{mutation.error && <p className="error-text">{mutation.error.message}</p>}</>;
 }
 
 function PrivacyActions({ row, close }: { row: Row; close: () => void }) {
@@ -92,20 +102,21 @@ function PrivacyActions({ row, close }: { row: Row; close: () => void }) {
   const needsIdentity = target === 'completed' && ['deletion', 'correction'].includes(String(row.request_type));
   const mutation = useMutation({ mutationFn: () => api(`/api/admin/v1/buyer-privacy/${encodeURIComponent(String(row.id))}`, { method: 'PATCH', body: JSON.stringify({ status: target, buyer_phone: phone || undefined, corrected_name: correctedName || undefined, notes }) }), onSuccess: () => { client.invalidateQueries({ queryKey: ['resource', 'privacy'] }); setOpen(false); close(); } });
   if (!next.length) return <p className="muted">This request has reached a terminal state.</p>;
-  return <><div className="button-row">{next.map(status => <button className={`button ${status === 'rejected' ? 'danger' : 'primary'}`} key={status} onClick={() => { setTarget(status); setOpen(true); }}>{status.replace('_', ' ')}</button>)}</div>{open && <div className="modal-backdrop"><section className="modal compact" role="dialog" aria-modal="true"><header><div><p className="eyebrow">PRIVACY WORKFLOW</p><h2>Move request to {target.replace('_', ' ')}</h2><p>Every transition is recorded in the immutable admin audit trail.</p></div><button className="icon-button" onClick={() => setOpen(false)} aria-label="Close"><X size={18} /></button></header><div className="form-grid">{needsIdentity && <label className="field"><span>Re-enter customer phone *</span><input value={phone} onChange={event => setPhone(event.target.value)} /></label>}{needsIdentity && row.request_type === 'correction' && <label className="field"><span>Corrected customer name *</span><input value={correctedName} onChange={event => setCorrectedName(event.target.value)} /></label>}<label className="field wide"><span>Evidence / resolution note</span><textarea rows={4} value={notes} onChange={event => setNotes(event.target.value)} /></label></div>{mutation.error && <p className="error-text">{mutation.error.message}</p>}<footer><button className="button" onClick={() => setOpen(false)}>Cancel</button><button className="button primary" disabled={mutation.isPending || (needsIdentity && phone.replace(/\D/g, '').length < 7) || (needsIdentity && row.request_type === 'correction' && !correctedName.trim())} onClick={() => mutation.mutate()}>{mutation.isPending ? 'Applying…' : 'Confirm transition'}</button></footer></section></div>}</>;
+  return <><div className="button-row">{next.map(status => <Button variant={status === 'rejected' ? 'destructive' : 'default'} key={status} onClick={() => { setTarget(status); setOpen(true); }}>{status.replace('_', ' ')}</Button>)}</div><Dialog open={open} onOpenChange={nextOpen => { if (!nextOpen) setOpen(false); }}><DialogContent className="w-[min(620px,calc(100vw-32px))]"><DialogHeader><p className="eyebrow">PRIVACY WORKFLOW</p><DialogTitle>Move request to {target.replace('_', ' ')}</DialogTitle><DialogDescription>Every transition is recorded in the immutable admin audit trail.</DialogDescription></DialogHeader><div className="form-grid">{needsIdentity && <Field label="Re-enter customer phone *"><Input value={phone} onChange={event => setPhone(event.target.value)} /></Field>}{needsIdentity && row.request_type === 'correction' && <Field label="Corrected customer name *"><Input value={correctedName} onChange={event => setCorrectedName(event.target.value)} /></Field>}<Field label="Evidence / resolution note" className="wide"><Textarea rows={4} value={notes} onChange={event => setNotes(event.target.value)} /></Field></div>{mutation.error && <p className="error-text">{mutation.error.message}</p>}<DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button disabled={mutation.isPending || (needsIdentity && phone.replace(/\D/g, '').length < 7) || (needsIdentity && row.request_type === 'correction' && !correctedName.trim())} onClick={() => mutation.mutate()}>{mutation.isPending ? 'Applying…' : 'Confirm transition'}</Button></DialogFooter></DialogContent></Dialog></>;
 }
 
 function ExportDownload({ row }: { row: Row }) {
   const [freshOpen, setFreshOpen] = useState(false);
   const [password, setPassword] = useState('');
   const [totpCode, setTotpCode] = useState('');
+  const stepUp = useStepUp();
   const completed = row.status === 'completed' && !row.downloaded_at;
   const sensitive = row.classification === 'sensitive';
   const mutation = useMutation({ mutationFn: async () => {
     const headers = new Headers();
     if (sensitive) {
-      const authorization = await api<{ authorization_id: string }>('/api/admin/v1/action-authorizations', { method: 'POST', body: JSON.stringify({ action: 'export.sensitive', entity_id: String(row.id), payload_hash: 'export-download', password, totp_code: totpCode }) });
-      headers.set('x-admin-action-authorization', authorization.authorization_id);
+      const authorizationId = await stepUp.authorize('export.sensitive', String(row.id), 'export-download', password, totpCode);
+      headers.set('x-admin-action-authorization', authorizationId);
     }
     const result = await api<{ download_url: string }>(`/api/admin/v1/exports/${encodeURIComponent(String(row.id))}/download`, { method: 'POST', headers, body: JSON.stringify({ acknowledgement: 'admin_ui_download' }) });
     // Same-origin only. This navigates the console to a URL the response body
@@ -117,7 +128,7 @@ function ExportDownload({ row }: { row: Row }) {
     window.location.assign(target.href);
   }, onSuccess: () => setFreshOpen(false) });
   if (!completed) return <p className="muted">Download becomes available once this private artifact completes. Tokens are one-use and expire in five minutes.</p>;
-  return <><button className="button primary" onClick={() => sensitive ? setFreshOpen(true) : mutation.mutate()} disabled={mutation.isPending}><Download size={16} /> Download once</button>{mutation.error && <p className="error-text">{mutation.error.message}</p>}{freshOpen && <div className="modal-backdrop"><section className="modal compact" role="dialog" aria-modal="true" aria-label="Authorize sensitive export"><header><div><p className="eyebrow">FRESH OWNER AUTH</p><h2>Authorize sensitive download</h2><p>Password and a current TOTP are required. This authorization is bound to this one export and consumed once.</p></div><button className="icon-button" onClick={() => setFreshOpen(false)} aria-label="Close"><X size={18} /></button></header><div className="form-grid"><label className="field"><span>Owner password</span><input type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} /></label><label className="field"><span>Current TOTP</span><input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={totpCode} onChange={event => setTotpCode(event.target.value.replace(/\D/g, '').slice(0, 6))} /></label></div>{mutation.error && <p className="error-text">{mutation.error.message}</p>}<footer><button className="button" onClick={() => setFreshOpen(false)}>Cancel</button><button className="button primary" disabled={password.length < 12 || totpCode.length !== 6 || mutation.isPending} onClick={() => mutation.mutate()}>{mutation.isPending ? 'Authorizing…' : 'Authorize and download'}</button></footer></section></div>}</>;
+  return <><Button onClick={() => { if (sensitive && !stepUp.available) return; if (sensitive) setFreshOpen(true); else mutation.mutate(); }} disabled={mutation.isPending || (sensitive && !stepUp.available)}><Download size={16} /> Download once</Button>{mutation.error && <p className="error-text">{mutation.error.message}</p>}{sensitive && !stepUp.available && <p className="error-text">{STEP_UP_UNAVAILABLE}</p>}<Dialog open={freshOpen} onOpenChange={nextOpen => { if (!nextOpen) setFreshOpen(false); }}><DialogContent className="w-[min(620px,calc(100vw-32px))]"><DialogHeader><p className="eyebrow">FRESH OWNER AUTH</p><DialogTitle>Authorize sensitive download</DialogTitle><DialogDescription>Password and a current TOTP are required. This authorization is bound to this one export and consumed once.</DialogDescription></DialogHeader><div className="form-grid"><Field label="Owner password"><Input type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} /></Field><Field label="Current TOTP"><Input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={totpCode} onChange={event => setTotpCode(event.target.value.replace(/\D/g, '').slice(0, 6))} /></Field></div>{mutation.error && <p className="error-text">{mutation.error.message}</p>}<DialogFooter><Button variant="outline" onClick={() => setFreshOpen(false)}>Cancel</Button><Button disabled={password.length < 12 || totpCode.length !== 6 || mutation.isPending} onClick={() => mutation.mutate()}>{mutation.isPending ? 'Authorizing…' : 'Authorize and download'}</Button></DialogFooter></DialogContent></Dialog></>;
 }
 
 function rowsFromPayload(payload: Record<string, unknown> | undefined, keys: string[]) {

@@ -35,6 +35,7 @@ const SecurityPage = lazyNamed(() => import('@/features/operations/OperationsPag
 const PlansPage = lazyNamed(() => import('@/features/commerce/PlansPage'), 'PlansPage');
 const BillingVerificationsPage = lazyNamed(() => import('@/features/commerce/BillingVerificationsPage'), 'BillingVerificationsPage');
 const ThemeBuilderPage = lazy(() => import('@/features/theme/ThemeBuilderPage'));
+const DesignSystemPage = lazy(() => import('@/features/design-system/DesignSystemPage'));
 
 /** lazy() for a module that exports the component under a name, not as default. */
 function lazyNamed<K extends string>(
@@ -66,7 +67,8 @@ export default function App() {
         now that every routed page is split, and a nested one here would give
         the theme builder a different loading state to everything else. */}
     <Route path="system/theme" element={<Permission permission="theme:view"><ThemeBuilderPage /></Permission>} />
-    {sections.filter(section => !['dashboard', 'stores', 'support', 'deletions', 'runtime', 'jobs', 'security', 'admins', 'plans', 'theme', 'billing-verifications'].includes(section.id)).map(section => <Route key={section.id} path={section.path.slice(1)} element={<Permission permission={section.permission}><ResourcePage section={section} />{section.id === 'flags' && <FlagSimulator />}</Permission>} />)}
+    <Route path="system/design-system" element={<Permission permission="theme:view"><DesignSystemPage /></Permission>} />
+    {sections.filter(section => !['dashboard', 'stores', 'support', 'deletions', 'runtime', 'jobs', 'security', 'admins', 'plans', 'theme', 'design-system', 'billing-verifications'].includes(section.id)).map(section => <Route key={section.id} path={section.path.slice(1)} element={<Permission permission={section.permission}><ResourcePage section={section} />{section.id === 'flags' && <FlagSimulator />}</Permission>} />)}
     <Route path="*" element={<Navigate to="/" replace />} />
   </Route></Routes>;
 }
