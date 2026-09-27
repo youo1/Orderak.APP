@@ -775,35 +775,67 @@ private fun OnboardingPasskeySheet(
     onCreate: () -> Unit,
     onSkip: () -> Unit,
 ) {
+    ModalBottomSheet(onDismissRequest = onSkip) {
+        OnboardingPasskeyContent(
+            creating = state.passkeyCreating,
+            error = state.error,
+            onCreate = onCreate,
+            onSkip = onSkip,
+        )
+    }
+}
+
+/**
+ * The onboarding passkey invite, without the sheet around it.
+ *
+ * `ModalBottomSheet` is not captured by the screenshot harness, so nothing that
+ * rendered `ShopSetupScreen` in its `showPasskeyInvite` state would have shown this
+ * sheet — and nothing did. There were no baselines for it at all.
+ *
+ * This is the second copy of the invite's layout: `PasskeyInviteContent` in
+ * `AuthScreen.kt` draws the same icon, the same title, the same two buttons. They are
+ * not merged here, and the reason is not style. Auth's version takes an `AuthError`
+ * and renders it through `AuthErrorText`; this one takes a raw wire code and renders it
+ * through [SetupError], which is the only place `setup_*` error strings appear.
+ * Collapsing them means choosing one error pipeline for both screens, which changes
+ * what a seller reads on the auth screen — a product decision, recorded rather than
+ * taken quietly.
+ */
+@Composable
+internal fun OnboardingPasskeyContent(
+    creating: Boolean,
+    error: String?,
+    onCreate: () -> Unit,
+    onSkip: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val layout = LocalOrderakLayout.current
     val spacing = LocalOrderakSpacing.current
-    ModalBottomSheet(onDismissRequest = onSkip) {
-        Column(
-            modifier = Modifier.widthIn(max = layout.contentMaxWidth).fillMaxWidth().padding(spacing.space6),
-            horizontalAlignment = Alignment.CenterHorizontally,
+    Column(
+        modifier = modifier.widthIn(max = layout.contentMaxWidth).fillMaxWidth().padding(spacing.space6),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(Icons.Outlined.Fingerprint, contentDescription = null, modifier = Modifier.size(spacing.iconHero))
+        Spacer(Modifier.height(spacing.space4))
+        Text(stringResource(R.string.passkey_invite_title), style = MaterialTheme.typography.titleLarge)
+        Spacer(Modifier.height(spacing.space2))
+        Text(
+            stringResource(R.string.passkey_invite_body),
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        SetupError(error)
+        Spacer(Modifier.height(spacing.space6))
+        Button(
+            onClick = onCreate,
+            enabled = !creating,
+            modifier = Modifier.fillMaxWidth(),
         ) {
-            Icon(Icons.Outlined.Fingerprint, contentDescription = null, modifier = Modifier.size(spacing.iconHero))
-            Spacer(Modifier.height(spacing.space4))
-            Text(stringResource(R.string.passkey_invite_title), style = MaterialTheme.typography.titleLarge)
-            Spacer(Modifier.height(spacing.space2))
-            Text(
-                stringResource(R.string.passkey_invite_body),
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            SetupError(state.error)
-            Spacer(Modifier.height(spacing.space6))
-            Button(
-                onClick = onCreate,
-                enabled = !state.passkeyCreating,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                if (state.passkeyCreating) CircularProgressIndicator(Modifier.size(spacing.iconMedium), strokeWidth = 2.dp)
-                else Text(stringResource(R.string.passkey_invite_create))
-            }
-            TextButton(onClick = onSkip, enabled = !state.passkeyCreating) {
-                Text(stringResource(R.string.passkey_invite_not_now))
-            }
+            if (creating) CircularProgressIndicator(Modifier.size(spacing.iconMedium), strokeWidth = 2.dp)
+            else Text(stringResource(R.string.passkey_invite_create))
+        }
+        TextButton(onClick = onSkip, enabled = !creating) {
+            Text(stringResource(R.string.passkey_invite_not_now))
         }
     }
 }

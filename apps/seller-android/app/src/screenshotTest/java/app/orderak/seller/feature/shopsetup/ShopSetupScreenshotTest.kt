@@ -243,3 +243,54 @@ fun setupStoreErrorDark() = setup(STORE.copy(error = "network_unavailable"), dar
 @Preview(name = "Setup store saving dark", locale = "ar")
 @Composable
 fun setupStoreSavingDark() = setup(STORE.copy(saving = true), dark = true)
+
+// ================= The passkey invite that ends onboarding =================
+//
+// `ShopSetupScreen` sets `showPasskeyInvite` when setup completes and draws this sheet
+// over the finished store step. Every render above has `showPasskeyInvite = false`, so
+// the sheet the seller is shown at the exact moment their store goes live had no
+// baselines — not blank ones, none. `ModalBottomSheet` is not captured by the harness,
+// which is why a render of `ShopSetupScreen` in this state would not have helped.
+//
+// The invite's failure case is the one that matters. A passkey that could not be
+// created is the seller's first experience of the account they just made; the sheet
+// has to say so and still leave "later" reachable, so the skip button is in that render.
+
+@Composable
+private fun passkeyInvite(
+    creating: Boolean = false,
+    error: String? = null,
+    dark: Boolean = false,
+) {
+    OrderakTheme(darkTheme = dark) {
+        Surface {
+            OnboardingPasskeyContent(
+                creating = creating,
+                error = error,
+                onCreate = {},
+                onSkip = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Setup passkey invite", locale = "ar")
+@Composable
+fun setupPasskeyInvite() = passkeyInvite()
+
+@PreviewTest
+@Preview(name = "Setup passkey creating", locale = "ar")
+@Composable
+fun setupPasskeyCreating() = passkeyInvite(creating = true)
+
+/** The ceremony failed: named, and "not now" stays enabled so the seller is not stuck. */
+@PreviewTest
+@Preview(name = "Setup passkey failed", locale = "ar")
+@Composable
+fun setupPasskeyFailed() = passkeyInvite(error = "passkey_failed")
+
+@PreviewTest
+@Preview(name = "Setup passkey failed dark", locale = "ar")
+@Composable
+fun setupPasskeyFailedDark() = passkeyInvite(error = "passkey_failed", dark = true)
