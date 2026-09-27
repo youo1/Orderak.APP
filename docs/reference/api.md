@@ -363,7 +363,7 @@ production URL returns the public 404.
 | `PUT`  | `/api/v1/categories/{category_code}` | Rename / reorder (code is immutable). |
 | `DELETE` | `/api/v1/categories/{category_code}` | Delete (products are un-linked). |
 | `GET`  | `/api/v1/products` | Pull the store's full catalog (name, price, stock, codes, images, category). The refresh Android replaces its cache from. |
-| `POST` | `/api/v1/products` | Create one product; idempotent under retry via `client_request_id`. |
+| `POST` | `/api/v1/products` | Create one product; idempotent under retry via `client_request_id`. `name` must be a string of 1–80 characters after trimming with no U+0000–U+001F controls; anything else is refused with `400 name_required`, never coerced or truncated (the same rule applies to `PUT`). |
 | `PUT`  | `/api/v1/products/{product_code}` | Replace one product's editable metadata. Never writes stock. |
 | `DELETE` | `/api/v1/products/{product_code}` | Delete one product. Stock movements are kept. |
 | `PATCH` | `/api/v1/products/{product_code}/stock` | Adjust stock under compare-and-set; a stale revision answers `409 stale_stock`. |
