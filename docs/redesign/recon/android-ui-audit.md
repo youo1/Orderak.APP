@@ -493,6 +493,42 @@ the whole time, because the symbol it looked for did exist, it was just the wron
 and `docs/ux/feature-surface-map.md` said `account` "keeps its four groups" while the
 contract and the screen both have six.
 
+### 4.6 The rows above, closed
+
+The eight findings in §4.5 were then fixed, because "outside the file that revealed it"
+is a reason to record a finding, not a reason to leave it:
+
+- **The blank sheet baselines.** `PasskeyInviteContent` was extracted from the sheet, the
+  way `TodayScreen`, `StoreContent` and `AuthScreenContent` were extracted before it and
+  for the same stated reason, and the three previews now render it. Their baselines are
+  real images and — checked with `Get-FileHash` — no longer identical to each other. The
+  sheet keeps dismissal, insets and the drag handle; the content is renderable. **The
+  other sheets are still unproven**, and the harness limitation is unchanged: what was
+  fixed is the three baselines that claimed coverage of a state.
+- **The cross-currency order.** `CUSTOMER_SUMMARIES_SQL` now sorts by the total only when
+  the total means something — `CASE WHEN COUNT(DISTINCT o.currency) <= 1 THEN SUM(…) END`
+  — and otherwise by how much history the seller has with the customer. The order and the
+  display now use the same rule: the row already replaced an incomparable total with an
+  em dash, and it is no longer *positioned* by the sum it refuses to print.
+- **The three contract claims** naming data the screen does not render were corrected in
+  place with the reason, and the gap stays written down rather than deleted:
+  `customers`' purpose no longer claims a last interaction, and `new-order` and `store`
+  no longer declare undrawn data as if it existed.
+- **The paywall's missing entry** was wired: `DevicesScreen` takes `onLimitReached` like
+  every other limit-bearing screen, and the edge the manifest and the contract both
+  already declared now exists.
+- **The dropped `already_verified`** travels: the resend call has a response type that
+  carries the backend's answer, so a verified seller is no longer told a link was sent.
+- **Restricted-account logout** is confirmed, mirroring the account surface's dialog. The
+  logout *sequence* is untouched, which is what the auth contract governs — and its guard
+  passes.
+- **The two orphaned strings** were deleted from all four locales. A string nobody renders
+  is a trap rather than a leftover: it still has to be translated, and the next person
+  reaching for `usage_value` finds the ordering a helper exists to prevent.
+
+§4.5 is kept as it was written, because a review that quietly deletes its own findings
+cannot be told apart from one that never had any.
+
 ---
 
 ## 5. Visual / layout quality issues

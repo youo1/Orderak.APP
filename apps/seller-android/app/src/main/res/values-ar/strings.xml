@@ -262,13 +262,13 @@
     <string name="usage_ai_requests">طلبات الذكاء الاصطناعي هذا الشهر</string>
     <string name="usage_categories">الفئات</string>
     <string name="usage_devices">الأجهزة</string>
-    <string name="usage_value">%1$s / %2$s</string>
     <string name="usage_value_unlimited">%1$s / غير محدود</string>
-    <string name="products_usage_unlimited">المنتجات (%1$s / غير محدود)</string>
     <string name="products_limit_title">تم بلوغ حد المنتجات</string>
     <string name="products_limit_body">لقد وصلت إلى حد %1$s منتجًا. قم بالترقية إلى %2$s للحصول على حد أعلى.</string>
     <string name="products_limit_body_over">تسمح خطتك بـ %1$s منتجًا ولديك حاليًا %2$s. يمكنك تعديل المنتجات الحالية أو حذفها، ولكن يجب خفض العدد إلى أقل من %1$s قبل إضافة منتج آخر.</string>
     <string name="products_limit_body_max_plan">لقد وصلت إلى حد %1$s منتجًا. تواصل مع الدعم إذا كنت تحتاج إلى سعة أكبر.</string>
+    <string name="devices_limit_body">باقتك بتسمح بـ %1$s أجهزة، وانت مستخدم %2$s منهم. مش هتقدر تدخل من موبايل جديد غير لما تشيل جهاز أو ترفّع الباقة.</string>
+    <string name="devices_limit_body_max_plan">باقتك بتسمح بـ %1$s أجهزة، ودي أعلى باقة عندنا. شيل جهاز عشان تدخل من موبايل جديد، أو كلّم الدعم لو محتاج أكتر.</string>
     <string name="product_add_locked">تم بلوغ حد المنتجات. اضغط لمراجعة خيارات الترقية.</string>
     <string name="upgrade_now">الترقية الآن</string>
     <string name="plan_paid1">المدفوعة 1</string>
@@ -417,6 +417,7 @@
     <string name="authorized_devices_title">الأجهزة المصرح بها</string>
     <string name="seller_profile_resend_verification">إعادة إرسال تحقق البريد</string>
     <string name="seller_profile_verification_sent">أُرسلت رسالة التحقق، وتنتهي صلاحيتها خلال 24 ساعة.</string>
+    <string name="seller_profile_verification_already_verified">بريدك متأكد منه بالفعل، فمبعتنالكش لينك جديد.</string>
     <string name="seller_profile_verification_failed">تعذر إرسال الرسالة. حاول لاحقًا.</string>
     <string name="setup_store_link_preview">رابط متجرك</string>
     <string name="setup_category_placeholder">اختر نوع نشاطك</string>

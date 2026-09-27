@@ -142,6 +142,15 @@ fun RestrictedAccountScreen(
  * could not be shown this page in a screenshot.
  *
  * This is the page a suspended seller stares at, so it is worth looking at.
+ *
+ * Closes §4.5's "**Restricted-account logout states no consequence and asks for
+ * no confirmation**, while the same action on the account surface is confirmed
+ * with 'Log out and remove local business data from this device?'." That is the
+ * confirmation drawn here, in the account surface's own words and its own shape
+ * — the same title, the same sentence, the same error-coloured confirm and the
+ * same cancel. [onLogout] is unchanged and still the one protected sequence;
+ * this only puts a question in front of it (auth contract v8, guarantee 10, and
+ * `:app:verifyAuthPhase1Contract`).
  */
 
 @Composable
@@ -150,6 +159,9 @@ fun RestrictedAccountContent(
     onContactSupport: () -> Unit,
     onLogout: () -> Unit,
 ) {
+    // `rememberSaveable`, like the account surface's own flag: a rotation must
+    // not dismiss a question the seller has not answered.
+    var confirmLogout by rememberSaveable { mutableStateOf(false) }
     OperationPage(
         title = stringResource(R.string.restricted_title),
         onBack = null,
@@ -162,8 +174,27 @@ fun RestrictedAccountContent(
             onClick = onContactSupport,
             modifier = Modifier.fillMaxWidth(),
         ) { Text(stringResource(R.string.restricted_contact)) }
-        OutlinedButton(onClick = onLogout, modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(onClick = { confirmLogout = true }, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.settings_logout))
         }
+    }
+    if (confirmLogout) {
+        AlertDialog(
+            onDismissRequest = { confirmLogout = false },
+            title = { Text(stringResource(R.string.settings_logout)) },
+            // The consequence the control did not state: this clears the local
+            // business data on the phone, not just the session.
+            text = { Text(stringResource(R.string.settings_logout_confirm)) },
+            confirmButton = {
+                TextButton(onClick = { confirmLogout = false; onLogout() }) {
+                    Text(stringResource(R.string.settings_logout), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmLogout = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
+        )
     }
 }

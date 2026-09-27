@@ -168,7 +168,14 @@ class SellerProfileViewModel @Inject constructor(
         }
         _busy.value = true
         val result = api.resendAccountEmailVerification(phone, secret, recent)
+        // Closes §4.5's "**A verified seller can be told a verification email was
+        // sent.** `auth-v2.ts:908-911` answers `already_verified`, and
+        // `BackendApi.resendAccountEmailVerification` (`BackendApi.kt:1127-1137`)
+        // returns the generic `OkRes`, dropping it." The answer is carried now, so
+        // the two answers a successful call can give are two states rather than
+        // one: the mail went out, or there was nothing to send it about.
         _emailVerificationStatus.value = when {
+            result.ok && result.already_verified -> "already_verified"
             result.ok -> "sent"
             result.error == "recent_auth_required" -> {
                 onReauthenticate()
@@ -371,17 +378,23 @@ fun SellerProfileContent(
                     Text(stringResource(R.string.seller_profile_resend_verification))
                 }
                 emailVerificationStatus?.let { status ->
+                    // Three answers, not two: the second success state is the one
+                    // §4.5 found being reported as the first — "**A verified
+                    // seller can be told a verification email was sent.**" A
+                    // verified address is neither a success to celebrate nor a
+                    // failure, so it reads in the neutral colour.
                     Text(
-                        if (status == "sent") {
-                            stringResource(R.string.seller_profile_verification_sent)
-                        } else {
-                            stringResource(R.string.seller_profile_verification_failed)
+                        when (status) {
+                            "sent" -> stringResource(R.string.seller_profile_verification_sent)
+                            "already_verified" ->
+                                stringResource(R.string.seller_profile_verification_already_verified)
+                            else -> stringResource(R.string.seller_profile_verification_failed)
                         },
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (status == "sent") {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.error
+                        color = when (status) {
+                            "sent" -> MaterialTheme.colorScheme.primary
+                            "already_verified" -> MaterialTheme.colorScheme.onSurfaceVariant
+                            else -> MaterialTheme.colorScheme.error
                         },
                     )
                 }

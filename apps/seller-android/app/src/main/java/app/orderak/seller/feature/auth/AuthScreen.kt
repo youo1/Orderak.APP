@@ -461,6 +461,77 @@ private fun PhoneVerificationContent(
     }
 }
 
+/**
+ * The invite's body, without the sheet around it.
+ *
+ * Split out because the three states that matter — the invite, the deferred invite
+ * after onboarding, and the one that is creating — had `@PreviewTest` renders that
+ * were **byte-identical blanks**: one SHA256 across all three, 15,540 bytes each,
+ * because the screenshot harness does not capture a `ModalBottomSheet`. Three
+ * baselines that look like coverage and carry none, which is worse than no baseline
+ * at all: the number reads as proof.
+ *
+ * This is the same reason `TodayScreen`, `StoreContent` and `AuthScreenContent` take
+ * a state instead of a view model — "the surface was a private composable inside a
+ * larger file, which is exactly why it had never been screenshot-tested". The sheet
+ * keeps its own concerns (dismissal, insets, the drag handle) and the content is
+ * renderable.
+ */
+@Composable
+internal fun PasskeyInviteContent(
+    state: AuthUiState.PasskeyInvite,
+    onCreate: () -> Unit,
+    onSkip: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val layout = LocalOrderakLayout.current
+    val spacing = LocalOrderakSpacing.current
+    Column(
+        modifier
+            .fillMaxWidth()
+            .widthIn(max = layout.contentMaxWidth)
+            .padding(spacing.space6),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(Icons.Outlined.Fingerprint, contentDescription = null, modifier = Modifier.size(spacing.iconHero))
+        Spacer(Modifier.height(spacing.space4))
+        Text(stringResource(R.string.passkey_invite_title), style = MaterialTheme.typography.titleLarge)
+        Spacer(Modifier.height(spacing.space2))
+        Text(
+            stringResource(
+                if (state.deferredForOnboarding) {
+                    R.string.passkey_invite_deferred_body
+                } else {
+                    R.string.passkey_invite_body
+                },
+            ),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        AuthErrorText(state.error)
+        Spacer(Modifier.height(spacing.space6))
+        Button(
+            onClick = onCreate,
+            enabled = !state.isCreating,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            if (state.isCreating) CircularProgressIndicator(Modifier.size(spacing.iconMedium), strokeWidth = 2.dp)
+            else Text(
+                stringResource(
+                    if (state.deferredForOnboarding) {
+                        R.string.passkey_invite_deferred_create
+                    } else {
+                        R.string.passkey_invite_create
+                    },
+                ),
+            )
+        }
+        TextButton(onClick = onSkip, enabled = !state.isCreating) {
+            Text(stringResource(R.string.passkey_invite_not_now))
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PasskeyInviteSheet(
@@ -468,50 +539,8 @@ private fun PasskeyInviteSheet(
     onCreate: () -> Unit,
     onSkip: () -> Unit,
 ) {
-    val layout = LocalOrderakLayout.current
-    val spacing = LocalOrderakSpacing.current
     ModalBottomSheet(onDismissRequest = onSkip) {
-        Column(
-            Modifier.fillMaxWidth().widthIn(max = layout.contentMaxWidth).align(Alignment.CenterHorizontally).padding(spacing.space6),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Icon(Icons.Outlined.Fingerprint, contentDescription = null, modifier = Modifier.size(spacing.iconHero))
-            Spacer(Modifier.height(spacing.space4))
-            Text(stringResource(R.string.passkey_invite_title), style = MaterialTheme.typography.titleLarge)
-            Spacer(Modifier.height(spacing.space2))
-            Text(
-                stringResource(
-                    if (state.deferredForOnboarding) {
-                        R.string.passkey_invite_deferred_body
-                    } else {
-                        R.string.passkey_invite_body
-                    },
-                ),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-            AuthErrorText(state.error)
-            Spacer(Modifier.height(spacing.space6))
-            Button(
-                onClick = onCreate,
-                enabled = !state.isCreating,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                if (state.isCreating) CircularProgressIndicator(Modifier.size(spacing.iconMedium), strokeWidth = 2.dp)
-                else Text(
-                    stringResource(
-                        if (state.deferredForOnboarding) {
-                            R.string.passkey_invite_deferred_create
-                        } else {
-                            R.string.passkey_invite_create
-                        },
-                    ),
-                )
-            }
-            TextButton(onClick = onSkip, enabled = !state.isCreating) {
-                Text(stringResource(R.string.passkey_invite_not_now))
-            }
-        }
+        PasskeyInviteContent(state = state, onCreate = onCreate, onSkip = onSkip)
     }
 }
 

@@ -239,13 +239,13 @@
     <string name="usage_ai_requests">AI requests this month</string>
     <string name="usage_categories">Categories</string>
     <string name="usage_devices">Devices</string>
-    <string name="usage_value">%1$s / %2$s</string>
     <string name="usage_value_unlimited">%1$s / Unlimited</string>
-    <string name="products_usage_unlimited">Products (%1$s / Unlimited)</string>
     <string name="products_limit_title">Product limit reached</string>
     <string name="products_limit_body">You\'ve reached your limit of %1$s products. Upgrade to %2$s for a higher limit.</string>
     <string name="products_limit_body_over">Your plan allows %1$s products and you currently have %2$s. You can edit or delete existing products, but you must reduce the total below %1$s before adding another.</string>
     <string name="products_limit_body_max_plan">You\'ve reached your limit of %1$s products. Contact support if you need more capacity.</string>
+    <string name="devices_limit_body">Your plan allows %1$s devices and %2$s are in use. A new phone can\'t sign in until you remove a device or move to a plan with more.</string>
+    <string name="devices_limit_body_max_plan">Your plan allows %1$s devices and that\'s the highest allowance available. Remove a device to sign in on a new one, or contact support if you need more.</string>
     <string name="product_add_locked">Product limit reached. Tap to review upgrade options.</string>
     <string name="upgrade_now">Upgrade now</string>
     <string name="plan_paid1">Paid 1</string>
@@ -392,6 +392,7 @@
     <string name="authorized_devices_title">Authorized devices</string>
     <string name="seller_profile_resend_verification">Resend email verification</string>
     <string name="seller_profile_verification_sent">Verification email sent. It expires in 24 hours.</string>
+    <string name="seller_profile_verification_already_verified">This email is already verified, so no new link was sent.</string>
     <string name="seller_profile_verification_failed">We could not send the email. Try again later.</string>
     <string name="setup_store_link_preview">Your store link</string>
     <string name="setup_category_placeholder">Choose your business type</string>

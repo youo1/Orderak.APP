@@ -105,6 +105,20 @@ import app.orderak.seller.core.ui.theme.LocalOrderakLayout
 fun DevicesScreen(
     onBack: () -> Unit,
     onReauthenticate: () -> Unit,
+    /**
+     * A plan limit refused something, named by its entitlement key — the same
+     * callback `ProductsScreen` and `CategoriesScreen` already take.
+     *
+     * Closes §4.5's "**The paywall declares an entry with no path.**"
+     * `screen-contracts.mjs` gives `paywall` `entry: [… "devices"]`, and
+     * `DevicesScreen` has no route to `PaywallRoute`; the manifest declares the
+     * same edge (`{ to: "PaywallRoute", trigger: "add device", condition: "at
+     * plan limit" }`). Both described a transition the app did not have: at
+     * `max_concurrent_devices` a seller had nowhere to go from the screen that
+     * counts the devices. Defaulted, like `CategoriesScreen`'s, so a renderer
+     * that is not wired to a graph can still be drawn.
+     */
+    onLimitReached: (String) -> Unit = {},
     vm: OperationsViewModel = hiltViewModel(),
 ) {
     val items by vm.devices.collectAsStateWithLifecycle()
@@ -117,6 +131,14 @@ fun DevicesScreen(
     var deleteTarget by remember { mutableStateOf<PasskeyDto?>(null) }
     var deviceRevokeTarget by remember { mutableStateOf<Pair<Long, String?>?>(null) }
     var selectedPasskeyId by rememberSaveable { mutableStateOf<String?>(null) }
+    // This contract declares "device limit usage" among this screen's own data
+    // and its entitlement key is `max_concurrent_devices`, and it drew neither:
+    // the count a seller needs at the moment a second phone cannot sign in was on
+    // the subscription page and nowhere near the control that revokes a device.
+    // The row comes from the shared list, so the same limit reads the same way
+    // here as it does on حسابي and on الاشتراك.
+    val deviceLimit = config?.let(::planUsageRows)
+        ?.firstOrNull { it.key == FeatureKeys.MAX_CONCURRENT_DEVICES }
     LaunchedEffect(Unit) { vm.loadDevices() }
     LaunchedEffect(passkeys) {
         // Only once the list has been read. Running this against null would
@@ -143,14 +165,18 @@ fun DevicesScreen(
         onRename = { renameTarget = it },
         onRevoke = { deleteTarget = it },
         onRevokeDevice = { rowId, label -> deviceRevokeTarget = rowId to label },
-        // This screen's contract declares "device limit usage" among its own data
-        // and its entitlement key is `max_concurrent_devices`, and it drew
-        // neither: the count a seller needs at the moment a second phone cannot
-        // sign in was on the subscription page and nowhere near the control that
-        // revokes a device. The row comes from the shared list, so the same limit
-        // reads the same way here as it does on حسابي and on الاشتراك.
-        deviceLimit = config?.let(::planUsageRows)
-            ?.firstOrNull { it.key == FeatureKeys.MAX_CONCURRENT_DEVICES },
+        // The allowance, and whether it is spent. Both are read off the same
+        // snapshot row, so the notice cannot disagree with the meter above it.
+        deviceLimit = deviceLimit,
+        // The two facts ProductsScreen's limit dialog is decided by, read here
+        // from the same manager: whether anything is for sale right now, and
+        // whether a higher plan exists at all.
+        purchaseOpen = vm.entitlements.isPurchaseOpen(),
+        limitReached = deviceLimit?.limit?.let { deviceLimit.used >= it } == true,
+        upgradeAvailable = vm.entitlements.nextUpgradePlanKey() != null,
+        // The key is named here, by the screen that carries the limit, so the
+        // paywall opens on the limit the seller actually hit.
+        onLimitReached = { onLimitReached(FeatureKeys.MAX_CONCURRENT_DEVICES) },
     )
 
     // Revoking a device ends a session on hardware the seller may not be holding.
@@ -257,6 +283,16 @@ fun DevicesScreen(
  * is the shared renderer's, including the count-against-a-limit marks that keep
  * it in order in Arabic. Null when the snapshot does not carry the figure — the
  * page then says nothing about a limit rather than drawing an assumed one.
+ *
+ * [limitReached] is whether that allowance is spent, and it is the state that
+ * blocked the edge §4.5 recorded as missing — "**The paywall declares an entry
+ * with no path.** `screen-contracts.mjs` gives `paywall` `entry: [… "devices"]`,
+ * and `DevicesScreen` has no route to `PaywallRoute`." The path is drawn here,
+ * where `max_concurrent_devices` actually bites: the next phone that tries to
+ * sign in is refused by this cap, so the seller reading this list is the one who
+ * needs the way out. [purchaseOpen] and [upgradeAvailable] are what the way out
+ * is allowed to say, exactly as on the store's limit dialog — a higher plan
+ * existing is not the same as being able to buy it.
  */
 
 @Composable
@@ -276,9 +312,14 @@ fun DevicesContent(
     onRevoke: (PasskeyDto) -> Unit,
     onRevokeDevice: (Long, String?) -> Unit,
     deviceLimit: PlanUsageRow? = null,
+    purchaseOpen: Boolean = false,
+    limitReached: Boolean = false,
+    upgradeAvailable: Boolean = false,
+    onLimitReached: () -> Unit = {},
 ) {
     val layout = LocalOrderakLayout.current
     val spacing = LocalOrderakSpacing.current
+    val locale = LocalConfiguration.current.locales[0]
     OperationPage(
         title = stringResource(R.string.devices_title),
         onBack = onBack,
@@ -365,7 +406,46 @@ fun DevicesContent(
         // The allowance the devices below are counted against, before the list
         // that spends it. This is where a seller looks when the next phone will
         // not sign in, and until now the only answer was on another screen.
-        deviceLimit?.let { PlanUsageRowItem(it) }
+        deviceLimit?.let { row ->
+            PlanUsageRowItem(row)
+            if (limitReached) {
+                // The path this row was missing. A limit is not a fault, so it
+                // reads as a notice rather than an error — the role the category
+                // limit already uses — and it keeps the list visible underneath,
+                // because revoking a device is the other way out and it is drawn
+                // right below this.
+                Spacer(Modifier.height(spacing.space2))
+                NoticeBanner(
+                    role = SemanticRole.Commerce,
+                    // The paywall's own words for this key, not a second sentence
+                    // saying the same thing.
+                    title = stringResource(R.string.paywall_limit_devices),
+                    message = if (upgradeAvailable) {
+                        stringResource(
+                            R.string.devices_limit_body,
+                            formatCount(row.limit ?: row.used, locale),
+                            formatCount(row.used, locale),
+                        )
+                    } else {
+                        stringResource(
+                            R.string.devices_limit_body_max_plan,
+                            formatCount(row.limit ?: row.used, locale),
+                        )
+                    },
+                    // Same shape as the store's limit dialog: the destination is
+                    // the paywall either way, and only the label changes when
+                    // purchase is closed, because the acquisition routes answer
+                    // 403. With no higher plan there is nothing to offer, so the
+                    // banner carries no action rather than a dead one.
+                    actionLabel = if (upgradeAvailable) {
+                        stringResource(
+                            if (purchaseOpen) R.string.upgrade_now else R.string.paywall_view_plans,
+                        )
+                    } else null,
+                    onAction = if (upgradeAvailable) onLimitReached else null,
+                )
+            }
+        }
         items.orEmpty().forEach { d ->
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(spacing.space4)) {

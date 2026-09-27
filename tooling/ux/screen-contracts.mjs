@@ -284,7 +284,15 @@ export const CONTRACTS = [
     purpose: "تسجيل طلب يدوي للبيع اللي بيحصل برّه الكتالوج",
     entry: ["orders", "today"],
     exit: ["OrderDetailsRoute — بعد الإنشاء، مع popUpTo", "رجوع"],
-    data: ["product picker", "customer lookup", "order limit usage"],
+    data: [
+	      "product picker",
+	      // "customer lookup" and "order limit usage" were both declared and neither is
+	      // drawn: the form takes a typed phone number, and the screen shows no plan
+	      // usage. The map puts max_orders_per_month on account, so the second one has
+	      // a home that is not this screen. `data` is validated by no guard, which is
+	      // how they drifted — recorded in
+	      // docs/redesign/recon/android-ui-audit.md §4.5 rather than silently dropped.
+	    ],
     actions: [
       { do: "add line", via: "changeQty" },
       { do: "set customer", via: "onPhone" },
@@ -305,7 +313,11 @@ export const CONTRACTS = [
     purpose: "الكتالوج: المنتجات والتصنيفات والواجهة العامة",
     entry: ["MainRoute — تاب المتجر"],
     exit: ["ProductEditRoute", "CategoriesRoute", "StoreInfoRoute", "PaywallRoute — عند الحد"],
-    data: ["products page", "product limit usage", "category count"],
+    data: [
+	      "products page", "product limit usage",
+	      // "category count" was declared and nothing on this surface counts
+	      // categories; the list of them lives in CategoriesScreen. See §4.5.
+	    ],
     actions: [
       { do: "add product", via: "onAdd" },
       { do: "edit product", via: "onEdit" },
@@ -411,7 +423,13 @@ export const CONTRACTS = [
     id: "customers",
     kotlinRoute: null,
     surface: "customers",
-    purpose: "قائمة العملاء وقيمتهم وآخر تعامل",
+    	  // Was "قائمة العملاء وقيمتهم وآخر تعامل" — and the row never showed a last
+	  // interaction: it draws the customer, their order count and their value.
+	  // `CustomerSummary` carries no last-order timestamp, and
+	  // customers_crm.last_contact_tracking is L3/planned in the map. A purpose that
+	  // names data the screen does not hold is the same defect as a heading that
+	  // names one member of its group.
+	  purpose: "قائمة العملاء وأوردراتهم وقيمتهم",
     entry: ["MainRoute — تاب العملاء"],
     exit: ["CustomerRoute"],
     data: ["customers page", "aggregate spend"],

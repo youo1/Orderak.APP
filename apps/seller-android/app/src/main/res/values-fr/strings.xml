@@ -242,13 +242,13 @@
     <string name="usage_ai_requests">Requêtes IA ce mois-ci</string>
     <string name="usage_categories">Catégories</string>
     <string name="usage_devices">Appareils</string>
-    <string name="usage_value">%1$s / %2$s</string>
     <string name="usage_value_unlimited">%1$s / Illimité</string>
-    <string name="products_usage_unlimited">Produits (%1$s / Illimité)</string>
     <string name="products_limit_title">Limite de produits atteinte</string>
     <string name="products_limit_body">Vous avez atteint la limite de %1$s produits. Passez à %2$s pour obtenir une limite supérieure.</string>
     <string name="products_limit_body_over">Votre forfait autorise %1$s produits et vous en avez actuellement %2$s. Vous pouvez modifier ou supprimer les produits existants, mais vous devez repasser sous %1$s avant d’en ajouter un.</string>
     <string name="products_limit_body_max_plan">Vous avez atteint la limite de %1$s produits. Contactez l’assistance si vous avez besoin d’une capacité supérieure.</string>
+    <string name="devices_limit_body">Votre forfait autorise %1$s appareils et %2$s sont utilisés. Un nouveau téléphone ne pourra pas se connecter avant que vous retiriez un appareil ou que vous passiez à un forfait supérieur.</string>
+    <string name="devices_limit_body_max_plan">Votre forfait autorise %1$s appareils, c’est le maximum disponible. Retirez un appareil pour vous connecter sur un nouveau, ou contactez l’assistance si vous en voulez plus.</string>
     <string name="product_add_locked">Limite de produits atteinte. Appuyez pour voir les options de mise à niveau.</string>
     <string name="upgrade_now">Mettre à niveau</string>
     <string name="plan_paid1">Payant 1</string>
@@ -397,6 +397,7 @@
     <string name="authorized_devices_title">Appareils autorisés</string>
     <string name="seller_profile_resend_verification">Renvoyer l’e-mail de vérification</string>
     <string name="seller_profile_verification_sent">L’e-mail a été envoyé et expire dans 24 heures.</string>
+    <string name="seller_profile_verification_already_verified">Cet e-mail est déjà vérifié, aucun nouveau lien n’a été envoyé.</string>
     <string name="seller_profile_verification_failed">Impossible d’envoyer l’e-mail. Réessayez plus tard.</string>
     <string name="setup_store_link_preview">Lien de votre boutique</string>
     <string name="setup_category_placeholder">Choisissez votre type d’activité</string>
