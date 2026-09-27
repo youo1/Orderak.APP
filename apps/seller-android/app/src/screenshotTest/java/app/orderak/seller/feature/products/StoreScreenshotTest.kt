@@ -66,6 +66,7 @@ private fun store(
                 onEdit = {},
                 onShare = {},
                 onShowStuck = {},
+                onRetry = {},
             )
         }
     }
@@ -144,6 +145,24 @@ fun storeErrorDark() =
 @Preview(name = "Store search empty", locale = "ar")
 @Composable
 fun storeSearchEmpty() = store(StoreUiState(products = CATALOGUE, quota = QUOTA), query = "جاكيت")
+
+// ---- a plan with no ceiling --------------------------------------------
+// The other half of the usage row. Every render above passes a plan with a
+// limit, so the row a seller on an unlimited plan meets — `PlanUsageRowItem`'s
+// count without a bar, at `bodyMedium` under "المنتجات" — had never been drawn
+// here. It used to be this surface's own `titleMedium` sentence under its own
+// string, which is the drift the shared renderer removes: one row, one label,
+// one type role wherever the seller meets it.
+
+@PreviewTest
+@Preview(name = "Store unlimited plan", locale = "ar")
+@Composable
+fun storeUnlimitedPlan() = store(
+    StoreUiState(
+        products = CATALOGUE,
+        quota = ProductQuotaUiState(used = 4, limit = null, canAdd = true),
+    ),
+)
 
 // ---- at the plan limit the FAB locks rather than disappearing ----------
 // A control that vanishes reads as a bug; one that locks says a plan decides

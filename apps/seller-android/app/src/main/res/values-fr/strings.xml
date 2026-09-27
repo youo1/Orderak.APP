@@ -72,6 +72,12 @@
     <string name="dash_today_orders">Commandes d\'aujourd\'hui</string>
     <string name="dash_unpaid">Non payé</string>
     <string name="dash_to_ship">À expédier</string>
+    <string name="dash_needs_you">Vous attend</string>
+    <string name="dash_nothing_needs_you">Rien ne vous attend pour le moment</string>
+    <string name="dash_nothing_needs_you_body">Les nouvelles commandes, celles non payées et tout ce qui est prêt à expédier apparaîtront ici.</string>
+    <string name="dash_day_so_far">Aujourd’hui jusqu’ici</string>
+    <string name="dash_count_unknown">Pas encore</string>
+    <string name="dash_open_orders">Ouvrir les commandes</string>
     <string name="dash_empty_title">Votre boutique est prête !</string>
     <string name="dash_empty_body_v2">Ajoutez votre premier produit depuis l\'onglet Produits, puis partagez votre catalogue sur WhatsApp</string>
     <string name="dash_share_catalog">Partager le catalogue</string>
@@ -89,6 +95,7 @@
     <string name="product_price_label">Prix (EGP)</string>
     <string name="product_stock_label">Stock</string>
     <string name="product_discount_none">Aucune</string>
+    <string name="product_category_none">Sans catégorie</string>
     <string name="product_available">Disponible à la vente</string>
     <string name="product_save">Enregistrer le produit</string>
     <string name="product_delete">Supprimer le produit</string>
@@ -98,9 +105,12 @@
     <string name="share_catalog_footer">Commander sur WhatsApp : %1$s\n— Propulsé par Orderak.app</string>
 
     <string name="orders_all">Tout</string>
+    <string name="orders_group_waiting">En attente de vous</string>
+    <string name="orders_group_rest">Le reste</string>
     <string name="orders_empty">Aucune commande pour l\'instant — appuyez sur ➕ et enregistrez votre première commande de chat</string>
     <string name="order_new_title">Nouvelle commande</string>
     <string name="order_buyer_phone">Téléphone du client</string>
+    <string name="order_phone_invalid">Saisissez le numéro complet — la commande ne peut pas être enregistrée sans lui</string>
     <string name="order_buyer_name_opt">Nom du client (optionnel)</string>
     <string name="order_note_opt">Notes (optionnel)</string>
     <string name="order_items_title">Articles</string>
@@ -108,6 +118,7 @@
     <string name="order_total">Total :</string>
     <string name="order_save">Enregistrer la commande</string>
     <string name="order_stock_error">La quantité demandée dépasse le stock disponible</string>
+    <string name="order_no_products_body">Aucun produit à vendre pour l’instant. Revenez à la liste des commandes, ouvrez l’onglet Boutique et ajoutez votre premier produit, puis revenez ici enregistrer la commande.</string>
     <string name="order_qty_decrease">Diminuer la quantité de %1$s</string>
     <string name="order_qty_increase">Augmenter la quantité de %1$s</string>
 
@@ -167,6 +178,11 @@
     <string name="settings_payout_saved">Coordonnées de paiement enregistrées</string>
     <string name="settings_logout">Déconnexion</string>
     <string name="settings_delete_account">Demander la suppression du compte</string>
+    <string name="settings_account_actions">Actions du compte</string>
+    <string name="settings_app_language">Langue de l’application</string>
+    <string name="settings_store_group_title">Boutique et identité</string>
+    <string name="settings_support_group_title">Aide et mises à jour</string>
+    <string name="settings_devices_group_title">Appareils et abonnement</string>
     <!-- Backend link -->
     <string name="settings_link_title">Lien de votre catalogue</string>
     <string name="settings_slug_label">Nom du lien (lettres anglaises)</string>
@@ -226,13 +242,13 @@
     <string name="usage_ai_requests">Requêtes IA ce mois-ci</string>
     <string name="usage_categories">Catégories</string>
     <string name="usage_devices">Appareils</string>
-    <string name="usage_value">%1$s / %2$s</string>
     <string name="usage_value_unlimited">%1$s / Illimité</string>
-    <string name="products_usage_unlimited">Produits (%1$s / Illimité)</string>
     <string name="products_limit_title">Limite de produits atteinte</string>
     <string name="products_limit_body">Vous avez atteint la limite de %1$s produits. Passez à %2$s pour obtenir une limite supérieure.</string>
     <string name="products_limit_body_over">Votre forfait autorise %1$s produits et vous en avez actuellement %2$s. Vous pouvez modifier ou supprimer les produits existants, mais vous devez repasser sous %1$s avant d’en ajouter un.</string>
     <string name="products_limit_body_max_plan">Vous avez atteint la limite de %1$s produits. Contactez l’assistance si vous avez besoin d’une capacité supérieure.</string>
+    <string name="devices_limit_body">Votre forfait autorise %1$s appareils et %2$s sont utilisés. Un nouveau téléphone ne pourra pas se connecter avant que vous retiriez un appareil ou que vous passiez à un forfait supérieur.</string>
+    <string name="devices_limit_body_max_plan">Votre forfait autorise %1$s appareils, c’est le maximum disponible. Retirez un appareil pour vous connecter sur un nouveau, ou contactez l’assistance si vous en voulez plus.</string>
     <string name="product_add_locked">Limite de produits atteinte. Appuyez pour voir les options de mise à niveau.</string>
     <string name="upgrade_now">Mettre à niveau</string>
     <string name="plan_paid1">Payant 1</string>
@@ -309,6 +325,8 @@
 
     <!-- Payment history -->
     <string name="payment_history_title">Historique des paiements</string>
+    <string name="payment_history_none">Aucun paiement enregistré sur cette commande pour l’instant</string>
+    <string name="payment_proof_attached">Image du reçu jointe</string>
     <string name="payment_ref_label">Réf : %1$s</string>
     <string name="payment_verified_badge">Vérifié</string>
     <string name="payment_flagged_badge">Signalé</string>
@@ -322,6 +340,7 @@
     <string name="seller_profile_photo">Photo de profil</string>
     <string name="seller_profile_phone">Numéro de téléphone (ID du compte)</string>
     <string name="seller_profile_photo_set">Photo téléchargée</string>
+    <string name="seller_profile_photo_failed">La photo n’a pas été téléversée — choisissez-la à nouveau. Votre photo actuelle reste en place.</string>
 
     <!-- Deletion status expanded -->
     <string name="deletion_status_label">Statut : %1$s</string>
@@ -378,6 +397,7 @@
     <string name="authorized_devices_title">Appareils autorisés</string>
     <string name="seller_profile_resend_verification">Renvoyer l’e-mail de vérification</string>
     <string name="seller_profile_verification_sent">L’e-mail a été envoyé et expire dans 24 heures.</string>
+    <string name="seller_profile_verification_already_verified">Cet e-mail est déjà vérifié, aucun nouveau lien n’a été envoyé.</string>
     <string name="seller_profile_verification_failed">Impossible d’envoyer l’e-mail. Réessayez plus tard.</string>
     <string name="setup_store_link_preview">Lien de votre boutique</string>
     <string name="setup_category_placeholder">Choisissez votre type d’activité</string>
@@ -426,6 +446,8 @@
     <string name="plans_included">Inclus</string>
     <string name="plans_unavailable">Les détails des offres ne sont pas disponibles pour le moment</string>
     <string name="plans_purchase_closed">La mise à niveau n\'est pas encore ouverte. Cette page vous montre ce que contient chaque offre.</string>
+    <string name="plans_purchase_closed_body">Votre offre actuelle reste en place — rien ne change pour vous.</string>
+    <string name="plans_current_plan_marked">%1$s (votre offre)</string>
     <string name="plans_price_note">Les prix seront affichés par Google Play dans votre devise à l\'ouverture des mises à niveau.</string>
     <string name="paywall_title">Limite de l\'offre atteinte</string>
     <string name="paywall_limit_products">Vous avez atteint votre limite de produits</string>
@@ -441,6 +463,7 @@
     <string name="paywall_dismiss">Retour</string>
     <string name="paywall_view_plans">Voir les offres</string>
     <string name="paywall_purchase_closed">La mise à niveau n\'est pas encore ouverte : il n\'y a rien à acheter ici.</string>
+    <string name="paywall_purchase_closed_body">Votre offre actuelle reste en place et cette limite reste la même jusqu’à l’ouverture des mises à niveau.</string>
     <string name="order_refused_chip">Non envoyée</string>
     <string name="order_refused_title">Cette commande n\'a pas pu être envoyée</string>
     <string name="order_refused_message">%1$s La commande n\'existe que sur ce téléphone : elle n\'atteindra pas un autre appareil et ne peut pas avancer dans son cycle. Supprimez-la et enregistrez-la à nouveau une fois le problème résolu.</string>
@@ -482,4 +505,17 @@
     <string name="products_stuck_discard">Supprimer</string>
     <string name="products_stuck_discard_title">Supprimer %1$s ?</string>
     <string name="products_stuck_discard_confirm">Ce produit n\'est enregistré que sur ce téléphone et votre compte ne l\'a jamais reçu : le supprimer ici le supprime partout. Cette action est irréversible.</string>
+    <string name="customer_save_failed">Impossible d\'enregistrer le client. Rien n\'a été modifié — réessayez.</string>
+    <string name="device_revoke_title">Révoquer %1$s ?</string>
+    <string name="device_revoke_confirm">Cet appareil est déconnecté immédiatement et devra se reconnecter. Vos autres appareils ne sont pas affectés.</string>
+    <string name="ai_reset_confirm">Cela efface la conversation sur ce téléphone. Rien ne change dans votre boutique, votre catalogue ou vos commandes.</string>
+    <string name="order_mixed_currency_title">Une seule devise par commande</string>
+    <string name="order_mixed_currency_body">Les produits choisis sont facturés dans des devises différentes : ils ne peuvent pas figurer sur une même commande. Retirez les lignes qui ne correspondent pas, ou enregistrez une commande séparée.</string>
+    <string name="order_save_failed_title">Impossible d\'enregistrer la commande</string>
+    <string name="order_save_failed_body">Rien n\'a été enregistré. Votre brouillon est toujours là : réessayez.</string>
+    <string name="order_details_missing_title">Commande introuvable</string>
+    <string name="order_details_missing_body">Cette commande n\'est pas enregistrée sur ce téléphone. Elle a peut-être été supprimée, ou elle n\'est pas encore arrivée de votre compte — revenez et actualisez la liste des commandes.</string>
+    <string name="store_info_save_failed">Impossible d\'enregistrer votre boutique — rien n\'a été modifié</string>
+    <string name="support_reply_failed">Votre réponse n\'a pas été envoyée — elle est toujours dans le champ</string>
+    <string name="store_info_upload_failed">L\'image n\'a pas été téléversée — choisissez-la à nouveau, ou enregistrez sans elle</string>
 </resources>

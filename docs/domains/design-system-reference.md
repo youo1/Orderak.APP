@@ -9,8 +9,23 @@ applies_to: [production, staging]
 
 The reference for every visual decision in Orderak: what the tokens are and
 how to choose between them. Generated from the brand seed `#014D4E` and
-validated at generation; `orderak-tokens.css` is the machine-readable form of
-everything below, and is the value that actually ships.
+validated at generation.
+
+Values have one authority and one fallback:
+
+- **The published revision wins.** The active design-system revision in D1 is
+  served as a stylesheet at `/api/theme.css` and reaches the admin panel through
+  the edge Worker's `/theme.css`. Its declarations are unlayered, so they outrank
+  everything a client has checked in.
+- **The committed bundle is the fallback.** `orderak-tokens.css` beside the admin
+  app is a flattened snapshot, generated on one date, and is imported into the
+  `@layer orderak-fallback` cascade layer for exactly that reason: when the
+  published theme is unavailable the console still renders styled, and when it is
+  available the snapshot cannot override it.
+- **Do not express this as stylesheet order.** It was, and it was wrong: the
+  bundler puts the application stylesheet last, so the snapshot silently
+  overrode every published revision. `tooling/repository/verify-theme-authority.mjs`
+  fails the build if the import leaves the layer.
 
 For how the system is generated, versioned, served and recovered, see the
 design system domain, which is authoritative for that.
@@ -103,6 +118,31 @@ space5, space7, space9 or space11 — a value off the scale is a mistake.
 16dp screen padding and 16dp between blocks on the phone; 8dp inside a group.
 **48dp minimum touch target everywhere**, including the public storefront.
 
+Four measurements are deliberately *not* on that scale, because they measure
+something other than the gap between two things. The phone names them in
+`OrderakSpacing` rather than snapping them, and the reason is written beside each
+one in `apps/seller-android/app/src/main/java/app/orderak/seller/core/ui/theme/Theme.kt`:
+
+| Token | Value | What it measures |
+| --- | --- | --- |
+| `minimumTouchTarget` | 48dp | the generator's own floor, read back from the generated system |
+| `fabClearance` | 80dp | the trailing clearance a floating action button needs before it covers the last list row |
+| `thumbnail` | 56dp | the size a product photo is drawn at in a list row |
+| `iconSmall` / `iconMedium` / `iconHero` | 16 / 20 / 44dp | an inline icon, a standalone icon, and a hero glyph |
+
+`iconSmall` is the one place a value was *moved* rather than named: chips carried
+`14.dp` and spinners `18.dp`, neither of which is a scale step, and both now read
+the system's own step between `space3` and `space4`.
+
+`tooling/repository/verify-android-spacing-tokens.mjs` enforces this. It checks
+positions, not values: a number inside `padding(…)`, `Arrangement.spacedBy(…)` or
+`Spacer(Modifier.height(…))` is a distance and must name a token, and a
+`RoundedCornerShape(N.dp)` must come from the shape scale. A `size(96.dp)` ad
+image, a `height(56.dp)` button and a `720.dp` breakpoint are the size of one
+thing or a comparison against the window, so they are left alone — forcing them
+onto the rhythm would be inventing a rule, and a guard that cannot tell the two
+apart is a guard that gets ignored.
+
 ## Shape and elevation
 
 Radii 4 / 8 / 12 / 16 / 24 plus full pills. Chips and buttons at 8, cards and
@@ -141,18 +181,27 @@ Three regimes that do not share a grid, because they do not share a device.
 
 | Regime | Rule |
 | --- | --- |
-| Phone (seller) | one column, 16dp gutters, no breakpoints — one column at every size |
+| Phone (seller) | one column, 16dp gutters. One breakpoint, not a grid: at 720dp+ the devices screen becomes list-detail, because two columns of device cards is the only place a seller can actually use the width. Every other screen is one column at every size. |
 | Storefront (buyer) | one 520px column, centred, 16px padding. Never widen it. |
 | Admin (staff) | 268px rail + fluid content capped at 1560px; breakpoints 1240 / 860 / 600 |
 
 Ready-made classes: `.ork-page`, `.ork-grid-metric` (4 → 2 → 1 up),
 `.ork-grid-panel` (2 → 1 up).
 
+Two measurements repeat often enough on the phone to be named rather than typed.
+`OrderakLayout.contentMaxWidth` (560dp) is the reading measure the auth and
+shop-setup flows centre themselves in — it appeared as a bare `560.dp` eight
+times — and `OrderakLayout.wideLayoutMinWidth` (720dp) is the breakpoint above,
+the same number as Material's expanded window-size class so the app and the
+platform do not disagree about what "wide" means.
+
 ## Iconography
 
 - **Phone:** `androidx…Icons.Outlined.*` (Material Symbols Outlined). One filled
-  exception: the selected bottom-navigation surface. 14dp in chips, 20dp in
-  banners, 24dp in navigation.
+  exception: the selected bottom-navigation surface. `iconSmall` (16dp) inside a
+  chip, a row or a button label; `iconMedium` (20dp) in a banner, a leading slot
+  or an inline spinner; 24dp in navigation; `iconHero` (44dp) for the one glyph
+  that stands for a whole action on its own — the passkey fingerprint.
 - **Admin:** `lucide-react`, 16–19px.
 - **Storefront:** no icons at all — emoji stand in, so the public page has no
   font dependency to download.
@@ -202,7 +251,9 @@ signal. 48dp minimum target, generator-enforced. Focus always visible.
 Run this against any screen before calling it done.
 
 - Every colour resolves to a token. No literal hex outside the token file.
-- Every spacing value is on the scale. No 5, 7, 9, 11.
+- Every spacing value is on the scale. No 5, 7, 9, 11. On the phone,
+  `tooling/repository/verify-android-spacing-tokens.mjs` fails the build over a
+  literal in a padding, a `spacedBy` or a Spacer, and over a hand-written radius.
 - Every text element uses one type role — no mixing sizes and weights across roles.
 - Latin text a user must read is ≥12px. Numbers in columns, totals and pairs are tabular.
 - Radii are from the shape set; shadows are one of the five, and only on web surfaces.

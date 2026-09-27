@@ -4,6 +4,13 @@ import { AlertTriangle, RefreshCw, RotateCcw } from 'lucide-react';
 import { api } from '@/shared/api/client';
 import { DataTable, StatusBadge } from '@/shared/ui/DataTable';
 import { ErrorState, LoadingState, PageHeader } from '@/shared/ui/Page';
+import { askConfirm } from '@/shared/ui/confirm';
+import { Button } from '@/shared/ui/button';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/dialog';
+import { Field } from '@/shared/ui/field';
+import { Input } from '@/shared/ui/input';
+import { NativeSelect, Textarea } from '@/shared/ui/textarea';
+import { STEP_UP_UNAVAILABLE, useStepUp } from '@/shared/api/step-up';
 import { useAuth } from '@/features/auth/auth-context';
 
 type Row = Record<string, unknown>;
@@ -55,24 +62,17 @@ export function BillingVerificationsPage() {
     },
   });
 
+  const stepUp = useStepUp();
+
   const requeue = useMutation({
     mutationFn: async () => {
       const id = String(selected?.id);
       // Bound to this job and this reason. The server checks the binding, so a
       // stale authorization cannot be replayed against a different job.
-      const authorization = await api<{ authorization_id: string }>('/api/admin/v1/action-authorizations', {
-        method: 'POST',
-        body: JSON.stringify({
-          action: 'billing.verification_retry',
-          entity_id: id,
-          payload_hash: retry.reason,
-          password: retry.password,
-          totp_code: retry.totp,
-        }),
-      });
+      const authorizationId = await stepUp.authorize('billing.verification_retry', id, retry.reason, retry.password, retry.totp);
       return api(`/api/admin/v1/billing/verifications/${id}/retry`, {
         method: 'POST',
-        headers: { 'x-admin-action-authorization': authorization.authorization_id },
+        headers: { 'x-admin-action-authorization': authorizationId },
         body: JSON.stringify({ reason: retry.reason }),
       });
     },
@@ -90,7 +90,7 @@ export function BillingVerificationsPage() {
     <PageHeader
       title="Purchase verification queue"
       description="Play purchase verification jobs, lease state and audited requeues of dead-lettered work."
-      actions={<button className="button" onClick={() => query.refetch()}><RefreshCw size={16} /> Refresh</button>}
+      actions={<Button variant="outline" onClick={() => query.refetch()}><RefreshCw size={16} /> Refresh</Button>}
     />
 
     <section className="truth-banner warning">
@@ -102,9 +102,8 @@ export function BillingVerificationsPage() {
     </section>
 
     <div className="inline-form">
-      <label className="field">
-        <span>Status</span>
-        <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)}>
+      <Field label="Status">
+        <NativeSelect value={statusFilter} onChange={event => setStatusFilter(event.target.value)}>
           <option value="">All</option>
           {/* The column's own CHECK constraint, in migration 030. A value not in
               this set returns an empty list rather than an error, which would
@@ -117,8 +116,8 @@ export function BillingVerificationsPage() {
           <option value="terminal_failed">terminal_failed</option>
           <option value="superseded">superseded</option>
           <option value="dead_lettered">dead_lettered</option>
-        </select>
-      </label>
+        </NativeSelect>
+      </Field>
     </div>
 
     {query.isLoading && <LoadingState />}
@@ -138,49 +137,47 @@ export function BillingVerificationsPage() {
       </section>
     </>}
 
-    {selected && <div className="modal-backdrop"><section className="modal" role="dialog" aria-modal="true">
-      <header>
-        <div>
-          <p className="eyebrow">VERIFICATION JOB</p>
-          <h2>{String(selected.id)}</h2>
-          <StatusBadge value={selected.status} />
-        </div>
-        <button className="icon-button" onClick={() => setSelected(null)} aria-label="Close">×</button>
-      </header>
+    {selected && <Dialog open onOpenChange={open => { if (!open) setSelected(null); }}>
+      <DialogContent className="w-[min(720px,calc(100vw-32px))]">
+        <DialogHeader>
+          <div>
+            <p className="eyebrow">VERIFICATION JOB</p>
+            <DialogTitle>{String(selected.id)}</DialogTitle>
+            <StatusBadge value={selected.status} />
+          </div>
+        </DialogHeader>
 
-      <pre className="json-view">{JSON.stringify(selected, null, 2)}</pre>
+        <pre className="json-view">{JSON.stringify(selected, null, 2)}</pre>
 
-      {/* Said plainly rather than by disabling a button with no explanation:
-          the server returns 409 verification_not_dead_lettered, and an operator
-          reading a greyed-out control cannot tell that from a permission
-          problem. */}
-      {!deadLettered && <p className="error-text">Only a dead-lettered job can be requeued. This one is {String(selected.status)}, so the queue has not given up on it yet.</p>}
+        {/* Said plainly rather than by disabling a button with no explanation:
+            the server returns 409 verification_not_dead_lettered, and an operator
+            reading a greyed-out control cannot tell that from a permission
+            problem. */}
+        {!deadLettered && <p className="error-text">Only a dead-lettered job can be requeued. This one is {String(selected.status)}, so the queue has not given up on it yet.</p>}
 
-      {deadLettered && canManage && <div className="form-grid">
-        <label className="field">
-          <span>Audited reason</span>
-          <textarea rows={3} value={retry.reason} onChange={event => setRetry(value => ({ ...value, reason: event.target.value }))} />
-        </label>
-        <label className="field">
-          <span>Password</span>
-          <input type="password" autoComplete="current-password" value={retry.password} onChange={event => setRetry(value => ({ ...value, password: event.target.value }))} />
-        </label>
-        <label className="field">
-          <span>Fresh TOTP</span>
-          <input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={retry.totp} onChange={event => setRetry(value => ({ ...value, totp: event.target.value.replace(/\D/g, '').slice(0, 6) }))} />
-        </label>
-      </div>}
+        {deadLettered && canManage && <div className="form-grid">
+          <Field label="Audited reason">
+            <Textarea rows={3} value={retry.reason} onChange={event => setRetry(value => ({ ...value, reason: event.target.value }))} />
+          </Field>
+          {stepUp.available ? <><Field label="Password">
+            <Input type="password" autoComplete="current-password" value={retry.password} onChange={event => setRetry(value => ({ ...value, password: event.target.value }))} />
+          </Field>
+          <Field label="Fresh TOTP">
+            <Input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={retry.totp} onChange={event => setRetry(value => ({ ...value, totp: event.target.value.replace(/\D/g, '').slice(0, 6) }))} />
+          </Field></> : <p className="error-text wide">{STEP_UP_UNAVAILABLE}</p>}
+        </div>}
 
-      {requeue.error && <p className="error-text">{requeue.error.message}</p>}
+        {requeue.error && <p className="error-text">{requeue.error.message}</p>}
 
-      <footer>
-        <button className="button" onClick={() => setSelected(null)}>Close</button>
-        {deadLettered && canManage && <button
-          className="button danger"
-          disabled={retry.reason.trim().length < 5 || retry.password.length < 12 || retry.totp.length !== 6 || requeue.isPending}
-          onClick={() => { if (confirm('Requeue this verification? The attempt and your reason are permanently audited.')) requeue.mutate(); }}
-        ><RotateCcw size={16} /> {requeue.isPending ? 'Requeuing…' : 'Requeue verification'}</button>}
-      </footer>
-    </section></div>}
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setSelected(null)}>Close</Button>
+          {deadLettered && canManage && <Button
+            variant="destructive"
+            disabled={!stepUp.available || retry.reason.trim().length < 5 || retry.password.length < 12 || retry.totp.length !== 6 || requeue.isPending}
+            onClick={() => { askConfirm('Requeue this verification? The attempt and your reason are permanently audited.', () => requeue.mutate()); }}
+          ><RotateCcw size={16} /> {requeue.isPending ? 'Requeuing…' : 'Requeue verification'}</Button>}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>}
   </>;
 }

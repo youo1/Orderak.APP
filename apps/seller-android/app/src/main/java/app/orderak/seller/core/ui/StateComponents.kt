@@ -29,6 +29,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.orderak.seller.R
+import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 
 /**
  * Full-screen centered loading indicator.
@@ -60,8 +61,9 @@ fun FullScreenError(
     icon: ImageVector = Icons.Outlined.ErrorOutline,
     modifier: Modifier = Modifier,
 ) {
+    val spacing = LocalOrderakSpacing.current
     Box(
-        modifier = modifier.fillMaxSize().padding(32.dp),
+        modifier = modifier.fillMaxSize().padding(spacing.space8),
         contentAlignment = Alignment.Center,
     ) {
         Column(
@@ -74,7 +76,7 @@ fun FullScreenError(
                 modifier = Modifier.size(48.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(spacing.space4))
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodyLarge,
@@ -82,7 +84,7 @@ fun FullScreenError(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (onRetry != null) {
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(spacing.space4))
                 Button(onClick = onRetry) {
                     Text(stringResource(R.string.common_retry))
                 }
@@ -107,8 +109,9 @@ fun FullScreenEmpty(
     icon: ImageVector = Icons.Outlined.Inbox,
     modifier: Modifier = Modifier,
 ) {
+    val spacing = LocalOrderakSpacing.current
     Box(
-        modifier = modifier.fillMaxSize().padding(32.dp),
+        modifier = modifier.fillMaxSize().padding(spacing.space8),
         contentAlignment = Alignment.Center,
     ) {
         Column(
@@ -121,7 +124,7 @@ fun FullScreenEmpty(
                 modifier = Modifier.size(48.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(spacing.space4))
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodyLarge,
@@ -129,7 +132,7 @@ fun FullScreenEmpty(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (actionLabel != null && onAction != null) {
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(spacing.space4))
                 Button(onClick = onAction) {
                     Text(actionLabel)
                 }
@@ -150,6 +153,7 @@ fun SyncStatusBanner(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val spacing = LocalOrderakSpacing.current
     val failed = status == "failed"
     Surface(
         color = if (failed) MaterialTheme.colorScheme.errorContainer
@@ -158,9 +162,9 @@ fun SyncStatusBanner(
         modifier = modifier.fillMaxWidth(),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            modifier = Modifier.fillMaxWidth().padding(spacing.space3),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(spacing.space2),
         ) {
             Icon(
                 imageVector = Icons.Outlined.CloudOff,

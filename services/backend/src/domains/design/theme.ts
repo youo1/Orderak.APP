@@ -102,56 +102,16 @@ export function mergeTheme(raw: unknown): Theme {
 	return t;
 }
 
-// Module-level cache: Workers isolates keep this between requests, so
-// hot paths (landing, catalog) don't pay a D1 read per page view.
-const CACHE_TTL_MS = 60_000;
-
-/** Load the effective theme (defaults + saved overrides), cached ~60s. */
-export async function loadTheme(env: Env): Promise<Theme> {
-	return (await loadActiveDesignSystem(env)).legacyTheme;
-}
-
-/** Drop the cache after a save so the next render picks up new colors. */
+/**
+ * Drop the cached design system so the next render picks up a published revision.
+ *
+ * This used to clear a second, unrelated module-level cache: a branding payload
+ * that nothing ever requested. `loadBrandingConfig` and the `loadTheme` wrapper it
+ * called were declared and never referenced from anywhere in this repository, so
+ * the whole chain went with them — the interface, the asset map, the SHA-256
+ * shortener and the TTL. `/api/v1/theme` is what clients actually read, and it
+ * caches inside the design-system loader.
+ */
 export function invalidateThemeCache(): void {
 	invalidateDesignSystemCache();
-	brandingCache = null;
-}
-
-// ---------------- Branding config (mobile remote-config) ----------------
-// A tiny, versioned payload the Android app polls: theme tokens + brand
-// asset URLs. `version` is a content hash, also served as the ETag, so
-// clients that send If-None-Match get a bodyless 304 when nothing changed
-// and only ever re-download assets whose URLs/content actually changed
-// (the static assets themselves are served with their own ETags).
-
-export interface BrandingConfig {
-	version: string;
-	theme: Theme;
-	assets: Record<string, string>;
-}
-
-const BRAND_ASSETS = (site: string): Record<string, string> => ({
-	logo: `${site}/static/orderak-logo.svg`,
-	logo_horizontal: `${site}/static/orderak-logo-horizontal.svg`,
-	icon: `${site}/static/orderak-icon.svg`,
-	icon_512: `${site}/static/orderak-icon-512.png`,
-	favicon: `${site}/static/orderak-favicon.svg`,
-});
-
-let brandingCache: { config: BrandingConfig; expires: number } | null = null;
-
-async function sha256Short(s: string): Promise<string> {
-	const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
-	return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 12);
-}
-
-/** Assemble the versioned branding config (cached alongside the theme). */
-export async function loadBrandingConfig(env: Env, siteUrl: string): Promise<BrandingConfig> {
-	if (brandingCache && brandingCache.expires > Date.now()) return brandingCache.config;
-	const theme = await loadTheme(env);
-	const assets = BRAND_ASSETS(siteUrl);
-	const version = await sha256Short(JSON.stringify({ theme, assets }));
-	const config: BrandingConfig = { version, theme, assets };
-	brandingCache = { config, expires: Date.now() + CACHE_TTL_MS };
-	return config;
 }

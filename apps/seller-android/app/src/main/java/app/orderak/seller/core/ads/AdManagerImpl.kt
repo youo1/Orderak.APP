@@ -36,6 +36,7 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.random.Random
 import javax.inject.Inject
 import javax.inject.Singleton
+import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 
 @Singleton
 class AdManagerImpl @Inject constructor(
@@ -52,6 +53,7 @@ class AdManagerImpl @Inject constructor(
 
     @Composable
     override fun Banner(modifier: Modifier) {
+        val spacing = LocalOrderakSpacing.current
         val remoteAdsEnabled by remoteConfig.adsEnabled.collectAsStateWithLifecycle()
         val config by entitlementManager.config.collectAsStateWithLifecycle()
         val context = LocalContext.current
@@ -103,7 +105,7 @@ class AdManagerImpl @Inject constructor(
             }) {
                 Column {
                     AsyncImage(model = campaign.image_url, contentDescription = campaign.title, modifier = Modifier.fillMaxWidth().height(96.dp), contentScale = ContentScale.Crop)
-                    Text(campaign.title, Modifier.padding(10.dp))
+                    Text(campaign.title, Modifier.padding(spacing.space3))
                 }
             }
         }

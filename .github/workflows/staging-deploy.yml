@@ -89,11 +89,23 @@ jobs:
           npx wrangler deploy --env staging --dry-run
           npx wrangler deploy --config wrangler.admin.jsonc --env staging --dry-run
 
+      # The end-to-end suite had never run anywhere. Its first line resolved its
+      # fixture relative to the working directory and died with ENOENT on a path
+      # that never existed, and no workflow invoked it — so the failure sat in a
+      # stale artifact and the suite read as coverage it was not. It exercises
+      # login with TOTP, permission-aware navigation, an audited CSRF-protected
+      # reply, the desktop navigation preference, the theme manager and revision
+      # history: none of which the unit tests reach.
+      - name: Install the browser for Admin end-to-end tests
+        working-directory: apps/admin-web
+        run: npx playwright install --with-deps chromium
+
       - name: Install and validate Admin
         working-directory: apps/admin-web
         run: |
           pnpm install --frozen-lockfile
           pnpm test
+          pnpm run test:e2e
           pnpm run lint
           pnpm run build
           pnpm run cf-types:check

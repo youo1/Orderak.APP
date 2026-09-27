@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -46,7 +45,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
+import app.orderak.seller.core.ui.theme.LocalOrderakMotion
+import app.orderak.seller.core.ui.theme.full
 import app.orderak.seller.R
+import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 
 // ═══════════════════════════════════════════════════════════════
 // AuthErrorText — animated inline error message
@@ -61,6 +63,7 @@ fun AuthErrorText(
     error: AuthError?,
     modifier: Modifier = Modifier,
 ) {
+    val spacing = LocalOrderakSpacing.current
     AnimatedVisibility(
         visible = error != null,
         enter = slideInVertically { -20 } + expandVertically() + fadeIn(),
@@ -73,7 +76,7 @@ fun AuthErrorText(
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = modifier
-                    .padding(start = 16.dp, top = 8.dp)
+                    .padding(start = spacing.space4, top = spacing.space2)
                     .semantics { contentDescription = errorMsg },
             )
         }
@@ -102,7 +105,10 @@ fun AuthButton(
         modifier = modifier
             .fillMaxWidth()
             .height(56.dp),
-        shape = RoundedCornerShape(100.dp),
+        // `full`, not a 100.dp radius: the system has one pill shape and this is
+        // it. On a 56dp button the two happen to agree — which is exactly why the
+        // difference would have gone unnoticed until the height changed.
+        shape = MaterialTheme.shapes.full,
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -137,13 +143,14 @@ fun AuthOutlinedButton(
     label: String = "",
     isLoading: Boolean = false,
 ) {
+    val spacing = LocalOrderakSpacing.current
     OutlinedButton(
         onClick = onClick,
         enabled = enabled && !isLoading,
         modifier = modifier
             .fillMaxWidth()
             .height(48.dp),
-        shape = RoundedCornerShape(100.dp),
+        shape = MaterialTheme.shapes.full,
         colors = ButtonDefaults.outlinedButtonColors(
             containerColor = MaterialTheme.colorScheme.surface,
             contentColor = MaterialTheme.colorScheme.primary,
@@ -151,7 +158,7 @@ fun AuthOutlinedButton(
     ) {
         if (isLoading) {
             CircularProgressIndicator(
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(spacing.iconMedium),
                 color = MaterialTheme.colorScheme.primary,
                 strokeWidth = 2.dp,
             )
@@ -178,8 +185,8 @@ fun AuthLoadingOverlay(
 ) {
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn(tween(300)),
-        exit = fadeOut(tween(300)),
+        enter = fadeIn(tween(LocalOrderakMotion.current.long)),
+        exit = fadeOut(tween(LocalOrderakMotion.current.long)),
     ) {
         Box(
             modifier = modifier
@@ -208,6 +215,7 @@ fun AuthDivider(
     label: String? = null,
     modifier: Modifier = Modifier,
 ) {
+    val spacing = LocalOrderakSpacing.current
     Row(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -223,7 +231,7 @@ fun AuthDivider(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp),
+                modifier = Modifier.padding(horizontal = spacing.space4),
             )
             Spacer(
                 modifier = Modifier

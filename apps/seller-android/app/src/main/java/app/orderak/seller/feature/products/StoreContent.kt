@@ -46,11 +46,13 @@ import app.orderak.seller.core.ui.FullScreenEmpty
 import app.orderak.seller.core.ui.FullScreenError
 import app.orderak.seller.core.ui.FullScreenLoading
 import app.orderak.seller.core.ui.NoticeBanner
+import app.orderak.seller.core.ui.PlanUsageRow
+import app.orderak.seller.core.ui.PlanUsageRowItem
 import app.orderak.seller.core.ui.SearchField
 import app.orderak.seller.core.ui.SemanticChip
 import app.orderak.seller.core.ui.SemanticRole
-import app.orderak.seller.core.ui.UsageMeter
 import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
+import app.orderak.seller.data.billing.FeatureKeys
 import app.orderak.seller.data.db.ProductEntity
 import coil3.compose.AsyncImage
 import java.io.File
@@ -92,6 +94,7 @@ fun StoreContent(
     onEdit: (Long) -> Unit,
     onShare: () -> Unit,
     onShowStuck: () -> Unit,
+    onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val spacing = LocalOrderakSpacing.current
@@ -102,7 +105,16 @@ fun StoreContent(
     if (state.loadError) {
         // The one case `catalogue == null` cannot distinguish on its own: a
         // Room read that actually threw, rather than one still in flight.
-        FullScreenError(message = stringResource(R.string.error_unknown), modifier = modifier)
+        //
+        // The retry is the point. The read that failed could not be re-run, so
+        // this state was the end of the surface: the catalogue stayed empty for
+        // the life of the process and the seller's only way out was to kill the
+        // app. `FullScreenError` accepted an `onRetry` from the start.
+        FullScreenError(
+            message = stringResource(R.string.error_unknown),
+            onRetry = onRetry,
+            modifier = modifier,
+        )
         return
     }
     if (catalogue == null) {
@@ -112,118 +124,134 @@ fun StoreContent(
         FullScreenLoading(modifier)
         return
     }
-    if (catalogue.isEmpty()) {
-        // WAS `products.isEmpty() && quota.limit == null`, and the second half
-        // was the bug. A limit is the normal case — free is 20 — so a new seller
-        // fell through to the branch below, where an empty catalogue and an
-        // empty SEARCH are the same test. They were shown
-        // «مفيش منتج مطابق لـ «»» and a "clear search" button, for a search they
-        // had not typed, on the first screen of their first session.
-        FullScreenEmpty(
-            message = stringResource(R.string.products_empty),
-            icon = Icons.Outlined.Inbox,
-            modifier = modifier,
-        )
-        return
-    }
-
     // Filtered in memory over what Room already holds, so search works with the
     // network off. Name and code both, because a seller reading a code off a
     // shelf label is the case a name-only search cannot serve.
     val visible = catalogue.filter { SearchText.matches(query, it.name, it.productCode) }
 
-    Column(modifier.fillMaxSize()) {
-        // Above the meter, because it is about whether the catalogue is
-        // updating at all — which outranks how close it is to the plan
-        // limit. Warning rather than Danger: nothing is lost, and the
-        // products are still here.
-        if (state.stuckCount > 0) {
-            NoticeBanner(
-                role = SemanticRole.Warning,
-                title = stringResource(R.string.products_stuck_title),
-                // The count picks the plural form; the digits it prints are a
-                // separate question, and Arabic answers the two differently.
-                message = pluralStringResource(
-                    R.plurals.products_stuck_body,
-                    state.stuckCount,
-                    formatCount(state.stuckCount, locale),
-                ),
-                actionLabel = stringResource(R.string.products_stuck_action),
-                onAction = onShowStuck,
-                modifier = Modifier.padding(horizontal = spacing.space4, vertical = spacing.space2),
-            )
-        }
-        // The shared meter rather than a sentence: the same component the
-        // dashboard and the subscription screen use, so "how close am I to
-        // the limit" reads identically wherever a seller meets it.
-        val limitValue = quota.limit
-        if (limitValue != null) {
-            UsageMeter(
-                label = stringResource(R.string.nav_products),
-                used = quota.used,
-                limit = limitValue,
-                modifier = Modifier.padding(horizontal = spacing.space4, vertical = spacing.space2),
+    // One Box around every remaining state, so the ➕ below is drawn in all of
+    // them. The empty branch used to `return` from above this point, which meant
+    // a seller on day one was shown «لسه مفيش منتجات — دوس ➕ وضيف أول منتج بصورة»
+    // and no ➕: the copy named a control the screen had not drawn, on the one
+    // screen where they have no other way to add a product. The FAB already
+    // branches on the plan limit, so drawing it here costs nothing and the
+    // sentence becomes true.
+    Box(modifier.fillMaxSize()) {
+        if (catalogue.isEmpty()) {
+            // WAS `products.isEmpty() && quota.limit == null`, and the second half
+            // was the bug. A limit is the normal case — free is 20 — so a new seller
+            // fell through to the branch below, where an empty catalogue and an
+            // empty SEARCH are the same test. They were shown
+            // «مفيش منتج مطابق لـ «»» and a "clear search" button, for a search they
+            // had not typed, on the first screen of their first session.
+            FullScreenEmpty(
+                message = stringResource(R.string.products_empty),
+                icon = Icons.Outlined.Inbox,
             )
         } else {
-            Text(
-                text = stringResource(R.string.products_usage_unlimited, formatCount(quota.used, locale)),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = spacing.space4, vertical = spacing.space2),
-            )
-        }
-        SearchField(
-            query = query,
-            onQueryChange = onQueryChange,
-            placeholder = stringResource(R.string.products_search_hint),
-            modifier = Modifier.padding(horizontal = spacing.space4, vertical = spacing.space1),
-        )
-        Box(Modifier.fillMaxWidth().weight(1f)) {
-            // A query that matches nothing is not an empty catalogue. Same
-            // sentence for both would read as "your products are gone", so
-            // this names the query and offers the way back to the full list.
-            if (visible.isEmpty()) {
-                FullScreenEmpty(
-                    message = stringResource(R.string.products_search_empty, query),
-                    actionLabel = stringResource(R.string.search_clear_action),
-                    onAction = { onQueryChange("") },
+            Column(Modifier.fillMaxSize()) {
+                // Above the meter, because it is about whether the catalogue is
+                // updating at all — which outranks how close it is to the plan
+                // limit. Warning rather than Danger: nothing is lost, and the
+                // products are still here.
+                if (state.stuckCount > 0) {
+                    NoticeBanner(
+                        role = SemanticRole.Warning,
+                        title = stringResource(R.string.products_stuck_title),
+                        // The count picks the plural form; the digits it prints are a
+                        // separate question, and Arabic answers the two differently.
+                        message = pluralStringResource(
+                            R.plurals.products_stuck_body,
+                            state.stuckCount,
+                            formatCount(state.stuckCount, locale),
+                        ),
+                        actionLabel = stringResource(R.string.products_stuck_action),
+                        onAction = onShowStuck,
+                        modifier = Modifier.padding(horizontal = spacing.space4, vertical = spacing.space2),
+                    )
+                }
+                // The shared meter rather than a sentence: the same component the
+                // dashboard and the subscription screen use, so "how close am I to
+                // the limit" reads identically wherever a seller meets it.
+                //
+                // It did not, on two counts. The meter carried this surface's own
+                // label — `nav_products`, "المتجر", beside a dashboard row that
+                // says "المنتجات" — and an unlimited plan was a `titleMedium`
+                // sentence over `products_usage_unlimited`, a string and a type
+                // role no other usage row uses. Going through `PlanUsageRowItem`
+                // for both cases is the row those surfaces already draw, at the
+                // label they already use. `quota.limit` is null when the plan has
+                // no ceiling, which is exactly the case that component branches on.
+                PlanUsageRowItem(
+                    row = PlanUsageRow(
+                        key = FeatureKeys.MAX_PRODUCTS,
+                        label = R.string.usage_products,
+                        used = quota.used,
+                        limit = quota.limit,
+                    ),
+                    modifier = Modifier.padding(horizontal = spacing.space4, vertical = spacing.space2),
                 )
-            } else {
-                LazyColumn(
-                    contentPadding = PaddingValues(spacing.space4),
-                    verticalArrangement = Arrangement.spacedBy(spacing.space2),
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = spacing.space4, vertical = spacing.space1),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    item {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                            IconButton(onClick = onShare) {
-                                Icon(
-                                    Icons.Outlined.Share,
-                                    contentDescription = stringResource(R.string.dash_share_catalog),
-                                )
+                    SearchField(
+                        query = query,
+                        onQueryChange = onQueryChange,
+                        placeholder = stringResource(R.string.products_search_hint),
+                        modifier = Modifier.weight(1f),
+                    )
+                    // Sharing the catalogue is a header-level action. It used to be
+                    // the first item inside the list, where it scrolled away with the
+                    // products and read as a row rather than as a control.
+                    IconButton(onClick = onShare) {
+                        Icon(
+                            imageVector = Icons.Outlined.Share,
+                            contentDescription = stringResource(R.string.dash_share_catalog),
+                        )
+                    }
+                }
+                Box(Modifier.fillMaxWidth().weight(1f)) {
+                    // A query that matches nothing is not an empty catalogue. Same
+                    // sentence for both would read as "your products are gone", so
+                    // this names the query and offers the way back to the full list.
+                    if (visible.isEmpty()) {
+                        FullScreenEmpty(
+                            message = stringResource(R.string.products_search_empty, query),
+                            actionLabel = stringResource(R.string.search_clear_action),
+                            onAction = { onQueryChange("") },
+                        )
+                    } else {
+                        LazyColumn(
+                            contentPadding = PaddingValues(spacing.space4),
+                            verticalArrangement = Arrangement.spacedBy(spacing.space2),
+                        ) {
+                            items(visible, key = { it.id }) { p ->
+                                ProductCard(p, onClick = { onEdit(p.id) })
                             }
+                            item { Spacer(Modifier.height(spacing.fabClearance)) }
                         }
                     }
-                    items(visible, key = { it.id }) { p ->
-                        ProductCard(p, onClick = { onEdit(p.id) })
-                    }
-                    item { Spacer(Modifier.height(80.dp)) }
                 }
             }
-            FloatingActionButton(
-                onClick = { if (quota.canAdd) onAdd() else onLimitReached() },
-                modifier = Modifier.align(Alignment.BottomEnd).padding(spacing.space4),
-                containerColor = if (quota.canAdd) {
-                    MaterialTheme.colorScheme.primaryContainer
-                } else {
-                    MaterialTheme.colorScheme.surfaceVariant
-                },
-            ) {
-                Icon(
-                    if (quota.canAdd) Icons.Filled.Add else Icons.Filled.Lock,
-                    contentDescription = stringResource(
-                        if (quota.canAdd) R.string.product_add_title else R.string.product_add_locked,
-                    ),
-                )
-            }
+        }
+        FloatingActionButton(
+            onClick = { if (quota.canAdd) onAdd() else onLimitReached() },
+            modifier = Modifier.align(Alignment.BottomEnd).padding(spacing.space4),
+            containerColor = if (quota.canAdd) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant
+            },
+        ) {
+            Icon(
+                if (quota.canAdd) Icons.Filled.Add else Icons.Filled.Lock,
+                contentDescription = stringResource(
+                    if (quota.canAdd) R.string.product_add_title else R.string.product_add_locked,
+                ),
+            )
         }
     }
 }
@@ -238,11 +266,11 @@ internal fun ProductCard(p: ProductEntity, onClick: () -> Unit) {
                 AsyncImage(
                     model = File(p.imagePath),
                     contentDescription = null,
-                    modifier = Modifier.size(56.dp).clip(RoundedCornerShape(10.dp)),
+                    modifier = Modifier.size(spacing.thumbnail).clip(MaterialTheme.shapes.medium),
                 )
             } else {
                 Box(
-                    Modifier.size(56.dp).clip(RoundedCornerShape(10.dp)),
+                    Modifier.size(spacing.thumbnail).clip(MaterialTheme.shapes.medium),
                     contentAlignment = Alignment.Center,
                 ) { Icon(Icons.Outlined.Image, contentDescription = null, tint = MaterialTheme.colorScheme.outline) }
             }
@@ -263,7 +291,7 @@ internal fun ProductCard(p: ProductEntity, onClick: () -> Unit) {
             // Low stock used to be the number in red and nothing else, which is
             // invisible to a colour-blind seller and to anyone in bright sun. The
             // chip carries an icon and a word as well.
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(horizontalAlignment = Alignment.End) {
                 if (p.stock <= LOW_STOCK_THRESHOLD) {
                     SemanticChip(
                         role = if (p.stock <= 0) SemanticRole.Danger else SemanticRole.Warning,

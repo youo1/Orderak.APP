@@ -136,5 +136,11 @@ jobs:
       - name: Build admin-web
         run: pnpm --filter @orderak/admin-web run build
 
+      # Same check, but now the build exists, so it also reads the emitted CSS.
+      # The source rule can hold while the pipeline stops preserving cascade
+      # layers, and that failure is invisible in every source file.
+      - name: Verify the published theme outranks the committed bundle
+        run: node tooling/repository/verify-theme-authority.mjs
+
       - name: Verify Worker size and startup budgets
         run: node tooling/repository/verify-worker-budget.mjs

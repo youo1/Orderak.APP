@@ -42,6 +42,26 @@ const STATES = ["loading", "content", "empty", "error"];
 /** Synthetic manifest keys: surfaces and overlays hosted inside MainRoute. */
 const isSynthetic = (route) => route.includes("#");
 
+/**
+ * The surfaces hosted inside `MainRoute`, read from the code.
+ *
+ * `MainRoute#orders` is a synthetic key: it is not a `Routes.kt` entry, so the
+ * route check above skips it, and nothing tied the five of them to the code. That
+ * was tolerable while a surface was a piece of state inside one screen and the
+ * manifest was describing something that had no route at all. It is not
+ * tolerable now: each surface is a destination of the shell's own `NavHost`,
+ * named by its `SellerSurface` entry, so the suffix after the `#` is a literal
+ * route string — and a surface renamed in Kotlin while the manifest kept the old
+ * name would leave the admin panel's screen tree describing a screen that no
+ * longer exists.
+ */
+const surfaceSourcePath = path.join(
+  root,
+  "apps/seller-android/app/src/main/java/app/orderak/seller/app/navigation/SellerSurface.kt",
+);
+const surfaceSource = readFileSync(surfaceSourcePath, "utf8");
+const declaredSurfaces = [...surfaceSource.matchAll(/^ {4}([A-Z][A-Za-z]*)\s*\(/gm)].map((m) => m[1]);
+
 const problems = [];
 
 /* ---------- parse ---------- */
@@ -133,6 +153,31 @@ for (const s of screens) {
 for (const route of declaredRoutes) {
   if (!known.has(route)) {
     problems.push(`${rel(routesPath)}: ${route} is declared but the manifest does not register it`);
+  }
+}
+
+/* ---------- the surfaces inside MainRoute ---------- */
+if (declaredSurfaces.length === 0) {
+  problems.push(`${rel(surfaceSourcePath)}: SellerSurface declares no entries — the parse of that enum is stale`);
+}
+const manifestSurfaces = screens
+  .map((s) => s.route)
+  .filter((route) => route.startsWith("MainRoute#") && !route.includes("#version-governance"))
+  .map((route) => route.slice("MainRoute#".length));
+for (const surface of declaredSurfaces) {
+  if (!manifestSurfaces.some((s) => s.toLowerCase() === surface.toLowerCase())) {
+    problems.push(
+      `SellerSurface.${surface} is a surface of the shell's NavHost but the manifest has no ` +
+      `"MainRoute#${surface.toLowerCase()}" entry`,
+    );
+  }
+}
+for (const surface of manifestSurfaces) {
+  if (!declaredSurfaces.some((s) => s.toLowerCase() === surface.toLowerCase())) {
+    problems.push(
+      `the manifest hosts "MainRoute#${surface}", which is not a SellerSurface entry — ` +
+      `the shell's NavHost has no such route`,
+    );
   }
 }
 

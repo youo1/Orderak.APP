@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
+import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 
 /**
  * A status chip: colour, icon and text together, inside an outlined container.
@@ -30,6 +31,7 @@ fun SemanticChip(
     label: String,
     modifier: Modifier = Modifier,
 ) {
+    val spacing = LocalOrderakSpacing.current
     val colors = role.colors()
     val glyph = role.icon
     Surface(
@@ -40,15 +42,15 @@ fun SemanticChip(
         border = BorderStroke(1.dp, colors.containerOutline),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(horizontal = spacing.space2, vertical = spacing.space1),
+            horizontalArrangement = Arrangement.spacedBy(spacing.space1),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (glyph != null) {
                 Icon(
                     imageVector = glyph,
                     contentDescription = null,
-                    modifier = Modifier.size(14.dp),
+                    modifier = Modifier.size(spacing.iconSmall),
                 )
             }
             Text(text = label, style = MaterialTheme.typography.labelSmall)

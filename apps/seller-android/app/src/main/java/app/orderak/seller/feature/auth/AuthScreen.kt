@@ -73,6 +73,8 @@ import app.orderak.seller.core.phone.Countries
 import app.orderak.seller.core.phone.Country
 import app.orderak.seller.core.ui.OrderakShippedLocalePreviews
 import app.orderak.seller.core.ui.theme.OrderakTheme
+import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
+import app.orderak.seller.core.ui.theme.LocalOrderakLayout
 
 @Composable
 fun AuthScreen(
@@ -105,6 +107,8 @@ fun AuthScreenContent(
     onPasskeySignIn: () -> Unit = {},
     onCreatePasskey: () -> Unit = {},
 ) {
+    val layout = LocalOrderakLayout.current
+    val spacing = LocalOrderakSpacing.current
     var showCountryPicker by rememberSaveable { mutableStateOf(false) }
     var showLanguage by remember { mutableStateOf(false) }
     var helpExpanded by remember { mutableStateOf(false) }
@@ -223,7 +227,7 @@ fun AuthScreenContent(
                             .fillMaxWidth()
                             .navigationBarsPadding()
                             .imePadding()
-                            .padding(horizontal = 24.dp, vertical = 12.dp),
+                            .padding(horizontal = spacing.space6, vertical = spacing.space3),
                         contentAlignment = Alignment.Center,
                     ) {
                         AuthButton(
@@ -239,7 +243,7 @@ fun AuthScreenContent(
                             enabled = enabled,
                             isLoading = loading,
                             label = stringResource(label),
-                            modifier = Modifier.fillMaxWidth().widthIn(max = 560.dp),
+                            modifier = Modifier.fillMaxWidth().widthIn(max = layout.contentMaxWidth),
                         )
                     }
                 }
@@ -264,7 +268,7 @@ fun AuthScreenContent(
                     dispatch = dispatch,
                 )
                 is AuthUiState.PasskeyInvite, is AuthUiState.Success -> CircularProgressIndicator(
-                    modifier = Modifier.padding(top = 120.dp),
+                    modifier = Modifier.padding(top = spacing.space16),
                 )
                 is AuthUiState.Welcome -> Unit
             }
@@ -282,6 +286,8 @@ private fun WelcomeScreen(
     onSignIn: () -> Unit,
     onChooseLanguage: () -> Unit,
 ) {
+    val layout = LocalOrderakLayout.current
+    val spacing = LocalOrderakSpacing.current
     val compactHeight = LocalConfiguration.current.screenHeightDp < 600
     val currentLanguage = AppLocales.supported
         .firstOrNull { it.tag == AppLocales.currentTag() }
@@ -293,13 +299,13 @@ private fun WelcomeScreen(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .statusBarsPadding()
-                .padding(horizontal = 12.dp, vertical = 4.dp)
+                .padding(horizontal = spacing.space3, vertical = spacing.space1)
                 .zIndex(2f),
         ) {
             Icon(
                 Icons.Outlined.Language,
                 contentDescription = null,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(spacing.iconMedium),
             )
             Spacer(Modifier.widthIn(min = 8.dp))
             Text(currentLanguage)
@@ -307,7 +313,7 @@ private fun WelcomeScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .widthIn(max = 560.dp)
+                .widthIn(max = layout.contentMaxWidth)
                 .align(Alignment.TopCenter)
                 .verticalScroll(rememberScrollState())
                 .padding(
@@ -329,7 +335,7 @@ private fun WelcomeScreen(
                 style = MaterialTheme.typography.headlineMedium,
                 textAlign = TextAlign.Center,
             )
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(spacing.space3))
             Text(
                 stringResource(R.string.welcome_subtitle),
                 style = MaterialTheme.typography.bodyLarge,
@@ -341,9 +347,9 @@ private fun WelcomeScreen(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .widthIn(max = 560.dp)
+                .widthIn(max = layout.contentMaxWidth)
                 .navigationBarsPadding()
-                .padding(horizontal = 24.dp, vertical = 16.dp),
+                .padding(horizontal = spacing.space6, vertical = spacing.space4),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Button(
@@ -353,14 +359,14 @@ private fun WelcomeScreen(
             ) {
                 Text(stringResource(R.string.welcome_create_store))
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(spacing.space3))
             OutlinedButton(
                 onClick = onSignIn,
                 enabled = !state.isPasskeyLoading,
                 modifier = Modifier.fillMaxWidth().height(54.dp),
             ) {
                 if (state.isPasskeyLoading) {
-                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                    CircularProgressIndicator(Modifier.size(spacing.iconMedium), strokeWidth = 2.dp)
                 } else {
                     Icon(Icons.Outlined.Fingerprint, contentDescription = null)
                     Spacer(Modifier.widthIn(min = 8.dp))
@@ -368,7 +374,7 @@ private fun WelcomeScreen(
                 }
             }
             if (state.showOtpFallback) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(spacing.space2))
                 TextButton(onClick = onCreateStore) {
                     Text(stringResource(R.string.welcome_otp_fallback))
                 }
@@ -384,6 +390,8 @@ private fun PhoneVerificationContent(
     onCountryPicker: () -> Unit,
     dispatch: (AuthEvent) -> Unit,
 ) {
+    val layout = LocalOrderakLayout.current
+    val spacing = LocalOrderakSpacing.current
     val phoneState = state as? AuthUiState.EnterPhone
     val otpState = state as? AuthUiState.EnterOtp
     if (phoneState == null && otpState == null) return
@@ -394,19 +402,35 @@ private fun PhoneVerificationContent(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .widthIn(max = 560.dp)
+            .widthIn(max = layout.contentMaxWidth)
             .verticalScroll(rememberScrollState())
-            .padding(24.dp),
+            .padding(spacing.space6),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(stringResource(R.string.auth_phone_entry_title), style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            stringResource(R.string.auth_phone_reason),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(32.dp))
+        // Entry copy belongs to the entry stage.
+        //
+        // Phone entry and the OTP are two stages of one screen, and `AuthOtpForm`
+        // renders the OTP stage's own title and subtitle ("Verify your number",
+        // "Sent to …"). Rendered together with these two lines the stage carried two
+        // `headlineMedium` headings — the "two stacked headings on OTP page" the UI
+        // audit recorded — and the upper one told the seller to enter a number the
+        // field below had just been locked against (`enabled = !phoneLocked`),
+        // directly above a promise to text a code that had already been sent. The
+        // locked country and phone stay visible either way, which is what this stage
+        // owes the contract.
+        if (phoneState != null) {
+            Text(
+                stringResource(R.string.auth_phone_entry_title),
+                style = MaterialTheme.typography.headlineMedium,
+            )
+            Spacer(Modifier.height(spacing.space2))
+            Text(
+                stringResource(R.string.auth_phone_reason),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(spacing.space8))
+        }
         AuthPhoneForm(
             phone = phone,
             country = country,
@@ -420,7 +444,7 @@ private fun PhoneVerificationContent(
             modifier = Modifier.fillMaxWidth(),
         )
         if (otpState != null) {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(spacing.space2))
             AuthOtpForm(
                 phoneE164 = otpState.phoneE164,
                 code = otpState.code,
@@ -437,6 +461,77 @@ private fun PhoneVerificationContent(
     }
 }
 
+/**
+ * The invite's body, without the sheet around it.
+ *
+ * Split out because the three states that matter — the invite, the deferred invite
+ * after onboarding, and the one that is creating — had `@PreviewTest` renders that
+ * were **byte-identical blanks**: one SHA256 across all three, 15,540 bytes each,
+ * because the screenshot harness does not capture a `ModalBottomSheet`. Three
+ * baselines that look like coverage and carry none, which is worse than no baseline
+ * at all: the number reads as proof.
+ *
+ * This is the same reason `TodayScreen`, `StoreContent` and `AuthScreenContent` take
+ * a state instead of a view model — "the surface was a private composable inside a
+ * larger file, which is exactly why it had never been screenshot-tested". The sheet
+ * keeps its own concerns (dismissal, insets, the drag handle) and the content is
+ * renderable.
+ */
+@Composable
+internal fun PasskeyInviteContent(
+    state: AuthUiState.PasskeyInvite,
+    onCreate: () -> Unit,
+    onSkip: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val layout = LocalOrderakLayout.current
+    val spacing = LocalOrderakSpacing.current
+    Column(
+        modifier
+            .fillMaxWidth()
+            .widthIn(max = layout.contentMaxWidth)
+            .padding(spacing.space6),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(Icons.Outlined.Fingerprint, contentDescription = null, modifier = Modifier.size(spacing.iconHero))
+        Spacer(Modifier.height(spacing.space4))
+        Text(stringResource(R.string.passkey_invite_title), style = MaterialTheme.typography.titleLarge)
+        Spacer(Modifier.height(spacing.space2))
+        Text(
+            stringResource(
+                if (state.deferredForOnboarding) {
+                    R.string.passkey_invite_deferred_body
+                } else {
+                    R.string.passkey_invite_body
+                },
+            ),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        AuthErrorText(state.error)
+        Spacer(Modifier.height(spacing.space6))
+        Button(
+            onClick = onCreate,
+            enabled = !state.isCreating,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            if (state.isCreating) CircularProgressIndicator(Modifier.size(spacing.iconMedium), strokeWidth = 2.dp)
+            else Text(
+                stringResource(
+                    if (state.deferredForOnboarding) {
+                        R.string.passkey_invite_deferred_create
+                    } else {
+                        R.string.passkey_invite_create
+                    },
+                ),
+            )
+        }
+        TextButton(onClick = onSkip, enabled = !state.isCreating) {
+            Text(stringResource(R.string.passkey_invite_not_now))
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PasskeyInviteSheet(
@@ -445,47 +540,7 @@ private fun PasskeyInviteSheet(
     onSkip: () -> Unit,
 ) {
     ModalBottomSheet(onDismissRequest = onSkip) {
-        Column(
-            Modifier.fillMaxWidth().widthIn(max = 560.dp).align(Alignment.CenterHorizontally).padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Icon(Icons.Outlined.Fingerprint, contentDescription = null, modifier = Modifier.size(44.dp))
-            Spacer(Modifier.height(16.dp))
-            Text(stringResource(R.string.passkey_invite_title), style = MaterialTheme.typography.titleLarge)
-            Spacer(Modifier.height(8.dp))
-            Text(
-                stringResource(
-                    if (state.deferredForOnboarding) {
-                        R.string.passkey_invite_deferred_body
-                    } else {
-                        R.string.passkey_invite_body
-                    },
-                ),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-            AuthErrorText(state.error)
-            Spacer(Modifier.height(20.dp))
-            Button(
-                onClick = onCreate,
-                enabled = !state.isCreating,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                if (state.isCreating) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                else Text(
-                    stringResource(
-                        if (state.deferredForOnboarding) {
-                            R.string.passkey_invite_deferred_create
-                        } else {
-                            R.string.passkey_invite_create
-                        },
-                    ),
-                )
-            }
-            TextButton(onClick = onSkip, enabled = !state.isCreating) {
-                Text(stringResource(R.string.passkey_invite_not_now))
-            }
-        }
+        PasskeyInviteContent(state = state, onCreate = onCreate, onSkip = onSkip)
     }
 }
 
@@ -496,6 +551,7 @@ private fun CountryPickerSheet(
     onSelected: (Country) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val spacing = LocalOrderakSpacing.current
     var query by rememberSaveable { mutableStateOf("") }
     val configuration = LocalConfiguration.current
     // Fall back to the Compose-observable locale, not java.util.Locale.getDefault():
@@ -512,9 +568,9 @@ private fun CountryPickerSheet(
         }
     }
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = spacing.space6)) {
             Text(stringResource(R.string.country_picker_title), style = MaterialTheme.typography.titleLarge)
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(spacing.space3))
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it.take(50) },
@@ -528,7 +584,7 @@ private fun CountryPickerSheet(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { onSelected(country) }
-                            .padding(vertical = 14.dp),
+                            .padding(vertical = spacing.space4),
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Text("${country.flag}  ${country.name}")

@@ -1,6 +1,21 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+/**
+ * The compiled design-system artifact, addressed from this file rather than from
+ * the working directory.
+ *
+ * This suite previously read it as `resolve(process.cwd(), '..', 'design', ...)`.
+ * Playwright runs from `apps/admin-web` — that is where the package script and
+ * the `testDir` are anchored — so `..` landed on `apps/`, and every run died on
+ * its first line with ENOENT on a path that has never existed. A suite that
+ * cannot reach its own fixture tests nothing, and nothing reported it: no
+ * workflow invoked this suite, so the failure lived only in an artifact.
+ */
+const DESIGN_SYSTEM_ARTIFACT = fileURLToPath(
+  new URL('../../../design/design-system.default.json', import.meta.url),
+);
 
 const dashboard = {
   stores: { total: 12, active: 10 },
@@ -191,8 +206,13 @@ test('tasks: create, edit, and delete a record through the Refine data provider'
   await expect(page.getByRole('cell', { name: 'done' })).toBeVisible();
 
   await page.getByRole('cell', { name: 'Verify Refine write path' }).click();
-  page.once('dialog', dialog => dialog.accept());
-  await page.getByRole('button', { name: 'Delete' }).click();
+  // The deletion is confirmed through the panel's own dialog, not a native
+  // `window.confirm`: this branch removed every `window.confirm` from the
+  // console (see `shared/ui/confirm.tsx`) and `TaskForm` was written on the
+  // other side of the merge, so the confirm step follows the kit here too.
+  // The assertion below is unchanged — the row is gone once Delete is answered.
+  await page.getByRole('button', { name: 'Delete', exact: true }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete task' }).click();
   await expect(page.getByRole('cell', { name: 'Verify Refine write path' })).toHaveCount(0);
 });
 
@@ -223,7 +243,7 @@ test('translations: approving a row refetches the Refine-backed list, not a stal
 });
 
 test('theme manager previews and applies an immutable generated checkpoint', async ({ page }) => {
-  const artifact = JSON.parse(readFileSync(resolve(process.cwd(), '..', 'design', 'design-system.default.json'), 'utf8'));
+  const artifact = JSON.parse(readFileSync(DESIGN_SYSTEM_ARTIFACT, 'utf8'));
   const snapshot = artifact.snapshot;
   let publishedBody: Record<string, unknown> | null = null;
   let csrf = '';
@@ -278,7 +298,7 @@ test('theme manager previews and applies an immutable generated checkpoint', asy
 });
 
 test('revision history groups current, saved, and recent checkpoints with managed actions', async ({ page }) => {
-  const artifact = JSON.parse(readFileSync(resolve(process.cwd(), '..', 'design', 'design-system.default.json'), 'utf8'));
+  const artifact = JSON.parse(readFileSync(DESIGN_SYSTEM_ARTIFACT, 'utf8'));
   const snapshot = artifact.snapshot;
   const active = {
     id: 3,

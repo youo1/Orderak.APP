@@ -5,6 +5,7 @@ import { api } from '@/shared/api/client';
 import type { Section } from '@/app/config/sections';
 import { DataTable } from '@/shared/ui/DataTable';
 import { DetailPanel, ErrorState, LoadingState, PageHeader } from '@/shared/ui/Page';
+import { Button } from '@/shared/ui/button';
 import { actions } from '@/app/config/actions';
 import { ActionDialog } from '@/shared/ui/ActionDialog';
 import { useAuth } from '@/features/auth/auth-context';
@@ -29,7 +30,7 @@ export function ResourcePage({ section }: { section: Section }) {
   const query = useQuery({ queryKey: ['resource', section.id], queryFn: () => api<Row>(section.endpoint!) });
   const groups = groupRows(query.data, section.resultKeys || []);
   return <>
-    <PageHeader title={section.label} description={section.description} actions={<>{action && auth.can(action.permission) && <button className="button primary" onClick={() => setActionOpen(true)}><Plus size={16} /> {action.label}</button>}<button className="button" onClick={() => query.refetch()}><RefreshCw size={16} /> Refresh</button></>} />
+    <PageHeader title={section.label} description={section.description} actions={<>{action && auth.can(action.permission) && <Button onClick={() => setActionOpen(true)}><Plus size={16} /> {action.label}</Button>}<Button variant="outline" onClick={() => query.refetch()}><RefreshCw size={16} /> Refresh</Button></>} />
     {query.isLoading && <LoadingState />}
     {query.error && <ErrorState error={query.error} retry={() => query.refetch()} />}
     {groups.map(group => <section className="resource-group" key={group.key}>{groups.length > 1 && <div className="section-heading"><h2>{group.label}</h2><span>{group.rows.length}</span></div>}<DataTable rows={group.rows} onSelect={setSelected} preferred={preferredColumns[section.id] || []} /></section>)}

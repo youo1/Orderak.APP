@@ -4,8 +4,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,13 +18,18 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.orderak.seller.R
+import app.orderak.seller.core.text.formatCount
 import app.orderak.seller.core.ui.FullScreenEmpty
 import app.orderak.seller.core.ui.FullScreenError
 import app.orderak.seller.core.ui.FullScreenLoading
@@ -57,6 +64,7 @@ fun OrdersContent(
     onOpen: (Long) -> Unit,
     onNew: () -> Unit,
     onFilter: (OrdersFilter) -> Unit,
+    onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val spacing = LocalOrderakSpacing.current
@@ -69,7 +77,15 @@ fun OrdersContent(
             // that actually threw, rather than one still in flight. Falls back to
             // an empty list upstream so this does not fight the loading check
             // below for the same null.
-            FullScreenError(message = stringResource(R.string.error_unknown))
+            //
+            // The retry is the point. This state used to be a dead end: the read
+            // that failed could not be re-run, so the seller's only way out was
+            // to kill the app. `FullScreenError` had accepted an `onRetry` all
+            // along — nothing passed one.
+            FullScreenError(
+                message = stringResource(R.string.error_unknown),
+                onRetry = onRetry,
+            )
         } else if (list == null) {
             // The state this screen declared and never had. An empty list stood
             // in for "not read yet", so the empty state — whose action is
@@ -140,14 +156,40 @@ fun OrdersContent(
                         onAction = { onFilter(OrdersFilter.All) },
                     )
                 } else {
+                    // Split where the order already splits.
+                    //
+                    // `needsSellerFirst` sorts the list into "still yours to move"
+                    // and "finished or cancelled", and the row already draws a rail
+                    // and a chip from the same predicate. Without the headings the
+                    // sort would be invisible — a priority-ordered list with nothing
+                    // naming the priority reads exactly like an arbitrary one, which
+                    // is what this list was until now.
+                    val (waiting, rest) = list.partition { o ->
+                        runCatching { OrderStatus.valueOf(o.status) }
+                            .getOrDefault(OrderStatus.NEW)
+                            .needsSeller
+                    }
                     LazyColumn(
                         contentPadding = PaddingValues(spacing.space4),
                         verticalArrangement = Arrangement.spacedBy(spacing.space2),
                     ) {
-                        items(list, key = { it.id }) { o ->
-                            OrderCard(o, refused = o.id in state.refusedPushes, onClick = { onOpen(o.id) })
+                        if (waiting.isNotEmpty()) {
+                            item(key = "group-waiting") {
+                                GroupHeading(stringResource(R.string.orders_group_waiting), waiting.size)
+                            }
+                            items(waiting, key = { it.id }) { o ->
+                                OrderCard(o, refused = o.id in state.refusedPushes, onClick = { onOpen(o.id) })
+                            }
                         }
-                        item { Spacer(Modifier.height(80.dp)) }
+                        if (rest.isNotEmpty()) {
+                            item(key = "group-rest") {
+                                GroupHeading(stringResource(R.string.orders_group_rest), rest.size)
+                            }
+                            items(rest, key = { it.id }) { o ->
+                                OrderCard(o, refused = o.id in state.refusedPushes, onClick = { onOpen(o.id) })
+                            }
+                        }
+                        item { Spacer(Modifier.height(spacing.fabClearance)) }
                     }
                 }
             }
@@ -156,5 +198,34 @@ fun OrdersContent(
             onClick = onNew,
             modifier = Modifier.align(Alignment.BottomEnd).padding(spacing.space4),
         ) { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.order_new_title)) }
+    }
+}
+
+/**
+ * A group heading that also carries the count.
+ *
+ * The count is not decoration: it answers the question the list exists to answer,
+ * in the place a seller reads before scrolling. `formatCount` gives it the locale's
+ * digits — these lists printed Latin numerals under an Arabic heading before
+ * `core/text/Counts.kt` existed.
+ */
+@Composable
+private fun GroupHeading(label: String, count: Int) {
+    val spacing = LocalOrderakSpacing.current
+    val locale = LocalConfiguration.current.locales[0]
+    Row(
+        Modifier.fillMaxWidth().padding(top = spacing.space2),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.weight(1f).semantics { heading() },
+        )
+        Text(
+            formatCount(count, locale),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }

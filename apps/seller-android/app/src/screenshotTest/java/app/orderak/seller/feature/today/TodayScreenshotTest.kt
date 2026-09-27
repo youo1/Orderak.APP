@@ -135,6 +135,31 @@ fun todayEmptyDark() {
     OrderakTheme(darkTheme = true) { Today(EMPTY) }
 }
 
+// ---- nothing is waiting on the seller ---------------------------------
+//
+// The state this redesign introduced, and the one G2's second half asks for:
+// "or explicitly shows that there is nothing". Before it, three neutral zeros
+// were the whole answer and the seller had to read all three and conclude it
+// themselves — which is also what the loading state looked like, and those are
+// different facts. `EMPTY` above cannot show this on its own: it also carries the
+// no-products card, so the sentence would be one block among several.
+
+private val CALM = LOADED.copy(todayCount = 4, unpaidCount = 0, toShipCount = 0)
+
+@PreviewTest
+@Preview(name = "Today nothing waiting light", locale = "ar")
+@Composable
+fun todayNothingWaitingLight() {
+    OrderakTheme(darkTheme = false) { Today(CALM) }
+}
+
+@PreviewTest
+@Preview(name = "Today nothing waiting dark", locale = "ar")
+@Composable
+fun todayNothingWaitingDark() {
+    OrderakTheme(darkTheme = true) { Today(CALM) }
+}
+
 // ---- error -----------------------------------------------------------
 // The counters stay REAL here. They come from local Room queries and do not
 // depend on the network, so blanking them would hide data the seller has. Only

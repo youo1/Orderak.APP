@@ -99,6 +99,17 @@ const EXPECTED_ABSENT = new Map([
 	["apps/seller-android/app/src/staging/google-services.json", "Staging Firebase client configuration. Same reason."],
 	["contracts/openapi/dist", "Build output of the OpenAPI bundle step. Gitignored."],
 	["contracts/openapi/dist/public-v1.json", "Build output. Gitignored."],
+	// Build and test output cited by the redesign review. These existed in the
+	// checkout the audit was written in and do not exist in a clean one, which is
+	// why this check passed locally and failed in CI: `admin-panel-audit.md` reads
+	// the committed `dist/index.html`'s stylesheet order to prove which stylesheet
+	// wins the cascade, and reads Playwright's `.last-run.json` to report that the
+	// e2e suite was failing. Both are evidence about artefacts, so the citation is
+	// the point and the absence is expected.
+	["apps/admin-web/dist", "Build output of the panel. Gitignored."],
+	["apps/admin-web/dist/index.html", "Build output. Gitignored. Cited for its stylesheet link order."],
+	["apps/admin-web/test-results/.last-run.json", "Playwright output. Gitignored. Cited as the record of a failing run."],
+	["contracts/openapi/dist/admin-v1.json", "Build output. Gitignored."],
 	// Deliberately deleted by Phase 0 item 2, and cited in the governance record
 	// precisely to say it is gone. A path can be referenced because it is absent,
 	// not only because it is present, and the check has no way to tell those

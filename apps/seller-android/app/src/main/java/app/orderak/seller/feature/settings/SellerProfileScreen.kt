@@ -43,6 +43,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import app.orderak.seller.R
 import app.orderak.seller.core.ui.FullScreenLoading
+import app.orderak.seller.core.ui.NoticeBanner
+import app.orderak.seller.core.ui.SemanticRole
 import app.orderak.seller.data.remote.BackendApi
 import app.orderak.seller.data.session.SessionStore
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -55,6 +57,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
+import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 
 @HiltViewModel
 class SellerProfileViewModel @Inject constructor(
@@ -165,7 +168,14 @@ class SellerProfileViewModel @Inject constructor(
         }
         _busy.value = true
         val result = api.resendAccountEmailVerification(phone, secret, recent)
+        // Closes §4.5's "**A verified seller can be told a verification email was
+        // sent.** `auth-v2.ts:908-911` answers `already_verified`, and
+        // `BackendApi.resendAccountEmailVerification` (`BackendApi.kt:1127-1137`)
+        // returns the generic `OkRes`, dropping it." The answer is carried now, so
+        // the two answers a successful call can give are two states rather than
+        // one: the mail went out, or there was nothing to send it about.
         _emailVerificationStatus.value = when {
+            result.ok && result.already_verified -> "already_verified"
             result.ok -> "sent"
             result.error == "recent_auth_required" -> {
                 onReauthenticate()
@@ -231,6 +241,13 @@ fun SellerProfileScreen(
     var email by rememberSaveable { mutableStateOf("") }
     var birthYear by rememberSaveable { mutableStateOf("") }
     var profilePhotoUri by rememberSaveable { mutableStateOf("") }
+    // A picked photo that never reached storage used to leave no trace: the
+    // callback only ran its success branch, so the seller chose an image,
+    // watched the "photo uploaded" line not appear, and could not tell a failed
+    // upload from a slow one. The same shape `store-info` already reports, with
+    // its own state for the same reason — nothing the seller typed is at risk,
+    // so this is not the save error.
+    var photoUploadFailed by rememberSaveable { mutableStateOf(false) }
 
     // Seed from ViewModel on first load
     LaunchedEffect(savedFullName, savedEmail, savedBirthYear, savedPhotoUri) {
@@ -241,7 +258,12 @@ fun SellerProfileScreen(
     }
 
     val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        uri?.let { viewModel.uploadProfilePhoto(it) { url -> if (url != null) profilePhotoUri = url } }
+        uri?.let {
+            photoUploadFailed = false
+            viewModel.uploadProfilePhoto(it) { url ->
+                if (url != null) profilePhotoUri = url else photoUploadFailed = true
+            }
+        }
     }
 
     SellerProfileContent(
@@ -254,6 +276,7 @@ fun SellerProfileScreen(
         email = email,
         birthYear = birthYear,
         profilePhotoUri = profilePhotoUri,
+        photoUploadFailed = photoUploadFailed,
         onFullName = { fullName = it },
         onEmail = { email = it },
         onBirthYear = { birthYear = it },
@@ -273,6 +296,10 @@ fun SellerProfileScreen(
  * view model seeds "" and the session snapshot is read in a suspend call, so the
  * form drew with a blank phone number — the seller's own, and the one read-only
  * identity on this page — and filled it in a beat later.
+ *
+ * [photoUploadFailed] is the failure this page used to swallow. Every other
+ * answer on it is drawn — the save's busy state, the verification mail's outcome
+ * — and a chosen photo that never reached storage drew nothing at all.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -286,6 +313,7 @@ fun SellerProfileContent(
     email: String,
     birthYear: String,
     profilePhotoUri: String,
+    photoUploadFailed: Boolean = false,
     onFullName: (String) -> Unit,
     onEmail: (String) -> Unit,
     onBirthYear: (String) -> Unit,
@@ -296,6 +324,7 @@ fun SellerProfileContent(
     onBack: () -> Unit,
     onReauthenticate: () -> Unit,
 ) {
+    val spacing = LocalOrderakSpacing.current
     Scaffold(
         topBar = {
             TopAppBar(
@@ -322,9 +351,9 @@ fun SellerProfileContent(
             Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp)
+                .padding(spacing.space4)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(spacing.space3),
         ) {
             Text(
                 stringResource(R.string.seller_profile_header),
@@ -349,17 +378,23 @@ fun SellerProfileContent(
                     Text(stringResource(R.string.seller_profile_resend_verification))
                 }
                 emailVerificationStatus?.let { status ->
+                    // Three answers, not two: the second success state is the one
+                    // §4.5 found being reported as the first — "**A verified
+                    // seller can be told a verification email was sent.**" A
+                    // verified address is neither a success to celebrate nor a
+                    // failure, so it reads in the neutral colour.
                     Text(
-                        if (status == "sent") {
-                            stringResource(R.string.seller_profile_verification_sent)
-                        } else {
-                            stringResource(R.string.seller_profile_verification_failed)
+                        when (status) {
+                            "sent" -> stringResource(R.string.seller_profile_verification_sent)
+                            "already_verified" ->
+                                stringResource(R.string.seller_profile_verification_already_verified)
+                            else -> stringResource(R.string.seller_profile_verification_failed)
                         },
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (status == "sent") {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.error
+                        color = when (status) {
+                            "sent" -> MaterialTheme.colorScheme.primary
+                            "already_verified" -> MaterialTheme.colorScheme.onSurfaceVariant
+                            else -> MaterialTheme.colorScheme.error
                         },
                     )
                 }
@@ -388,7 +423,7 @@ fun SellerProfileContent(
             )
 
             Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp)) {
+                Column(Modifier.padding(spacing.space3)) {
                     Text(
                         stringResource(R.string.seller_profile_photo),
                         style = MaterialTheme.typography.titleMedium,
@@ -406,10 +441,21 @@ fun SellerProfileContent(
                             else stringResource(R.string.setup_change_photo),
                         )
                     }
+                    if (photoUploadFailed) {
+                        // Beside the control that caused it, not at the bottom of
+                        // the form: the remedy is to pick again, and that button
+                        // is here.
+                        NoticeBanner(
+                            role = SemanticRole.Danger,
+                            title = stringResource(R.string.seller_profile_photo_failed),
+                            message = stringResource(R.string.error_unknown),
+                            modifier = Modifier.padding(top = spacing.space3),
+                        )
+                    }
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(spacing.space2))
             Button(
                 onClick = {
                     onSave(fullName, email, birthYear, profilePhotoUri, onBack)

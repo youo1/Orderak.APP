@@ -92,6 +92,8 @@ import app.orderak.seller.R
 import app.orderak.seller.core.text.formatCount
 import app.orderak.seller.data.remote.BusinessCategoryDto
 import app.orderak.seller.data.remote.CityCatalogSuggestionDto
+import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
+import app.orderak.seller.core.ui.theme.LocalOrderakLayout
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -185,6 +187,8 @@ fun ShopSetupContent(
     actions: ShopSetupActions,
     onExit: () -> Unit,
 ) {
+    val layout = LocalOrderakLayout.current
+    val spacing = LocalOrderakSpacing.current
     val locale = LocalConfiguration.current.locales[0]
     Scaffold(
         topBar = {
@@ -217,20 +221,28 @@ fun ShopSetupContent(
                         .fillMaxWidth()
                         .navigationBarsPadding()
                         .imePadding()
-                        .padding(horizontal = 24.dp, vertical = 12.dp),
+                        .padding(horizontal = spacing.space6, vertical = spacing.space3),
                     contentAlignment = Alignment.Center,
                 ) {
                     Button(
                         onClick = if (state.step == 1) actions.next else actions.finish,
                         enabled = if (state.step == 1) {
-                            !state.saving
+                            // `canContinueAccount` was written for this button and
+                            // had no reader anywhere in the app: step 1's button was
+                            // enabled on "not saving" alone while step 2's consulted
+                            // `canFinishStore`. So the two steps of one screen
+                            // disagreed about when a form is ready, and a seller who
+                            // mistyped their birth year learned it after a tap and a
+                            // round trip instead of before the tap. The validation
+                            // already existed; only the wiring was missing.
+                            state.canContinueAccount && !state.saving
                         } else {
                             state.canFinishStore && !state.saving
                         },
-                        modifier = Modifier.fillMaxWidth().widthIn(max = 560.dp).height(56.dp),
+                        modifier = Modifier.fillMaxWidth().widthIn(max = layout.contentMaxWidth).height(56.dp),
                     ) {
                         if (state.saving) {
-                            CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+                            CircularProgressIndicator(Modifier.size(spacing.iconMedium), strokeWidth = 2.dp)
                         } else {
                             Text(
                                 stringResource(
@@ -249,11 +261,11 @@ fun ShopSetupContent(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 16.dp),
+                .padding(horizontal = spacing.space6, vertical = spacing.space4),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Column(
-                modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth(),
+                modifier = Modifier.widthIn(max = layout.contentMaxWidth).fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 val progress by animateFloatAsState(
@@ -262,18 +274,24 @@ fun ShopSetupContent(
                 )
                 LinearProgressIndicator(
                     progress = { progress },
-                    modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                    modifier = Modifier.fillMaxWidth().height(6.dp).clip(MaterialTheme.shapes.extraSmall),
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(spacing.space2))
                 Text(
                     // The Arabic string writes its “of 2” as ٢, so the step has to
                     // be Arabic-Indic too or one sentence carries both forms.
                     stringResource(R.string.setup_step_indicator, formatCount(state.step, locale)),
+                    // Emphasis comes from the role, not from a second weight on top of
+                    // it. `labelLarge` is already the scale's medium (500) and the
+                    // design system states the product has no weight above it —
+                    // "Weight is 400 or 500 — there is no bold display type in this
+                    // product" — so `FontWeight.Bold` was an off-scale emphasis. The
+                    // step is still signalled twice without it: by this line and by
+                    // the progress bar above, never by colour alone.
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
                 )
-                Spacer(Modifier.height(28.dp))
+                Spacer(Modifier.height(spacing.space8))
 
                 if (state.step == 1) {
                     AccountInformationStep(state, actions)
@@ -291,6 +309,7 @@ private fun AccountInformationStep(
     state: ShopSetupUiState,
     actions: ShopSetupActions,
 ) {
+    val spacing = LocalOrderakSpacing.current
     var showYearDialog by rememberSaveable { mutableStateOf(false) }
 
     Text(
@@ -298,7 +317,7 @@ private fun AccountInformationStep(
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.fillMaxWidth(),
     )
-    Spacer(Modifier.height(28.dp))
+    Spacer(Modifier.height(spacing.space8))
     OutlinedTextField(
         value = state.fullName,
         onValueChange = actions.onFullNameChanged,
@@ -310,7 +329,7 @@ private fun AccountInformationStep(
         ),
         isError = state.fullName.isNotBlank() && state.fullName.trim().length !in 3..80,
     )
-    Spacer(Modifier.height(16.dp))
+    Spacer(Modifier.height(spacing.space4))
     val openYearLabel = stringResource(R.string.setup_birth_year_open_description)
     Box(Modifier.fillMaxWidth()) {
         OutlinedTextField(
@@ -335,7 +354,7 @@ private fun AccountInformationStep(
                 ),
         )
     }
-    Spacer(Modifier.height(16.dp))
+    Spacer(Modifier.height(spacing.space4))
     OutlinedTextField(
         value = state.email,
         onValueChange = actions.onEmailChanged,
@@ -350,9 +369,9 @@ private fun AccountInformationStep(
         isError = !state.emailValid,
     )
     SetupError(state.error)
-    Spacer(Modifier.height(30.dp))
+    Spacer(Modifier.height(spacing.space8))
     OnboardingLegalText()
-    Spacer(Modifier.height(16.dp))
+    Spacer(Modifier.height(spacing.space4))
 
     if (showYearDialog) {
         YearOfBirthDialog(
@@ -372,6 +391,7 @@ private fun YearOfBirthDialog(
     onDismiss: () -> Unit,
     onSelected: (Int) -> Unit,
 ) {
+    val spacing = LocalOrderakSpacing.current
     val currentYear = remember { currentUtcYear() }
     val years = remember(currentYear) { birthYearOptions(currentYear) }
     val selectedIndex = selectedYear
@@ -400,7 +420,7 @@ private fun YearOfBirthDialog(
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         },
-                        modifier = Modifier.padding(4.dp),
+                        modifier = Modifier.padding(spacing.space1),
                     )
                 }
             }
@@ -421,6 +441,7 @@ private fun StoreInformationStep(
     state: ShopSetupUiState,
     actions: ShopSetupActions,
 ) {
+    val spacing = LocalOrderakSpacing.current
     var categoryExpanded by rememberSaveable { mutableStateOf(false) }
     var cityExpanded by rememberSaveable { mutableStateOf(false) }
 
@@ -433,13 +454,13 @@ private fun StoreInformationStep(
         style = MaterialTheme.typography.headlineSmall,
         modifier = Modifier.fillMaxWidth(),
     )
-    Spacer(Modifier.height(6.dp))
+    Spacer(Modifier.height(spacing.space2))
     Text(
         stringResource(R.string.setup_store_subtitle),
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.fillMaxWidth(),
     )
-    Spacer(Modifier.height(24.dp))
+    Spacer(Modifier.height(spacing.space6))
     OutlinedTextField(
         value = state.name,
         onValueChange = actions.onNameChanged,
@@ -447,7 +468,7 @@ private fun StoreInformationStep(
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
     )
-    Spacer(Modifier.height(8.dp))
+    Spacer(Modifier.height(spacing.space2))
     Text(
         text = stringResource(R.string.setup_store_link_preview),
         style = MaterialTheme.typography.labelMedium,
@@ -465,7 +486,7 @@ private fun StoreInformationStep(
             textDirection = TextDirection.Ltr,
         ),
         color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = spacing.space1),
     )
     Text(
         text = when (state.slugAvailability) {
@@ -482,9 +503,9 @@ private fun StoreInformationStep(
         } else {
             MaterialTheme.colorScheme.onSurfaceVariant
         },
-        modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = spacing.space1),
     )
-    Spacer(Modifier.height(18.dp))
+    Spacer(Modifier.height(spacing.space4))
 
     ExposedDropdownMenuBox(
         expanded = categoryExpanded,
@@ -525,7 +546,7 @@ private fun StoreInformationStep(
                 DropdownMenuItem(
                     text = {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(22.dp),
+                            modifier = Modifier.size(spacing.iconMedium),
                             strokeWidth = 2.dp,
                         )
                     },
@@ -557,7 +578,7 @@ private fun StoreInformationStep(
         }
     }
 
-    Spacer(Modifier.height(14.dp))
+    Spacer(Modifier.height(spacing.space4))
 
     ExposedDropdownMenuBox(
         expanded = cityExpanded,
@@ -600,7 +621,7 @@ private fun StoreInformationStep(
                 state.citySearching -> DropdownMenuItem(
                     text = {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(22.dp),
+                            modifier = Modifier.size(spacing.iconMedium),
                             strokeWidth = 2.dp,
                         )
                     },
@@ -679,7 +700,7 @@ private fun StoreInformationStep(
         stringResource(R.string.setup_city_country_from_phone, state.country.name),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = spacing.space1),
     )
     SetupError(state.error)
 }
@@ -727,6 +748,7 @@ private fun OnboardingLegalText() {
 
 @Composable
 private fun SetupError(error: String?) {
+    val spacing = LocalOrderakSpacing.current
     if (error.isNullOrBlank()) return
     val text = when (error) {
         "invalid_full_name" -> stringResource(R.string.setup_full_name_error)
@@ -742,7 +764,7 @@ private fun SetupError(error: String?) {
         text,
         color = MaterialTheme.colorScheme.error,
         style = MaterialTheme.typography.bodySmall,
-        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = spacing.space2),
     )
 }
 
@@ -753,28 +775,30 @@ private fun OnboardingPasskeySheet(
     onCreate: () -> Unit,
     onSkip: () -> Unit,
 ) {
+    val layout = LocalOrderakLayout.current
+    val spacing = LocalOrderakSpacing.current
     ModalBottomSheet(onDismissRequest = onSkip) {
         Column(
-            modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(24.dp),
+            modifier = Modifier.widthIn(max = layout.contentMaxWidth).fillMaxWidth().padding(spacing.space6),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Icon(Icons.Outlined.Fingerprint, contentDescription = null, modifier = Modifier.size(44.dp))
-            Spacer(Modifier.height(14.dp))
+            Icon(Icons.Outlined.Fingerprint, contentDescription = null, modifier = Modifier.size(spacing.iconHero))
+            Spacer(Modifier.height(spacing.space4))
             Text(stringResource(R.string.passkey_invite_title), style = MaterialTheme.typography.titleLarge)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(spacing.space2))
             Text(
                 stringResource(R.string.passkey_invite_body),
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             SetupError(state.error)
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(spacing.space6))
             Button(
                 onClick = onCreate,
                 enabled = !state.passkeyCreating,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                if (state.passkeyCreating) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                if (state.passkeyCreating) CircularProgressIndicator(Modifier.size(spacing.iconMedium), strokeWidth = 2.dp)
                 else Text(stringResource(R.string.passkey_invite_create))
             }
             TextButton(onClick = onSkip, enabled = !state.passkeyCreating) {

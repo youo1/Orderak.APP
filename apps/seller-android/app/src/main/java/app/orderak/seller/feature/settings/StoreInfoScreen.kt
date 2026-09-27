@@ -52,7 +52,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import java.util.Locale
+import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 import app.orderak.seller.core.ui.FullScreenLoading
+import app.orderak.seller.core.ui.NoticeBanner
+import app.orderak.seller.core.ui.SemanticRole
+import app.orderak.seller.core.ui.backendErrorResource
 import app.orderak.seller.R
 import app.orderak.seller.data.remote.BusinessSubcategoryDto
 import app.orderak.seller.data.remote.StoreDto
@@ -87,6 +91,16 @@ class StoreInfoViewModel @Inject constructor(
     val store: StateFlow<StoreDto?> = _store.asStateFlow()
     private val _busy = MutableStateFlow(false)
     val busy: StateFlow<Boolean> = _busy.asStateFlow()
+
+    /**
+     * A stable backend code for the last refused save, or null.
+     *
+     * Rendered through `backendErrorResource`, so the seller reads the same
+     * sentence for "this slug is taken" here as anywhere else in the app, and a
+     * code nobody has mapped yet still produces a sentence rather than a blank.
+     */
+    private val _saveError = MutableStateFlow<String?>(null)
+    val saveError: StateFlow<String?> = _saveError.asStateFlow()
     private val _slugState = MutableStateFlow<String?>(null)
     val slugState: StateFlow<String?> = _slugState.asStateFlow()
     private val _businessSubcategories =
@@ -143,8 +157,16 @@ class StoreInfoViewModel @Inject constructor(
 
     fun save(req: StoreUpdateReq, onDone: () -> Unit) = viewModelScope.launch {
         _busy.value = true
+        _saveError.value = null
         val phone = sessionStore.phone.first()
-        if (phone == null) { _busy.value = false; return@launch }
+        if (phone == null) {
+            _busy.value = false
+            // Unreachable in practice — the screen needs a session — but a silent
+            // return here is the same defect in one line: a Save that reports
+            // nothing at all.
+            _saveError.value = "auth"
+            return@launch
+        }
         val secret = sessionStore.getOrCreateSecret()
         val res = api.updateStore(phone, secret, req)
         _busy.value = false
@@ -153,6 +175,16 @@ class StoreInfoViewModel @Inject constructor(
             _store.value = s
             cache(s)
             onDone()
+        } else {
+            // The refusal had nowhere to go.
+            //
+            // `ok` false with a null store left the screen exactly as it was: the
+            // spinner stopped, nothing changed on screen, and `onDone` was not
+            // called — so a seller whose slug was taken, whose field the server
+            // rejected, or who was simply offline could not tell a saved store
+            // from a refused one. The server sends a stable code, and the app
+            // already has one place that turns those into sentences.
+            _saveError.value = res.error ?: "network"
         }
     }
 
@@ -248,9 +280,11 @@ fun StoreInfoScreen(
     val context = LocalContext.current
     val store by viewModel.store.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
+    val saveError by viewModel.saveError.collectAsStateWithLifecycle()
     val slugState by viewModel.slugState.collectAsStateWithLifecycle()
     val storeUrl by viewModel.storeUrl.collectAsStateWithLifecycle()
     val storeCode by viewModel.storeCode.collectAsStateWithLifecycle()
+    val publicIdentifier by viewModel.publicIdentifier.collectAsStateWithLifecycle()
     val country by viewModel.countryIso.collectAsStateWithLifecycle()
     val businessSubcategories by viewModel.businessSubcategories.collectAsStateWithLifecycle()
     val appLanguage = LocalConfiguration.current.locales[0].language
@@ -272,6 +306,12 @@ fun StoreInfoScreen(
     var address by rememberSaveable(loaded) { mutableStateOf(store?.address.orEmpty()) }
     var logoUrl by rememberSaveable(loaded) { mutableStateOf(store?.logo_url.orEmpty()) }
     var coverUrl by rememberSaveable(loaded) { mutableStateOf(store?.cover_url.orEmpty()) }
+    // A picked image that never reached R2 used to leave no trace at all: the
+    // callback only ran its success branch, so the seller chose a logo, watched
+    // nothing appear, and could not tell a failed upload from a slow one. The
+    // store is not dirty in that case, which is why this is its own state rather
+    // than the save error above it — nothing the seller typed is at risk.
+    var uploadFailed by rememberSaveable { mutableStateOf(false) }
     var businessSubcategoryId by rememberSaveable(loaded) {
         mutableStateOf(store?.business_subcategory_id)
     }
@@ -283,10 +323,16 @@ fun StoreInfoScreen(
     }
 
     val pickLogo = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        uri?.let { viewModel.uploadImage(it, "logo") { url -> if (url != null) logoUrl = url } }
+        uri?.let {
+            uploadFailed = false
+            viewModel.uploadImage(it, "logo") { url -> if (url != null) logoUrl = url else uploadFailed = true }
+        }
     }
     val pickCover = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        uri?.let { viewModel.uploadImage(it, "cover") { url -> if (url != null) coverUrl = url } }
+        uri?.let {
+            uploadFailed = false
+            viewModel.uploadImage(it, "cover") { url -> if (url != null) coverUrl = url else uploadFailed = true }
+        }
     }
 
 
@@ -312,10 +358,13 @@ fun StoreInfoScreen(
         },
         phone = phone,
         busy = busy,
+        saveError = saveError,
+        uploadFailed = uploadFailed,
         slugState = slugState,
         storeUrl = storeUrl,
         storeCode = storeCode,
         country = country,
+        publicIdentifier = publicIdentifier,
         businessSubcategories = businessSubcategories,
         businessSubcategoryExpanded = businessSubcategoryExpanded,
         onSubcategoryExpanded = { businessSubcategoryExpanded = it },
@@ -370,10 +419,23 @@ fun StoreInfoContent(
     storeUrl: String?,
     storeCode: String?,
     country: String?,
+    /**
+     * The store's public identifier (`EG-store-A1B2C3`), or null before the server
+     * has issued one. Read by the identity card's own "Public identifier" row, which
+     * used to print the store link instead.
+     *
+     * Defaulted so the screenshot fixtures that predate the row keep compiling; the
+     * screen always passes it.
+     */
+    publicIdentifier: String? = null,
     businessSubcategories: List<BusinessSubcategoryDto>,
     businessSubcategoryExpanded: Boolean,
     onSubcategoryExpanded: (Boolean) -> Unit,
     onSave: (StoreUpdateReq, (() -> Unit)) -> Unit,
+    /** A stable backend code for the last refused save, or null. */
+    saveError: String? = null,
+    /** True when a chosen image never reached storage. */
+    uploadFailed: Boolean = false,
     onPickLogo: () -> Unit,
     onPickCover: () -> Unit,
     onCopyLink: (String) -> Unit,
@@ -398,30 +460,46 @@ fun StoreInfoContent(
         // into an empty field and have the whole form reset under them the
         // moment the network answered. Waiting here closes that window: the form
         // is composed once, with the values already in hand.
+        val spacing = LocalOrderakSpacing.current
         if (store == null) {
             FullScreenLoading(Modifier.padding(padding))
             return@Scaffold
         }
         Column(
-            Modifier.fillMaxSize().padding(padding).padding(16.dp).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            Modifier.fillMaxSize().padding(padding).padding(spacing.space4).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(spacing.space3)
         ) {
             // ---- Read-only identity block ----
             Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(Modifier.padding(spacing.space4), verticalArrangement = Arrangement.spacedBy(spacing.space1)) {
                     ReadOnlyRow(stringResource(R.string.store_info_country), country.orEmpty())
                     ReadOnlyRow(stringResource(R.string.store_info_code), storeCode.orEmpty())
+                    // The row this label names, drawn once, with the value it names.
+                    //
+                    // `store_info_public_id` is "المعرّف العام" / "Public identifier",
+                    // and the row carrying it printed the store URL — then the same URL
+                    // again on the line beneath it. Two defects in two lines: a label
+                    // that named one value and a row that showed another, and one value
+                    // drawn twice. The identifier is a different value (`EG-store-A1B2C3`,
+                    // what the storefront and the category links are addressed by), and
+                    // `StoreInfoViewModel.publicIdentifier` has exposed it all along with
+                    // nothing reading it. The published link still renders — once, under
+                    // the name the account surface already gives it — with the copy and
+                    // share controls beside it, and the pending sentence when it has not
+                    // been issued.
+                    publicIdentifier?.takeIf { it.isNotBlank() }?.let {
+                        ReadOnlyRow(stringResource(R.string.store_info_public_id), it)
+                    }
                     storeUrl?.let { url ->
-                        ReadOnlyRow(stringResource(R.string.store_info_public_id), url)
-                        Text(url, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ReadOnlyRow(stringResource(R.string.settings_link_title), url)
+                        Row(horizontalArrangement = Arrangement.spacedBy(spacing.space2)) {
                             OutlinedButton(onClick = { onCopyLink(url) }) {
                                 Icon(Icons.Outlined.ContentCopy, contentDescription = null)
-                                Text(stringResource(R.string.action_copy_url), Modifier.padding(start = 6.dp))
+                                Text(stringResource(R.string.action_copy_url), Modifier.padding(start = spacing.space1))
                             }
                             OutlinedButton(onClick = { onShareLink(url) }) {
                                 Icon(Icons.Outlined.Share, contentDescription = null)
-                                Text(stringResource(R.string.action_share_store), Modifier.padding(start = 6.dp))
+                                Text(stringResource(R.string.action_share_store), Modifier.padding(start = spacing.space1))
                             }
                         }
                     } ?: run {
@@ -431,8 +509,16 @@ fun StoreInfoContent(
                 }
             }
 
-            // ---- Editable fields ----
-            Text(stringResource(R.string.store_info_title), style = MaterialTheme.typography.titleMedium)
+            // ---- The store's own fields, and no second title ----
+            //
+            // A heading stood here printing `store_info_title`, the same string the
+            // bar above the whole screen already carries: the screen named itself
+            // twice, and the second naming told the seller nothing the bar had not
+            // (the fields label themselves, and the card above is what separates
+            // them from the read-only identity block). Every replacement was either
+            // those same words again or false of a row beneath it — the verified
+            // phone number cannot be changed here — so the block carries no heading,
+            // as the sibling pushed form route `SellerProfileScreen` already does.
             Field(draft.name, { onDraft(draft.copy(name = it.take(60))) }, R.string.store_info_name)
             OutlinedTextField(
                 value = draft.slug,
@@ -505,12 +591,33 @@ fun StoreInfoContent(
                 }
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(spacing.space2)) {
                 OutlinedButton(onClick = { onPickLogo() }) { Text(stringResource(R.string.store_info_logo)) }
                 OutlinedButton(onClick = { onPickCover() }) { Text(stringResource(R.string.store_info_cover)) }
             }
 
-            Spacer(Modifier.height(8.dp))
+            if (uploadFailed) {
+                // Beside the two buttons that caused it, not at the bottom of the
+                // form: the remedy is to pick again, and that control is here.
+                NoticeBanner(
+                    role = SemanticRole.Danger,
+                    title = stringResource(R.string.store_info_upload_failed),
+                    message = stringResource(R.string.error_unknown),
+                )
+            }
+
+            Spacer(Modifier.height(spacing.space2))
+            if (saveError != null) {
+                // Above the button, not below it: this is the answer to the press
+                // that is about to be repeated, and on a form this long the button
+                // is at the bottom of the scroll.
+                NoticeBanner(
+                    role = SemanticRole.Danger,
+                    title = stringResource(R.string.store_info_save_failed),
+                    message = stringResource(backendErrorResource(saveError)),
+                )
+                Spacer(Modifier.height(spacing.space2))
+            }
             Button(
                 onClick = {
                     onSave(

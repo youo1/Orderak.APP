@@ -104,6 +104,7 @@ trigger's final semicolon when replaying a fresh remote D1 database.
 - [057_product_discounts.sql](#057_product_discountssql)
 - [058_product_client_request_id.sql](#058_product_client_request_idsql)
 - [059_stock_movements_product_code_not_null.sql](#059_stock_movements_product_code_not_nullsql)
+- [060_retire_dead_tables.sql](#060_retire_dead_tablessql)
 
 ## 001_init.sql
 
@@ -684,3 +685,15 @@ trigger's final semicolon when replaying a fresh remote D1 database.
 - Nothing needs repairing. Every writer resolves the code through `products`, where `product_code` has been NOT NULL since 009: the seller's adjustment matches a row BY that code, both triggers select it from the joined product row, and all three of 052's backfills inner-join `products` so a row whose product was already gone was never inserted rather than inserted blank. Checked rather than assumed on 2026-09-15 - staging held zero movement rows and production had not reached 052 at all, so the rebuild is as cheap as it will ever be.
 - The one branch the plan left open is answered in the copy itself. A row that lost its code but whose product survives has it restored by COALESCE; a row with neither hits NOT NULL and aborts the migration. Aborting is the decision, not an oversight: dropping the row destroys a financial record and inventing a placeholder makes unattributable history look attributed, which is the failure 052 wrote the table to avoid.
 - Both triggers are dropped first and recreated verbatim last. They are declared ON `order_items` and ON `orders`, so DROP TABLE does not take them - but `ALTER TABLE ... RENAME TO` reparses every trigger in the schema, both name `stock_movements` in their bodies, and at that moment the old table is gone and the new one is not yet in place. The first attempt skipped them and failed with 'error in trigger trg_order_items_claim_stock: no such table: main.stock_movements'.
+
+## 060_retire_dead_tables.sql
+
+**Source:** `services/backend/migrations/060_retire_dead_tables.sql`
+
+### What it does
+
+- Retires two tables nothing reads, in the reversible form. `items` was created by 001 and `content_pages` by 003; a search for a statement naming either returns nothing across `src/`, `scripts/` and `test/`. The count a name search gives is not the check: `items` appears 62 times in `src/` and every one is the English word - a response field, a loop variable, `items: z.array(OrderItemSchema)` - which is exactly how a dead table survives a review. The check is SQL context, and 044 states `items` is dead in its own comment.
+- The rename rather than a drop is the whole point of the migration. "No code reads it" is a fact about reachability, not about emptiness: nobody has counted the rows, and there is no verified backup in this repository to restore them from. Dropping would destroy data on the strength of an inference, and applied migrations are immutable history - a drop could not be undone by editing this file afterwards. A rename clears every reader's path exactly as a drop would, makes the name say what the table is, and leaves the data one statement away: `ALTER TABLE zz_retired_items RENAME TO items`.
+- `retired_tables` is new here and exists so the follow-up that drops them has the date and the reason without reconstructing it from git history. The drop is migration 061, and it is a deliberate second step after a backup rather than an oversight.
+- `geo_city_names` and `geo_city_search` were proposed for deletion alongside these two and are deliberately not here. They are unreferenced from `src/` in the same way, but three maintenance paths still treat them as live: `scripts/import-geonames.mjs` (wired as `pnpm run geo:build-geonames-rollback`) writes both, `scripts/d1-search-index-rebuild.sql` rebuilds the search index from `geo_city_names`, and the schema-extras exporter names them. Retiring a table out from under a recovery script is how a bad night gets worse, so they go when the `city_catalog*` set is confirmed to have replaced them in production - tables, importer and rebuild script in one change.
+- The rollout marker is present and honest. `production-deploy.yml` applies migrations before deploying the Workers, so the previous release serves traffic against the new schema in between; that window is safe here because no release of the Worker names either table, which was verified against the code rather than assumed from the age of the tables.

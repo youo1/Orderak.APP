@@ -78,6 +78,18 @@ fun categoriesLoadingLight() = categories(categories = null, loading = true)
 @Composable
 fun categoriesLoadingDark() = categories(categories = null, loading = true, dark = true)
 
+/**
+ * Loading, holding the list the view model actually has.
+ *
+ * `categories` seeds as an `emptyList`, not null, so this — not the two renders
+ * above — is the state the screen opens in, and it is the one the empty message
+ * used to be drawn in, underneath the spinner.
+ */
+@PreviewTest
+@Preview(name = "Categories loading, list seeded", locale = "ar")
+@Composable
+fun categoriesLoadingSeededList() = categories(categories = emptyList(), loading = true)
+
 /** One category with no products in it, so the plural row has something to vary against. */
 @PreviewTest
 @Preview(name = "Categories content light", locale = "ar")
@@ -174,6 +186,7 @@ private fun storeInfo(
                 storeUrl = store?.store_url,
                 storeCode = store?.store_code,
                 country = store?.country_code,
+                publicIdentifier = store?.public_identifier,
                 businessSubcategories = emptyList(),
                 businessSubcategoryExpanded = false,
                 onSubcategoryExpanded = {},
@@ -230,6 +243,24 @@ fun storeInfoSlugTaken() = storeInfo(store = STORE.copy(slug = "taken-name"), sl
 @Preview(name = "Store info saving", locale = "ar")
 @Composable
 fun storeInfoSaving() = storeInfo(store = STORE, busy = true)
+
+/**
+ * The identity card with the store's public identifier in it.
+ *
+ * This is the state no other render can show, and it is the one that proves the
+ * fix: the row labelled `store_info_public_id` — "المعرّف العام", the store's
+ * public identifier — printed the store URL, and the same URL again on the line
+ * beneath it. `STORE` carries no `public_identifier`, so every render above still
+ * draws the card without that row, exactly as a store whose identifier the server
+ * has not issued yet does. Here `EG-store-A1B2C3` is present, under its own label,
+ * and the published link is printed once, under the name the account surface gives
+ * it.
+ */
+@PreviewTest
+@Preview(name = "Store info identity", locale = "ar")
+@Composable
+fun storeInfoIdentityLight() =
+    storeInfo(store = STORE.copy(public_identifier = "EG-store-A1B2C3"))
 
 // ================= seller profile =================
 
@@ -297,3 +328,44 @@ fun sellerProfileVerificationError() = sellerProfile(loaded = true, verification
 @Preview(name = "Seller profile saving", locale = "ar")
 @Composable
 fun sellerProfileSaving() = sellerProfile(loaded = true, busy = true)
+
+/**
+ * A chosen photo that never reached storage — the page's other failure.
+ *
+ * The render above calls the verification mail "the one error this page
+ * reports", and that was true only because the upload's callback ran its success
+ * branch alone: the seller picked an image, watched "تم رفع الصورة" not appear,
+ * and could not tell a failed upload from a slow one. Nothing drew this state,
+ * so it is composed here directly rather than through [sellerProfile], whose
+ * argument list the previews above share.
+ */
+@PreviewTest
+@Preview(name = "Seller profile photo upload failed", locale = "ar")
+@Composable
+fun sellerProfilePhotoUploadFailed() {
+    OrderakTheme(darkTheme = false) {
+        Surface {
+            SellerProfileContent(
+                phone = "01000000001",
+                loaded = true,
+                busy = false,
+                savedEmail = "mona@example.com",
+                emailVerificationStatus = null,
+                fullName = "منى عبد الله",
+                email = "mona@example.com",
+                birthYear = "1994",
+                profilePhotoUri = "",
+                photoUploadFailed = true,
+                onFullName = {},
+                onEmail = {},
+                onBirthYear = {},
+                onProfilePhotoUri = {},
+                onPickPhoto = {},
+                onResendVerification = {},
+                onSave = { _, _, _, _, _ -> },
+                onBack = {},
+                onReauthenticate = {},
+            )
+        }
+    }
+}

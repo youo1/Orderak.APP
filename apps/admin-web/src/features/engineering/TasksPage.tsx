@@ -1,8 +1,14 @@
 import { useState } from 'react';
 import { CanAccess, useCreate, useDelete, useList, useUpdate } from '@refinedev/core';
-import { Plus, RefreshCw, X } from 'lucide-react';
+import { Plus, RefreshCw } from 'lucide-react';
 import { DataTable } from '@/shared/ui/DataTable';
 import { ErrorState, LoadingState, PageHeader } from '@/shared/ui/Page';
+import { Button } from '@/shared/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/dialog';
+import { Field } from '@/shared/ui/field';
+import { Input } from '@/shared/ui/input';
+import { NativeSelect, Textarea } from '@/shared/ui/textarea';
+import { askConfirm } from '@/shared/ui/confirm';
 import { sectionById } from '@/app/config/sections';
 import { useAuth } from '@/features/auth/auth-context';
 
@@ -46,8 +52,8 @@ export function TasksPage() {
         title={section.label}
         description={section.description}
         actions={<>
-          {auth.can('tasks:manage') && <button className="button primary" onClick={() => setEditing({ ...emptyTask })}><Plus size={16} /> New task</button>}
-          <button className="button" onClick={() => query.refetch()}><RefreshCw size={16} /> Refresh</button>
+          {auth.can('tasks:manage') && <Button onClick={() => setEditing({ ...emptyTask })}><Plus size={16} /> New task</Button>}
+          <Button variant="outline" onClick={() => query.refetch()}><RefreshCw size={16} /> Refresh</Button>
         </>}
       />
       {query.isLoading && <LoadingState />}
@@ -81,36 +87,39 @@ function TaskForm({ task, close }: { task: Partial<Task>; close: () => void }) {
   };
 
   const remove = () => {
-    if (!isEdit || !confirm('Delete this task?')) return;
-    deleteOne.mutate({ resource: 'tasks', id: task.id! }, { onSuccess: close });
+    if (!isEdit) return;
+    askConfirm('Delete this task?', () => deleteOne.mutate({ resource: 'tasks', id: task.id! }, { onSuccess: close }), 'Delete task');
   };
 
   const set = (field: keyof typeof values) => (value: string) => setValues(current => ({ ...current, [field]: value }));
 
   return (
-    <div className="modal-backdrop" onMouseDown={event => { if (event.currentTarget === event.target) close(); }}>
-      <section className="modal" role="dialog" aria-modal="true">
-        <header>
-          <div><p className="eyebrow">{isEdit ? 'EDIT TASK' : 'NEW TASK'}</p><h2>{isEdit ? 'Edit task' : 'Add task'}</h2></div>
-          <button className="icon-button" onClick={close} aria-label="Close"><X size={18} /></button>
-        </header>
+    <Dialog open onOpenChange={open => { if (!open) close(); }}>
+      <DialogContent className="w-[min(720px,calc(100vw-32px))]">
+        <DialogHeader>
+          <p className="eyebrow">{isEdit ? 'EDIT TASK' : 'NEW TASK'}</p>
+          <DialogTitle>{isEdit ? 'Edit task' : 'Add task'}</DialogTitle>
+          <DialogDescription>Tasks are internal-only delivery records; every write goes through the audited admin API.</DialogDescription>
+        </DialogHeader>
         <div className="form-grid">
-          <label className="field wide"><span>Title *</span><input value={values.title} onChange={event => set('title')(event.target.value)} /></label>
-          <label className="field wide"><span>Description</span><textarea rows={4} value={values.description} onChange={event => set('description')(event.target.value)} /></label>
-          <label className="field"><span>Status</span><select value={values.status} onChange={event => set('status')(event.target.value)}>{STATUS_OPTIONS.map(option => <option key={option}>{option}</option>)}</select></label>
-          <label className="field"><span>Priority</span><select value={values.priority} onChange={event => set('priority')(event.target.value)}>{PRIORITY_OPTIONS.map(option => <option key={option}>{option}</option>)}</select></label>
-          <label className="field"><span>Assignee</span><input value={values.assigned_to} onChange={event => set('assigned_to')(event.target.value)} /></label>
-          <label className="field"><span>Related area</span><input value={values.related_area} onChange={event => set('related_area')(event.target.value)} /></label>
+          <Field label="Title *" className="wide"><Input value={values.title} onChange={event => set('title')(event.target.value)} /></Field>
+          <Field label="Description" className="wide"><Textarea rows={4} value={values.description} onChange={event => set('description')(event.target.value)} /></Field>
+          <Field label="Status"><NativeSelect value={values.status} onChange={event => set('status')(event.target.value)}>{STATUS_OPTIONS.map(option => <option key={option}>{option}</option>)}</NativeSelect></Field>
+          <Field label="Priority"><NativeSelect value={values.priority} onChange={event => set('priority')(event.target.value)}>{PRIORITY_OPTIONS.map(option => <option key={option}>{option}</option>)}</NativeSelect></Field>
+          <Field label="Assignee"><Input value={values.assigned_to} onChange={event => set('assigned_to')(event.target.value)} /></Field>
+          <Field label="Related area"><Input value={values.related_area} onChange={event => set('related_area')(event.target.value)} /></Field>
         </div>
         {active.mutation.error && <p className="error-text">{active.mutation.error.message}</p>}
-        <footer>
-          {isEdit && <button className="button danger" disabled={deleteOne.mutation.isPending} onClick={remove}>{deleteOne.mutation.isPending ? 'Deleting…' : 'Delete'}</button>}
-          <button className="button" onClick={close}>Cancel</button>
-          <button className="button primary" disabled={!values.title.trim() || active.mutation.isPending} onClick={submit}>
-            {active.mutation.isPending ? 'Saving…' : isEdit ? 'Save changes' : 'Add task'}
-          </button>
-        </footer>
-      </section>
-    </div>
+        <DialogFooter className="sm:justify-between">
+          {isEdit ? <Button variant="destructive" disabled={deleteOne.mutation.isPending} onClick={remove}>{deleteOne.mutation.isPending ? 'Deleting…' : 'Delete'}</Button> : <span />}
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={close}>Cancel</Button>
+            <Button disabled={!values.title.trim() || active.mutation.isPending} onClick={submit}>
+              {active.mutation.isPending ? 'Saving…' : isEdit ? 'Save changes' : 'Add task'}
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

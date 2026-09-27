@@ -71,6 +71,20 @@ export const RENDERS = {
   todayOfflineDark: { kind: "screen", contract: "today", offline: true, theme: "dark" },
   todayGreyscale: { kind: "component", note: "اليوم counters survive greyscale — colour is never the only carrier" },
   todayContentEnglish: { kind: "component", note: "the اليوم counters in English — the control for the Arabic digits" },
+  todayNothingWaitingLight: { kind: "component", note: "G2's other answer: nothing is waiting, said in words rather than left as three neutral zeros the seller has to add up" },
+  todayNothingWaitingDark: { kind: "component", note: "the same sentence in dark" },
+  // Added by the surface-by-surface redesign pass. Each one exists because a
+  // declared state or a claimed structure had no render at all — which is how it
+  // drifted in the first place: a state nobody can see is a state nobody checks.
+  customersLoadError: { kind: "screen", contract: "customers", state: "error", theme: "light" },
+  storeInfoIdentityLight: { kind: "screen", contract: "store-info", state: "content", theme: "light" },
+  orderDetailsPaymentProofAttached: { kind: "screen", contract: "order-details", state: "content", theme: "light" },
+  newOrderPhoneInvalid: { kind: "screen", contract: "new-order", state: "content", theme: "light" },
+  storeUnlimitedPlan: { kind: "component", note: "an unlimited plan draws the shared usage row, not a hand-built sentence under a string no other screen reads" },
+  assistantQuota: { kind: "component", note: "a count against a limit in Arabic, in that order — the pair swaps when it is built from two separate numbers" },
+  devicesAtDeviceLimit: { kind: "component", note: "the device allowance the contract declares as this screen's data, drawn at the ceiling" },
+  categoriesLoadingSeededList: { kind: "component", note: "loading with the seeded empty list production actually passes, which is the frame the empty message used to appear under" },
+  sellerProfilePhotoUploadFailed: { kind: "component", note: "a photo that never reached storage, named beside the control that caused it" },
 
   // ---- components, not screens ----
   // Each of these renders a shared component with a surface's copy in it. That
@@ -94,6 +108,8 @@ export const RENDERS = {
   ordersErrorDark: { kind: "screen", contract: "orders", state: "error", theme: "dark" },
   ordersFilteredToNone: { kind: "component", note: "filtered to none keeps the chips — the way out is to clear one" },
   ordersFilteredUnpaid: { kind: "component", note: "a اليوم counter's filter arrives visible, so it can be cleared" },
+  ordersBothGroupsLight: { kind: "component", note: "the split the list's own documentation always claimed: what is waiting on the seller, then what is finished — the finished rows carry the newer timestamps, which is where the old chronological order put them" },
+  ordersBothGroupsDark: { kind: "component", note: "the same split in dark" },
 
   // ---- العملاء ----
   customersLoadingLight: { kind: "screen", contract: "customers", state: "loading", theme: "light" },
@@ -116,8 +132,10 @@ export const RENDERS = {
   accountLoadingDark: { kind: "screen", contract: "account", state: "loading", theme: "dark" },
   accountContentLight: { kind: "screen", contract: "account", state: "content", theme: "light" },
   accountContentDark: { kind: "screen", contract: "account", state: "content", theme: "dark" },
-  accountFreePlan: { kind: "component", note: "aiAvailable=false omits the entry rather than showing it locked — NotBuilt carries no upgrade affordance" },
+  accountFreePlan: { kind: "component", note: "aiAvailable=false shows the LockedByPlan notice with no upgrade control, because purchaseOpen is false and billing is closed — the notice states the lock, it does not offer a plan change that cannot happen" },
+  accountFreePlanUpgradable: { kind: "component", note: "the same lock with purchaseOpen true, which is the only case where the notice carries an Upgrade — the pair is what makes 'offered only when there is somewhere to go' reviewable" },
   accountLinkPending: { kind: "component", note: "the store link before it has been issued" },
+  accountGroupsTail: { kind: "component", note: "the two groups at the bottom of the scroll, which no full-screen render reaches: the devices header renamed to the contract's own name for that group, deletion status moved into account actions, and the group's two rows at the 48dp floor" },
 
   // المتجر, once StoreContent(state) existed to render. These replace four
   // `products*` renders that called FullScreenEmpty and FullScreenLoading

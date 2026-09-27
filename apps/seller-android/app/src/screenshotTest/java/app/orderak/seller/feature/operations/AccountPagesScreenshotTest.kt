@@ -7,12 +7,15 @@ import app.orderak.seller.R
 import app.orderak.seller.core.ui.PlanUsageRow
 import app.orderak.seller.core.ui.theme.OrderakTheme
 import app.orderak.seller.data.billing.BillingState
+import app.orderak.seller.data.billing.FeatureKeys
 import app.orderak.seller.data.remote.DeletionRequestDto
 import app.orderak.seller.data.remote.DeviceDto
+import app.orderak.seller.data.remote.EntitlementDto
 import app.orderak.seller.data.remote.PasskeyDto
 import app.orderak.seller.data.remote.SupportMessageDto
 import app.orderak.seller.data.remote.SupportTicketDto
 import com.android.tools.screenshot.PreviewTest
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * The five remaining account pages, in every state their contracts declare.
@@ -301,7 +304,7 @@ private fun devices(
                 onSelectPasskey = {},
                 onRename = {},
                 onRevoke = {},
-                onRevokeDevice = {},
+                onRevokeDevice = { _, _ -> },
             )
         }
     }
@@ -352,6 +355,51 @@ fun devicesRecentAuthRequired() =
 fun devicesErrorDark() =
     devices(items = emptyList(), passkeys = emptyList(), error = "network_unavailable", dark = true)
 
+/**
+ * The plan's device allowance, drawn under the devices it counts.
+ *
+ * A counterexample rather than a state: this contract declares "device limit
+ * usage" among this screen's own data and nothing rendered it, so no existing
+ * fixture could show what the row now says — and it is the row a seller reads at
+ * the moment a second phone will not sign in. It is deliberately AT the ceiling:
+ * at the limit the shared meter carries the role, the glyph and the outline that
+ * keep it readable in greyscale, which is the part a count alone does not.
+ *
+ * Built here rather than through `devices(...)` above, which does not take the
+ * limit — adding one to it would edit an existing fixture.
+ */
+@PreviewTest
+@Preview(name = "Devices at the device limit", locale = "ar")
+@Composable
+fun devicesAtDeviceLimit() {
+    OrderakTheme {
+        Surface {
+            DevicesContent(
+                items = DEVICES,
+                passkeys = PASSKEYS,
+                busy = false,
+                error = null,
+                selectedPasskeyId = PASSKEYS.first().id,
+                canAddPasskey = true,
+                onBack = {},
+                onRetry = {},
+                onReauthenticate = {},
+                onAddPasskey = {},
+                onSelectPasskey = {},
+                onRename = {},
+                onRevoke = {},
+                onRevokeDevice = { _, _ -> },
+                deviceLimit = PlanUsageRow(
+                    key = FeatureKeys.MAX_CONCURRENT_DEVICES,
+                    label = R.string.usage_devices,
+                    used = 2,
+                    limit = 2,
+                ),
+            )
+        }
+    }
+}
+
 // ================= ai assistant =================
 
 @Composable
@@ -372,6 +420,7 @@ private fun assistant(
                 onInputChange = {},
                 onBack = {},
                 onSend = {},
+                onRetry = {},
                 onReset = {},
             )
         }
@@ -428,3 +477,47 @@ fun assistantErrorLight() = assistant(messages = emptyList(), error = "network_u
 @Composable
 fun assistantErrorDark() =
     assistant(messages = emptyList(), error = "network_unavailable", dark = true)
+
+/**
+ * The quota line, which no existing render reaches: every preview above passes
+ * `entitlements = null` through `assistant(...)`, so the one place on this screen
+ * that draws a count against a limit was never in a screenshot at all.
+ *
+ * That is the counterexample this fixture exists for. The pair used to be built
+ * from two separate `formatCount` values inside `usage_value` ("%1$s / %2$s"),
+ * and an Arabic-Indic digit is bidi class AN: without the marks
+ * `formatCountOfLimit` carries, the count and the ceiling swap in an Arabic
+ * paragraph and "٣ / ٢٠" renders as twenty of three. Rendering in Arabic is what
+ * makes the order checkable by eye.
+ *
+ * Built here rather than through `assistant(...)` above, which pins
+ * `entitlements = null` — the very thing that hid this line.
+ */
+@PreviewTest
+@Preview(name = "Assistant quota", locale = "ar")
+@Composable
+fun assistantQuota() {
+    OrderakTheme {
+        Surface {
+            AiAssistantContent(
+                messages = emptyList(),
+                entitlements = mapOf(
+                    FeatureKeys.MAX_AI_REQUESTS_PER_MONTH to EntitlementDto(
+                        key = FeatureKeys.MAX_AI_REQUESTS_PER_MONTH,
+                        mode = "limited",
+                        value = JsonPrimitive(20),
+                        used = 3,
+                    ),
+                ),
+                busy = false,
+                error = null,
+                input = "",
+                onInputChange = {},
+                onBack = {},
+                onSend = {},
+                onRetry = {},
+                onReset = {},
+            )
+        }
+    }
+}

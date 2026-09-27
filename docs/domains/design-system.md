@@ -72,6 +72,20 @@ transient D1 problem must not unstyle the app.
 `FIRST_SCHEMA_V2_ANDROID_VERSION_CODE` gates by client build, so older
 installations keep receiving a payload they can parse.
 
+Two consumers take the same revision by different routes, and only one of them
+can be declared authoritative in a stylesheet:
+
+- **Android** compiles the token set into the build and keeps the generated map
+  as its offline fallback. A published revision reaches the device only through
+  a client build that understands it, which is what the version gate is for.
+- **The admin panel** loads the revision as a live stylesheet from
+  `/api/theme.css`, by way of the edge Worker's `/theme.css`. That stylesheet is
+  unlayered and therefore outranks the flattened snapshot checked in beside the
+  app; the snapshot is imported into the `@layer orderak-fallback` cascade layer
+  so it can only ever fill gaps. Authority by stylesheet order is not authority —
+  the bundler appends the application stylesheet last, which silently inverted
+  this until `tooling/repository/verify-theme-authority.mjs` was added.
+
 When a bad revision does reach production, use the
 [design system recovery runbook](../runbooks/design-system-recovery.md), and
 `pnpm run design-system:recovery-sql` in `services/backend` to generate the

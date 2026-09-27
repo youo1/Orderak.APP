@@ -72,6 +72,16 @@
     <string name="dash_today_orders">Today\'s orders</string>
     <string name="dash_unpaid">Unpaid</string>
     <string name="dash_to_ship">To ship</string>
+    <!-- The two halves of اليوم: what is waiting on the seller, and what merely
+         happened. G2 asks the surface to answer "what needs me now" at first
+         paint, which is a claim about hierarchy — three equal counters cannot
+         make it, and neither can silence when the answer is "nothing". -->
+    <string name="dash_needs_you">Needs you now</string>
+    <string name="dash_nothing_needs_you">Nothing is waiting on you right now</string>
+    <string name="dash_nothing_needs_you_body">New orders, unpaid orders and anything ready to ship appear here.</string>
+    <string name="dash_day_so_far">Today so far</string>
+    <string name="dash_count_unknown">Not yet</string>
+    <string name="dash_open_orders">Open the orders</string>
     <string name="dash_empty_title">Your shop is ready!</string>
     <string name="dash_empty_body_v2">Add your first product from the Products tab, then share your catalog on WhatsApp</string>
     <string name="dash_share_catalog">Share catalog</string>
@@ -89,6 +99,7 @@
     <string name="product_price_label">Price (EGP)</string>
     <string name="product_stock_label">Stock</string>
     <string name="product_discount_none">None</string>
+    <string name="product_category_none">No category</string>
     <string name="product_available">Available for sale</string>
     <string name="product_save">Save product</string>
     <string name="product_delete">Delete product</string>
@@ -98,9 +109,12 @@
     <string name="share_catalog_footer">Order on WhatsApp: %1$s\n— Powered by Orderak.app</string>
 
     <string name="orders_all">All</string>
+    <string name="orders_group_waiting">Waiting on you</string>
+    <string name="orders_group_rest">Everything else</string>
     <string name="orders_empty">No orders yet — tap ➕ and log your first chat order</string>
     <string name="order_new_title">New order</string>
     <string name="order_buyer_phone">Customer phone</string>
+    <string name="order_phone_invalid">Enter the full phone number — the order can\'t be saved without it</string>
     <string name="order_buyer_name_opt">Customer name (optional)</string>
     <string name="order_note_opt">Notes (optional)</string>
     <string name="order_items_title">Items</string>
@@ -108,6 +122,7 @@
     <string name="order_total">Total:</string>
     <string name="order_save">Save order</string>
     <string name="order_stock_error">Requested quantity exceeds available stock</string>
+    <string name="order_no_products_body">No products to sell yet — go back and add your first product from the Store tab, then log the order here</string>
     <string name="order_qty_decrease">Decrease %1$s quantity</string>
     <string name="order_qty_increase">Increase %1$s quantity</string>
 
@@ -166,6 +181,11 @@
     <string name="settings_payout_saved">Payout details saved</string>
     <string name="settings_logout">Log out</string>
     <string name="settings_delete_account">Request account deletion</string>
+    <string name="settings_account_actions">Account actions</string>
+    <string name="settings_app_language">App language</string>
+    <string name="settings_store_group_title">Store and identity</string>
+    <string name="settings_support_group_title">Help and updates</string>
+    <string name="settings_devices_group_title">Devices and subscription</string>
     <!-- Backend link -->
     <string name="settings_link_title">Your catalog link</string>
     <string name="settings_slug_label">Link name (English letters)</string>
@@ -224,13 +244,13 @@
     <string name="usage_ai_requests">AI requests this month</string>
     <string name="usage_categories">Categories</string>
     <string name="usage_devices">Devices</string>
-    <string name="usage_value">%1$s / %2$s</string>
     <string name="usage_value_unlimited">%1$s / Unlimited</string>
-    <string name="products_usage_unlimited">Products (%1$s / Unlimited)</string>
     <string name="products_limit_title">Product limit reached</string>
     <string name="products_limit_body">You\'ve reached your limit of %1$s products. Upgrade to %2$s for a higher limit.</string>
     <string name="products_limit_body_over">Your plan allows %1$s products and you currently have %2$s. You can edit or delete existing products, but you must reduce the total below %1$s before adding another.</string>
     <string name="products_limit_body_max_plan">You\'ve reached your limit of %1$s products. Contact support if you need more capacity.</string>
+    <string name="devices_limit_body">Your plan allows %1$s devices and %2$s are in use. A new phone can\'t sign in until you remove a device or move to a plan with more.</string>
+    <string name="devices_limit_body_max_plan">Your plan allows %1$s devices and that\'s the highest allowance available. Remove a device to sign in on a new one, or contact support if you need more.</string>
     <string name="product_add_locked">Product limit reached. Tap to review upgrade options.</string>
     <string name="upgrade_now">Upgrade now</string>
     <string name="plan_paid1">Paid 1</string>
@@ -312,6 +332,8 @@
 
     <!-- Payment history -->
     <string name="payment_history_title">Payment history</string>
+    <string name="payment_history_none">No payment recorded on this order yet</string>
+    <string name="payment_proof_attached">Receipt image attached</string>
     <string name="payment_ref_label">Ref: %1$s</string>
     <string name="payment_verified_badge">Verified</string>
     <string name="payment_flagged_badge">Flagged</string>
@@ -325,6 +347,7 @@
     <string name="seller_profile_photo">Profile Photo</string>
     <string name="seller_profile_phone">Phone Number (Account ID)</string>
     <string name="seller_profile_photo_set">Photo uploaded</string>
+    <string name="seller_profile_photo_failed">The photo didn\'t upload — pick it again. Your current photo is unchanged.</string>
     <!-- Auth and onboarding V2 -->
     <string name="welcome_value">Manage your store with ease</string>
     <string name="welcome_subtitle">Create your store and start selling in a few simple steps.</string>
@@ -374,6 +397,7 @@
     <string name="authorized_devices_title">Authorized devices</string>
     <string name="seller_profile_resend_verification">Resend email verification</string>
     <string name="seller_profile_verification_sent">Verification email sent. It expires in 24 hours.</string>
+    <string name="seller_profile_verification_already_verified">This email is already verified, so no new link was sent.</string>
     <string name="seller_profile_verification_failed">We could not send the email. Try again later.</string>
     <string name="setup_store_link_preview">Your store link</string>
     <string name="setup_category_placeholder">Choose your business type</string>
@@ -422,6 +446,8 @@
     <string name="plans_included">Included</string>
     <string name="plans_unavailable">Plan details aren\'t available right now</string>
     <string name="plans_purchase_closed">Upgrading isn\'t open yet. This is here so you can see what each plan includes.</string>
+    <string name="plans_purchase_closed_body">Your current plan stays as it is — nothing about it changes.</string>
+    <string name="plans_current_plan_marked">%1$s (your plan)</string>
     <string name="plans_price_note">Prices are shown by Google Play in your own currency when upgrading opens.</string>
     <string name="paywall_title">Plan limit reached</string>
     <string name="paywall_limit_products">You\'ve reached your product limit</string>
@@ -437,6 +463,7 @@
     <string name="paywall_dismiss">Go back</string>
     <string name="paywall_view_plans">See plans</string>
     <string name="paywall_purchase_closed">Upgrading isn\'t open yet, so there\'s nothing to buy from here.</string>
+    <string name="paywall_purchase_closed_body">Your current plan stays as it is, and this limit stays where it is until upgrading opens.</string>
     <string name="order_refused_chip">Couldn\'t send</string>
     <string name="order_refused_title">This order couldn\'t be sent</string>
     <string name="order_refused_message">%1$s The order is saved on this phone only: it will not reach another device, and it cannot be moved along its pipeline. Remove it and record it again once that is sorted.</string>
@@ -478,4 +505,17 @@
     <string name="products_stuck_discard">Remove</string>
     <string name="products_stuck_discard_title">Remove %1$s?</string>
     <string name="products_stuck_discard_confirm">This product is saved on this phone only and your account never received it, so removing it here removes it everywhere. This cannot be undone.</string>
+    <string name="customer_save_failed">Couldn\'t save the customer. Nothing was changed — try again.</string>
+    <string name="device_revoke_title">Revoke %1$s?</string>
+    <string name="device_revoke_confirm">This device is signed out immediately and has to sign in again. Your other devices are not affected.</string>
+    <string name="ai_reset_confirm">This clears the conversation on this phone. Nothing in your store, catalogue or orders changes.</string>
+    <string name="order_mixed_currency_title">One currency per order</string>
+    <string name="order_mixed_currency_body">The products you picked are priced in different currencies, so they cannot go on one order. Remove the lines that do not match, or record them as a separate order.</string>
+    <string name="order_save_failed_title">Couldn\'t record the order</string>
+    <string name="order_save_failed_body">Nothing was saved. Your draft is still here, so try again.</string>
+    <string name="order_details_missing_title">Order not found</string>
+    <string name="order_details_missing_body">This order is not saved on this phone. It may have been removed, or it may not have arrived from your account yet — go back and refresh the orders list.</string>
+    <string name="store_info_save_failed">Couldn\'t save your store — nothing was changed</string>
+    <string name="support_reply_failed">Your reply wasn\'t sent — it is still in the box</string>
+    <string name="store_info_upload_failed">The image didn\'t upload — pick it again, or save without it</string>
 </resources>
