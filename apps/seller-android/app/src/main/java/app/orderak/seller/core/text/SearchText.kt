@@ -20,10 +20,14 @@ import java.util.Locale
  * Everything here is folding, not stemming. Two spellings of one word are made
  * equal; two different words are left different. Nothing is language-detected,
  * because a catalogue routinely holds both scripts at once — often in one name.
+ *
+ * A run of spaces, tabs, or newlines counts as a single space, and the Persian
+ * kaf and yeh fold to their Arabic counterparts.
  */
 object SearchText {
 
     private val ARABIC_DIACRITICS = Regex("[\\u064B-\\u065F\\u0670\\u06D6-\\u06ED]")
+    private val WHITESPACE_RUN = Regex("\\s+")
     private const val TATWEEL = 'ـ'
 
     /**
@@ -52,12 +56,18 @@ object SearchText {
                 // Hamza carriers.
                 'ؤ' -> builder.append('و')
                 'ئ' -> builder.append('ي')
+                // Persian kaf and yeh, which Persian and some Android keyboards type in place of the Arabic letters.
+                '\u06A9' -> builder.append('\u0643')
+                '\u06CC' -> builder.append('\u064A')
                 // A display-only stretch, never part of the word.
                 TATWEEL -> Unit
                 else -> builder.append(character)
             }
         }
-        return ARABIC_DIACRITICS.replace(builder, "").lowercase(Locale.ROOT).trim()
+        return ARABIC_DIACRITICS.replace(builder, "")
+            .lowercase(Locale.ROOT)
+            .replace(WHITESPACE_RUN, " ")
+            .trim()
     }
 
     /**
