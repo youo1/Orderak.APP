@@ -132,6 +132,6 @@ class ProductWriteRepository @Inject constructor(
 
     private suspend fun credentials(): Pair<String, String>? {
         val phone = sessionStore.phone.first() ?: return null
-        return phone to sessionStore.getOrCreateSecret()
+        return phone to sessionStore.currentSecret()
     }
 }

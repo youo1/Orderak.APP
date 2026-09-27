@@ -203,7 +203,7 @@ class SettingsViewModel @Inject constructor(
     fun requestAccountDeletion(onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
             val phone = sessionStore.phone.first().orEmpty()
-            val secret = sessionStore.getOrCreateSecret()
+            val secret = sessionStore.currentSecret()
             val response = if (phone.isNotBlank()) backendApi.requestAccountDeletion(phone, secret) else null
             onResult(response?.ok == true)
         }

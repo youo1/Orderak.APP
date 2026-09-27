@@ -11,6 +11,7 @@ import app.orderak.seller.data.session.SessionRouteMonitor
 import app.orderak.seller.data.session.SessionRouteSignal
 import app.orderak.seller.data.session.SessionRouteSignalType
 import app.orderak.seller.data.session.SessionStore
+import app.orderak.seller.data.session.appliesTo
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -150,11 +151,15 @@ class EntryRouteResolver @Inject constructor(
             return EntryDecision.Auth
         }
 
-        if (pendingSignal != null) {
-            val signaledRemote = when (pendingSignal.type) {
+        // A signal about a credential this device no longer holds is ignored,
+        // and the live status check below decides instead. resolve() still
+        // acknowledges it, so it cannot fire again.
+        val currentSignal = pendingSignal?.takeIf { it.appliesTo(secret) }
+        if (currentSignal != null) {
+            val signaledRemote = when (currentSignal.type) {
                 SessionRouteSignalType.CREDENTIAL_REJECTED -> RemoteAccountState.CredentialRejected
                 SessionRouteSignalType.ACCOUNT_RESTRICTED -> {
-                    val status = pendingSignal.accountStatus?.ifBlank { null } ?: "restricted"
+                    val status = currentSignal.accountStatus?.ifBlank { null } ?: "restricted"
                     cacheStatus(status)
                     RemoteAccountState.Restricted(status)
                 }
@@ -245,10 +250,31 @@ class EntryRouteResolver @Inject constructor(
 @HiltViewModel
 class SessionRoutingViewModel @Inject constructor(
     private val monitor: SessionRouteMonitor,
+    private val sessionStore: SessionStore,
 ) : ViewModel() {
     val signal: StateFlow<SessionRouteSignal?> = monitor.signal
 
     fun acknowledge(signalId: Long) {
         monitor.acknowledge(signalId)
+    }
+
+    /**
+     * Whether [signal] is about the credential this device holds now. One that
+     * is not — the late answer to a request sent before a sign-out or sign-in —
+     * is acknowledged here and never reroutes, so it can neither throw the seller
+     * back to Splash mid-task nor reach the resolver as a fresh rejection.
+     */
+    suspend fun shouldReroute(signal: SessionRouteSignal): Boolean {
+        val current = try {
+            sessionStore.readExistingSecret()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // Unreadable storage: let the resolver decide, as before.
+            return true
+        }
+        if (signal.appliesTo(current)) return true
+        monitor.acknowledge(signal.id)
+        return false
     }
 }

@@ -124,7 +124,7 @@ class StoreInfoViewModel @Inject constructor(
         // null as "still loading". A state nothing can leave is worse than an
         // empty form, so fall through to the cached view instead.
         val phone = sessionStore.phone.first() ?: run { _store.value = cachedStore(); return@launch }
-        val secret = sessionStore.getOrCreateSecret()
+        val secret = sessionStore.currentSecret()
         val res = api.getStore(phone, secret)
         val s = res.store
         if (res.ok && s != null) {
@@ -167,7 +167,7 @@ class StoreInfoViewModel @Inject constructor(
             _saveError.value = "auth"
             return@launch
         }
-        val secret = sessionStore.getOrCreateSecret()
+        val secret = sessionStore.currentSecret()
         val res = api.updateStore(phone, secret, req)
         _busy.value = false
         val s = res.store
@@ -191,7 +191,7 @@ class StoreInfoViewModel @Inject constructor(
     /** Pick -> upload to R2 -> return the public URL to store as logo/cover. */
     fun uploadImage(uri: Uri, kind: String, onResult: (String?) -> Unit) = viewModelScope.launch {
         val phone = sessionStore.phone.first() ?: return@launch
-        val secret = sessionStore.getOrCreateSecret()
+        val secret = sessionStore.currentSecret()
         val prepared = withContext(Dispatchers.IO) { prepareImage(uri) }
         val (bytes, mime) = prepared ?: run { onResult(null); return@launch }
         if (bytes.isEmpty()) { onResult(null); return@launch }
@@ -208,7 +208,7 @@ class StoreInfoViewModel @Inject constructor(
         _slugState.value = "loading"
         delay(450)
         val phone = sessionStore.phone.first() ?: return@launch
-        val result = api.checkSlug(phone, sessionStore.getOrCreateSecret(), slug)
+        val result = api.checkSlug(phone, sessionStore.currentSecret(), slug)
         _slugState.value = when {
             result.error != null -> "network"
             result.reserved -> "reserved"

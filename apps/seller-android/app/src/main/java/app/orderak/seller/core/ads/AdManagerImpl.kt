@@ -66,7 +66,7 @@ class AdManagerImpl @Inject constructor(
             if (!enabled) return@LaunchedEffect
             val phone = sessionStore.phone.first().orEmpty()
             if (phone.isBlank()) return@LaunchedEffect
-            val secret = sessionStore.getOrCreateSecret()
+            val secret = sessionStore.currentSecret()
             val opportunity = bannerOpportunity.incrementAndGet()
             val eligible = backendApi.listAds(phone, secret).ads.filter {
                 opportunity % it.frequency.coerceAtLeast(1) == 0L
@@ -96,7 +96,7 @@ class AdManagerImpl @Inject constructor(
                 scope.launch {
                     val phone = sessionStore.phone.first().orEmpty()
                     if (phone.isNotBlank()) withTimeoutOrNull(1_500) {
-                        backendApi.trackAd(phone, sessionStore.getOrCreateSecret(), campaign.id, "click", "android-click:${campaign.id}:${UUID.randomUUID()}")
+                        backendApi.trackAd(phone, sessionStore.currentSecret(), campaign.id, "click", "android-click:${campaign.id}:${UUID.randomUUID()}")
                     }
                     // No browser installed resolves nothing for ACTION_VIEW; an
                     // ad tap must not be able to take the app down.

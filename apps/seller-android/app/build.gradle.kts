@@ -555,6 +555,39 @@ val verifyAuthPhase1Contract by tasks.registering {
                 "sessionLogoutManager.logout()" in entryRouting,
             "A rejected credential must clear the local session (via SessionLogoutManager) before EntryRouteResolver reaches Auth."
         )
+        val navHost = mainRoot.resolve(
+            "java/app/orderak/seller/app/navigation/OrderakNavHost.kt"
+        ).readText()
+        val sessionRouteMonitor = mainRoot.resolve(
+            "java/app/orderak/seller/data/session/SessionRouteMonitor.kt"
+        ).readText()
+        requireContract(
+            // Guarantee 23, the recurring sign-out loop. A 401 is a verdict about
+            // the secret one request carried, not about whatever secret the
+            // device holds when the answer lands. The logout revocation always
+            // carries the secret being retired, so its own 401 used to survive as
+            // a pending signal and sign the *next* session straight back out.
+            // Every consumer must compare the signal's credential to the current
+            // one before acting on it.
+            "val credentialFingerprint: String" in sessionRouteMonitor &&
+                "fun SessionRouteSignal.appliesTo(currentSecret: String?)" in sessionRouteMonitor &&
+                "credentialFingerprint(sentSecret)" in backendApi &&
+                "pendingSignal?.takeIf { it.appliesTo(secret) }" in entryRouting &&
+                "sessionRoutingViewModel.shouldReroute(signal)" in navHost,
+            "Session route signals must name the credential they reject, and only a signal about the current credential may reroute or sign out."
+        )
+        val mintingCallers = mainRoot.resolve("java").walkTopDown()
+            .filter { it.isFile && it.extension == "kt" && "getOrCreateSecret()" in it.readText() }
+            .map { it.name }
+            .toSet()
+        requireContract(
+            // Only the three requests that make the server provision a secret may
+            // mint one. A background caller minting after a sign-out produced a
+            // secret the server had never seen, whose 401 later matched the
+            // session the next sign-in provisioned with that same value.
+            mintingCallers == setOf("SessionStore.kt", "AuthViewModel.kt", "ShopSetupViewModel.kt"),
+            "getOrCreateSecret() is for sign-in only; other callers must use currentSecret(). Found in: $mintingCallers"
+        )
         requireContract(
             "completePhoneAuth(" in authViewModel &&
                 "terms_accepted" !in authViewModel &&
