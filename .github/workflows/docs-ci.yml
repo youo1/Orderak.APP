@@ -248,12 +248,29 @@ jobs:
           fi
           echo "Generated documentation matches its generators."
 
+      # Pages that exist and refuse automated requests, cited by the redesign's
+      # open-source evaluation. Each was checked by hand: chanfana.com and the
+      # Egyptian statistics portal fail from CI's network or on their own
+      # certificate, and ag-grid, the Figma community plugin page and the ISO
+      # country-code page answer 403 to a non-browser client. The citations are the
+      # evidence for that document's verdicts, so the hosts are excluded rather than
+      # the links removed - and the exclusion names the reason, so the next 403 is a
+      # new entry here rather than a quietly dropped source.
+      #
+      # The list is below, in the args, and the explanation is here because inside a
+      # folded block (`args: >`) a `#` is not a comment - it is passed to the command
+      # as an argument. Written inline first, and it would have broken the check.
       - name: Link check
         uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
           args: >
             --exclude "orderak\\.app|admin\\.orderak\\.app|api\\.orderak\\.app"
             --exclude "^https?://(localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0)(:|/|$)"
+            --exclude "^https?://chanfana\\.com"
+            --exclude "^https?://www\\.ag-grid\\.com"
+            --exclude "^https?://www\\.censusinfo\\.capmas\\.gov\\.eg"
+            --exclude "^https?://www\\.figma\\.com/community/plugin"
+            --exclude "^https?://www\\.iso\\.org/iso-3166-country-codes"
             --exclude-path docs/archive
             --exclude-path '(^|/)node_modules(/|$)'
             --exclude-path '^tools/'
