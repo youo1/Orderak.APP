@@ -478,6 +478,26 @@ export const RENDERS = {
   authPasskeyInvite: { kind: "screen", contract: "auth", state: "content", theme: "light", note: "offered to an existing seller" },
   authPasskeyCreating: { kind: "screen", contract: "auth", state: "loading", theme: "light", note: "the system ceremony in flight" },
   authPasskeyDeferred: { kind: "screen", contract: "auth", state: "content", theme: "light", note: "a new seller: recorded now, ceremony after setup — must not look like a passkey exists" },
+
+  // ---- the language picker, which had no renders at all ----
+  // `component`, not `screen`, and deliberately: these render
+  // `LanguageSheetContent` with a chosen `selectedTag`, so they prove the picker and
+  // its three rows. They do not prove that AuthScreen or SettingsScreen opens it —
+  // that is `showLanguage` in the auth contract's actions, and a `component` render
+  // must not be allowed to claim it.
+  languageSheetArabic: { kind: "component", note: "العربية checked — the direction the sheet is normally read in" },
+  languageSheetEnglish: { kind: "component", note: "English checked: the control for the Latin row and the LTR layout, which the Arabic render cannot show" },
+  languageSheetFrench: { kind: "component", note: "Français checked — the longest native name, and the locale the app exercises least" },
+  languageSheetDark: { kind: "component", note: "the tick on primary over surface in the dark scheme, which is the pair most likely to lose contrast" },
+
+  // ---- the country picker, the only route to a non-default dial code ----
+  authCountryPicker: { kind: "component", note: "the full list with Egypt ticked — the list is passed in, so this is not a function of the test machine's locale" },
+  authCountryPickerSearch: { kind: "component", note: "filtered by dial code, which is the `startsWith` branch of the filter and a query a seller who knows their prefix will actually type" },
+  authCountryPickerDark: { kind: "component", note: "the list and the tick in the dark scheme" },
+  setupPasskeyInvite: { kind: "component", note: "the new seller's invite, shown over the finished store step" },
+  setupPasskeyCreating: { kind: "component", note: "the ceremony in flight: the button is disabled while it runs, which is what stops a second tap creating a second credential" },
+  setupPasskeyFailed: { kind: "component", note: "the ceremony failed and said so — this screen's own `setup_*` error pipeline, which is the reason it is not merged with the auth sheet" },
+  setupPasskeyFailedDark: { kind: "component", note: "the same failure in dark, over the surface the sheet actually uses" },
 };
 
 /** Proven screen-states may never drop below this. Raise it; never lower it. */

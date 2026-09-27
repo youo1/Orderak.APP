@@ -551,7 +551,6 @@ private fun CountryPickerSheet(
     onSelected: (Country) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val spacing = LocalOrderakSpacing.current
     var query by rememberSaveable { mutableStateOf("") }
     val configuration = LocalConfiguration.current
     // Fall back to the Compose-observable locale, not java.util.Locale.getDefault():
@@ -568,28 +567,61 @@ private fun CountryPickerSheet(
         }
     }
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = spacing.space6)) {
-            Text(stringResource(R.string.country_picker_title), style = MaterialTheme.typography.titleLarge)
-            Spacer(Modifier.height(spacing.space3))
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it.take(50) },
-                label = { Text(stringResource(R.string.country_picker_search)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            LazyColumn(Modifier.fillMaxWidth().height(420.dp)) {
-                items(countries, key = { it.iso }) { country ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onSelected(country) }
-                            .padding(vertical = spacing.space4),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text("${country.flag}  ${country.name}")
-                        Text("+${country.dialCode}${if (country.iso == selected.iso) "  ✓" else ""}")
-                    }
+        CountryPickerContent(
+            countries = countries,
+            selected = selected,
+            query = query,
+            onQueryChange = { query = it.take(50) },
+            onSelected = onSelected,
+        )
+    }
+}
+
+/**
+ * The country list, without the sheet around it.
+ *
+ * Extracted for the same reason `PasskeyInviteContent` was: `ModalBottomSheet` is not
+ * captured by the screenshot harness, so the sheet had no renderable form and therefore
+ * no baselines. It is the only way to reach a country other than the default when
+ * entering a phone number, and a wrong `dialCode` here is a seller who never receives
+ * an OTP.
+ *
+ * [countries] is a parameter rather than something this composable looks up. The sheet
+ * derives it from the device locale, which a preview cannot set — and passing it also
+ * lets a render show a filtered list without depending on what `Countries.all` returns
+ * for the machine running the test.
+ */
+@Composable
+internal fun CountryPickerContent(
+    countries: List<Country>,
+    selected: Country,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onSelected: (Country) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val spacing = LocalOrderakSpacing.current
+    Column(modifier.fillMaxWidth().padding(horizontal = spacing.space6)) {
+        Text(stringResource(R.string.country_picker_title), style = MaterialTheme.typography.titleLarge)
+        Spacer(Modifier.height(spacing.space3))
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            label = { Text(stringResource(R.string.country_picker_search)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        LazyColumn(Modifier.fillMaxWidth().height(420.dp)) {
+            items(countries, key = { it.iso }) { country ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onSelected(country) }
+                        .padding(vertical = spacing.space4),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text("${country.flag}  ${country.name}")
+                    Text("+${country.dialCode}${if (country.iso == selected.iso) "  ✓" else ""}")
                 }
             }
         }

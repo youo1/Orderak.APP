@@ -29,12 +29,14 @@ import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 /**
  * Language selection bottom sheet. System language is the first-launch
  * behavior only; every choice shown here creates an explicit app override.
+ *
+ * This composable is the sheet — its container, its corners, the dismissal. The
+ * rows are [LanguageSheetContent], which is what the screenshot tests render.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LanguageSheet(onDismiss: () -> Unit) {
     val spacing = LocalOrderakSpacing.current
-    val currentTag = AppLocales.currentTag()
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -53,29 +55,62 @@ fun LanguageSheet(onDismiss: () -> Unit) {
             bottomStart = CornerSize(spacing.space0),
         ),
     ) {
-        Column(
-            Modifier
-                .padding(horizontal = spacing.space6, vertical = spacing.space4)
-                .padding(bottom = spacing.space8),
-        ) {
-            Text(
-                text = stringResource(R.string.language_pick_title),
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.padding(bottom = spacing.space6),
-            )
+        LanguageSheetContent(
+            selectedTag = AppLocales.currentTag(),
+            onSelect = { tag ->
+                onDismiss()
+                AppLocales.set(tag)
+            },
+        )
+    }
+}
 
-            // The sheet intentionally exposes only explicit app languages.
-            AppLocales.supported.forEach { locale ->
-                LanguageRow(
-                    text = locale.nativeName,
-                    isSelected = locale.tag == currentTag,
-                    onClick = {
-                        onDismiss()
-                        AppLocales.set(locale.tag)
-                    },
-                )
-            }
+/**
+ * The picker's content, without the sheet around it.
+ *
+ * `ModalBottomSheet` is not captured by the screenshot harness: it composes into a
+ * separate window, so a preview of [LanguageSheet] renders an empty frame. That is
+ * how the three passkey baselines came to share one SHA256 — see the note in
+ * `AuthScreenshotTest`. This sheet had no baselines at all, which is the same defect
+ * with nothing to notice it by.
+ *
+ * The split also hoists the two pieces of hidden state. [selectedTag] used to be read
+ * from `AppLocales.currentTag()` deep inside the composable, and the selection used to
+ * call `AppLocales.set` directly; a render whose appearance depends on ambient global
+ * state cannot be asked to show a chosen state, and a preview cannot simulate a tap
+ * that mutates the real application locale. Both are parameters now, so the preview
+ * decides what is checked and [LanguageSheet] stays the only caller that touches
+ * `AppLocales`.
+ *
+ * The padding travels with the content rather than staying in the sheet, so the
+ * preview's pixels are the sheet's pixels.
+ */
+@Composable
+fun LanguageSheetContent(
+    selectedTag: String,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val spacing = LocalOrderakSpacing.current
+    Column(
+        modifier
+            .padding(horizontal = spacing.space6, vertical = spacing.space4)
+            .padding(bottom = spacing.space8),
+    ) {
+        Text(
+            text = stringResource(R.string.language_pick_title),
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(bottom = spacing.space6),
+        )
+
+        // The sheet intentionally exposes only explicit app languages.
+        AppLocales.supported.forEach { locale ->
+            LanguageRow(
+                text = locale.nativeName,
+                isSelected = locale.tag == selectedTag,
+                onClick = { onSelect(locale.tag) },
+            )
         }
     }
 }
