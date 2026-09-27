@@ -1,4 +1,4 @@
-import { jsonResponse } from "../../platform/http/shared";
+import { jsonResponse, parseLimitParam } from "../../platform/http/shared";
 import { auditDb, cookieValue, verifyFreshAdminAuth } from "./admin-auth";
 import { ALL_ROLES, hashPassword, keyedHash, randomToken, sha256Hex, type AdminClaims, type AdminRole } from "../identity/auth";
 import { R2CsvWriter } from "../../platform/storage/r2-csv-writer";
@@ -13,7 +13,7 @@ async function body(request: Request): Promise<Json> {
 }
 
 function page(url: URL): { limit: number; offset: number } {
-	const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") ?? 30)));
+	const limit = parseLimitParam(url.searchParams.get("limit"), 30, 100);
 	const offset = Math.max(0, Number(url.searchParams.get("offset") ?? 0));
 	return { limit, offset };
 }
@@ -450,8 +450,8 @@ async function runArchiveVerification(request: Request, env: AdminWorkerEnv, adm
 	// OLDEST — the ones most likely to have lost their key or rotted in storage.
 	// "failed: 0" over an unstated subset is the shape of a check that reassures
 	// without verifying.
-	const requested = Number(new URL(request.url).searchParams.get("limit") ?? "");
-	const limit = Number.isFinite(requested) && requested > 0 ? requested : 20;
+	const requestLimit = new URL(request.url).searchParams.get("limit");
+	const limit = parseLimitParam(requestLimit, 20, 100);
 	const total = await env.orderak_db
 		.prepare("SELECT COUNT(*) AS n FROM admin_audit_exports WHERE status='written'")
 		.first<{ n: number }>();
