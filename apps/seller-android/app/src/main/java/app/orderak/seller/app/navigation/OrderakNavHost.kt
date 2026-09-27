@@ -65,7 +65,10 @@ fun OrderakNavHost() {
                 // Credential errors from an older background seller request do
                 // not apply to the phone currently being verified.
                 sessionRoutingViewModel.acknowledge(signal.id)
-            } else {
+            } else if (sessionRoutingViewModel.shouldReroute(signal)) {
+                // Only a verdict about the credential held now reroutes. One
+                // about a retired credential is acknowledged inside
+                // shouldReroute; routing on it signed fresh sessions out.
                 navController.navigateAsRoot(SplashRoute)
             }
         }
