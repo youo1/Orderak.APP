@@ -301,6 +301,108 @@ describe("product CRUD: discounts", () => {
 	});
 });
 
+describe("product CRUD: name validation", () => {
+	/**
+	 * The name arrives from a client and is stored verbatim or not at all.
+	 *
+	 * A name that is not a string, is blank, exceeds 80 trimmed characters, or
+	 * carries a U+0000–U+001F control is refused with the existing
+	 * `name_required` problem code. It is never coerced into a string and never
+	 * truncated into something shorter than what was sent: a refused write must
+	 * leave the product, and the catalogue version that describes it, exactly as
+	 * they were.
+	 */
+	const INVALID_NAMES: Array<[string, unknown]> = [
+		["a non-string name", 12345],
+		["a blank name", "   "],
+		["an 81-character name", "n".repeat(81)],
+		["a U+0000 control", "Mango\u0000Juice"],
+		["a U+001F control", "Mango\u001FJuice"],
+	];
+
+	async function catalogVersion(r: Registered): Promise<number> {
+		const row = await env.orderak_db
+			.prepare("SELECT catalog_version FROM sellers WHERE id=?")
+			.bind(await storeIdOf(r)).first<{ catalog_version: number }>();
+		return Number(row?.catalog_version ?? 0);
+	}
+
+	async function productRow(r: Registered, code: string): Promise<Record<string, unknown> | null> {
+		return (await env.orderak_db
+			.prepare(
+				`SELECT name, slug, description, price_minor, currency, available, image_url,
+				        category_id, discount_type, discount_value, stock, stock_version
+				 FROM products WHERE store_id=? AND product_code=?`,
+			)
+			.bind(await storeIdOf(r), code).first()) as Record<string, unknown> | null;
+	}
+
+	for (const [label, name] of INVALID_NAMES) {
+		it(`refuses a create whose name is ${label} and creates nothing`, async () => {
+			const r = await registerStore();
+			const versionBefore = await catalogVersion(r);
+
+			const res = await SELF.fetch(`${BASE}/api/v1/products`, {
+				method: "POST", headers: authHeaders(r),
+				body: JSON.stringify({ name, price: { amount_minor: 600, currency: "EGP" }, available: true }),
+			});
+
+			expect(res.status).toBe(400);
+			expect(((await res.json()) as Record<string, unknown>).code).toBe("name_required");
+			expect(await productCount(r)).toBe(0);
+			expect(await catalogVersion(r)).toBe(versionBefore);
+		});
+
+		it(`refuses a replace whose name is ${label} and leaves the product untouched`, async () => {
+			const r = await registerStore();
+			const created = await seedProduct(r, { name: "Mango Juice", description: "cold" });
+			const code = String(created.product_code);
+			const rowBefore = await productRow(r, code);
+			const versionBefore = await catalogVersion(r);
+
+			const res = await SELF.fetch(`${BASE}/api/v1/products/${code}`, {
+				method: "PUT", headers: authHeaders(r),
+				body: JSON.stringify({ name, price: { amount_minor: 900, currency: "EGP" }, available: false }),
+			});
+
+			expect(res.status).toBe(400);
+			expect(((await res.json()) as Record<string, unknown>).code).toBe("name_required");
+			expect(await productRow(r, code)).toEqual(rowBefore);
+			expect(await catalogVersion(r)).toBe(versionBefore);
+			expect(await productCount(r)).toBe(1);
+		});
+	}
+
+	it("accepts an exactly 80-character name intact on create and replace", async () => {
+		const r = await registerStore();
+		const created80 = "a".repeat(80);
+		const created = await seedProduct(r, { name: created80 });
+		expect(created.name).toBe(created80);
+		expect(String(created.name)).toHaveLength(80);
+
+		const replaced80 = "b".repeat(80);
+		const res = await SELF.fetch(`${BASE}/api/v1/products/${created.product_code}`, {
+			method: "PUT", headers: authHeaders(r),
+			body: JSON.stringify({ name: replaced80, price: { amount_minor: 600, currency: "EGP" } }),
+		});
+		expect(res.status).toBe(200);
+		expect(((await res.json()) as { product: Record<string, unknown> }).product.name).toBe(replaced80);
+
+		const pulled = await SELF.fetch(`${BASE}/api/v1/products`, { headers: authHeaders(r) });
+		const body = (await pulled.json()) as { products: Record<string, unknown>[] };
+		expect(body.products[0].name).toBe(replaced80);
+	});
+
+	it("trims surrounding ordinary spaces before storing the name", async () => {
+		const r = await registerStore();
+		const product = await seedProduct(r, { name: "   Mango Juice   " });
+		expect(product.name).toBe("Mango Juice");
+		// The slug follows the name that was actually stored.
+		const plain = await seedProduct(r, { name: "Mango Juice" });
+		expect(product.slug).toBe(plain.slug);
+	});
+});
+
 describe("cross-store isolation: product CRUD", () => {
 	async function twoStores(): Promise<{ a: Registered; b: Registered; aCode: string }> {
 		const a = await registerStore();
