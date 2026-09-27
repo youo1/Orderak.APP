@@ -9,6 +9,7 @@ import app.orderak.seller.core.platform.CrashReporter
 import app.orderak.seller.core.platform.isReportableFailure
 import app.orderak.seller.core.platform.redactRoute
 import app.orderak.seller.data.session.SessionRouteMonitor
+import app.orderak.seller.data.session.credentialFingerprint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -802,6 +803,42 @@ data class BillingCatalogRes(
 }
 
 /**
+ * Publish a stable backend auth verdict from a credentialed seller request.
+ *
+ * Normal DTO decoding still owns the response; this only observes it, and never
+ * logs or forwards the credential or the raw body. Lifted out of [BackendApi] so
+ * it can be tested without an HTTP stack.
+ *
+ * The verdict is about the secret the request carried, which may no longer be
+ * the device's secret when the answer arrives — the logout revocation is the
+ * certain case, since it always carries the credential being retired. The
+ * fingerprint lets the consumer tell the two apart; see SessionRouteSignal.
+ */
+internal fun publishSessionRouteSignal(
+    monitor: SessionRouteMonitor,
+    code: Int,
+    encodedPath: String,
+    sentPhone: String?,
+    sentSecret: String?,
+    raw: String,
+) {
+    if (sentPhone.isNullOrBlank() || sentSecret.isNullOrBlank()) return
+    if (ApiRoutes.isV1(encodedPath, "account/status")) return
+    if (code != 401 && code != 403) return
+
+    val payload = runCatching { NetworkJson.decoder.parseToJsonElement(raw).jsonObject }.getOrNull() ?: return
+    val error = runCatching { payload["code"]?.jsonPrimitive?.contentOrNull }.getOrNull()
+    val sentCredential = credentialFingerprint(sentSecret)
+    when (error) {
+        "auth" -> if (code == 401) monitor.reportCredentialRejected(sentCredential)
+        "account_restricted" -> if (code == 403) {
+            val status = runCatching { payload["resource_status"]?.jsonPrimitive?.contentOrNull }.getOrNull()
+            monitor.reportRestricted(status, sentCredential)
+        }
+    }
+}
+
+/**
  * عميل HTTP بسيط للـ Worker.
  * Main-safe: all blocking work (request execution + body read + parsing input)
  * is confined to [io] internally, so callers may invoke from any dispatcher.
@@ -878,20 +915,14 @@ class BackendApi @Inject constructor(
      * it never logs or forwards credential values or raw response bodies.
      */
     private fun Response.reportSessionRouteSignal(raw: String) {
-        val sellerCredentialed = !request.header("x-orderak-phone").isNullOrBlank() &&
-            !request.header("x-orderak-secret").isNullOrBlank()
-        if (!sellerCredentialed || ApiRoutes.isV1(request.url.encodedPath, "account/status")) return
-        if (code != 401 && code != 403) return
-
-        val payload = runCatching { json.parseToJsonElement(raw).jsonObject }.getOrNull() ?: return
-        val error = runCatching { payload["code"]?.jsonPrimitive?.contentOrNull }.getOrNull()
-        when (error) {
-            "auth" -> if (code == 401) sessionRouteMonitor.reportCredentialRejected()
-            "account_restricted" -> if (code == 403) {
-                val status = runCatching { payload["resource_status"]?.jsonPrimitive?.contentOrNull }.getOrNull()
-                sessionRouteMonitor.reportRestricted(status)
-            }
-        }
+        publishSessionRouteSignal(
+            monitor = sessionRouteMonitor,
+            code = code,
+            encodedPath = request.url.encodedPath,
+            sentPhone = request.header("x-orderak-phone"),
+            sentSecret = request.header("x-orderak-secret"),
+            raw = raw,
+        )
     }
 
     /** Executes on [io]: OkHttp enqueue is async, but body.string() blocks. */
