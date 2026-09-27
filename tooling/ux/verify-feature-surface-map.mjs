@@ -176,7 +176,13 @@ out.push("**Documented seam, not built now:** when an organisation actually has 
 out.push("API access, `account` splits into `حسابي` (identity, store, plan, support) and");
 out.push("an organisation-administration surface. Naming the seam now is what stops");
 out.push("`account` becoming the settings dumping ground the migration exists to remove.");
-out.push("Until then `account` keeps its four groups and no L4 screen is built.");
+// This said "four groups". Nothing compared the sentence to the contract that states
+// six (الخطة · المتجر والهوية · الدعم · الأجهزة والاشتراك · بيانات التحصيل ·
+// إجراءات الحساب) or to the surface, which renders six — the redesign pass checked it
+// row by row. Correcting the generated document by hand was the first attempt, and it
+// lasted exactly until the next regeneration, which is what a generated file is for:
+// the source is the only place a correction sticks.
+out.push("Until then `account` keeps its six groups and no L4 screen is built.");
 out.push("");
 for (const surface of SURFACES) {
   out.push(`## Surface: ${surface}`);
