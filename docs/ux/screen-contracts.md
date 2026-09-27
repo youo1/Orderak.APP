@@ -178,7 +178,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Status | implemented |
 | Entry | orders · today |
 | Exit | OrderDetailsRoute — بعد الإنشاء، مع popUpTo · رجوع |
-| Data | product picker · customer lookup · order limit usage |
+| Data | product picker |
 | Actions | add line `changeQty` · set customer `onPhone` · submit `save` |
 
 ## Surface: store
@@ -196,7 +196,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Status | implemented |
 | Entry | MainRoute — تاب المتجر |
 | Exit | ProductEditRoute · CategoriesRoute · StoreInfoRoute · PaywallRoute — عند الحد |
-| Data | products page · product limit usage · category count |
+| Data | products page · product limit usage |
 | Actions | add product `onAdd` · edit product `onEdit` · search `SearchField` · open categories *(planned)* |
 
 ### `product-edit`
@@ -267,7 +267,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 
 ### `customers`
 
-قائمة العملاء وقيمتهم وآخر تعامل
+قائمة العملاء وأوردراتهم وقيمتهم
 
 | | |
 | --- | --- |
@@ -313,7 +313,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Entry | AuthRoute — تحقّق ناجح لبائع جديد |
 | Exit | MainRoute — اكتمل الإنشاء · AuthRoute — رجوع مع حفظ المسوّدة |
 | Data | resumable draft · business categories · city catalogue · slug availability |
-| Actions | save account step `next` · name the shop, and see whether its link is free `onNameChanged` · select city `onCitySelected` · create store `onCreate` |
+| Actions | save account step `next` · name the shop, and see whether its link is free `onNameChanged` · select city `onCitySelected` · create store `finish` |
 
 ### `restricted-account`
 
@@ -344,8 +344,8 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Status | implemented |
 | Entry | MainRoute — تاب حسابي |
 | Exit | SellerProfileRoute · StoreInfoRoute · CategoriesRoute · CatalogLanguagesRoute · SubscriptionRoute · DevicesRoute · SupportRoute · AnnouncementsRoute · AiAssistantRoute · DeletionStatusRoute |
-| Data | seller profile · plan summary · entitlement states for every entry · public slug · payout handles (InstaPay, Vodafone Cash) |
-| Actions | open group entry `onOpenStoreInfo` · save payout and slug `savePayout` · switch language `showLanguage` · purchase plan `purchase` · delete account `requestAccountDeletion` · sign out `onLogout` |
+| Data | seller profile · plan summary · entitlement states for every entry · published catalogue link (read-only) · payout handles (InstaPay, Vodafone Cash) |
+| Actions | open group entry `onOpenStoreInfo` · save payout `savePayout` · switch language `showLanguage` · purchase plan `purchase` · delete account `requestAccountDeletion` · sign out `onLogout` |
 
 ### `seller-profile`
 
