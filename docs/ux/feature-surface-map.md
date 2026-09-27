@@ -66,7 +66,7 @@ administration, not "my account".
 API access, `account` splits into `حسابي` (identity, store, plan, support) and
 an organisation-administration surface. Naming the seam now is what stops
 `account` becoming the settings dumping ground the migration exists to remove.
-Until then `account` keeps its four groups and no L4 screen is built.
+Until then `account` keeps its six groups and no L4 screen is built.
 
 ## Surface: today
 

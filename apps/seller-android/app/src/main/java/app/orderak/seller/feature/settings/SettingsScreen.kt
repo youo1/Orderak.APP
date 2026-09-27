@@ -2,41 +2,19 @@ package app.orderak.seller.feature.settings
 
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Category
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.Devices
-import androidx.compose.material.icons.outlined.Language
-import androidx.compose.material.icons.outlined.Logout
-import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.SmartToy
-import androidx.compose.material.icons.outlined.Store
-import androidx.compose.material.icons.outlined.SupportAgent
-import androidx.compose.material.icons.outlined.Campaign
-import androidx.compose.material.icons.outlined.Translate
-import androidx.compose.material.icons.outlined.Star
-import androidx.compose.material.icons.outlined.Subscriptions
-import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -49,12 +27,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -67,8 +44,6 @@ import app.orderak.seller.data.db.OrderakDatabase
 import app.orderak.seller.data.session.SessionLogoutManager
 import app.orderak.seller.data.session.SessionStore
 import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import dagger.hilt.android.qualifiers.ApplicationContext
 import app.orderak.seller.data.billing.EntitlementManager
 import app.orderak.seller.data.auth.AuthRepository
@@ -91,7 +66,7 @@ import kotlinx.coroutines.flow.collectLatest
 
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import java.util.Locale
+import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
@@ -121,8 +96,17 @@ class SettingsViewModel @Inject constructor(
 	 * was known: every paying seller opening حسابي was told they were on the free
 	 * plan until the config arrived, and the screen had no way to say "not yet".
 	 * The contract has declared a loading state for this surface all along.
+	 *
+	 * The map carried `?: "Free"` as well, so the sentence above and the behaviour
+	 * still disagreed. `EntitlementManager.config` is null until the snapshot
+	 * answers — and null again when the snapshot is cleared — so a paying seller
+	 * offline, or signed out, read "Current plan: Free" about their own money: the
+	 * same claim, in the same place, one layer down. It also made the state the
+	 * contract declares unreachable: the skeletons in `AccountContent` draw for
+	 * null, and the fallback never produced one. An answered snapshot that carries
+	 * no plan name is still "not known", which is what null means here.
 	 */
-	val planName: StateFlow<String?> = entitlementManager.config.map { it?.plan_name ?: "Free" }
+	val planName: StateFlow<String?> = entitlementManager.config.map { it?.plan_name }
 		.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
 	/**
@@ -186,10 +170,15 @@ class SettingsViewModel @Inject constructor(
 		}
 	}
 
-    fun savePayout(instapay: String, vfcash: String, slug: String, onDone: () -> Unit) {
+    fun savePayout(instapay: String, vfcash: String, onDone: () -> Unit) {
         viewModelScope.launch {
             sessionStore.savePayout(instapay.trim(), vfcash.trim())
-            if (slug.isNotBlank()) sessionStore.saveSlug(slug.trim())
+            // The slug is not written here. It is a store field, edited on the
+            // store surface, which is the only place that can check the name
+            // against the server before saving it (`StoreInfoScreen`). This call
+            // used to write a slug that had never been checked, and a taken name
+            // made the registration below fail — stopping the sync — while the
+            // snackbar reported success.
             RefreshScheduler.refreshNow(appContext)   // يبعت التحديث للباك اند فورًا
             onDone()
         }
@@ -246,7 +235,6 @@ fun SettingsScreen(
     val storeUrlSaved by viewModel.storeUrl.collectAsStateWithLifecycle()
     val instapaySaved by viewModel.instapay.collectAsStateWithLifecycle()
     val vfcashSaved by viewModel.vfcash.collectAsStateWithLifecycle()
-    val slugSaved by viewModel.slug.collectAsStateWithLifecycle()
     val catalogIdSaved by viewModel.catalogId.collectAsStateWithLifecycle()
 	val planName by viewModel.planName.collectAsStateWithLifecycle()
 	val aiAvailable by viewModel.aiAvailable.collectAsStateWithLifecycle()
@@ -256,7 +244,6 @@ fun SettingsScreen(
 
     var instapay by rememberSaveable(instapaySaved) { mutableStateOf(instapaySaved.orEmpty()) }
     var vfcash by rememberSaveable(vfcashSaved) { mutableStateOf(vfcashSaved.orEmpty()) }
-    var slug by rememberSaveable(slugSaved) { mutableStateOf(slugSaved.orEmpty()) }
     var showLanguage by rememberSaveable { mutableStateOf(value = false) }
     var confirmDeletion by rememberSaveable { mutableStateOf(false) }
     var confirmLogout by rememberSaveable { mutableStateOf(false) }
@@ -271,19 +258,14 @@ fun SettingsScreen(
 
     if (showLanguage) LanguageSheet { showLanguage = false }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.settings_title), modifier = Modifier.semantics { heading() }) },
-                actions = {
-                    IconButton(onClick = { showLanguage = true }) {
-                        Icon(Icons.Outlined.Language, contentDescription = stringResource(R.string.cd_language))
-                    }
-                }
-            )
-        }
-    ) { padding ->
+    // One bar, not two.
+    //
+    // This surface used to draw its own `Scaffold` and `TopAppBar` inside the
+    // shell's, which is two stacked bars with two titles — the shop's above the
+    // word "Settings" — and two snackbar hosts. A surface hosted in the shell
+    // draws no chrome of its own; the only thing the inner bar carried was the
+    // language switch, and that is a row in the account-actions group now.
+    Box(Modifier.fillMaxSize()) {
         AccountContent(
             state = AccountUiState(
                 planName = planName,
@@ -294,14 +276,12 @@ fun SettingsScreen(
                 purchaseOpen = purchaseOpen && activity != null,
                 storeUrl = storeUrlSaved,
             ),
-            slug = slug,
-            onSlugChange = { slug = it },
             instapay = instapay,
             onInstapayChange = { instapay = it },
             vfcash = vfcash,
             onVfcashChange = { vfcash = it },
             onSavePayout = {
-                viewModel.savePayout(instapay, vfcash, slug) {
+                viewModel.savePayout(instapay, vfcash) {
                     scope.launch { snackbarHostState.showSnackbar(payoutSaved) }
                 }
             },
@@ -318,7 +298,11 @@ fun SettingsScreen(
             onOpenDeletionStatus = onOpenDeletionStatus,
             onRequestDeletion = { confirmDeletion = true },
             onRequestLogout = { confirmLogout = true },
-            modifier = Modifier.padding(padding),
+            onOpenAppLanguage = { showLanguage = true },
+        )
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
 
@@ -360,14 +344,15 @@ fun SettingsScreen(
 
 @Composable
 internal fun SettingsSectionHeader(title: String) {
+    val spacing = LocalOrderakSpacing.current
     Text(
         text = title,
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        modifier = Modifier.padding(horizontal = spacing.space4, vertical = spacing.space1),
     )
     HorizontalDivider(
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+        modifier = Modifier.padding(horizontal = spacing.space4, vertical = spacing.space1),
         color = MaterialTheme.colorScheme.outlineVariant,
     )
 }
@@ -377,19 +362,37 @@ internal fun SettingsListItem(
     icon: ImageVector,
     label: String,
     onClick: () -> Unit,
+    /**
+     * A row whose action cannot be undone: the icon and the label carry the
+     * error colour. The words still say what it does, so the colour reinforces
+     * the meaning rather than being the only place it exists.
+     */
+    destructive: Boolean = false,
 ) {
+    val tint = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
     ListItem(
-        headlineContent = { Text(label, style = MaterialTheme.typography.bodyLarge) },
+        headlineContent = {
+            Text(
+                label,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (destructive) MaterialTheme.colorScheme.error else Color.Unspecified,
+            )
+        },
         leadingContent = {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = tint,
             )
         },
         colors = ListItemDefaults.colors(
             containerColor = MaterialTheme.colorScheme.surface,
         ),
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        // Every row is at least the 48dp floor the design system sets, whatever
+        // its label's line height happens to be.
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = LocalOrderakSpacing.current.minimumTouchTarget)
+            .clickable(onClick = onClick),
     )
 }

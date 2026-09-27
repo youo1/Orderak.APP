@@ -15,10 +15,34 @@ function apply(snapshot: Snapshot) {
   const colors = { ...snapshot.schemes[contrast][mode], ...snapshot.semantic[contrast][mode] };
   for (const [role, value] of Object.entries(colors)) document.documentElement.style.setProperty(`--md-${cssName(role)}`, value);
   document.documentElement.style.setProperty('--preview-font', snapshot.typography.family === 'cairo' ? 'Cairo, sans-serif' : `${snapshot.typography.family}, sans-serif`);
-  document.documentElement.style.setProperty('--shape-sm', `${snapshot.shapes.small}px`);
-  document.documentElement.style.setProperty('--shape-md', `${snapshot.shapes.medium}px`);
+  // Shape roles under the published names, so preview.css carries the same
+  // declarations the console does rather than a parallel short-name set.
+  //
+  // `full` is deliberately not looped: the pill radius is a constant of the
+  // system, not a knob the theme editor exposes, and the published stylesheet
+  // does not declare it either. It is supplied here so the preview's pills match
+  // what a client renders.
+  for (const [role, value] of Object.entries(snapshot.shapes)) {
+    document.documentElement.style.setProperty(`--orderak-shape-${cssName(role)}`, `${value}px`);
+  }
+  document.documentElement.style.setProperty('--orderak-shape-full', '999px');
   document.documentElement.style.setProperty('--gap', `${snapshot.spacing.tokens.space4}px`);
   document.documentElement.style.setProperty('--touch', `${snapshot.components.minimumTouchTargetDp}px`);
+  // The type scale, under the same names the published stylesheet uses.
+  //
+  // The preview is how an owner decides a revision, so it has to be rendered from
+  // the revision. It previously carried its own hand-picked sizes — 11px, 12px,
+  // 28px — which meant the preview could show type the product would never
+  // produce, and an owner could approve a scale they had never seen. Naming the
+  // properties exactly as /api/theme.css does means one set of declarations in
+  // preview.css would also be correct in the console.
+  for (const [role, token] of Object.entries(snapshot.typography.roles)) {
+    const name = cssName(role);
+    document.documentElement.style.setProperty(`--orderak-type-${name}-size`, `${token.sizeRem}rem`);
+    document.documentElement.style.setProperty(`--orderak-type-${name}-line-height`, `${token.lineHeight}rem`);
+    document.documentElement.style.setProperty(`--orderak-type-${name}-weight`, String(token.weight));
+    document.documentElement.style.setProperty(`--orderak-type-${name}-tracking`, `${token.letterSpacingEm}em`);
+  }
   render(snapshot);
 }
 

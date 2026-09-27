@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, ArrowRight, Headphones, ShieldAlert, ShoppingBag, Store } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api } from '@/shared/api/client';
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card';
 import { ErrorState, LoadingState, PageHeader } from '@/shared/ui/Page';
 
 type Metric = Record<string, number>;
@@ -21,12 +22,12 @@ export default function DashboardPage() {
       <MetricCard label="Open support" value={data.support.open} detail={`${data.support.high || 0} high priority`} icon={<Headphones />} href="/support" />
       <MetricCard label="Urgent alerts" value={urgent} detail={`${data.security.critical || 0} critical security`} icon={<ShieldAlert />} href="/system/security" danger={urgent > 0} />
     </div>
-    <div className="dashboard-grid"><section className="panel"><div className="panel-heading"><div><p className="eyebrow">OPERATIONS</p><h2>Attention queue</h2></div></div><div className="attention-list">
+    <div className="dashboard-grid"><Card><CardHeader><p className="eyebrow">OPERATIONS</p><CardTitle>Attention queue</CardTitle></CardHeader><CardContent><div className="attention-list">
       <Attention icon={<ShieldAlert />} label="Open security alerts" value={data.security.open || 0} href="/system/security" tone="danger" />
       <Attention icon={<AlertTriangle />} label="Deletion requests requiring action" value={data.deletions.actionable || 0} href="/deletions" tone="warning" />
       <Attention icon={<Headphones />} label="High-priority tickets" value={data.support.high || 0} href="/support" tone="neutral" />
-    </div></section>
-    <section className="panel"><div className="panel-heading"><div><p className="eyebrow">COMMERCIAL HEALTH</p><h2>Subscription snapshot</h2></div><Link to="/commerce/subscriptions">Open details <ArrowRight size={14} /></Link></div><dl className="snapshot"><div><dt>Active</dt><dd>{data.subscriptions.active || 0}</dd></div><div><dt>Grace</dt><dd>{data.subscriptions.grace || 0}</dd></div><div><dt>Total</dt><dd>{data.subscriptions.total || 0}</dd></div><div><dt>Admin sessions</dt><dd>{data.sessions.active || 0}</dd></div></dl></section></div>
+    </div></CardContent></Card>
+    <Card><CardHeader className="flex items-start justify-between gap-3.5 space-y-0"><div><p className="eyebrow">COMMERCIAL HEALTH</p><CardTitle>Subscription snapshot</CardTitle></div><Link to="/commerce/subscriptions">Open details <ArrowRight size={14} /></Link></CardHeader><CardContent><dl className="snapshot"><div><dt>Active</dt><dd>{data.subscriptions.active || 0}</dd></div><div><dt>Grace</dt><dd>{data.subscriptions.grace || 0}</dd></div><div><dt>Total</dt><dd>{data.subscriptions.total || 0}</dd></div><div><dt>Admin sessions</dt><dd>{data.sessions.active || 0}</dd></div></dl></CardContent></Card></div>
     <section className="truth-banner"><ShieldAlert size={20} /><div><strong>Truthful control policy is active</strong><p>Deployment hard gates remain authoritative. Display-only and planned capabilities cannot be changed from this panel.</p></div><Link to="/governance/capabilities">Review registry</Link></section>
   </>;
 }

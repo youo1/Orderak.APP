@@ -2,19 +2,17 @@ package app.orderak.seller.feature.orders
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.orderak.seller.core.read.RestartableRead
 import app.orderak.seller.data.db.OrderEntity
 import app.orderak.seller.data.orders.OrderRepository
 import app.orderak.seller.domain.OrderStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
@@ -41,33 +39,29 @@ class OrdersViewModel @Inject constructor(
      * than a flicker, because the empty state's action is to create an order —
      * and a seller who takes it has now recorded a duplicate of one they already
      * had.
-     */
-    /**
-     * True after [orders] falls back to empty because its Room `Flow` threw.
      *
-     * Rare in practice — Room rarely throws under normal operation — but
-     * un-guarded before this: an uncaught exception here failed the collector
-     * silently, and the screen was left on its loading spinner with nothing
-     * telling the seller (or a crash report) that anything had gone wrong.
+     * A thrown Room read used to be terminal here: `catch` ended the upstream, so
+     * the empty list it emitted was the last value the surface would ever see and
+     * nothing — no re-read, no sync — could replace it. See [RestartableRead].
      */
-    private val _loadError = MutableStateFlow(false)
-    val loadError: StateFlow<Boolean> = _loadError.asStateFlow()
-
-    val orders: StateFlow<List<OrderEntity>?> =
+    private val read = RestartableRead {
         combine(repo.orders, filter) { list, f ->
             // One evaluation of `now` for the whole list, so a list crossing
             // midnight mid-filter cannot include an order by one row and exclude
             // it by the next.
             val now = System.currentTimeMillis()
-            list.filter { f.matches(it, now) }
+            list.filter { f.matches(it, now) }.sortedWith(needsSellerFirst)
         }
-            .onEach { _loadError.value = false }
-            .catch { e ->
-                if (e is CancellationException) throw e
-                _loadError.value = true
-                emit(emptyList())
-            }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    }
+
+    /** True while the local read is failing, so the surface can offer a retry. */
+    val loadError: StateFlow<Boolean> = read.failed
+
+    val orders: StateFlow<List<OrderEntity>?> =
+        read.values.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** Run the local read again after it threw. */
+    fun retry() = read.retry()
 
     /**
      * Local ids of orders the server refused, so the list can mark them apart
@@ -85,3 +79,30 @@ class OrdersViewModel @Inject constructor(
         filter.value = if (status == null) OrdersFilter.All else OrdersFilter.Status(status)
     }
 }
+
+/**
+ * What is still the seller's problem first; newest first within each group.
+ *
+ * The surface has always described itself this way — `SellerSurface.Orders` says
+ * "Orders, ordered by whether they need the seller", and `OrderCard` says "the
+ * list's job is 'which of these still need me?', not 'what stage is each one at'"
+ * — while the query behind it was `ORDER BY createdAt DESC` (`Daos.kt:136`). The
+ * intent was documented and the behaviour was chronological, which is a different
+ * thing: an unpaid order from three weeks ago sat below twenty orders finished this
+ * morning, and the priority rail on each row was explaining an order the seller had
+ * to scroll to reach.
+ *
+ * The tiebreak is `createdAt` descending, so within "needs you" the oldest waiting
+ * order is *not* on top by accident — it is the most recent one, which is the one
+ * the seller was told about last and is most likely still working on. Changing that
+ * is a product decision, not a sorting detail, so it is named here rather than left
+ * to whichever comparison reads first.
+ *
+ * Written as a plain comparator rather than a Room `ORDER BY CASE` so it can be
+ * tested without a database, and so the DAO keeps returning one list rather than
+ * one list per caller's idea of priority.
+ */
+internal val needsSellerFirst: Comparator<OrderEntity> =
+    compareByDescending<OrderEntity> {
+        runCatching { OrderStatus.valueOf(it.status) }.getOrDefault(OrderStatus.NEW).needsSeller
+    }.thenByDescending { it.createdAt }

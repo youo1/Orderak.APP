@@ -1,6 +1,5 @@
 package app.orderak.seller.feature.main
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,17 +9,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.outlined.CloudOff
-import androidx.compose.material.icons.outlined.Group
-import androidx.compose.material.icons.outlined.Inventory2
-import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -28,7 +19,6 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -44,7 +34,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -56,9 +45,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
+import androidx.activity.compose.BackHandler
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import app.orderak.seller.R
 import app.orderak.seller.app.navigation.SellerSurface
 import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
@@ -85,13 +80,23 @@ import app.orderak.seller.data.billing.EntitlementSyncState
 import app.orderak.seller.core.share.shareStoreLink
 import app.orderak.seller.feature.products.shareCatalogText
 import app.orderak.seller.feature.operations.AnnouncementsDashboardIndicator
-import app.orderak.seller.core.ui.theme.LocalOrderakExtendedColors
 import kotlinx.coroutines.launch
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 
 /**
  * Main graph shell: S4 dashboard + S5 orders + S8 products + S11 customers.
- * TODO(polish): nested NavHost with saveState/restoreState per tab (Plan §3.4).
+ *
+ * The five surfaces are destinations of their own inside the shell rather than a
+ * `when` over an enum. The enum version lost every surface's `rememberSaveable`
+ * state on each tab switch — the product search query, the customer query, the
+ * list scroll position and any open dialog — because a composable that leaves the
+ * composition has nowhere to keep it. A `NavHost` keeps a `SaveableStateHolder`
+ * per destination, and the navigation below saves the state of the surface it
+ * leaves, so returning to a tab returns to what the seller had on it.
+ *
+ * The surface is still saved by name: a navigation route IS a string, so the
+ * reason the old state used `SellerSurface.Today.name` rather than an ordinal
+ * survives the change.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -141,14 +146,25 @@ fun MainScreen(
         return
     }
 
-    // Saved by name rather than index: an ordinal survives process death only
-    // until the surface list changes, and then restores the wrong screen.
-    var surfaceName by rememberSaveable { mutableStateOf(SellerSurface.Default.name) }
-    // Set by a اليوم counter, read once by the orders surface. Not saveable on
-    // purpose: a filter is a request made by one tap, and restoring it after
-    // process death would filter a list the seller never asked to filter.
+    val surfaceNav = rememberNavController()
+    val surfaceEntry by surfaceNav.currentBackStackEntryAsState()
+    val surface = surfaceFor(surfaceEntry?.destination?.route)
+
+    // Not saveable on purpose: a filter is a request made by one tap, and
+    // restoring it after process death would filter a list the seller never asked
+    // to filter.
     var requestedOrdersFilter by remember { mutableStateOf<OrdersFilter?>(null) }
-    val surface = SellerSurface.valueOf(surfaceName)
+
+    // System back inside the shell means "go home", not "leave the app".
+    //
+    // It used to mean leave: a surface is not a pushed destination, so the back
+    // stack was one entry deep and the button that every Android seller presses
+    // to go up closed the app from any surface but اليوم. On اليوم there is
+    // nothing above it, so back still leaves — which is what the platform's own
+    // convention asks for.
+    BackHandler(enabled = shellOwnsBack(surface)) {
+        surfaceNav.navigateToSurface(SellerSurface.Default)
+    }
 
     val appContext = LocalContext.current.applicationContext
     LaunchedEffect(Unit) {
@@ -169,12 +185,13 @@ fun MainScreen(
     MainShellContent(
         shopName = shopName,
         surface = surface,
-        onSurface = { surfaceName = it.name },
+        onSurface = surfaceNav::navigateToSurface,
         onNewOrder = onNewOrder,
         snackbarHostState = snackbarHostState,
     ) {
-        when (surface) {
-                SellerSurface.Today -> DashboardTab(
+        NavHost(navController = surfaceNav, startDestination = SellerSurface.Default.name) {
+            composable(SellerSurface.Today.name) {
+                DashboardTab(
                     viewModel = viewModel,
                     sellerPhone = sellerPhone,
                     storeUrl = storeUrl,
@@ -193,12 +210,14 @@ fun MainScreen(
                             TodayCounter.Unpaid -> OrdersFilter.Unpaid
                             TodayCounter.ToShip -> OrdersFilter.ToShip
                         }
-                        surfaceName = SellerSurface.Orders.name
+                        surfaceNav.navigateToSurface(SellerSurface.Orders)
                     },
                     onOpenAnnouncements = onOpenAnnouncements,
                 )
+            }
 
-                SellerSurface.Orders -> OrdersScreen(
+            composable(SellerSurface.Orders.name) {
+                OrdersScreen(
                     onOpen = onOpenOrder,
                     onNew = onNewOrder,
                     // Consumed once on arrival, then cleared: re-entering the
@@ -207,16 +226,25 @@ fun MainScreen(
                     initialFilter = requestedOrdersFilter,
                     onInitialFilterApplied = { requestedOrdersFilter = null },
                 )
-                SellerSurface.Store -> ProductsScreen(
+            }
+
+            composable(SellerSurface.Store.name) {
+                ProductsScreen(
                     onAdd = onAddProduct,
                     onEdit = onEditProduct,
                     onLimitReached = onLimitReached,
                     sellerPhone = sellerPhone,
                 )
-                SellerSurface.Customers -> CustomersScreen(onOpen = onOpenCustomer)
-                // Hosted, not reimplemented: this is the same screen the old
-                // settings route showed, now reached only as a surface.
-                SellerSurface.Account -> SettingsScreen(
+            }
+
+            composable(SellerSurface.Customers.name) {
+                CustomersScreen(onOpen = onOpenCustomer)
+            }
+
+            // Hosted, not reimplemented: this is the same screen the old
+            // settings route showed, now reached only as a surface.
+            composable(SellerSurface.Account.name) {
+                SettingsScreen(
                     onLogout = onLogout,
                     onOpenStoreInfo = onOpenStoreInfo,
                     onOpenCategories = onOpenCategories,
@@ -230,6 +258,46 @@ fun MainScreen(
                     onOpenSellerProfile = onOpenSellerProfile,
                 )
             }
+        }
+    }
+}
+
+/**
+ * The surface a route names, or اليوم for a route that names none.
+ *
+ * The fallback is not defensive padding: `currentBackStackEntryAsState()` is null
+ * for the first frame of the inner `NavHost`, and the bar has to draw something
+ * selected on that frame. Today is what the graph starts on, so the bar's first
+ * frame agrees with the graph's own answer instead of showing nothing selected.
+ */
+private fun surfaceFor(route: String?): SellerSurface =
+    SellerSurface.entries.firstOrNull { it.name == route } ?: SellerSurface.Default
+
+/** Exposed for `MainShellNavigationTest`; the shell itself calls [surfaceFor]. */
+internal fun sellerSurfaceForRoute(route: String?): SellerSurface = surfaceFor(route)
+
+/**
+ * Whether the shell, rather than the system, owns the back gesture.
+ *
+ * On any surface but the start one, back means "go home". On اليوم there is
+ * nothing above it, so back leaves the app — the platform's own convention.
+ * Extracted from the `BackHandler` so the rule is asserted rather than read.
+ */
+internal fun shellOwnsBack(surface: SellerSurface): Boolean = surface != SellerSurface.Default
+
+/**
+ * Move between surfaces the way a bottom bar is supposed to.
+ *
+ * `popUpTo(start) { saveState = true }` sends the surface being left to the
+ * `SaveableStateHolder` with its state and its view model intact, and
+ * `restoreState = true` hands them back on return. Without the pair, a tab switch
+ * discards what the seller had typed and where the seller had scrolled.
+ */
+private fun NavHostController.navigateToSurface(target: SellerSurface) {
+    navigate(target.name) {
+        popUpTo(graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
     }
 }
 
@@ -371,9 +439,10 @@ private fun DashboardTab(
 
 @Composable
 private fun PlanStatusBanners(state: EntitlementSyncState, versionMode: VersionUiMode, versionPolicy: AppVersionPolicy?) {
+    val spacing = LocalOrderakSpacing.current
     val config = state.config
     var dismissedPending by rememberSaveable(config?.pending_revision_id) { mutableStateOf(false) }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(spacing.space2)) {
         if (versionMode == VersionUiMode.WARNING || versionMode == VersionUiMode.STALE_WARNING) {
             PlanNotice(
                 text = localizedVersionMessage(versionPolicy, blocking = false)
@@ -415,6 +484,7 @@ private fun PlanStatusBanners(state: EntitlementSyncState, versionMode: VersionU
  */
 @Composable
 internal fun VersionBlockingScreen(mode: VersionUiMode, policy: AppVersionPolicy, onRetry: () -> Unit) {
+    val spacing = LocalOrderakSpacing.current
     val uriHandler = LocalUriHandler.current
     val title = when (mode) {
         VersionUiMode.MAINTENANCE -> stringResource(R.string.app_version_maintenance_title)
@@ -428,17 +498,17 @@ internal fun VersionBlockingScreen(mode: VersionUiMode, policy: AppVersionPolicy
     }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
-            Modifier.fillMaxSize().padding(32.dp),
+            Modifier.fillMaxSize().padding(spacing.space8),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(title, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center)
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(spacing.space3))
             Text(localizedVersionMessage(policy, blocking = true) ?: fallback, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(spacing.space6))
             if (mode == VersionUiMode.FORCE_UPDATE && !policy.store_url.isNullOrBlank()) {
                 Button(onClick = { runCatching { uriHandler.openUri(policy.store_url) } }) { Text(stringResource(R.string.app_version_update_action)) }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(spacing.space2))
             }
             TextButton(onClick = onRetry) { Text(stringResource(R.string.common_retry)) }
         }
@@ -476,6 +546,7 @@ private fun PlanNotice(text: String, dismissible: Boolean, onDismiss: () -> Unit
 
 @Composable
 private fun PlanUsageCard(config: BackendConfig) {
+    val spacing = LocalOrderakSpacing.current
     // Rows, order and unlimited handling all come from core/ui/PlanUsage.kt, so
     // this card and the subscription screen cannot drift apart again. It used to
     // keep its own list and its own filter, and the two screens disagreed about
@@ -484,7 +555,7 @@ private fun PlanUsageCard(config: BackendConfig) {
     if (rows.isEmpty()) return
 
     Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.fillMaxWidth().padding(spacing.space4), verticalArrangement = Arrangement.spacedBy(spacing.space3)) {
             Text(stringResource(R.string.plan_usage_title), style = MaterialTheme.typography.titleMedium)
             rows.forEach { row -> PlanUsageRowItem(row) }
         }

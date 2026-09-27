@@ -71,6 +71,12 @@ private val PAYMENT = PaymentEntity(
 private fun details(
     order: OrderWithItems?,
     payments: List<PaymentEntity>?,
+    /**
+     * False by default when there is no order, which is the loading state these
+     * renders were written for. A render that wants the "no such order" state
+     * passes `answered = true` with `order = null`.
+     */
+    answered: Boolean = order != null,
     ocr: FeatureAvailability = FeatureAvailability.Available,
     proof: ProofUiState = ProofUiState.Idle,
     refusalCode: String? = null,
@@ -80,6 +86,7 @@ private fun details(
         Surface {
             OrderDetailsContent(
                 orderWithItems = order,
+                answered = answered,
                 payments = payments,
                 countryIso = "EG",
                 proof = proof,
@@ -128,6 +135,22 @@ fun orderDetailsContentDark() = details(order = ORDER, payments = listOf(PAYMENT
 @Preview(name = "Order details no payment", locale = "ar")
 @Composable
 fun orderDetailsNoPayment() = details(order = ORDER, payments = emptyList())
+
+/**
+ * A payment that carries a receipt image.
+ *
+ * `PAYMENT` has no `proofPath`, so the mark this row draws for
+ * `payments_finance.receipt_image_attachment` hadn't been rendered by anything.
+ * It was "📎" until now, which no render could hold to a standard either: an
+ * emoji is copy, and this is an interface glyph with a meaning to announce.
+ */
+@PreviewTest
+@Preview(name = "Order details payment with receipt", locale = "ar")
+@Composable
+fun orderDetailsPaymentProofAttached() = details(
+    order = ORDER,
+    payments = listOf(PAYMENT.copy(proofPath = "proof/insta-88213.jpg")),
+)
 
 /**
  * The gate's three states, which nothing had drawn.
@@ -260,6 +283,23 @@ fun newOrderFilled() = newOrder(
 @Preview(name = "New order empty catalogue", locale = "ar")
 @Composable
 fun newOrderEmptyCatalogue() = newOrder(NewOrderUiState(), products = emptyList())
+
+/**
+ * The phone number, still incomplete.
+ *
+ * No render had a partly typed number, so the only thing that ever said this was
+ * an outline turning red — and Save, which is dead until the number is complete,
+ * said nothing at all.
+ */
+@PreviewTest
+@Preview(name = "New order incomplete phone", locale = "ar")
+@Composable
+fun newOrderPhoneInvalid() = newOrder(
+    NewOrderUiState(phone = "0100000", qty = mapOf(1L to 1)),
+    products = CATALOGUE,
+    totalMinor = 45_000,
+    currency = "EGP",
+)
 
 @PreviewTest
 @Preview(name = "New order saving", locale = "ar")

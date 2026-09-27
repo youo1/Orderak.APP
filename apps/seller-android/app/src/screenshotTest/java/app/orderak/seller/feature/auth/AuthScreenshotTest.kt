@@ -3,6 +3,7 @@ package app.orderak.seller.feature.auth
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
+import app.orderak.seller.core.phone.Countries
 import app.orderak.seller.core.phone.Country
 import app.orderak.seller.core.ui.theme.OrderakTheme
 import com.android.tools.screenshot.PreviewTest
@@ -244,16 +245,33 @@ fun authOtpExpired() = auth(
 )
 
 // ================= Passkey invite =================
+//
+// These three render the invite's CONTENT, not the screen that hosts it.
+//
+// They used to call `auth(AuthUiState.PasskeyInvite(…))`, which renders
+// `AuthScreenContent` — and in this state that composes a `ModalBottomSheet`, which
+// the screenshot harness does not capture. The three baselines were therefore
+// byte-identical: one SHA256 across all three, 15,540 bytes each, so three different
+// states shared one image and none of them could be reviewed. `PasskeyInviteContent`
+// was extracted for this, the same reason `TodayScreen` and `StoreContent` take a
+// state instead of a view model.
+
+@Composable
+private fun passkeyInvite(state: AuthUiState.PasskeyInvite, dark: Boolean = false) {
+    OrderakTheme(darkTheme = dark) {
+        Surface { PasskeyInviteContent(state = state, onCreate = {}, onSkip = {}) }
+    }
+}
 
 @PreviewTest
 @Preview(name = "Auth passkey invite", locale = "ar")
 @Composable
-fun authPasskeyInvite() = auth(AuthUiState.PasskeyInvite())
+fun authPasskeyInvite() = passkeyInvite(AuthUiState.PasskeyInvite())
 
 @PreviewTest
 @Preview(name = "Auth passkey creating", locale = "ar")
 @Composable
-fun authPasskeyCreating() = auth(AuthUiState.PasskeyInvite(isCreating = true))
+fun authPasskeyCreating() = passkeyInvite(AuthUiState.PasskeyInvite(isCreating = true))
 
 /**
  * A new seller: the choice is recorded now and the system ceremony waits until
@@ -262,7 +280,7 @@ fun authPasskeyCreating() = auth(AuthUiState.PasskeyInvite(isCreating = true))
 @PreviewTest
 @Preview(name = "Auth passkey deferred", locale = "ar")
 @Composable
-fun authPasskeyDeferred() = auth(AuthUiState.PasskeyInvite(deferredForOnboarding = true))
+fun authPasskeyDeferred() = passkeyInvite(AuthUiState.PasskeyInvite(deferredForOnboarding = true))
 
 // ---- dark variants for loading and error -------------------------------
 // The surfaces render every declared state in both themes; auth's loading and
@@ -293,3 +311,60 @@ fun authOtpWrongCodeDark() = auth(
     ),
     dark = true,
 )
+
+// ================= Country picker =================
+//
+// The last sheet in this file, and the one with the highest cost per defect. It is the
+// only way to change the country code on the phone step, and the country code is what
+// the OTP is sent to: wrong here, the code never arrives and nothing on screen says so.
+// It had no baselines because `ModalBottomSheet` is not captured — the same reason the
+// passkey sheet had three identical ones, except this one had none to be identical.
+//
+// The list is passed in rather than looked up, so the filtered render below is a real
+// filter result and not a function of the machine's locale.
+
+private val COUNTRY_LIST = Countries.all(java.util.Locale("ar"))
+
+@Composable
+private fun countryPicker(
+    countries: List<Country>,
+    selected: Country,
+    query: String = "",
+    dark: Boolean = false,
+) {
+    OrderakTheme(darkTheme = dark) {
+        Surface {
+            CountryPickerContent(
+                countries = countries,
+                selected = selected,
+                query = query,
+                onQueryChange = {},
+                onSelected = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Auth country picker", locale = "ar")
+@Composable
+fun authCountryPicker() = countryPicker(COUNTRY_LIST, EGYPT)
+
+/**
+ * Searched by dial code, not by name — the shape of query the filter's
+ * `dialCode.startsWith` branch exists for, and the one a seller is most likely to type
+ * when they already know their prefix. The tick still sits on Egypt.
+ */
+@PreviewTest
+@Preview(name = "Auth country picker search", locale = "ar")
+@Composable
+fun authCountryPickerSearch() = countryPicker(
+    countries = COUNTRY_LIST.filter { it.dialCode.startsWith("2") },
+    selected = EGYPT,
+    query = "2",
+)
+
+@PreviewTest
+@Preview(name = "Auth country picker dark", locale = "ar")
+@Composable
+fun authCountryPickerDark() = countryPicker(COUNTRY_LIST, EGYPT, dark = true)

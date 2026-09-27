@@ -39,6 +39,7 @@ const SecurityPage = lazyNamed(() => import('@/features/operations/OperationsPag
 const PlansPage = lazyNamed(() => import('@/features/commerce/PlansPage'), 'PlansPage');
 const BillingVerificationsPage = lazyNamed(() => import('@/features/commerce/BillingVerificationsPage'), 'BillingVerificationsPage');
 const ThemeBuilderPage = lazy(() => import('@/features/theme/ThemeBuilderPage'));
+const DesignSystemPage = lazy(() => import('@/features/design-system/DesignSystemPage'));
 const AuditPage = lazyNamed(() => import('@/features/system/AuditPage'), 'AuditPage');
 const TasksPage = lazyNamed(() => import('@/features/engineering/TasksPage'), 'TasksPage');
 
@@ -76,6 +77,7 @@ export default function App() {
         now that every routed page is split, and a nested one here would give
         the theme builder a different loading state to everything else. */}
     <Route path="system/theme" element={<Permission permission="theme:view"><ThemeBuilderPage /></Permission>} />
+    <Route path="system/design-system" element={<Permission permission="theme:view"><DesignSystemPage /></Permission>} />
     {/* Refine install plan: resources migrated off the generic ResourcePage
         gate themselves with Refine's <CanAccess> instead of the
         <Permission> wrapper every route below still uses — deliberate,
@@ -87,7 +89,7 @@ export default function App() {
         ResourcePage.tsx), which doesn't fit Refine's one-resource-one-array
         getList. */}
     {sections.filter(section => ['flags', 'capabilities'].includes(section.id)).map(section => <Route key={section.id} path={section.path.slice(1)} element={<Permission permission={section.permission}><ResourcePage section={section} />{section.id === 'flags' && <FlagSimulator />}</Permission>} />)}
-    {sections.filter(section => !['dashboard', 'stores', 'support', 'deletions', 'runtime', 'jobs', 'security', 'admins', 'plans', 'theme', 'billing-verifications', 'audit', 'tasks', 'flags', 'capabilities'].includes(section.id)).map(section => <Route key={section.id} path={section.path.slice(1)} element={<RefineResourcePage section={section} />} />)}
+    {sections.filter(section => !['dashboard', 'stores', 'support', 'deletions', 'runtime', 'jobs', 'security', 'admins', 'plans', 'theme', 'design-system', 'billing-verifications', 'audit', 'tasks', 'flags', 'capabilities'].includes(section.id)).map(section => <Route key={section.id} path={section.path.slice(1)} element={<RefineResourcePage section={section} />} />)}
     <Route path="*" element={<Navigate to="/" replace />} />
   </Route></Routes>;
 }

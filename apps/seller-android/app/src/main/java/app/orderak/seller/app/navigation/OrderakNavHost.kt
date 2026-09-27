@@ -201,6 +201,12 @@ fun OrderakNavHost() {
             DevicesScreen(
                 onBack = { navController.popBackStack() },
                 onReauthenticate = { navController.navigateAsRoot(AuthRoute) },
+                // The paywall's declared entry, "devices", which had no path to
+                // it: the devices screen counts the allowance an at-limit seller
+                // spends, and until this edge existed neither `screen-contracts`
+                // nor the screen manifest described anything the app could do.
+                // The key is the screen's own, `max_concurrent_devices`.
+                onLimitReached = { key: String -> navController.navigate(PaywallRoute(key)) },
             )
         }
         composable<DeletionStatusRoute> { DeletionStatusScreen(onBack = { navController.popBackStack() }) }

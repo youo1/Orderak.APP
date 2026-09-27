@@ -55,7 +55,7 @@ private fun customers(
 ) {
     OrderakTheme(darkTheme = dark) {
         Surface {
-            CustomersContent(state = state, query = query, onQueryChange = {}, onOpen = {})
+            CustomersContent(state = state, query = query, onQueryChange = {}, onOpen = {}, onRetry = {})
         }
     }
 }
@@ -122,3 +122,18 @@ fun customersErrorDark() = customers(
 @Preview(name = "Customers search empty", locale = "ar")
 @Composable
 fun customersSearchEmpty() = customers(CustomersUiState(customers = CUSTOMERS), query = "سلمى")
+
+// ---- the declared error state, which nothing above renders -------------
+// `loadError` is the only thing that reaches the surface's error state, and it
+// is the one state the contract declares with no reference PNG of its own: the
+// two `customersError*` renders above show a total the list refuses to add up,
+// which is a content state. So the state's own claim — "This is the failure
+// state, so it is the one that does carry an action: the read can be run again,
+// and before this it could not" — has never been reviewable. `customers` is
+// null here as well, because a failed read and a read in flight are different
+// facts and the surface has to tell them apart.
+
+@PreviewTest
+@Preview(name = "Customers load error", locale = "ar")
+@Composable
+fun customersLoadError() = customers(CustomersUiState(customers = null, loadError = true))

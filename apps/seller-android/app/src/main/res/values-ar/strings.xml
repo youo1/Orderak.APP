@@ -76,6 +76,12 @@
     <string name="dash_today_orders">أوردرات النهاردة</string>
     <string name="dash_unpaid">لسه مدفعوش</string>
     <string name="dash_to_ship">جاهز للشحن</string>
+    <string name="dash_needs_you">محتاجك دلوقتي</string>
+    <string name="dash_nothing_needs_you">مفيش حاجة مستنياك دلوقتي</string>
+    <string name="dash_nothing_needs_you_body">الأوردرات الجديدة، واللي لسه مدفعوش، وأي حاجة جاهزة للشحن هتظهر هنا.</string>
+    <string name="dash_day_so_far">النهاردة لحد دلوقتي</string>
+    <string name="dash_count_unknown">لسه</string>
+    <string name="dash_open_orders">افتح الطلبات</string>
     <string name="dash_empty_title">متجرك جاهز!</string>
     <string name="dash_empty_body_v2">ضيف أول منتج من تاب المنتجات وبعدين شارك الكتالوج على واتساب</string>
     <string name="dash_share_catalog">شارك الكتالوج</string>
@@ -95,6 +101,7 @@
     <string name="product_price_label">السعر (ج.م)</string>
     <string name="product_stock_label">المخزون</string>
     <string name="product_discount_none">بدون خصم</string>
+    <string name="product_category_none">من غير تصنيف</string>
     <string name="product_available">متاح للبيع</string>
     <string name="product_save">احفظ المنتج</string>
     <string name="product_delete">امسح المنتج</string>
@@ -106,9 +113,12 @@
 
     <!-- S5/S7 Orders -->
     <string name="orders_all">الكل</string>
+    <string name="orders_group_waiting">مستنيين منك</string>
+    <string name="orders_group_rest">الباقي</string>
     <string name="orders_empty">لسه مفيش أوردرات — دوس ➕ وسجّل أول أوردر من الشات</string>
     <string name="order_new_title">أوردر جديد</string>
     <string name="order_buyer_phone">رقم موبايل العميل</string>
+    <string name="order_phone_invalid">اكتب رقم الموبايل كامل — مش هينفع تسجّل الطلب من غيره</string>
     <string name="order_buyer_name_opt">اسم العميل (اختياري)</string>
     <string name="order_note_opt">ملاحظات (اختياري)</string>
     <string name="order_items_title">المنتجات</string>
@@ -116,6 +126,7 @@
     <string name="order_total">الإجمالي:</string>
     <string name="order_save">سجّل الأوردر</string>
     <string name="order_stock_error">الكمية المطلوبة أكبر من المخزون المتاح</string>
+    <string name="order_no_products_body">لسه مفيش منتجات تتباع. ارجع للطلبات، افتح تاب المتجر، وضيف أول منتج — وبعدها ارجع سجّل الطلب من هنا.</string>
     <string name="order_qty_decrease">تقليل كمية %1$s</string>
     <string name="order_qty_increase">زيادة كمية %1$s</string>
 
@@ -184,6 +195,11 @@
     <string name="settings_payout_saved">تم حفظ بيانات التحصيل</string>
     <string name="settings_logout">تسجيل خروج</string>
     <string name="settings_delete_account">طلب حذف الحساب</string>
+    <string name="settings_account_actions">إجراءات الحساب</string>
+    <string name="settings_app_language">لغة التطبيق</string>
+    <string name="settings_store_group_title">المتجر والهوية</string>
+    <string name="settings_support_group_title">المساعدة والتحديثات</string>
+    <string name="settings_devices_group_title">الأجهزة والاشتراك</string>
     <!-- Backend link -->
     <string name="settings_link_title">لينك الكتالوج بتاعك</string>
     <string name="settings_slug_label">اسم اللينك (حروف إنجليزية)</string>
@@ -246,13 +262,13 @@
     <string name="usage_ai_requests">طلبات الذكاء الاصطناعي هذا الشهر</string>
     <string name="usage_categories">الفئات</string>
     <string name="usage_devices">الأجهزة</string>
-    <string name="usage_value">%1$s / %2$s</string>
     <string name="usage_value_unlimited">%1$s / غير محدود</string>
-    <string name="products_usage_unlimited">المنتجات (%1$s / غير محدود)</string>
     <string name="products_limit_title">تم بلوغ حد المنتجات</string>
     <string name="products_limit_body">لقد وصلت إلى حد %1$s منتجًا. قم بالترقية إلى %2$s للحصول على حد أعلى.</string>
     <string name="products_limit_body_over">تسمح خطتك بـ %1$s منتجًا ولديك حاليًا %2$s. يمكنك تعديل المنتجات الحالية أو حذفها، ولكن يجب خفض العدد إلى أقل من %1$s قبل إضافة منتج آخر.</string>
     <string name="products_limit_body_max_plan">لقد وصلت إلى حد %1$s منتجًا. تواصل مع الدعم إذا كنت تحتاج إلى سعة أكبر.</string>
+    <string name="devices_limit_body">باقتك بتسمح بـ %1$s أجهزة، وانت مستخدم %2$s منهم. مش هتقدر تدخل من موبايل جديد غير لما تشيل جهاز أو ترفّع الباقة.</string>
+    <string name="devices_limit_body_max_plan">باقتك بتسمح بـ %1$s أجهزة، ودي أعلى باقة عندنا. شيل جهاز عشان تدخل من موبايل جديد، أو كلّم الدعم لو محتاج أكتر.</string>
     <string name="product_add_locked">تم بلوغ حد المنتجات. اضغط لمراجعة خيارات الترقية.</string>
     <string name="upgrade_now">الترقية الآن</string>
     <string name="plan_paid1">المدفوعة 1</string>
@@ -329,6 +345,8 @@
 
     <!-- Payment history -->
     <string name="payment_history_title">سجل الدفع</string>
+    <string name="payment_history_none">لسه مفيش دفعة متسجّلة على الطلب ده</string>
+    <string name="payment_proof_attached">صورة إيصال مرفوعة مع الدفعة</string>
     <string name="payment_ref_label">مرجع: %1$s</string>
     <string name="payment_verified_badge">تم التحقق</string>
     <string name="payment_flagged_badge">معلّم</string>
@@ -342,6 +360,7 @@
     <string name="seller_profile_photo">الصورة الشخصية</string>
     <string name="seller_profile_phone">رقم الهاتف (معرف الحساب)</string>
     <string name="seller_profile_photo_set">تم رفع الصورة</string>
+    <string name="seller_profile_photo_failed">الصورة ماترفعتش — اختارها تاني. صورتك الحالية زي ما هي.</string>
 
     <!-- Deletion status expanded -->
     <string name="deletion_status_label">الحالة: %1$s</string>
@@ -398,6 +417,7 @@
     <string name="authorized_devices_title">الأجهزة المصرح بها</string>
     <string name="seller_profile_resend_verification">إعادة إرسال تحقق البريد</string>
     <string name="seller_profile_verification_sent">أُرسلت رسالة التحقق، وتنتهي صلاحيتها خلال 24 ساعة.</string>
+    <string name="seller_profile_verification_already_verified">بريدك متأكد منه بالفعل، فمبعتنالكش لينك جديد.</string>
     <string name="seller_profile_verification_failed">تعذر إرسال الرسالة. حاول لاحقًا.</string>
     <string name="setup_store_link_preview">رابط متجرك</string>
     <string name="setup_category_placeholder">اختر نوع نشاطك</string>
@@ -446,6 +466,8 @@
     <string name="plans_included">متاح</string>
     <string name="plans_unavailable">تفاصيل الباقات مش متاحة دلوقتي</string>
     <string name="plans_purchase_closed">الترقية لسه مش مفتوحة. الصفحة دي عشان تشوف كل باقة فيها إيه.</string>
+    <string name="plans_purchase_closed_body">باقتك الحالية زي ما هي — مفيش حاجة هتتغير.</string>
+    <string name="plans_current_plan_marked">%1$s (خطتك)</string>
     <string name="plans_price_note">الأسعار هتظهر من Google Play بعملتك لما الترقية تفتح.</string>
     <string name="paywall_title">وصلت لحد الباقة</string>
     <string name="paywall_limit_products">وصلت لأقصى عدد منتجات في باقتك</string>
@@ -461,6 +483,7 @@
     <string name="paywall_dismiss">رجوع</string>
     <string name="paywall_view_plans">شوف الباقات</string>
     <string name="paywall_purchase_closed">الترقية لسه مش مفتوحة، فمفيش حاجة تتشتري من هنا.</string>
+    <string name="paywall_purchase_closed_body">باقتك الحالية زي ما هي، والحد ده هيفضل زي ما هو لحد ما الترقية تفتح.</string>
     <string name="order_refused_chip">ما اتبعتش</string>
     <string name="order_refused_title">الأوردر ده ما اتبعتش</string>
     <string name="order_refused_message">%1$s الأوردر متسجل على الموبايل ده بس: مش هيوصل جهاز تاني، ومش هتقدر تحرّكه في مراحله. امسحه وسجّله تاني بعد ما تظبط المشكلة.</string>
@@ -505,4 +528,17 @@
     <string name="products_stuck_discard">امسح</string>
     <string name="products_stuck_discard_title">تمسح %1$s؟</string>
     <string name="products_stuck_discard_confirm">المنتج ده متسجل على الموبايل ده بس وحسابك ما استلمهوش، يعني لو مسحته من هنا هيتمسح خالص. مفيش رجوع.</string>
+    <string name="customer_save_failed">مقدرناش نحفظ بيانات العميل. مفيش حاجة اتغيرت — جرّب تاني.</string>
+    <string name="device_revoke_title">تسحب صلاحية %1$s؟</string>
+    <string name="device_revoke_confirm">الجهاز ده هيتسجّل خروجه فورًا وهيلزمه يسجّل دخول تاني. باقي أجهزتك مش هتتأثر.</string>
+    <string name="ai_reset_confirm">ده هيمسح المحادثة على الموبايل ده بس. مفيش حاجة في متجرك أو منتجاتك أو طلباتك هتتغير.</string>
+    <string name="order_mixed_currency_title">عملة واحدة لكل طلب</string>
+    <string name="order_mixed_currency_body">المنتجات اللي اخترتها بأسعار بعملات مختلفة، فمينفعش يبقوا في طلب واحد. شيل السطور اللي مش متوافقة، أو سجّلهم في طلب منفصل.</string>
+    <string name="order_save_failed_title">مقدرناش نسجّل الأوردر</string>
+    <string name="order_save_failed_body">مفيش حاجة اتحفظت. المسودة لسه موجودة زي ما هي، فجرّب تاني.</string>
+    <string name="order_details_missing_title">الطلب مش موجود</string>
+    <string name="order_details_missing_body">الطلب ده مش متسجّل على الموبايل. ممكن يكون اتمسح، أو لسه ما وصلش من حسابك — ارجع وحدّث قايمة الطلبات.</string>
+    <string name="store_info_save_failed">مقدرناش نحفظ بيانات المتجر — مفيش حاجة اتغيرت</string>
+    <string name="support_reply_failed">ردّك ماتبعتش — لسه موجود في الخانة</string>
+    <string name="store_info_upload_failed">الصورة ماترفعتش — اختارها تاني، أو احفظ من غيرها</string>
 </resources>

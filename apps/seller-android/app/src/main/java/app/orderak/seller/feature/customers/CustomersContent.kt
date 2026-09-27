@@ -42,6 +42,7 @@ fun CustomersContent(
     query: String,
     onQueryChange: (String) -> Unit,
     onOpen: (String) -> Unit,
+    onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val spacing = LocalOrderakSpacing.current
@@ -56,8 +57,14 @@ fun CustomersContent(
     // not handed something to search through nothing with.
     if (state.loadError) {
         // The one case `list == null` cannot distinguish on its own: a Room
-        // read that actually threw, rather than one still in flight.
-        FullScreenError(message = stringResource(R.string.error_unknown), modifier = modifier)
+        // read that actually threw, rather than one still in flight. This is the
+        // failure state, so it is the one that does carry an action: the read can
+        // be run again, and before this it could not.
+        FullScreenError(
+            message = stringResource(R.string.error_unknown),
+            onRetry = onRetry,
+            modifier = modifier,
+        )
         return
     }
     if (list == null) {

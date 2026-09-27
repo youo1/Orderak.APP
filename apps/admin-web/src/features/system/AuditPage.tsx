@@ -3,6 +3,7 @@ import { CanAccess, useList } from '@refinedev/core';
 import { RefreshCw } from 'lucide-react';
 import { DataTable } from '@/shared/ui/DataTable';
 import { DetailPanel, ErrorState, LoadingState, PageHeader } from '@/shared/ui/Page';
+import { Button } from '@/shared/ui/button';
 import { sectionById } from '@/app/config/sections';
 
 const section = sectionById.audit;
@@ -30,7 +31,7 @@ export function AuditPage() {
       <PageHeader
         title={section.label}
         description={section.description}
-        actions={<button className="button" onClick={() => query.refetch()}><RefreshCw size={16} /> Refresh</button>}
+        actions={<Button variant="outline" onClick={() => query.refetch()}><RefreshCw size={16} /> Refresh</Button>}
       />
       {query.isLoading && <LoadingState />}
       {query.error && <ErrorState error={query.error} retry={() => query.refetch()} />}

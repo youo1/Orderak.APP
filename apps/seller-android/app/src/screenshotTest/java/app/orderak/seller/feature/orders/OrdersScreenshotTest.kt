@@ -48,6 +48,23 @@ private val ORDERS = listOf(
     order(4, "هدى مصطفى", OrderStatus.SHIPPED, 64_000),
 )
 
+/**
+ * The list with both sides of the split in it.
+ *
+ * `ORDERS` above is entirely orders that still need the seller, so it can only ever
+ * show one heading. The list now separates what is waiting on the seller from what
+ * is finished — and that separation is the change, so a fixture with one group
+ * cannot review it. The finished rows carry the *newer* timestamps deliberately:
+ * under the old `ORDER BY createdAt DESC` they would have been at the top, which is
+ * the behaviour this replaced.
+ */
+private val MIXED = listOf(
+    order(1, "منى عبد الله", OrderStatus.NEW, 45_000),
+    order(5, "سارة الشناوي", OrderStatus.DONE, 32_000, createdAt = 1_757_900_000_000),
+    order(2, "أحمد يسري", OrderStatus.PAID, 87_500),
+    order(6, "محمود العزب", OrderStatus.CANCELLED, 215_000, createdAt = 1_757_950_000_000),
+)
+
 @Composable
 private fun orders(
     state: OrdersUiState,
@@ -55,7 +72,7 @@ private fun orders(
 ) {
     OrderakTheme(darkTheme = dark) {
         Surface {
-            OrdersContent(state = state, onOpen = {}, onNew = {}, onFilter = {})
+            OrdersContent(state = state, onOpen = {}, onNew = {}, onFilter = {}, onRetry = {})
         }
     }
 }
@@ -112,6 +129,18 @@ fun ordersErrorLight() = orders(OrdersUiState(orders = ORDERS, refusedPushes = s
 @Preview(name = "Orders error dark", locale = "ar")
 @Composable
 fun ordersErrorDark() = orders(OrdersUiState(orders = ORDERS, refusedPushes = setOf(3L)), dark = true)
+
+// ---- both groups, in the order the seller now gets ---------------------
+
+@PreviewTest
+@Preview(name = "Orders both groups light", locale = "ar")
+@Composable
+fun ordersBothGroupsLight() = orders(OrdersUiState(orders = MIXED))
+
+@PreviewTest
+@Preview(name = "Orders both groups dark", locale = "ar")
+@Composable
+fun ordersBothGroupsDark() = orders(OrdersUiState(orders = MIXED), dark = true)
 
 // ---- filtered to none is not empty ------------------------------------
 // The chips stay, because the way out is to clear one.

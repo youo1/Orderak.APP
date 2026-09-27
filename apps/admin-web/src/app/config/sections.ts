@@ -1,7 +1,7 @@
 import {
   BadgeDollarSign, BookOpenText, Boxes, BriefcaseBusiness, Bug, CircleGauge, ClipboardCheck,
   CreditCard, FileClock, FileText, Flag, GalleryVerticalEnd, Globe2, HardDrive, Headphones,
-  Image, Inbox, Languages, LayoutDashboard, ListChecks, Mail, Megaphone, MessageSquareText, MonitorSmartphone, PackageCheck, Paintbrush,
+  Image, Inbox, Languages, Layers, LayoutDashboard, ListChecks, Mail, Megaphone, MessageSquareText, MonitorSmartphone, PackageCheck, Paintbrush,
   ReceiptText, ScrollText, Settings2, Shield, ShieldAlert, ShoppingBag, Store, Tags, Ticket,
   Trash2, WandSparkles,
 } from 'lucide-react';
@@ -54,6 +54,7 @@ export const sections: Section[] = [
   { id: 'admins', path: '/system/access', label: 'Admin access', description: 'Fixed roles, invitations and access lifecycle', group: 'System', permission: 'admins:view', endpoint: '/api/admin/v1/access/admins', resultKeys: ['items'], icon: Shield },
   { id: 'settings', path: '/system/settings', label: 'Settings & theme', description: 'System settings and design tokens', group: 'System', permission: 'settings:view', endpoint: '/api/admin/v1/settings', resultKeys: ['settings'], icon: Settings2 },
   { id: 'theme', path: '/system/theme', label: 'Design system', description: 'Generated colors, typography, spacing and shapes for every product surface', group: 'System', permission: 'theme:view', endpoint: '/api/admin/v1/theme', resultKeys: ['active'], icon: Paintbrush },
+  { id: 'design-system', path: '/system/design-system', label: 'Token reference', description: 'Every token the panel draws from, drawn from the tokens themselves', group: 'System', permission: 'theme:view', icon: Layers },
 
   { id: 'roadmap', path: '/internal/roadmap', label: 'Roadmap', description: 'Internal roadmap and execution status', group: 'Engineering', permission: 'roadmap:view', endpoint: '/api/admin/v1/roadmap', resultKeys: ['items', 'roadmap'], icon: ClipboardCheck },
   { id: 'tasks', path: '/internal/tasks', label: 'Tasks', description: 'Internal delivery tasks', group: 'Engineering', permission: 'tasks:view', endpoint: '/api/admin/v1/tasks', resultKeys: ['items', 'tasks'], icon: BriefcaseBusiness },

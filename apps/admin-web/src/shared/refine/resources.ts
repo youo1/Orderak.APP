@@ -26,6 +26,10 @@ import { sections } from '@/app/config/sections';
 const NOT_REFINE_LIST_IDS = new Set([
   'dashboard', 'deletions', 'runtime', 'jobs', 'security',
   'admins', 'plans', 'theme', 'billing-verifications', 'flags', 'capabilities',
+  // `design-system` is the token-reference page: it has no admin API endpoint
+  // and no Refine list view, and `App.tsx` routes it to its own page — the same
+  // exclusion its route carries there.
+  'design-system',
 ]);
 
 export const refineResources: ResourceProps[] = sections.map(section => ({
