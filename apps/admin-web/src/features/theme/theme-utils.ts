@@ -12,8 +12,16 @@ export function recoveryIsCurrent(expiresAt: number, now = Date.now()) {
   return Number.isFinite(expiresAt) && expiresAt > now && expiresAt <= now + RECOVERY_DAYS_MS;
 }
 
+function sortKeys(_key: string, value: unknown) {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return value;
+  const record = value as Record<string, unknown>;
+  const sorted: Record<string, unknown> = {};
+  for (const key of Object.keys(record).sort()) sorted[key] = record[key];
+  return sorted;
+}
+
 export function deepEqual(a: unknown, b: unknown) {
-  return JSON.stringify(a) === JSON.stringify(b);
+  return JSON.stringify(a, sortKeys) === JSON.stringify(b, sortKeys);
 }
 
 /** Apply only fields changed locally relative to the original base. */
