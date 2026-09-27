@@ -26,8 +26,14 @@ export function LoadingState() { return <div className="state-card"><div classNa
  * No retry button on the refusal, deliberately. A 403 answers identically
  * however many times it is asked; offering Try again would be the same lie in a
  * smaller place.
+ *
+ * The parameter is typed for the message, not for `Error`. A Refine-backed
+ * section renders its error through here too now, and Refine surfaces that as
+ * its own `HttpError` — `{ message, statusCode }`, with no `name` — which an
+ * `Error` parameter would reject. The refusal check is unaffected: it narrows on
+ * `instanceof ApiError`, which is what `api()` throws.
  */
-export function ErrorState({ error, retry }: { error: Error; retry: () => void }) {
+export function ErrorState({ error, retry }: { error: { message: string }; retry: () => void }) {
   if (error instanceof ApiError && error.status === 403) {
     return (
       <div className="state-card">

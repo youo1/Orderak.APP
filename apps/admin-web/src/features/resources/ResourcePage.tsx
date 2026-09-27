@@ -1,158 +1,45 @@
 import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, Plus, RefreshCw } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Plus, RefreshCw } from 'lucide-react';
 import { api } from '@/shared/api/client';
 import type { Section } from '@/app/config/sections';
 import { DataTable } from '@/shared/ui/DataTable';
 import { DetailPanel, ErrorState, LoadingState, PageHeader } from '@/shared/ui/Page';
 import { Button } from '@/shared/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/dialog';
-import { Field } from '@/shared/ui/field';
-import { Input } from '@/shared/ui/input';
-import { Textarea } from '@/shared/ui/textarea';
-import { STEP_UP_UNAVAILABLE, useStepUp } from '@/shared/api/step-up';
-import { askConfirm } from '@/shared/ui/confirm';
 import { actions } from '@/app/config/actions';
 import { ActionDialog } from '@/shared/ui/ActionDialog';
 import { useAuth } from '@/features/auth/auth-context';
+import { groupRows, type Row } from '@/shared/refine/resource-shape';
 
-type Row = Record<string, unknown>;
-
+/**
+ * Legacy path, kept only for `flags` and `capabilities` (Refine install
+ * plan, Phase 3): their real API response genuinely returns more than one
+ * row group at once — flag definitions + targeting rules; capability
+ * definitions + store overrides (confirmed against
+ * admin-control-plane.ts). Refine's `getList` is one resource → one flat
+ * array, so these two aren't a single Refine resource and stay on the
+ * original raw-fetch, multi-group rendering until someone deliberately
+ * redesigns them into separate resources. Every other formerly-generic
+ * section is on `RefineResourcePage` now.
+ */
 export function ResourcePage({ section }: { section: Section }) {
   const [selected, setSelected] = useState<Row | null>(null);
   const [actionOpen, setActionOpen] = useState(false);
   const auth = useAuth();
   const action = actions[section.id];
-  const query = useQuery({ queryKey: ['resource', section.id], queryFn: () => api<Record<string, unknown>>(section.endpoint!) });
-  const groups = rowsFromPayload(query.data, section.resultKeys || []);
+  const query = useQuery({ queryKey: ['resource', section.id], queryFn: () => api<Row>(section.endpoint!) });
+  const groups = groupRows(query.data, section.resultKeys || []);
   return <>
     <PageHeader title={section.label} description={section.description} actions={<>{action && auth.can(action.permission) && <Button onClick={() => setActionOpen(true)}><Plus size={16} /> {action.label}</Button>}<Button variant="outline" onClick={() => query.refetch()}><RefreshCw size={16} /> Refresh</Button></>} />
     {query.isLoading && <LoadingState />}
     {query.error && <ErrorState error={query.error} retry={() => query.refetch()} />}
-    {section.id === 'subscriptions' && <BillingLeaseHealth />}
     {groups.map(group => <section className="resource-group" key={group.key}>{groups.length > 1 && <div className="section-heading"><h2>{group.label}</h2><span>{group.rows.length}</span></div>}<DataTable rows={group.rows} onSelect={setSelected} preferred={preferredColumns[section.id] || []} /></section>)}
-    {selected && <DetailPanel title={String(selected.name ?? selected.store_name ?? selected.subject ?? selected.id ?? section.label)} row={selected} onClose={() => setSelected(null)} actions={section.id === 'exports' ? <ExportDownload row={selected} /> : section.id === 'privacy' ? <PrivacyActions row={selected} close={() => setSelected(null)} /> : section.id === 'translations' ? <TranslationActions row={selected} close={() => setSelected(null)} /> : section.id === 'content' ? <ContentActions row={selected} close={() => setSelected(null)} /> : undefined} />}
+    {selected && <DetailPanel title={String(selected.name ?? selected.store_name ?? selected.subject ?? selected.id ?? section.label)} row={selected} onClose={() => setSelected(null)} />}
     {actionOpen && action && <ActionDialog config={action} resourceKey={section.id} close={() => setActionOpen(false)} />}
   </>;
 }
 
-type BillingHealth = {
-  claim_leases?: {
-    lease_seconds?: number;
-    durations?: { samples?: number; average_ms?: number; maximum_ms?: number; p50_ms?: number; p95_ms?: number; exceeded_lease?: number };
-    reclaims?: { total_reclaims?: number; jobs_reclaimed?: number; last_reclaimed_at?: string | null };
-  };
-};
-
-function BillingLeaseHealth() {
-  const query = useQuery({
-    queryKey: ['billing-health'],
-    queryFn: () => api<BillingHealth>('/api/admin/v1/billing/health'),
-    refetchInterval: 60_000,
-  });
-  if (query.isLoading) return <LoadingState />;
-  if (query.error) return <ErrorState error={query.error} retry={() => query.refetch()} />;
-  const lease = Number(query.data?.claim_leases?.lease_seconds ?? 120);
-  const durations = query.data?.claim_leases?.durations ?? {};
-  const reclaims = query.data?.claim_leases?.reclaims ?? {};
-  const p95 = Number(durations.p95_ms ?? 0);
-  const review = p95 >= lease * 1000 * 0.8 || Number(durations.exceeded_lease ?? 0) > 0;
-  const seconds = (value: unknown) => `${(Number(value ?? 0) / 1000).toFixed(1)} s`;
-  return <Card>
-    <CardHeader className="panel-heading"><div><p className="eyebrow">PLAY CLAIM LEASE</p><CardTitle>Verification duration and reclaim health</CardTitle><CardDescription>Lease changes require observed percentile evidence. A reclaim can duplicate a non-charging Google verification or acknowledgement call.</CardDescription></div><span className={review ? 'status danger' : 'status active'}>{review ? 'Review lease' : 'Within lease'}</span></CardHeader>
-    <CardContent>
-    <dl className="snapshot">
-      <div><dt>Lease</dt><dd>{lease} s</dd></div>
-      <div><dt>p50</dt><dd>{seconds(durations.p50_ms)}</dd></div>
-      <div><dt>p95</dt><dd>{seconds(durations.p95_ms)}</dd></div>
-      <div><dt>Maximum</dt><dd>{seconds(durations.maximum_ms)}</dd></div>
-      <div><dt>Samples</dt><dd>{Number(durations.samples ?? 0)}</dd></div>
-      <div><dt>Over lease</dt><dd>{Number(durations.exceeded_lease ?? 0)}</dd></div>
-      <div><dt>Total reclaims</dt><dd>{Number(reclaims.total_reclaims ?? 0)}</dd></div>
-      <div><dt>Jobs reclaimed</dt><dd>{Number(reclaims.jobs_reclaimed ?? 0)}</dd></div>
-    </dl>
-    {reclaims.last_reclaimed_at && <p className="muted">Last reclaim: {String(reclaims.last_reclaimed_at)}</p>}
-    </CardContent>
-  </Card>;
-}
-
-function TranslationActions({ row, close }: { row: Row; close: () => void }) {
-  const client = useQueryClient();
-  const mutation = useMutation({ mutationFn: (status: 'reviewed' | 'rejected') => api(`/api/admin/v1/product-translations/${encodeURIComponent(String(row.product_code))}/${encodeURIComponent(String(row.lang))}`, { method: 'PATCH', body: JSON.stringify({ status }) }), onSuccess: () => { client.invalidateQueries({ queryKey: ['resource', 'translations'] }); close(); } });
-  return <><p className="muted">Rejected or stale content falls back to seller-authored source text at runtime.</p><div className="button-row"><Button disabled={mutation.isPending} onClick={() => mutation.mutate('reviewed')}>Approve current translation</Button><Button variant="destructive" disabled={mutation.isPending} onClick={() => { askConfirm('Reject this translation and use seller-authored fallback?', () => mutation.mutate('rejected')); }}>Reject and fall back</Button></div>{mutation.error && <p className="error-text">{mutation.error.message}</p>}</>;
-}
-
-function ContentActions({ row, close }: { row: Row; close: () => void }) {
-  const client = useQueryClient();
-  const mutation = useMutation({ mutationFn: () => api(`/api/admin/v1/content-configs/${encodeURIComponent(String(row.id))}/publish`, { method: 'POST', body: '{}' }), onSuccess: () => { client.invalidateQueries({ queryKey: ['resource', 'content'] }); close(); } });
-  if (row.status !== 'draft') return <p className="muted">Published content remains immutable; create a new version to change it.</p>;
-  return <><p className="muted">Publishing retires the previous version for the same content key and locale.</p><Button disabled={mutation.isPending} onClick={() => { askConfirm('Publish this content version?', () => mutation.mutate()); }}>Publish version</Button>{mutation.error && <p className="error-text">{mutation.error.message}</p>}</>;
-}
-
-function PrivacyActions({ row, close }: { row: Row; close: () => void }) {
-  const client = useQueryClient();
-  const [open, setOpen] = useState(false);
-  const [target, setTarget] = useState('');
-  const [phone, setPhone] = useState('');
-  const [correctedName, setCorrectedName] = useState('');
-  const [notes, setNotes] = useState('');
-  const current = String(row.status);
-  const next = current === 'open' ? ['verified', 'rejected'] : current === 'verified' ? ['in_progress', 'rejected'] : current === 'in_progress' ? ['completed', 'rejected'] : [];
-  const needsIdentity = target === 'completed' && ['deletion', 'correction'].includes(String(row.request_type));
-  const mutation = useMutation({ mutationFn: () => api(`/api/admin/v1/buyer-privacy/${encodeURIComponent(String(row.id))}`, { method: 'PATCH', body: JSON.stringify({ status: target, buyer_phone: phone || undefined, corrected_name: correctedName || undefined, notes }) }), onSuccess: () => { client.invalidateQueries({ queryKey: ['resource', 'privacy'] }); setOpen(false); close(); } });
-  if (!next.length) return <p className="muted">This request has reached a terminal state.</p>;
-  return <><div className="button-row">{next.map(status => <Button variant={status === 'rejected' ? 'destructive' : 'default'} key={status} onClick={() => { setTarget(status); setOpen(true); }}>{status.replace('_', ' ')}</Button>)}</div><Dialog open={open} onOpenChange={nextOpen => { if (!nextOpen) setOpen(false); }}><DialogContent className="w-[min(620px,calc(100vw-32px))]"><DialogHeader><p className="eyebrow">PRIVACY WORKFLOW</p><DialogTitle>Move request to {target.replace('_', ' ')}</DialogTitle><DialogDescription>Every transition is recorded in the immutable admin audit trail.</DialogDescription></DialogHeader><div className="form-grid">{needsIdentity && <Field label="Re-enter customer phone *"><Input value={phone} onChange={event => setPhone(event.target.value)} /></Field>}{needsIdentity && row.request_type === 'correction' && <Field label="Corrected customer name *"><Input value={correctedName} onChange={event => setCorrectedName(event.target.value)} /></Field>}<Field label="Evidence / resolution note" className="wide"><Textarea rows={4} value={notes} onChange={event => setNotes(event.target.value)} /></Field></div>{mutation.error && <p className="error-text">{mutation.error.message}</p>}<DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button disabled={mutation.isPending || (needsIdentity && phone.replace(/\D/g, '').length < 7) || (needsIdentity && row.request_type === 'correction' && !correctedName.trim())} onClick={() => mutation.mutate()}>{mutation.isPending ? 'Applying…' : 'Confirm transition'}</Button></DialogFooter></DialogContent></Dialog></>;
-}
-
-function ExportDownload({ row }: { row: Row }) {
-  const [freshOpen, setFreshOpen] = useState(false);
-  const [password, setPassword] = useState('');
-  const [totpCode, setTotpCode] = useState('');
-  const stepUp = useStepUp();
-  const completed = row.status === 'completed' && !row.downloaded_at;
-  const sensitive = row.classification === 'sensitive';
-  const mutation = useMutation({ mutationFn: async () => {
-    const headers = new Headers();
-    if (sensitive) {
-      const authorizationId = await stepUp.authorize('export.sensitive', String(row.id), 'export-download', password, totpCode);
-      headers.set('x-admin-action-authorization', authorizationId);
-    }
-    const result = await api<{ download_url: string }>(`/api/admin/v1/exports/${encodeURIComponent(String(row.id))}/download`, { method: 'POST', headers, body: JSON.stringify({ acknowledgement: 'admin_ui_download' }) });
-    // Same-origin only. This navigates the console to a URL the response body
-    // supplied, so it is worth one check: the artifact is served from this
-    // origin behind the one-use cookie, and anything else — an absolute URL to
-    // somewhere else, or a `javascript:` scheme — is not a download.
-    const target = new URL(result.download_url, window.location.origin);
-    if (target.origin !== window.location.origin) throw new Error('Refusing an off-origin download URL.');
-    window.location.assign(target.href);
-  }, onSuccess: () => setFreshOpen(false) });
-  if (!completed) return <p className="muted">Download becomes available once this private artifact completes. Tokens are one-use and expire in five minutes.</p>;
-  return <><Button onClick={() => { if (sensitive && !stepUp.available) return; if (sensitive) setFreshOpen(true); else mutation.mutate(); }} disabled={mutation.isPending || (sensitive && !stepUp.available)}><Download size={16} /> Download once</Button>{mutation.error && <p className="error-text">{mutation.error.message}</p>}{sensitive && !stepUp.available && <p className="error-text">{STEP_UP_UNAVAILABLE}</p>}<Dialog open={freshOpen} onOpenChange={nextOpen => { if (!nextOpen) setFreshOpen(false); }}><DialogContent className="w-[min(620px,calc(100vw-32px))]"><DialogHeader><p className="eyebrow">FRESH OWNER AUTH</p><DialogTitle>Authorize sensitive download</DialogTitle><DialogDescription>Password and a current TOTP are required. This authorization is bound to this one export and consumed once.</DialogDescription></DialogHeader><div className="form-grid"><Field label="Owner password"><Input type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} /></Field><Field label="Current TOTP"><Input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={totpCode} onChange={event => setTotpCode(event.target.value.replace(/\D/g, '').slice(0, 6))} /></Field></div>{mutation.error && <p className="error-text">{mutation.error.message}</p>}<DialogFooter><Button variant="outline" onClick={() => setFreshOpen(false)}>Cancel</Button><Button disabled={password.length < 12 || totpCode.length !== 6 || mutation.isPending} onClick={() => mutation.mutate()}>{mutation.isPending ? 'Authorizing…' : 'Authorize and download'}</Button></DialogFooter></DialogContent></Dialog></>;
-}
-
-function rowsFromPayload(payload: Record<string, unknown> | undefined, keys: string[]) {
-  if (!payload) return [];
-  const groups = keys.flatMap(key => {
-    const value = payload[key];
-    if (Array.isArray(value)) return [{ key, label: key.replaceAll('_', ' '), rows: value as Row[] }];
-    if (value && typeof value === 'object') return [{ key, label: key.replaceAll('_', ' '), rows: Object.entries(value as Record<string, unknown>).map(([name, item]) => ({ name, ...(typeof item === 'object' && item ? item as Row : { value: item }) })) }];
-    return [];
-  });
-  if (groups.length) return groups;
-  const arrays = Object.entries(payload).filter(([, value]) => Array.isArray(value));
-  if (arrays.length) return arrays.map(([key, value]) => ({ key, label: key, rows: value as Row[] }));
-  return [{ key: 'data', label: 'Data', rows: Object.entries(payload).map(([name, value]) => ({ name, value })) }];
-}
-
 const preferredColumns: Record<string, string[]> = {
-  stores: ['store_name', 'store_code', 'country_code', 'status', 'product_count', 'category_count', 'created_at'],
-  buyers: ['buyer_name', 'buyer_phone', 'store_name', 'order_count', 'total_minor', 'last_order_at', 'restricted'],
-  support: ['id', 'subject', 'store_name', 'status', 'priority', 'assigned_email', 'updated_at'],
-  deletions: ['id', 'phone_e164', 'status', 'requested_at', 'scheduled_for', 'verified_at'],
-  subscriptions: ['store_name', 'plan_id', 'status', 'gateway', 'organization_status', 'current_period_end'],
   flags: ['flag_key', 'description', 'status', 'env_gate', 'runtime_consumer', 'risk'],
-  versions: ['platform', 'country_code', 'minimum_version_code', 'recommended_version_code', 'maintenance_mode', 'active', 'updated_at'],
   capabilities: ['domain', 'label', 'implementation_status', 'risk', 'runtime_consumer', 'enforcement_binding'],
-  audit: ['id', 'admin_email', 'action', 'entity', 'entity_id', 'ip', 'created_at'],
 };

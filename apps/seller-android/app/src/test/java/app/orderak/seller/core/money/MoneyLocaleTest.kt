@@ -19,6 +19,23 @@ class MoneyLocaleTest {
 
     private val arabicEgypt = Locale.forLanguageTag("ar-EG")
 
+    /** `AppLocales.set("ar")` — what the in-app picker actually applies. */
+    private val arabic = Locale.forLanguageTag("ar")
+
+    private fun isArabicIndic(text: String) = text.any { it in '٠'..'٩' }
+
+    /**
+     * Never asserted before: every other test in this file uses `ar-EG`, but
+     * the picker sets the bare tag. On the JVM the two behave the same, so
+     * this passes here — the on-device gap this closes is that Android's ICU
+     * does not, which only `LocaleUiTest` (instrumented) can observe.
+     */
+    @Test
+    fun `bare arabic tag renders arabic-indic digits, matching what the picker actually sets`() {
+        assertTrue(isArabicIndic(formatAmount(45_000, "EGP", arabic)))
+        assertTrue(isArabicIndic(formatAmountLabel(45_000, "EGP", arabic)))
+    }
+
     @Test
     fun `english formats with latin digits and a comma group separator`() {
         assertEquals("1,200", formatAmount(120_000, "EGP", Locale.US))

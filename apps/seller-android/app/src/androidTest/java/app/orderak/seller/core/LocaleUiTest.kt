@@ -21,6 +21,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import app.orderak.seller.R
 import app.orderak.seller.core.text.formatCount
 import app.orderak.seller.core.ui.theme.OrderakTheme
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Rule
 import org.junit.Test
@@ -73,6 +74,34 @@ class LocaleUiTest {
      * finding becomes a permanent regression test.
      */
     @Test fun arabicDigitsAreShapedNotLatin() = verifyDigitsDifferFromLatin("ar")
+
+    /**
+     * The exact regression this app shipped: [arabicDigitsAreShapedNotLatin]
+     * only asserts the rendered string is *not* the Latin one, which a
+     * grouping-separator difference alone could satisfy even if the digits
+     * themselves stayed Latin. This pins the literal Eastern Arabic-Indic
+     * glyphs (U+0660–U+0669, the `nu=arab` set — not `arabext`'s
+     * U+06F0–U+06F9 Persian/Urdu variant) for the exact tag
+     * `AppLocales.set("ar")` applies: bare `ar`, no region, no `-u-nu-`
+     * extension. Confirmed failing before `arabicIndicLocale` existed —
+     * `formatCount(1, Locale.forLanguageTag("ar"))` rendered plain `"1"` on
+     * this emulator's real ICU, not `"١"`, even though the equivalent JVM
+     * assertion in `CountsTest` was already green.
+     */
+    @Test fun bareArabicTagRendersEasternArabicIndicDigits() {
+        val locale = Locale.forLanguageTag("ar")
+        assertEquals("١", formatCount(1, locale))
+        assertEquals("٢٠", formatCount(20, locale))
+        assertEquals("١٠٠", formatCount(100, locale))
+    }
+
+    /** The other half of the claim: fixing Arabic must not touch English. */
+    @Test fun englishTagRendersLatinDigits() {
+        val locale = Locale.forLanguageTag("en")
+        assertEquals("1", formatCount(1, locale))
+        assertEquals("20", formatCount(20, locale))
+        assertEquals("100", formatCount(100, locale))
+    }
 
     private fun verifyLocale(tag: String, expectedDirection: LayoutDirection) {
         val locale = Locale.forLanguageTag(tag)

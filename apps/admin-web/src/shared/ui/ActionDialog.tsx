@@ -10,7 +10,7 @@ import { Input } from '@/shared/ui/input';
 import { NativeSelect, Textarea } from '@/shared/ui/textarea';
 import type { ActionConfig, Field as ActionField } from '@/app/config/actions';
 
-export function ActionDialog({ config, resourceKey, close }: { config: ActionConfig; resourceKey: string; close: () => void }) {
+export function ActionDialog({ config, resourceKey, close, onSuccess }: { config: ActionConfig; resourceKey: string; close: () => void; onSuccess?: () => void }) {
   const client = useQueryClient();
   const stepUp = useStepUp();
   const initial = useMemo(() => Object.fromEntries(config.fields.map(field => [field.name, field.defaultValue ?? (field.type === 'checkbox' ? false : '')])), [config]);
@@ -32,7 +32,7 @@ export function ActionDialog({ config, resourceKey, close }: { config: ActionCon
       headers.set('x-admin-action-authorization', authorizationId);
     }
     return api(endpoint, { method: config.method || 'POST', headers, body: JSON.stringify(payload) });
-  }, onSuccess: () => { client.invalidateQueries({ queryKey: ['resource', resourceKey] }); close(); } });
+  }, onSuccess: () => { client.invalidateQueries({ queryKey: ['resource', resourceKey] }); onSuccess?.(); close(); } });
   const valid = config.fields.filter(field => field.required).every(field => String(values[field.name] ?? '').trim()) && !stepUpBlocked && (!sensitiveExport || (freshPassword.length >= 12 && /^\d{6}$/.test(totpCode)));
   // Radix `Dialog`, like the confirmation dialog beside it. This was the second
   // of five hand-rolled `div.modal-backdrop` layers: no focus trap, no scroll
