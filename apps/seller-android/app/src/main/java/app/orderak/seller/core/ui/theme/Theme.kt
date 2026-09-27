@@ -2,6 +2,8 @@ package app.orderak.seller.core.ui.theme
 
 import android.app.Activity
 import android.animation.ValueAnimator
+import android.os.Build
+import android.provider.Settings
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
@@ -256,8 +259,31 @@ fun OrderakTheme(
     val colorScheme = GeneratedDesignSystem.colorScheme(safeContrast, darkTheme)
     val extended = GeneratedDesignSystem.extendedColors(safeContrast, darkTheme)
     val spacing = generatedSpacing()
-    val motion = remember {
-        if (ValueAnimator.areAnimatorsEnabled()) OrderakMotion() else OrderakMotion().reduced()
+    // Reduced motion, asked of the platform rather than assumed.
+    //
+    // `ValueAnimator.areAnimatorsEnabled()` is API 26 and this app's `minSdk` is 24,
+    // so calling it unguarded is a `NoSuchMethodError` on Android 24 and 25 — found
+    // by `:app:lintStagingDebug` in CI, which is the only place it could be found:
+    // it compiles, and the screenshot suite runs on one API level.
+    //
+    // The older branch reads the setting that method reads. `ANIMATOR_DURATION_SCALE`
+    // has been public since API 17 and is exactly what "animators are enabled" means,
+    // so those two versions get the same answer from the same source instead of a
+    // guess — either guess would be wrong for somebody: assuming enabled animates for
+    // a seller who turned animation off, and assuming disabled takes it away from
+    // every seller on an older phone.
+    val context = LocalContext.current
+    val motion = remember(context) {
+        val enabled = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            ValueAnimator.areAnimatorsEnabled()
+        } else {
+            Settings.Global.getFloat(
+                context.contentResolver,
+                Settings.Global.ANIMATOR_DURATION_SCALE,
+                1f,
+            ) != 0f
+        }
+        if (enabled) OrderakMotion() else OrderakMotion().reduced()
     }
     // Constructed once rather than per-read: every field is a constant today, but
     // a CompositionLocal's value is compared by identity, so a fresh instance per
