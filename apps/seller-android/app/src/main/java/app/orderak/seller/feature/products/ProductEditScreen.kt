@@ -58,6 +58,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.orderak.seller.core.ui.FullScreenLoading
+import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 import app.orderak.seller.R
 import app.orderak.seller.core.text.formatCount
 import coil3.compose.AsyncImage
@@ -143,6 +144,10 @@ fun ProductEditContent(
     onBack: () -> Unit,
     onLimitReached: (String) -> Unit,
 ) {
+    // Declared on the composable rather than inside the Scaffold's content
+    // lambda: the delete confirmation below the Scaffold is on the same screen
+    // and reads the same scale.
+    val spacing = LocalOrderakSpacing.current
     Scaffold(
         topBar = {
             TopAppBar(
@@ -167,14 +172,14 @@ fun ProductEditContent(
             return@Scaffold
         }
         Column(
-            Modifier.fillMaxSize().padding(padding).padding(16.dp).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            Modifier.fillMaxSize().padding(padding).padding(spacing.space4).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(spacing.space4)
         ) {
             Box(
                 Modifier
                     .fillMaxWidth()
                     .height(180.dp)
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(MaterialTheme.shapes.large)
                     .clickable {
                         onPickImage()
                     },
@@ -187,7 +192,7 @@ fun ProductEditContent(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(Icons.Outlined.AddAPhoto, contentDescription = null,
                             modifier = Modifier.size(40.dp), tint = MaterialTheme.colorScheme.primary)
-                        Spacer(Modifier.height(8.dp))
+                        Spacer(Modifier.height(spacing.space2))
                         Text(stringResource(R.string.product_pick_photo), style = MaterialTheme.typography.bodyMedium)
                     }
                 }
@@ -208,7 +213,7 @@ fun ProductEditContent(
 
             // prices/numbers are LTR runs (Plan §3.1)
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(spacing.space3)) {
                     OutlinedTextField(
                         value = state.priceText, onValueChange = actions.onPrice,
                         label = { Text(stringResource(R.string.product_price_label)) },
@@ -227,7 +232,7 @@ fun ProductEditContent(
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Switch(checked = state.available, onCheckedChange = actions.onAvailable)
-                Text(stringResource(R.string.product_available), Modifier.padding(start = 8.dp))
+                Text(stringResource(R.string.product_available), Modifier.padding(start = spacing.space2))
             }
 
             // Category picker (optional). Manage the list in Settings → Categories.
@@ -235,12 +240,17 @@ fun ProductEditContent(
                 Text(stringResource(R.string.categories_title), style = MaterialTheme.typography.titleMedium)
                 Row(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(spacing.space2)
                 ) {
+                    // The chip that means "no category". It borrowed
+                    // `product_discount_none` — "بدون خصم", "no discount" — the
+                    // string written for a discount control this screen does not
+                    // draw (ProductEditViewModel.save says as much), so the picker
+                    // offered "no discount" under a heading that reads «الأقسام».
                     FilterChip(
                         selected = state.categoryCode == null,
                         onClick = { actions.onCategory(null) },
-                        label = { Text(stringResource(R.string.product_discount_none)) }
+                        label = { Text(stringResource(R.string.product_category_none)) }
                     )
                     categories.forEach { c ->
                         FilterChip(
@@ -289,7 +299,7 @@ fun ProductEditContent(
                 // about why or what to do. The paywall names the limit, the
                 // usage and what the next plan gives; the input on this screen
                 // survives because the paywall's exit pops rather than resets.
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.space1)) {
                     Text(
                         stringResource(R.string.error_plan_limit),
                         color = MaterialTheme.colorScheme.error,

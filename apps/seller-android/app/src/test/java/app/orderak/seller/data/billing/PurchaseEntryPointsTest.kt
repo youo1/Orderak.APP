@@ -46,6 +46,10 @@ class PurchaseEntryPointsTest {
      * paired with a marker proving the affordance is still there. The marker
      * keeps the test honest: if the control is removed the file stops needing a
      * gate, and this should be updated deliberately rather than passing quietly.
+     *
+     * `AccountScreens.kt` is in this list for its BANNER, not for its recovery
+     * control: see `purchase recovery is not hidden behind the purchase gate`
+     * below, which asserts the opposite for that one control.
      */
     private val purchaseSurfaces = listOf(
         Triple(
@@ -54,7 +58,7 @@ class PurchaseEntryPointsTest {
             "viewModel.purchase(",
         ),
         Triple(
-            "feature/operations/OperationsScreens.kt",
+            "feature/operations/AccountScreens.kt",
             "offers Play guidance and purchase recovery",
             "recoverPurchases",
         ),
@@ -145,5 +149,71 @@ class PurchaseEntryPointsTest {
             "the purchase callback no longer null-checks the Activity",
             screen.contains("activity?.let { viewModel.purchase(it,"),
         )
+    }
+
+    /**
+     * Recovery is deliberately OUTSIDE the purchase gate, and this pins it there.
+     *
+     * `purchaseOpen` answers "may this seller buy?" — it is the backend's
+     * `BILLING_ENABLED` launch gate. Recovering a purchase the seller already made
+     * is not buying: it re-queries Play and re-verifies through
+     * `/api/v1/billing/google/verify`, which is absent from
+     * `BILLING_ACQUISITION_ROUTES` and therefore served while the gate is shut.
+     * Play connects on `GOOGLE_PLAY_LIFECYCLE_ENABLED`, a separate flag.
+     *
+     * The screen hid it while purchase was closed, so a paying seller who
+     * reinstalled during the closed period could not get their plan back — on the
+     * one screen whose own copy promises "Nothing you have changes" and tells them
+     * to "Use purchase recovery after reinstalling or changing devices".
+     *
+     * A text match is all this test has, so it asserts the structural property
+     * rather than a position: no `if (purchaseOpen)` block may contain the
+     * recovery control.
+     */
+    @Test
+    fun `purchase recovery is not hidden behind the purchase gate`() {
+        val root = sourceRoot()
+        assumeTrue("app sources not reachable from the test working directory", root != null)
+        val source = read("feature/operations/AccountScreens.kt")!!
+        val body = source.substringAfter("fun SubscriptionContent(")
+
+        assertTrue(
+            "the subscription surface no longer offers purchase recovery at all",
+            body.contains("subscription_recover"),
+        )
+
+        val gatedBranches = mutableListOf<String>()
+        var at = body.indexOf("if (purchaseOpen")
+        while (at >= 0) {
+            val open = body.indexOf('{', at)
+            if (open >= 0) {
+                var depth = 0
+                var close = open
+                while (close < body.length) {
+                    when (body[close]) {
+                        '{' -> depth++
+                        '}' -> {
+                            depth--
+                            if (depth == 0) break
+                        }
+                    }
+                    close++
+                }
+                gatedBranches += body.substring(open, minOf(close + 1, body.length))
+            }
+            at = body.indexOf("if (purchaseOpen", at + 1)
+        }
+
+        assertTrue(
+            "no `if (purchaseOpen)` branch was found — this test is no longer checking anything",
+            gatedBranches.isNotEmpty(),
+        )
+        for (branch in gatedBranches) {
+            assertTrue(
+                "purchase recovery is behind the purchase gate again: a paying seller who " +
+                    "reinstalls while billing is closed cannot restore their plan",
+                !branch.contains("subscription_recover"),
+            )
+        }
     }
 }

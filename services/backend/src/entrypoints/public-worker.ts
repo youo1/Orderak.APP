@@ -87,7 +87,10 @@ function validateSellerCompatibilityHeaders(request: Request): Response | null {
 const DEEPSEEK_MODEL = "deepseek-chat";
 const SYSTEM_PROMPT =
 	"You are Orderak, a friendly assistant that helps a shop take customer orders. " +
-	"Keep replies short, clear, and helpful.";
+	"Keep replies short, clear, and helpful. " +
+	"You are not given the shop's real product catalog, prices, inventory, or order history, " +
+	"so never state a specific price, stock level, delivery date, or order status as fact — " +
+	"tell the customer to confirm those with the seller instead.";
 
 export type PublicQueueKind = "email" | "email_dlq" | "unknown";
 

@@ -72,6 +72,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 
 @HiltViewModel
 class CategoriesViewModel @Inject constructor(
@@ -288,6 +289,7 @@ fun CategoriesContent(
     onShareLink: (CategoryDto) -> Unit,
     onBack: () -> Unit,
 ) {
+    val spacing = LocalOrderakSpacing.current
     Scaffold(
         topBar = {
             TopAppBar(
@@ -300,8 +302,8 @@ fun CategoriesContent(
             )
         }
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.fillMaxSize().padding(padding).padding(spacing.space4)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(spacing.space2)) {
                 OutlinedTextField(
                     value = newName, onValueChange = { onNewName(it.take(60)) },
                     label = { Text(stringResource(R.string.categories_new)) },
@@ -311,7 +313,7 @@ fun CategoriesContent(
                     Text(stringResource(R.string.categories_add))
                 }
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(spacing.space3))
             if (loading || categories == null) CircularProgressIndicator()
             when (error) {
                 null -> Unit
@@ -344,19 +346,24 @@ fun CategoriesContent(
             // read and genuinely empty, the LazyColumn drew nothing and left a
             // seller looking at the add field over blank space, unsure whether
             // it had loaded. The add field stays above it — it is the way out.
-            if (categories?.isEmpty() == true && error == null) {
+            //
+            // "Read" is what `!loading` carries. The list seeds as an emptyList
+            // rather than null, so the first frame — the state the screen really
+            // opens in — drew this message underneath the spinner, claiming an
+            // answer about a read that had not happened yet.
+            if (!loading && categories?.isEmpty() == true && error == null) {
                 Text(
                     stringResource(R.string.categories_empty),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 24.dp),
+                    modifier = Modifier.padding(vertical = spacing.space6),
                 )
             }
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(spacing.space2)) {
                 items(categories.orEmpty(), key = { it.category_code }) { c ->
                     Card(Modifier.fillMaxWidth()) {
                         Row(
-                            Modifier.fillMaxWidth().padding(12.dp),
+                            Modifier.fillMaxWidth().padding(spacing.space3),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Column {

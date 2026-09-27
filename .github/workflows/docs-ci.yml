@@ -82,6 +82,55 @@ jobs:
       - name: Verify no hand-written colour in the Android app
         run: node tooling/repository/verify-no-hardcoded-colors.mjs
 
+      # And the values colour checks cannot see. The same rule covers "duration"
+      # and "radius", and neither was guarded: the app carried one duration —
+      # `tween(300)` at six sites, longer than any the system names — and two
+      # `RoundedCornerShape(100.dp)` pills, which is a pill on a 56dp button and
+      # a different shape on anything taller.
+      - name: Verify Android motion and shape stay on the design system
+        run: node tooling/repository/verify-android-motion-tokens.mjs
+
+      # And the values that are only recognisable by where they sit. A number
+      # inside padding(), spacedBy() or a Spacer is a distance between two things,
+      # and the system has one set of those; the auth and shop-setup flows carried
+      # 46 raw literals between them, most of them off the scale entirely (6, 10,
+      # 14, 18, 22, 30), so two screens meant to share a rhythm each had their own.
+      # Sixteen years of renders would not have caught it. The size literals this
+      # cannot classify — a 96dp ad image, a 720dp breakpoint — are deliberately
+      # left alone rather than forced onto the 4dp rhythm.
+      - name: Verify Android spacing and shape read the design-system tokens
+        run: node tooling/repository/verify-android-spacing-tokens.mjs
+
+      # The other half of the same rule, on the other client. The admin panel
+      # carries a committed snapshot of the design system as a fallback, and the
+      # live values arrive as a stylesheet from the published revision. Both
+      # declare the same custom properties, so document order decided it — and
+      # the bundler always put the snapshot last. Every published theme revision
+      # was therefore overridden, and the only person who could have noticed was
+      # the administrator whose own tab the builder restyles inline.
+      - name: Verify the published theme outranks the committed bundle
+        run: node tooling/repository/verify-theme-authority.mjs
+
+      # The same rule, for the values colour checks cannot see. The admin panel
+      # carries dozens of hand-picked font sizes and radii, and eight of those
+      # sizes sit below the system's own 12px floor for Latin text — the smallest
+      # is 9.9px. A screen that invents `font-size: .68rem` looks deliberate in
+      # review and passes every other check. Weight joined the same guard: the
+      # scale says 400 or 500 and the panel had 21 rules at 650/700/800/900 plus
+      # five `font-semibold` classes, so three different bolds were in use that no
+      # role had chosen. Every ceiling is zero.
+      - name: Verify the admin panel stays on the design system
+        run: node tooling/repository/verify-admin-token-conformance.mjs
+
+      # And the other half of RD-16: one kit, not two implementations of every
+      # primitive. `.button` was 38px with a hover lift where the kit's `Button` is
+      # 40px with a background change; five of six modals were hand-rolled
+      # `div.modal-backdrop` layers with no focus trap, while the kit had Radix's
+      # dialog all along. The worst case was inside the kit. The ceilings here are
+      # per file and may only go down.
+      - name: Verify the admin panel has one component kit
+        run: node tooling/repository/verify-admin-primitives.mjs
+
       # D1 is the system of record and Room is a cache of it (ADR-012). That rule
       # is only as strong as the narrowest place it can be broken, which is one
       # productDao().upsert() in a view model written by someone reasonably
@@ -114,6 +163,25 @@ jobs:
 
       - name: Verify screen contracts
         run: node tooling/ux/verify-screen-contracts.mjs
+
+      # Two surfaces edited the same store field and only one could be right. The
+      # store surface checks the name against the server and keeps Save disabled
+      # until it is free; the account surface carried a bare field that wrote
+      # locally, whose value a later `api.register` push could make fail the whole
+      # sync — while the snackbar said it saved. The field is gone and this keeps
+      # it gone, because the duplicate is exactly the kind of thing a "helpful"
+      # future edit re-adds.
+      - name: Verify the catalogue slug has one editor
+        run: node tooling/ux/verify-slug-authority.mjs
+
+      # G4's criterion, made checkable. The panel kept two registries of its own
+      # sections — the shell's `sections.ts` and `contracts/typescript/admin.ts` —
+      # with nothing comparing them, and they had drifted by two entries and nine
+      # groups. It also asserts that every branch states its purpose and that each
+      # section is one navigation from the landing view, so the depth claim in the
+      # information-architecture doc cannot go stale in silence.
+      - name: Verify the admin panel's information architecture
+        run: node tooling/ux/verify-admin-ia.mjs
 
       # The verifier decides whether the product's claims about itself are
       # true, and for a year nothing decided whether the verifier was. It
@@ -180,12 +248,29 @@ jobs:
           fi
           echo "Generated documentation matches its generators."
 
+      # Pages that exist and refuse automated requests, cited by the redesign's
+      # open-source evaluation. Each was checked by hand: chanfana.com and the
+      # Egyptian statistics portal fail from CI's network or on their own
+      # certificate, and ag-grid, the Figma community plugin page and the ISO
+      # country-code page answer 403 to a non-browser client. The citations are the
+      # evidence for that document's verdicts, so the hosts are excluded rather than
+      # the links removed - and the exclusion names the reason, so the next 403 is a
+      # new entry here rather than a quietly dropped source.
+      #
+      # The list is below, in the args, and the explanation is here because inside a
+      # folded block (`args: >`) a `#` is not a comment - it is passed to the command
+      # as an argument. Written inline first, and it would have broken the check.
       - name: Link check
         uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
           args: >
             --exclude "orderak\\.app|admin\\.orderak\\.app|api\\.orderak\\.app"
             --exclude "^https?://(localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0)(:|/|$)"
+            --exclude "^https?://chanfana\\.com"
+            --exclude "^https?://www\\.ag-grid\\.com"
+            --exclude "^https?://www\\.censusinfo\\.capmas\\.gov\\.eg"
+            --exclude "^https?://www\\.figma\\.com/community/plugin"
+            --exclude "^https?://www\\.iso\\.org/iso-3166-country-codes"
             --exclude-path docs/archive
             --exclude-path '(^|/)node_modules(/|$)'
             --exclude-path '^tools/'

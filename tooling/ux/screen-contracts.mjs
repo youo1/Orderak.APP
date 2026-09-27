@@ -126,7 +126,13 @@ export const CONTRACTS = [
       // ShopSetupContent out put the callback in ShopSetupScreen's own body,
       // where the check can see it.
       { do: "select city", via: "onCitySelected" },
-      { do: "create store", via: "onCreate" },
+      // Was `via: "onCreate"`, which resolves to the passkey callback
+      // (`onCreate = { activity?.let(viewModel::createPasskey) }`) rather than to
+      // store creation, which is the bottom button's `actions.finish` →
+      // `viewModel::finish`. The guard passed the whole time, because the symbol
+      // it looked for did exist — it was just the wrong one. Found while checking
+      // this contract against the screen during the surface redesign.
+      { do: "create store", via: "finish" },
     ],
     states: ["content", "loading", "error"],
     offline: false,
@@ -278,7 +284,15 @@ export const CONTRACTS = [
     purpose: "تسجيل طلب يدوي للبيع اللي بيحصل برّه الكتالوج",
     entry: ["orders", "today"],
     exit: ["OrderDetailsRoute — بعد الإنشاء، مع popUpTo", "رجوع"],
-    data: ["product picker", "customer lookup", "order limit usage"],
+    data: [
+	      "product picker",
+	      // "customer lookup" and "order limit usage" were both declared and neither is
+	      // drawn: the form takes a typed phone number, and the screen shows no plan
+	      // usage. The map puts max_orders_per_month on account, so the second one has
+	      // a home that is not this screen. `data` is validated by no guard, which is
+	      // how they drifted — recorded in
+	      // docs/redesign/recon/android-ui-audit.md §4.5 rather than silently dropped.
+	    ],
     actions: [
       { do: "add line", via: "changeQty" },
       { do: "set customer", via: "onPhone" },
@@ -299,7 +313,11 @@ export const CONTRACTS = [
     purpose: "الكتالوج: المنتجات والتصنيفات والواجهة العامة",
     entry: ["MainRoute — تاب المتجر"],
     exit: ["ProductEditRoute", "CategoriesRoute", "StoreInfoRoute", "PaywallRoute — عند الحد"],
-    data: ["products page", "product limit usage", "category count"],
+    data: [
+	      "products page", "product limit usage",
+	      // "category count" was declared and nothing on this surface counts
+	      // categories; the list of them lives in CategoriesScreen. See §4.5.
+	    ],
     actions: [
       { do: "add product", via: "onAdd" },
       { do: "edit product", via: "onEdit" },
@@ -405,7 +423,13 @@ export const CONTRACTS = [
     id: "customers",
     kotlinRoute: null,
     surface: "customers",
-    purpose: "قائمة العملاء وقيمتهم وآخر تعامل",
+    	  // Was "قائمة العملاء وقيمتهم وآخر تعامل" — and the row never showed a last
+	  // interaction: it draws the customer, their order count and their value.
+	  // `CustomerSummary` carries no last-order timestamp, and
+	  // customers_crm.last_contact_tracking is L3/planned in the map. A purpose that
+	  // names data the screen does not hold is the same defect as a heading that
+	  // names one member of its group.
+	  purpose: "قائمة العملاء وأوردراتهم وقيمتهم",
     entry: ["MainRoute — تاب العملاء"],
     exit: ["CustomerRoute"],
     data: ["customers page", "aggregate spend"],
@@ -460,11 +484,16 @@ export const CONTRACTS = [
     ],
     data: [
       "seller profile", "plan summary", "entitlement states for every entry",
-      "public slug", "payout handles (InstaPay, Vodafone Cash)",
+      // "public slug" was listed here as data and was in fact an editable field,
+      // which is how the account surface came to own a second editor for a store
+      // field — the one without the `/api/v1/slug/check` call `StoreInfoScreen`
+      // makes. It is a read-only display of the published link now, so it stays
+      // as data and every `store` entry owns the writing.
+      "published catalogue link (read-only)", "payout handles (InstaPay, Vodafone Cash)",
     ],
     actions: [
       { do: "open group entry", via: "onOpenStoreInfo" },
-      { do: "save payout and slug", via: "savePayout" },
+      { do: "save payout", via: "savePayout" },
       // Both were real and untraced: the language sheet is behind `showLanguage`
       // and account deletion behind `requestAccountDeletion`.
       { do: "switch language", via: "showLanguage" },

@@ -13,6 +13,7 @@ import app.orderak.seller.domain.PayMethod
 import app.orderak.seller.domain.availablePayMethods
 import app.orderak.seller.domain.resolvePayMethod
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -37,6 +38,16 @@ data class NewOrderUiState(
     val qty: Map<Long, Int> = emptyMap(),   // productId -> qty
     val saving: Boolean = false,
     val stockError: Boolean = false,
+    /**
+     * The write itself failed — a database error rather than a rule refusal.
+     *
+     * Both paths used to be the same path, and it was unguarded: `create` threw,
+     * the exception propagated out of `viewModelScope.launch`, and the seller
+     * lost the screen with `saving` still true and the draft still in
+     * `savedStateHandle`. Reporting it is the difference between "try again" and
+     * "the app closed".
+     */
+    val saveFailed: Boolean = false,
     val countryIso: String = "EG",
 ) {
     val phoneValid: Boolean get() = Countries.isValid(Countries.byIso(countryIso), phone)
@@ -161,23 +172,43 @@ class NewOrderViewModel @Inject constructor(
     fun save(onDone: (Long) -> Unit) {
         val s = _state.value
         if (!s.canSave || s.saving) return
-        _state.value = s.copy(saving = true)
+        // `OrderRepository.create` refuses a mixed-currency order, and it is right
+        // to: minor units from two currencies sum to a number that is not money,
+        // and the order row carries one currency column. This used to reach it
+        // anyway — `canSave` checked a phone number and a quantity and nothing
+        // else — so a seller who selected one legacy row priced in a second
+        // currency threw an IllegalStateException inside `viewModelScope.launch`
+        // and lost the screen, draft and all.
+        //
+        // The guard's own comment says "the caller filters to a single currency
+        // before it gets here". This is the caller doing it, for the first time.
+        if (selectedCurrency() == null) return
+        _state.value = s.copy(saving = true, saveFailed = false)
         viewModelScope.launch {
-            val selected = products.value.orEmpty().mapNotNull { p ->
-                val q = s.qty[p.id] ?: 0
-                if (q <= 0) null else Triple(p, q, q > p.stock)
+            try {
+                val selected = products.value.orEmpty().mapNotNull { p ->
+                    val q = s.qty[p.id] ?: 0
+                    if (q <= 0) null else Triple(p, q, q > p.stock)
+                }
+                if (selected.any { it.third }) {
+                    _state.value = _state.value.copy(saving = false, stockError = true)
+                    return@launch
+                }
+                val lines = selected.map { (p, q, _) -> NewOrderLine(p.id, p.productCode, p.name, q, p.priceMinor, p.currency) }
+                val id = orderRepo.create(
+                    buyerPhone = s.phone, buyerName = s.name.ifBlank { null },
+                    payMethod = s.payMethod, note = s.note.ifBlank { null }, lines = lines
+                )
+                clearDraft()
+                onDone(id)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failed: Exception) {
+                // A write that did not happen must not look like one that did, and
+                // it must not take the screen with it. The draft is untouched, so
+                // "try again" is a real offer rather than a gesture.
+                _state.value = _state.value.copy(saving = false, saveFailed = true)
             }
-            if (selected.any { it.third }) {
-                _state.value = s.copy(saving = false, stockError = true)
-                return@launch
-            }
-            val lines = selected.map { (p, q, _) -> NewOrderLine(p.id, p.productCode, p.name, q, p.priceMinor, p.currency) }
-            val id = orderRepo.create(
-                buyerPhone = s.phone, buyerName = s.name.ifBlank { null },
-                payMethod = s.payMethod, note = s.note.ifBlank { null }, lines = lines
-            )
-            clearDraft()
-            onDone(id)
         }
     }
 

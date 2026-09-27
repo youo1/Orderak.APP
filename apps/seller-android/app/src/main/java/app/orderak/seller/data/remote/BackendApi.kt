@@ -653,6 +653,29 @@ data class AccountStatusRes(
      */
     val accountStatus: String get() = status.domainStatus() ?: "active"
 }
+
+/**
+ * The resend endpoint's own answer, rather than the generic [OkRes].
+ *
+ * Closes §4.5's "**A verified seller can be told a verification email was
+ * sent.** `auth-v2.ts:908-911` answers `already_verified`, and
+ * `BackendApi.resendAccountEmailVerification` (`BackendApi.kt:1127-1137`)
+ * returns the generic `OkRes`, dropping it." The field decoded into nothing and
+ * the screen then claimed a link had been sent and would expire in 24 hours to
+ * a seller whose email was already verified.
+ *
+ * The backend already answers correctly and is not changed here. This is the
+ * shape [SlugCheckRes] already uses for the same reason: the domain state its
+ * endpoint answers with, beside the transport `ok`, so the caller can say the
+ * true thing.
+ */
+@Serializable
+data class EmailVerificationResendRes(
+    val ok: Boolean = false,
+    /** True when nothing was sent because the address is already verified. */
+    val already_verified: Boolean = false,
+    @SerialName("code") val error: String? = null,
+)
 @Serializable data class DeletionRequestDto(val id: String, val status: String, val requested_at: String? = null, val deadline_at: String? = null, val verified_at: String? = null, val completed_at: String? = null, val notes: String? = null)
 @Serializable data class DeletionStatusRes(val ok: Boolean = false, val request: DeletionRequestDto? = null, @SerialName("code") val error: String? = null)
 @Serializable data class SupportTicketDto(val id: Long, val subject: String, val status: String, val priority: String = "normal", val last_message: String? = null, val created_at: String? = null, val updated_at: String? = null)
@@ -1128,7 +1151,7 @@ class BackendApi @Inject constructor(
         phone: String,
         secret: String,
         recentAuthToken: String,
-    ): OkRes = apiCall({ OkRes(error = it) }) {
+    ): EmailVerificationResendRes = apiCall({ EmailVerificationResendRes(error = it) }) {
         postRaw(
             "/api/v1/account/email/verification/resend",
             "{}",

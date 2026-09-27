@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import app.orderak.seller.R
 import app.orderak.seller.core.text.formatCount
+import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 
 /**
  * OTP entry form — title, subtitle, 6-digit code input, inline error,
@@ -73,6 +74,7 @@ fun AuthOtpForm(
     onChangeNumber: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val spacing = LocalOrderakSpacing.current
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -85,7 +87,7 @@ fun AuthOtpForm(
             color = MaterialTheme.colorScheme.onBackground,
         )
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(spacing.space3))
 
         Text(
             text = stringResource(R.string.auth_otp_sent_to, phoneE164),
@@ -94,7 +96,7 @@ fun AuthOtpForm(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        Spacer(Modifier.height(48.dp))
+        Spacer(Modifier.height(spacing.space12))
 
         // ── 2. OTP digit input ─────────────────────────────────────
         AndroidViewLayoutDirectionReset {
@@ -110,7 +112,7 @@ fun AuthOtpForm(
         // ── 3. Inline error ───────────────────────────────────────
         AuthErrorText(error = error)
 
-        Spacer(Modifier.height(48.dp))
+        Spacer(Modifier.height(spacing.space12))
 
         // ── 4. Status label (replaces the old always-disabled button) ──
         val statusLabel = when {
@@ -129,7 +131,7 @@ fun AuthOtpForm(
             },
         )
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(spacing.space6))
 
         // ── 5. Resend ──────────────────────────────────────────────
         if (!isVerifying) {
@@ -156,7 +158,7 @@ fun AuthOtpForm(
                 )
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(spacing.space2))
 
             TextButton(
                 onClick = onChangeNumber,
@@ -185,6 +187,7 @@ private fun OtpCodeInput(
     enabled: Boolean,
     length: Int,
 ) {
+    val spacing = LocalOrderakSpacing.current
     BasicTextField(
         value = code,
         onValueChange = { raw ->
@@ -245,14 +248,14 @@ private fun OtpCodeInput(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
                                 .weight(1f)
-                                .padding(horizontal = 4.dp)
+                                .padding(horizontal = spacing.space1)
                                 .height(64.dp)
-                                .clip(RoundedCornerShape(16.dp))
+                                .clip(MaterialTheme.shapes.large)
                                 .background(boxBackgroundColor)
                                 .border(
                                     width = if (isActive || isError) 2.dp else 1.dp,
                                     color = boxBorderColor,
-                                    shape = RoundedCornerShape(16.dp),
+                                    shape = MaterialTheme.shapes.large,
                                 ),
                         ) {
                             Text(

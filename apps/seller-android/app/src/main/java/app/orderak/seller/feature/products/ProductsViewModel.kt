@@ -2,6 +2,7 @@ package app.orderak.seller.feature.products
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.orderak.seller.core.read.RestartableRead
 import app.orderak.seller.data.billing.EntitlementManager
 import app.orderak.seller.data.db.ProductEntity
 import app.orderak.seller.data.catalog.CatalogRepository
@@ -11,14 +12,10 @@ import app.orderak.seller.data.remote.StoreIdentityResolver
 import app.orderak.seller.data.session.SessionStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -40,20 +37,21 @@ class ProductsViewModel @Inject constructor(
      * forty products met the empty state on every cold start until Room emitted.
      * On this screen that is worse than a flicker, because the empty state is
      * the one that tells them to add their first product.
+     *
+     * A thrown Room read used to be terminal as well: `catch` ended the upstream,
+     * so the catalogue stayed empty for the life of the process behind an error
+     * screen with no way to try again. See [RestartableRead].
      */
-    /** True after [products] falls back to empty because its Room `Flow` threw. */
-    private val _loadError = MutableStateFlow(false)
-    val loadError: StateFlow<Boolean> = _loadError.asStateFlow()
+    private val read = RestartableRead { repo.products }
+
+    /** True while the local read is failing, so the surface can offer a retry. */
+    val loadError: StateFlow<Boolean> = read.failed
 
     val products: StateFlow<List<ProductEntity>?> =
-        repo.products
-            .onEach { _loadError.value = false }
-            .catch { e ->
-                if (e is CancellationException) throw e
-                _loadError.value = true
-                emit(emptyList())
-            }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+        read.values.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** Run the local read again after it threw. */
+    fun retry() = read.retry()
 
     /**
      * Products that live on this phone and have not reached the server.

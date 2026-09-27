@@ -242,7 +242,17 @@ interface OrderDao {
  *   - currencyCount is selected so the screen can tell "one currency, and this
  *     is it" from "more than one, so there is no such number". SUM over minor
  *     units across currencies is 30000 of nothing.
- *   - ORDER BY totalMinor, which is only meaningful for the same reason.
+ *   - ORDER BY the total only when that total means something. This line used to
+ *     read `ORDER BY totalMinor DESC`, which the sentence above already conceded
+ *     was "only meaningful for the same reason" — and then sorted by it anyway. A
+ *     customer whose orders span currencies was therefore *positioned* by adding
+ *     amounts in different currencies: the exact sum the row refuses to print and
+ *     replaces with an em dash. The CASE makes the order and the display agree —
+ *     comparable totals rank first by value, and everything else follows by how
+ *     much history the seller has with them, which needs no exchange rate. SQLite
+ *     sorts NULL below every value, so DESC puts the incomparable ones last.
+ *   - ordersCount before the name, because a tie on value is likelier than a tie
+ *     on history, and the name is there to make the order stable between reads.
  */
 const val CUSTOMER_SUMMARIES_SQL =
     """SELECT c.customerKey AS customerKey, c.phone AS phone, c.name AS name,
@@ -252,7 +262,10 @@ const val CUSTOMER_SUMMARIES_SQL =
               MAX(o.currency) AS currency
        FROM customers c
        LEFT JOIN orders o ON o.buyerPhone = c.phone AND o.status != 'CANCELLED'
-       GROUP BY c.customerKey ORDER BY totalMinor DESC"""
+       GROUP BY c.customerKey
+       ORDER BY (CASE WHEN COUNT(DISTINCT o.currency) <= 1 THEN COALESCE(SUM(o.totalMinor), 0) END) DESC,
+                COUNT(o.id) DESC,
+                c.name"""
 
 
 @Dao

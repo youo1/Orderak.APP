@@ -245,13 +245,6 @@ async function saveAppVersion(request: Request, env: AdminWorkerEnv, admin: Admi
 	return jsonResponse({ ok: true, id });
 }
 
-export async function effectiveAppVersionPolicy(env: AdminWorkerEnv, platform: string, country: string | null): Promise<Record<string, unknown> | null> {
-	return env.orderak_db.prepare(
-		`SELECT * FROM app_version_policies WHERE platform=? AND active=1 AND (country_code=? OR country_code IS NULL)
-		 ORDER BY CASE WHEN country_code=? THEN 0 ELSE 1 END,updated_at DESC LIMIT 1`,
-	).bind(platform, country, country).first<Record<string, unknown>>();
-}
-
 async function buyers(env: AdminWorkerEnv, url: URL): Promise<Response> {
 	const { limit, offset } = page(url);
 	const storeId = url.searchParams.get("store_id");

@@ -244,16 +244,33 @@ fun authOtpExpired() = auth(
 )
 
 // ================= Passkey invite =================
+//
+// These three render the invite's CONTENT, not the screen that hosts it.
+//
+// They used to call `auth(AuthUiState.PasskeyInvite(…))`, which renders
+// `AuthScreenContent` — and in this state that composes a `ModalBottomSheet`, which
+// the screenshot harness does not capture. The three baselines were therefore
+// byte-identical: one SHA256 across all three, 15,540 bytes each, so three different
+// states shared one image and none of them could be reviewed. `PasskeyInviteContent`
+// was extracted for this, the same reason `TodayScreen` and `StoreContent` take a
+// state instead of a view model.
+
+@Composable
+private fun passkeyInvite(state: AuthUiState.PasskeyInvite, dark: Boolean = false) {
+    OrderakTheme(darkTheme = dark) {
+        Surface { PasskeyInviteContent(state = state, onCreate = {}, onSkip = {}) }
+    }
+}
 
 @PreviewTest
 @Preview(name = "Auth passkey invite", locale = "ar")
 @Composable
-fun authPasskeyInvite() = auth(AuthUiState.PasskeyInvite())
+fun authPasskeyInvite() = passkeyInvite(AuthUiState.PasskeyInvite())
 
 @PreviewTest
 @Preview(name = "Auth passkey creating", locale = "ar")
 @Composable
-fun authPasskeyCreating() = auth(AuthUiState.PasskeyInvite(isCreating = true))
+fun authPasskeyCreating() = passkeyInvite(AuthUiState.PasskeyInvite(isCreating = true))
 
 /**
  * A new seller: the choice is recorded now and the system ceremony waits until
@@ -262,7 +279,7 @@ fun authPasskeyCreating() = auth(AuthUiState.PasskeyInvite(isCreating = true))
 @PreviewTest
 @Preview(name = "Auth passkey deferred", locale = "ar")
 @Composable
-fun authPasskeyDeferred() = auth(AuthUiState.PasskeyInvite(deferredForOnboarding = true))
+fun authPasskeyDeferred() = passkeyInvite(AuthUiState.PasskeyInvite(deferredForOnboarding = true))
 
 // ---- dark variants for loading and error -------------------------------
 // The surfaces render every declared state in both themes; auth's loading and
