@@ -189,6 +189,27 @@ export function esc(s: unknown): string {
 		.replace(/"/g, "&quot;");
 }
 
+/**
+ * Parse a URL query `limit` into a bounded page size.
+ *
+ * A query string is attacker-controlled text, so every route that reads a
+ * `limit` used to write its own `Math.min(max, Math.max(1, Number(value) || default))`
+ * — and `Number("12abc")` is NaN, `Number("")` is 0, `Number("2.5")` is a
+ * fraction, and `Number("Infinity")` is Infinity, so the hand-written forms
+ * disagreed about which of those fell back and which reached SQL as a
+ * non-integer LIMIT. One helper keeps every endpoint's guard identical.
+ *
+ * Missing, non-finite, non-integer, zero and negative values return
+ * `defaultValue`; a positive integer is capped at `maxValue`. The result is
+ * always an integer for the integer defaults and maxima the routes pass.
+ */
+export function parseLimitParam(value: string | null, defaultValue: number, maxValue: number): number {
+	if (value === null) return defaultValue;
+	const parsed = Number(value);
+	if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed <= 0) return defaultValue;
+	return Math.min(parsed, maxValue);
+}
+
 // `egp(piasters)` stood here: a formatter with `/ 100` and `en-EG` hardcoded.
 // It had no callers, so it is removed rather than migrated — carrying dead code
 // through a currency migration only creates another place for the old

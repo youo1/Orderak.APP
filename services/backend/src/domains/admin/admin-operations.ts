@@ -1,4 +1,4 @@
-import { jsonResponse } from "../../platform/http/shared";
+import { jsonResponse, parseLimitParam } from "../../platform/http/shared";
 import { Hono } from "hono";
 import type { AdminEnv } from "./admin-context";
 import { auditDb } from "./admin-auth";
@@ -68,7 +68,7 @@ op.patch(`${B}/runtime-config`, async (c) => {
 op.get(`${B}/subscriptions`, async (c) => {
 		const env = c.env, url = new URL(c.req.url), gate = c.get("gate");
 		const denied = gate("subscriptions:view"); if (denied) return denied;
-		const limit = Math.min(500, Math.max(1, Number(url.searchParams.get("limit")) || 100));
+		const limit = parseLimitParam(url.searchParams.get("limit"), 100, 500);
 		const { results } = await env.orderak_db.prepare(
 			`SELECT s.id,s.seller_id,se.store_name,se.store_code,se.public_identifier,s.plan_id,s.status,s.gateway,
 			 s.amount_minor,s.current_period_end,s.created_at,s.updated_at,
@@ -151,7 +151,7 @@ op.get(`${B}/billing/health`, async (c) => {
 op.get(`${B}/billing/verifications`, async (c) => {
 		const env = c.env, url = new URL(c.req.url), gate = c.get("gate");
 		const denied = gate("subscriptions:view"); if (denied) return denied;
-		const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit")) || 100));
+		const limit = parseLimitParam(url.searchParams.get("limit"), 100, 200);
 		const status = textValue(url.searchParams.get("status"), 40);
 		const base = `SELECT id,organization_id,seller_id,source,message_id,status,attempt_count,
 		 verification_generation,purchase_status,error_code,next_attempt_at,dispatched_at,last_attempt_at,

@@ -6,7 +6,7 @@
 // (emails:view for reads, emails:manage for writes) and audited.
 // ============================================================
 
-import { jsonResponse } from "../../platform/http/shared";
+import { jsonResponse, parseLimitParam } from "../../platform/http/shared";
 import { Hono } from "hono";
 import type { AdminEnv } from "../../domains/admin/admin-context";
 import { auditDb } from "../../domains/admin/admin-auth";
@@ -55,7 +55,7 @@ const B = "/api/admin/v1";
 em.get(`${B}/email-events`, async (c) =>
 	c.get("gate")("emails:view") ?? jsonResponse({
 		ok: true,
-		events: await listEvents(c.env, Number(new URL(c.req.url).searchParams.get("limit")) || 100),
+		events: await listEvents(c.env, parseLimitParam(new URL(c.req.url).searchParams.get("limit"), 100, 500)),
 	}));
 
 // ---- Inbound mailbox (Cloudflare Email Routing -> Worker) ----
@@ -64,7 +64,7 @@ em.get(`${B}/inbound-emails`, async (c) => {
 	if (denied) return denied;
 	return jsonResponse({
 		ok: true,
-		emails: await listInbound(c.env, Number(new URL(c.req.url).searchParams.get("limit")) || 100),
+		emails: await listInbound(c.env, parseLimitParam(new URL(c.req.url).searchParams.get("limit"), 100, 500)),
 		unread: await countInboundUnread(c.env),
 	});
 });
