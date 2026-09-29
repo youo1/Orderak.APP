@@ -141,19 +141,19 @@ export const LEGACY_DEFAULT_THEME: LegacyTheme = {
 	danger_soft: "#FFDAD5",
 	warning: "#755B00",
 	warning_soft: "#FFDF91",
-	accent: "#9B4500",
+	accent: "#386664",
 };
 
 export const DEFAULT_DESIGN_SYSTEM_SOURCE: DesignSystemSource = {
 	colors: {
 		primary: "#014D4E",
-		secondary: "#F2751A",
-		tertiary: "#3B82F6",
+		secondary: "#4B6B69",
+		tertiary: "#2F7D6A",
 		error: "#BA1A1A",
 		warning: "#9A6700",
 		success: "#2E7D32",
 		information: "#0061A4",
-		commerce: "#6D509A",
+		commerce: "#824894",
 		primaryChromaFloor: 28.7,
 		primaryLightTones: [29.1, 22, 14],
 		surfaceTemperature: "cool",
