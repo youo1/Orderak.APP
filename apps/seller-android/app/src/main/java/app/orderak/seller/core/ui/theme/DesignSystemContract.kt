@@ -4,5 +4,5 @@ package app.orderak.seller.core.ui.theme
 internal object DesignSystemContract {
     const val SCHEMA_VERSION = 2
     const val GENERATOR_VERSION = "orderak-mcu-0.3.0+3"
-    const val DEFAULT_FALLBACK_HASH = "11e20c99568f55cce54091704622bb725faf6938450a9d8c6936d73edc319956"
+    const val DEFAULT_FALLBACK_HASH = "6b95438c3fa8a37a8a7614882da4e0d44d2054ca7dd4317036c3040a62a6e0eb"
 }

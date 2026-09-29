@@ -35,7 +35,7 @@ describe("public design-system contract", () => {
 		expect(body.schemaVersion).toBe(2);
 		expect(body.designSystem.schemaVersion).toBe(2);
 		expect(body.theme.primary).toBe("#014D4E");
-		expect(body.theme.accent).toBe("#9B4500");
+		expect(body.theme.accent).toBe("#386664");
 		expect(body.version).toHaveLength(64);
 
 		const notModified = await SELF.fetch("https://api.orderak.app/api/v1/theme", {

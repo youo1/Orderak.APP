@@ -10,7 +10,7 @@
 //
 // Dark Teal palette. These values are the standard/light roles emitted by
 // generateDesignSystem() from the brand seed #014D4E (HCT hue 198.1, chroma
-// 28.7) with secondary #F2751A and tertiary #3B82F6. `primary` is pinned to the
+// 28.7) with secondary #4B6B69 and tertiary #2F7D6A. `primary` is pinned to the
 // tone the seed occupies, so the published brand colour and the primary action
 // colour are the same colour. Every pair was contrast-validated at generation.
 // Keep them in step with design/tokens.json and LEGACY_DEFAULT_THEME; they are
@@ -33,7 +33,7 @@ export interface Theme {
 	danger_soft: string;    // error container fill — #FFDAD5
 	warning: string;        // warning text/icons — #755B00
 	warning_soft: string;   // warning container fill — #FFDF91
-	accent: string;         // decorative fill — #9B4500 (fill-only)
+	accent: string;         // decorative fill — #386664 (fill-only)
 }
 
 export const DEFAULT_THEME: Theme = {
@@ -50,7 +50,7 @@ export const DEFAULT_THEME: Theme = {
 	danger_soft: "#FFDAD5",
 	warning: "#755B00",
 	warning_soft: "#FFDF91",
-	accent: "#9B4500",
+	accent: "#386664",
 };
 
 export const THEME_KEYS = Object.keys(DEFAULT_THEME) as (keyof Theme)[];
