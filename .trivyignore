@@ -1,0 +1,25 @@
+# Trivy findings ignored by id, each with its reason and the condition that
+# removes it. Same rule as auditConfig.ignoreGhsas in pnpm-workspace.yaml: one
+# id, never a severity threshold or a package.
+
+# CVE-2026-85024 (medium) — undici's WebSocket permessage-deflate cleanup drops
+# the inflate stream's error listener, so a peer that sends a payload past the
+# 128 MiB limit followed by a malformed DEFLATE byte crashes the process. Fixed
+# in 7.29.1. It reached the vulnerability database on 2026-09-28 or 29, which is
+# why this check began failing every pull request at once.
+#
+# The vulnerable copy is 7.29.0, and every miniflare release pins
+# `undici: 7.29.0` exactly, including the latest (5.20260926.0-alpha), so no
+# upgrade reaches the fix. An override would hand miniflare a version it never
+# declared, the trade pnpm-workspace.yaml refuses for sharp in the same place.
+#
+# Exposure: undici arrives through miniflare (the wrangler dev server and
+# @cloudflare/vitest-pool-workers) and jsdom (the admin tests). Trivy counts it
+# as a production dependency only because @sentry/cloudflare names wrangler as an
+# optional peer. A Worker never bundles undici — Workers use the runtime's own
+# fetch and WebSocket — and nothing in the dev server or the tests opens a
+# WebSocket to an untrusted peer.
+#
+# Remove this entry when miniflare pins undici 7.29.1 or later. The expiry makes
+# the check fail again on that date, so it is re-checked rather than forgotten.
+CVE-2026-85024 exp:2026-12-31
