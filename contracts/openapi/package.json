@@ -19,7 +19,7 @@
     "mock:seller-v1": "prism mock src/seller-v1.json --host 0.0.0.0 --port 4010 --dynamic"
   },
   "devDependencies": {
-    "@redocly/cli": "^2.46.2",
+    "@redocly/cli": "^2.54.2",
     "@stoplight/prism-cli": "^5.16.0",
     "@stoplight/spectral-cli": "^6.16.3"
   }
