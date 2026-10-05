@@ -78,10 +78,13 @@ const adminSrc = path.join(repositoryRoot, "apps", "admin-web", "src");
 const reportMode = process.argv.includes("--report");
 
 /**
- * The generated bundle is the token source, not a consumer: it declares the
- * literals every other file is supposed to reference.
+ * The two token sources are the only files allowed to carry raw literals:
+ * `orderak-tokens.css` is emitted by designSystemCss() and
+ * `orderak-tokens-pending.css` holds the generator-unowned declarations B2
+ * will fold back into the emitter. Every other stylesheet consumes them.
  */
-const GENERATED = new Set(["orderak-tokens.css"]);
+const TOKEN_SOURCE_NAMES = ["orderak-tokens.css", "orderak-tokens-pending.css"];
+const TOKEN_SOURCE_PATHS = new Set(TOKEN_SOURCE_NAMES.map((name) => path.join(adminSrc, name)));
 
 /**
  * All zero: the migrations are done and nothing is grandfathered. Raising one of
@@ -95,6 +98,8 @@ const CEILING = {
 	weight: 0,
 	"weight-class": 0,
 	"unknown-var": 0,
+	colour: 0,
+	scrim: 0,
 };
 
 /**
@@ -147,7 +152,7 @@ function stylesheets(directory) {
 		const full = path.join(directory, entry);
 		if (entry === "node_modules" || entry === "dist") continue;
 		if (statSync(full).isDirectory()) found.push(...stylesheets(full));
-		else if (entry.endsWith(".css") && !GENERATED.has(entry)) found.push(full);
+		else if (entry.endsWith(".css") && !TOKEN_SOURCE_PATHS.has(full)) found.push(full);
 	}
 	return found;
 }
@@ -172,9 +177,11 @@ const declared = new Set(RUNTIME_PROPERTIES);
 for (const text of source.values()) {
 	for (const match of text.matchAll(/(^|[\s;{])--([a-z0-9-]+)\s*:/g)) declared.add(`--${match[2]}`);
 }
-// The generated bundle declares the whole token set.
-const generated = readFileSync(path.join(adminSrc, "orderak-tokens.css"), "utf8");
-for (const match of generated.matchAll(/(^|[\s;{])--([a-z0-9-]+)\s*:/g)) declared.add(`--${match[2]}`);
+// Both token sources declare the whole token set, generated and pending.
+for (const name of TOKEN_SOURCE_NAMES) {
+	const text = readFileSync(path.join(adminSrc, name), "utf8");
+	for (const match of text.matchAll(/(^|[\s;{])--([a-z0-9-]+)\s*:/g)) declared.add(`--${match[2]}`);
+}
 
 const counts = {};
 const details = {};
@@ -197,6 +204,65 @@ for (const rule of RULES) {
 
 counts["unknown-var"] = 0;
 details["unknown-var"] = [];
+
+// ---- Colour literals and scrim backgrounds --------------------------------
+// Declaration values are parsed with comments removed, so a comment may name a
+// colour without failing the guard, and `color-mix(in oklch, ...)` is not
+// mistaken for an `oklch()` literal.
+
+const stripComments = (text) => text.replace(/\/\*[\s\S]*?\*\//g, "");
+const DECLARATION = /(?:^|[;{])\s*([a-zA-Z-][a-zA-Z0-9-]*)\s*:\s*([^;{}]+)/g;
+const COLOUR_LITERAL = /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab|lab|lch|hwb|color)\(/i;
+
+counts["colour"] = 0;
+details["colour"] = [];
+for (const [file, text] of source) {
+	const plain = stripComments(text);
+	for (const match of plain.matchAll(DECLARATION)) {
+		const value = match[2].trim();
+		if (!COLOUR_LITERAL.test(value)) continue;
+		counts["colour"] += 1;
+		const line = plain.slice(0, match.index).split(/\r?\n/).length;
+		details["colour"].push(`${path.relative(repositoryRoot, file).replace(/\\/g, "/")}:${line} ${value}`);
+	}
+}
+
+const CANONICAL_SCRIM = /^color-mix\(\s*in\s+oklch\s*,\s*var\(\s*--orderak-scrim\s*\)\s+48%\s*,\s*transparent\s*\)$/;
+const SCRIM_REFERENCE = /var\(\s*--orderak-scrim\s*\)/;
+
+counts["scrim"] = 0;
+details["scrim"] = [];
+for (const [file, text] of source) {
+	const plain = stripComments(text);
+	for (const match of plain.matchAll(/(?:^|[;{])\s*background(?:-color)?\s*:\s*([^;{}]+)/g)) {
+		const value = match[1].trim();
+		if (!SCRIM_REFERENCE.test(value) || CANONICAL_SCRIM.test(value)) continue;
+		counts["scrim"] += 1;
+		const line = plain.slice(0, match.index).split(/\r?\n/).length;
+		details["scrim"].push(`${path.relative(repositoryRoot, file).replace(/\\/g, "/")}:${line} ${value}`);
+	}
+}
+
+// The four backdrop selectors have to use the canonical mix, not merely avoid a
+// full-opacity one.
+const BACKDROPS = ["drawer-backdrop", "modal-backdrop", "palette-backdrop", "mobile-overlay"];
+const canonicalBackdrops = new Set();
+for (const [, text] of source) {
+	const plain = stripComments(text);
+	for (const match of plain.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+		for (const cls of BACKDROPS) {
+			if (!new RegExp(`\\.${cls}(?![\\w-])`).test(match[1])) continue;
+			for (const declaration of match[2].matchAll(/(?:^|[;{])\s*background(?:-color)?\s*:\s*([^;{}]+)/g)) {
+				if (CANONICAL_SCRIM.test(declaration[1].trim())) canonicalBackdrops.add(cls);
+			}
+		}
+	}
+}
+for (const cls of BACKDROPS) {
+	if (canonicalBackdrops.has(cls)) continue;
+	counts["scrim"] += 1;
+	details["scrim"].push(`admin stylesheets .${cls}: no background: color-mix(in oklch, var(--orderak-scrim) 48%, transparent)`);
+}
 for (const [file, text] of source) {
 	// The theme builder's preview stylesheet is the one place a property name is
 	// built at runtime: `preview.ts` loops over the snapshot's colour roles and
@@ -278,6 +344,8 @@ if (over.length > 0 || kitProblems.length > 0) {
 		...RULES.map((rule) => [rule.kind, rule.remedy]),
 		["unknown-var", "declare it, or fix the name"],
 		["weight-class", "only `font-normal` (400) and `font-medium` (500) exist in this system"],
+		["colour", "use a token or var(); literal colours belong only in the two token sources"],
+		["scrim", "backdrops must use color-mix(in oklch, var(--orderak-scrim) 48%, transparent)"],
 	]);
 	for (const kind of over) {
 		console.error(`  ${kind}: ${counts[kind]} literal(s), ceiling ${CEILING[kind]}. ${REMEDIES.get(kind) ?? "no remedy recorded"}`);

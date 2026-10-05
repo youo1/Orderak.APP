@@ -1,0 +1,225 @@
+/* orderak-tokens-pending.css
+ *
+ * Intentionally hand-kept until plan item B2. B2 deletes this file.
+ *
+ * designSystemCss() owns the fonts, colour roles and aliases, type, spacing,
+ * shape roles and the touch target. Everything else the old
+ * orderak-tokens.css carried — motion, interaction states, focus rings,
+ * shadows, layout sizes, breakpoints, mark colours, family-selection helpers,
+ * numeric helpers, the ready-made .ork-* utilities and the reduced-motion
+ * block — is generator-unowned in B1 and lives here, preserving the old
+ * selectors, scoping, declared values and behaviour verbatim.
+ *
+ * Both this file and the generated bundle are imported into
+ * layer(orderak-fallback) by src/index.css; the unlayered live /theme.css
+ * still outranks them.
+ */
+
+/* ===== family-selection helpers, numerals and the Latin floor ===== */
+:root{
+  --orderak-font-family-tajawal:"Orderak Tajawal",Tajawal,system-ui,sans-serif;
+  --orderak-font-family-noto:"Orderak Noto Arabic","Noto Sans Arabic",system-ui,sans-serif;
+  --orderak-type-latin-floor:12px;
+  --orderak-numeric-tabular:tabular-nums lining-nums;
+}
+
+.ork-numeric{font-variant-numeric:var(--orderak-numeric-tabular);font-feature-settings:"tnum" 1,"lnum" 1}
+/* Counted pairs and money stay LTR inside Arabic — "14 / 20" reorders otherwise. */
+.ork-numeric-pair{font-variant-numeric:var(--orderak-numeric-tabular);direction:ltr;unicode-bidi:isolate}
+
+/* Ready-made role classes. Apply one per text element; never mix a role's size
+   with another role's weight. */
+.ork-display-large{font:var(--orderak-type-display-large-weight) var(--orderak-type-display-large-size)/var(--orderak-type-display-large-line-height) var(--orderak-font-family);letter-spacing:var(--orderak-type-display-large-tracking)}
+.ork-display-medium{font:var(--orderak-type-display-medium-weight) var(--orderak-type-display-medium-size)/var(--orderak-type-display-medium-line-height) var(--orderak-font-family)}
+.ork-display-small{font:var(--orderak-type-display-small-weight) var(--orderak-type-display-small-size)/var(--orderak-type-display-small-line-height) var(--orderak-font-family)}
+.ork-headline-large{font:var(--orderak-type-headline-large-weight) var(--orderak-type-headline-large-size)/var(--orderak-type-headline-large-line-height) var(--orderak-font-family)}
+.ork-headline-medium{font:var(--orderak-type-headline-medium-weight) var(--orderak-type-headline-medium-size)/var(--orderak-type-headline-medium-line-height) var(--orderak-font-family)}
+.ork-headline-small{font:var(--orderak-type-headline-small-weight) var(--orderak-type-headline-small-size)/var(--orderak-type-headline-small-line-height) var(--orderak-font-family)}
+.ork-title-large{font:var(--orderak-type-title-large-weight) var(--orderak-type-title-large-size)/var(--orderak-type-title-large-line-height) var(--orderak-font-family)}
+.ork-title-medium{font:var(--orderak-type-title-medium-weight) var(--orderak-type-title-medium-size)/var(--orderak-type-title-medium-line-height) var(--orderak-font-family);letter-spacing:var(--orderak-type-title-medium-tracking)}
+.ork-title-small{font:var(--orderak-type-title-small-weight) var(--orderak-type-title-small-size)/var(--orderak-type-title-small-line-height) var(--orderak-font-family);letter-spacing:var(--orderak-type-title-small-tracking)}
+.ork-body-large{font:var(--orderak-type-body-large-weight) var(--orderak-type-body-large-size)/var(--orderak-type-body-large-line-height) var(--orderak-font-family);letter-spacing:var(--orderak-type-body-large-tracking)}
+.ork-body-medium{font:var(--orderak-type-body-medium-weight) var(--orderak-type-body-medium-size)/var(--orderak-type-body-medium-line-height) var(--orderak-font-family);letter-spacing:var(--orderak-type-body-medium-tracking)}
+.ork-body-small{font:var(--orderak-type-body-small-weight) var(--orderak-type-body-small-size)/var(--orderak-type-body-small-line-height) var(--orderak-font-family);letter-spacing:var(--orderak-type-body-small-tracking)}
+.ork-label-large{font:var(--orderak-type-label-large-weight) var(--orderak-type-label-large-size)/var(--orderak-type-label-large-line-height) var(--orderak-font-family);letter-spacing:var(--orderak-type-label-large-tracking)}
+.ork-label-medium{font:var(--orderak-type-label-medium-weight) var(--orderak-type-label-medium-size)/var(--orderak-type-label-medium-line-height) var(--orderak-font-family);letter-spacing:var(--orderak-type-label-medium-tracking)}
+.ork-label-small{font:var(--orderak-type-label-small-weight) var(--orderak-type-label-small-size)/var(--orderak-type-label-small-line-height) var(--orderak-font-family);letter-spacing:var(--orderak-type-label-small-tracking)}
+
+/* ===== shape + elevation ===== */
+:root{
+  --orderak-shape-full:999px;
+
+  --orderak-shadow-card:0 5px 18px rgba(20,20,31,.04);
+  --orderak-shadow-raised:0 5px 14px rgba(20,20,31,.08);
+  --orderak-shadow-storefront:0 1px 4px rgba(0,0,0,.067);
+  --orderak-shadow-modal:0 16px 40px rgba(13,21,20,.08);
+  --orderak-shadow-overlay:0 30px 80px rgba(20,20,31,.14);
+}
+
+/* ===== motion ===== */
+:root{
+  --orderak-duration-instant:0ms; /* @kind other */
+  --orderak-duration-short:150ms; /* @kind other */   /* hover, colour, opacity */
+  --orderak-duration-medium:180ms; /* @kind other */  /* sidebar + workspace slide */
+  --orderak-duration-long:200ms; /* @kind other */    /* switch thumb, drawer, sheet */
+  --orderak-duration-extra-long:300ms; /* @kind other */ /* full-screen transition — rare */
+
+  --orderak-easing-standard:cubic-bezier(.2,0,0,1); /* @kind other */
+  --orderak-easing-decelerate:cubic-bezier(0,0,0,1); /* @kind other */  /* entering */
+  --orderak-easing-accelerate:cubic-bezier(.3,0,1,1); /* @kind other */ /* exiting */
+  --orderak-easing-linear:linear; /* @kind other */                     /* spinners only */
+
+  /* Ready-made transitions. Prefer these over writing a duration inline. */
+  --orderak-motion-fast:var(--orderak-duration-short) ease; /* @kind other */
+  --orderak-motion-nav:var(--orderak-duration-medium) ease; /* @kind other */
+  --orderak-motion-drawer:var(--orderak-duration-long) ease; /* @kind other */
+  --orderak-motion-state:opacity var(--orderak-duration-short) var(--orderak-easing-standard); /* @kind other */
+}
+
+@keyframes ork-spin{to{transform:rotate(360deg)}}
+.ork-spinner{width:26px;height:26px;border:3px solid var(--md-sys-color-surface-variant);border-top-color:var(--md-sys-color-primary);border-radius:50%;animation:ork-spin .9s var(--orderak-easing-linear) infinite}
+
+/* Reduced motion is honoured, not approximated. The product already turns the
+   sidebar transitions off entirely; extend that to everything. */
+@media (prefers-reduced-motion: reduce){
+  :root{
+    --orderak-duration-short:0ms; /* @kind other */
+    --orderak-duration-medium:0ms; /* @kind other */
+    --orderak-duration-long:0ms; /* @kind other */
+    --orderak-duration-extra-long:0ms; /* @kind other */
+    --orderak-motion-fast:0ms linear; /* @kind other */
+    --orderak-motion-nav:0ms linear; /* @kind other */
+    --orderak-motion-drawer:0ms linear; /* @kind other */
+  }
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important}
+  .ork-spinner{animation-duration:1.6s !important;animation-iteration-count:infinite !important}
+}
+
+/* ===== interactive states ===== */
+:root{
+  /* state layer opacities — the whole interaction system in five numbers */
+  --orderak-state-hover:0.08; /* @kind other */
+  --orderak-state-focus:0.10; /* @kind other */
+  --orderak-state-pressed:0.10; /* @kind other */
+  --orderak-state-dragged:0.16; /* @kind other */
+  --orderak-state-selected:0.12; /* @kind other */
+
+  /* disabled: opacity, never a different colour */
+  --orderak-disabled-content-opacity:0.38; /* @kind other */
+  --orderak-disabled-container-opacity:0.12; /* @kind other */
+  /* the web surfaces use a flat 0.5 on the whole control instead */
+  --orderak-disabled-opacity-web:0.5; /* @kind other */
+
+  /* focus ring. Always visible, never removed — outline, not a colour change,
+     so it reads on any container. */
+  --orderak-focus-ring-width:3px;
+  --orderak-focus-ring-offset:2px;
+  --orderak-focus-ring-color:rgba(30,58,138,.22);
+  --orderak-focus-ring:var(--orderak-focus-ring-width) solid var(--orderak-focus-ring-color); /* @kind other */
+  /* inner ring on a focused text field, paired with a --primary border */
+  --orderak-focus-field-ring:0 0 0 3px rgba(30,58,138,.12); /* @kind other */
+
+  /* resolved web hover values (admin surfaces) */
+  --orderak-hover-surface:#F0F3FA;        /* table row, list row */
+  --orderak-hover-border:#B8C0D4;         /* outlined control */
+  --orderak-hover-lift:translateY(-1px); /* @kind other */  /* paired with --orderak-shadow-raised */
+  --orderak-hover-tint:var(--orderak-primary-soft);
+
+  /* press. There is no press-shrink anywhere in Orderak: Compose ripple owns
+     press on the phone, and the web simply drops the hover lift. */
+  --orderak-pressed-lift:none; /* @kind other */
+}
+
+.orderak-dark{
+  --orderak-focus-ring-color:rgba(149,209,210,.34);
+  --orderak-focus-field-ring:0 0 0 3px rgba(149,209,210,.18); /* @kind other */
+  --orderak-hover-surface:#242B2C;
+  --orderak-hover-border:#6B7A7C;
+}
+
+/* Utility: a state layer you can drop on any container.
+   .ork-interactive gives hover/focus/press to a custom element without
+   hardcoding a second colour for each state. */
+.ork-interactive{position:relative;isolation:isolate}
+.ork-interactive::after{content:"";position:absolute;inset:0;border-radius:inherit;background:currentColor;opacity:0;pointer-events:none;transition:opacity var(--orderak-duration-short) var(--orderak-easing-standard)}
+.ork-interactive:hover::after{opacity:var(--orderak-state-hover)}
+.ork-interactive:focus-visible::after{opacity:var(--orderak-state-focus)}
+.ork-interactive:active::after{opacity:var(--orderak-state-pressed)}
+.ork-interactive[aria-selected="true"]::after,.ork-interactive[aria-pressed="true"]::after{opacity:var(--orderak-state-selected)}
+.ork-interactive:disabled,.ork-interactive[aria-disabled="true"]{opacity:var(--orderak-disabled-opacity-web);cursor:not-allowed}
+.ork-interactive:disabled::after,.ork-interactive[aria-disabled="true"]::after{opacity:0}
+
+/* Focus is never removed. This is the one rule with no exceptions. */
+:where(a,button,input,select,textarea,[tabindex]):focus-visible{outline:var(--orderak-focus-ring);outline-offset:var(--orderak-focus-ring-offset)}
+
+/* ===== layout: grid, breakpoints and responsive rules ===== */
+:root{
+  /* Breakpoints. Only three, and only the admin surface uses them —
+     the phone app has no breakpoints (it is one column at every size) and the
+     storefront's column is narrower than the smallest phone. */
+  --orderak-breakpoint-compact:600px; /* @kind other */   /* below: single column, drawer nav */
+  --orderak-breakpoint-medium:860px; /* @kind other */    /* below: sidebar collapses to overlay */
+  --orderak-breakpoint-expanded:1240px; /* @kind other */ /* above: full metric + two-panel grid */
+
+  /* Containers */
+  --orderak-container-storefront:520px; /* the buyer page. Never widen it. */
+  --orderak-container-admin:1560px;     /* admin content column cap */
+  --orderak-container-prose:760px;      /* description/guidance line length */
+  --orderak-container-phone:412px;      /* Compose reference frame width */
+
+  /* Structural fixed dimensions */
+  --orderak-sidebar-width:268px;
+  --orderak-topbar-height:64px;
+  --orderak-appbar-height:64px;
+  --orderak-navbar-height:80px;   /* phone bottom navigation */
+  --orderak-fab-inset:16px;
+
+  /* Gutters */
+  --orderak-gutter-phone:var(--orderak-space4);   /* 16 */
+  --orderak-gutter-storefront:var(--orderak-space4);
+  --orderak-gutter-admin:34px;                     /* index.css .page padding */
+  --orderak-page-padding-block:var(--orderak-space8); /* 32 */
+
+  /* Grid columns */
+  --orderak-grid-metric:repeat(4, minmax(0, 1fr)); /* @kind other */
+  --orderak-grid-panel:repeat(2, minmax(0, 1fr)); /* @kind other */
+  --orderak-grid-gap:14px;
+}
+
+/* Responsive rules, written once so no screen re-derives them. */
+.ork-page{width:min(var(--orderak-container-admin),100%);margin-inline:auto;padding:var(--orderak-page-padding-block) var(--orderak-gutter-admin) 70px}
+.ork-grid-metric{display:grid;grid-template-columns:var(--orderak-grid-metric);gap:var(--orderak-grid-gap)}
+.ork-grid-panel{display:grid;grid-template-columns:var(--orderak-grid-panel);gap:18px}
+
+@media (max-width:1240px){
+  .ork-grid-metric{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:860px){
+  /* The sidebar becomes an overlay drawer; the content column takes the width. */
+  .ork-grid-panel{grid-template-columns:1fr}
+  .ork-page{padding-inline:var(--orderak-space4)}
+}
+@media (max-width:600px){
+  .ork-grid-metric{grid-template-columns:1fr}
+}
+
+/* ===== brand mark colours =====
+   These live only in the logo files; no UI surface uses them. Recorded so
+   nobody re-derives them from the SVG by eye. */
+:root{
+  --orderak-mark-green:#1DAB61;
+  --orderak-mark-badge:#ED8936;
+  --orderak-mark-wordmark:#14342A;
+  --orderak-mark-tagline:#157F49;
+}
+
+/* ===== legacy storefront aliases =====
+   The generator owns the colour aliases now. These three remain because they
+   are structural (a shadow and the storefront's short names), not colours. */
+:root{
+  --shadow:var(--orderak-shadow-modal);
+  --g:var(--orderak-primary);
+  --bg:var(--orderak-canvas);
+  --tx:var(--orderak-ink);
+  --mut:var(--orderak-muted);
+}

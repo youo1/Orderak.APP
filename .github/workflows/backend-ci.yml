@@ -83,6 +83,13 @@ jobs:
         working-directory: services/backend
         run: pnpm run design-system:benchmark
 
+      # The committed admin bundle is emitted by the same designSystemCss() as
+      # /theme.css. A hand edit or a missed regeneration fails here, before the
+      # drift can reach the admin panel's fallback stylesheet.
+      - name: Verify generated design-system outputs are current
+        working-directory: services/backend
+        run: pnpm run design-system:check
+
       - name: Verify migration naming
         working-directory: services/backend
         run: pnpm run verify:migrations

@@ -2,29 +2,31 @@
 
 /* The committed token bundle is a FALLBACK, not the authority.
  *
- * `orderak-tokens.css` is a flattened snapshot generated on one date. The live
- * values come from the published design-system revision, which the edge Worker
- * serves at /theme.css. Both declare the same custom properties on `:root`, so
- * whichever stylesheet the browser parses last used to win — and the built HTML
- * always put the application bundle last, because Vite injects its CSS link at
- * the end of <head>. The generated snapshot therefore overrode every published
- * revision: pressing "Apply as current" in the Theme Builder changed nothing for
- * anybody, and the one administrator who pressed it saw their own tab restyle
- * because the builder also writes inline styles onto documentElement.
+ * `orderak-tokens.css` is the generated snapshot and `orderak-tokens-pending.css`
+ * holds the generator-unowned rules that B2 will fold back into the emitter.
+ * The live values come from the published design-system revision, which the
+ * edge Worker serves at /theme.css. Both declare the same custom properties on
+ * `:root`, so whichever stylesheet the browser parses last used to win — and the
+ * built HTML always put the application bundle last, because Vite injects its
+ * CSS link at the end of <head>. The generated snapshot therefore overrode every
+ * published revision: pressing "Apply as current" in the Theme Builder changed
+ * nothing for anybody, and the one administrator who pressed it saw their own tab
+ * restyle because the builder also writes inline styles onto documentElement.
  *
- * A cascade layer fixes this without depending on stylesheet order. Unlayered
- * author styles always beat layered ones, so the published theme wins wherever
- * the two disagree, and this bundle still supplies every token when /theme.css
- * is unavailable — the edge Worker deliberately answers with an empty
- * stylesheet in that case rather than an error body.
+ * A cascade layer fixes this without depending on stylesheet order.
+ * Unlayered author styles always beat layered ones, so the published theme
+ * wins wherever the two disagree, and this bundle still supplies every token
+ * when /theme.css is unavailable — the edge Worker deliberately answers with an
+ * empty stylesheet in that case rather than an error body.
  *
- * Do not move this import out of the layer. Order-based fixes are what broke
+ * Do not move these imports out of the layer. Order-based fixes are what broke
  * this in the first place. */
 @import "./orderak-tokens.css" layer(orderak-fallback);
+@import "./orderak-tokens-pending.css" layer(orderak-fallback);
 
 @theme inline {
   --color-primary: var(--orderak-primary, var(--primary));
-  --color-primary-foreground: var(--orderak-on-primary, #fff);
+  --color-primary-foreground: var(--orderak-on-primary);
   --color-secondary: var(--orderak-secondary, var(--accent));
   --color-background: var(--orderak-background, var(--canvas));
   --color-foreground: var(--orderak-on-surface, var(--ink));
@@ -152,12 +154,13 @@ h2 { margin-bottom: 4px; font-size: var(--orderak-type-title-medium-size); }
    below resolve to the generated dark scheme whatever the page is set to.
    Nothing here is pinned by hand.
 
-   Everything in this block must name a token that .orderak-dark redefines
-   directly — the --md-sys-color-* and --orderak-* families, and --surface. The
-   unprefixed aliases (--ink, --muted, --line, --primary...) will NOT work here:
-   they are declared once as var() indirections on :root, so they are
-   substituted at the root and inherit down as an already-resolved light value.
-   Using --ink here silently paints dark-on-dark. */
+   Every token in this block must be defined directly in .orderak-dark. The
+   generator now redeclares the unprefixed aliases (--ink, --muted, --line,
+   --primary...) directly in .orderak-dark, so they resolve here too — but only
+   because of that direct redeclaration. An alias declared solely on :root is
+   substituted at the root and inherits down as an already-resolved light value;
+   using one would silently paint dark-on-dark. Keep this block on the tokens
+   that .orderak-dark itself declares. */
 .sidebar { position: fixed; inset: 0 auto 0 0; z-index: 30; width: var(--orderak-sidebar-width); display: flex; flex-direction: column; overflow: hidden; color: var(--md-sys-color-on-surface); background: var(--md-sys-color-surface-container-low); box-shadow: inset -1px 0 var(--md-sys-color-outline-variant); transition: transform var(--orderak-duration-medium) ease, visibility 0s linear 0s; }
 .brand { height: 74px; display: flex; align-items: center; gap: 12px; padding: 0 18px; border-bottom: 1px solid var(--md-sys-color-outline-variant); }
 .brand-mark { width: 36px; height: 36px; display: grid; flex: 0 0 36px; place-items: center; border-radius: var(--orderak-shape-medium); color: var(--md-sys-color-on-primary-container); background: linear-gradient(145deg, var(--md-sys-color-primary-container), var(--orderak-primary-tint)); font-weight: var(--orderak-type-label-large-weight); }
@@ -276,7 +279,7 @@ td, .metric-card strong, .attention em, .snapshot dd, .pagination { font-variant
 .state-card { min-height: 220px; display: grid; align-content: center; justify-items: center; gap: 12px; padding: 30px; border: 1px solid var(--line); border-radius: var(--orderak-shape-large); color: var(--muted); background: var(--surface); text-align: center; }
 .state-card.error { border-color: color-mix(in srgb, var(--danger), transparent 55%); color: var(--danger); }
 
-.drawer-backdrop, .modal-backdrop, .palette-backdrop { position: fixed; inset: 0; z-index: 60; background: var(--orderak-scrim); backdrop-filter: blur(2px); }
+.drawer-backdrop, .modal-backdrop, .palette-backdrop { position: fixed; inset: 0; z-index: 60; background: color-mix(in oklch, var(--orderak-scrim) 48%, transparent); backdrop-filter: blur(2px); }
 .drawer { position: absolute; inset: 0 0 0 auto; width: min(600px, 100vw); overflow-y: auto; padding: 24px; background: var(--surface); box-shadow: -20px 0 60px color-mix(in srgb, var(--md-sys-color-scrim), transparent 84%); }
 .drawer header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
 .drawer dl { margin: 0; }
@@ -350,7 +353,7 @@ td, .metric-card strong, .attention em, .snapshot dd, .pagination { font-variant
   .sidebar { transform: translateX(-100%); visibility: hidden; pointer-events: none; transition: transform var(--orderak-motion-drawer), visibility 0s linear var(--orderak-duration-long); }
   .sidebar.open, .app-shell.navigation-hidden .sidebar.open { transform: translateX(0); visibility: visible; pointer-events: auto; transition: transform var(--orderak-motion-drawer), visibility 0s linear 0s; }
   .mobile-close, .menu-button { display: grid; }
-  .mobile-overlay { position: fixed; inset: 0; z-index: 25; display: block; border: 0; background: var(--orderak-scrim); }
+  .mobile-overlay { position: fixed; inset: 0; z-index: 25; display: block; border: 0; background: color-mix(in oklch, var(--orderak-scrim) 48%, transparent); }
   .workspace { width: 100%; margin-left: 0; }
   .page { padding: 24px 18px 60px; }
   .profile-button span { display: none; }

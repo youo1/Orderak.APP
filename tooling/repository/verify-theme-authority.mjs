@@ -50,6 +50,9 @@ const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url))
 const adminRoot = path.join(repositoryRoot, "apps", "admin-web");
 const indexPath = path.join(adminRoot, "src", "index.css");
 const bundleName = "orderak-tokens.css";
+const pendingName = "orderak-tokens-pending.css";
+/** Both are token sources imported into the same cascade layer. */
+const tokenSourceNames = [bundleName, pendingName];
 const layerName = "orderak-fallback";
 const distAssets = path.join(adminRoot, "dist", "assets");
 
@@ -58,6 +61,7 @@ const TOKEN_PREFIXES = ["--orderak-", "--md-sys-"];
 
 const problems = [];
 const note = (message) => problems.push(message);
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 function relative(filePath) {
 	return path.relative(repositoryRoot, filePath).replace(/\\/g, "/");
@@ -66,30 +70,32 @@ function relative(filePath) {
 // ---- 1. The source rule -------------------------------------------------
 
 const indexCss = readFileSync(indexPath, "utf8");
-const importLines = indexCss
-	.split(/\r?\n/)
-	.map((line) => line.trim())
-	.filter((line) => line.startsWith("@import") && line.includes(bundleName));
+const indexLines = indexCss.split(/\r?\n/).map((line) => line.trim());
 
-if (importLines.length === 0) {
-	note(
-		`${relative(indexPath)} no longer imports ${bundleName}. If the bundle was removed on purpose, delete this ` +
-			`check with it — an unenforced rule that reads as enforced is worse than no rule.`,
-	);
-} else if (importLines.length > 1) {
-	note(`${relative(indexPath)} imports ${bundleName} ${importLines.length} times; expected exactly one, inside the layer.`);
-} else {
-	const line = importLines[0];
-	if (!new RegExp(`layer\\(\\s*${layerName}\\s*\\)`).test(line)) {
+for (const name of tokenSourceNames) {
+	const quotedPath = new RegExp(`["']\\./${escapeRegExp(name)}["']`);
+	const importLines = indexLines.filter((line) => line.startsWith("@import") && quotedPath.test(line));
+
+	if (importLines.length === 0) {
 		note(
-			`${relative(indexPath)} imports ${bundleName} without layer(${layerName}): "${line}". Unlayered, it outranks ` +
-				`the published theme, which is the defect this check exists for.`,
+			`${relative(indexPath)} no longer imports ${name}. If it was removed on purpose, delete this ` +
+				`check with it — an unenforced rule that reads as enforced is worse than no rule.`,
 		);
+	} else if (importLines.length > 1) {
+		note(`${relative(indexPath)} imports ${name} ${importLines.length} times; expected exactly one, inside the layer.`);
+	} else {
+		const line = importLines[0];
+		if (!new RegExp(`layer\\(\\s*${layerName}\\s*\\)`).test(line)) {
+			note(
+				`${relative(indexPath)} imports ${name} without layer(${layerName}): "${line}". Unlayered, it outranks ` +
+					`the published theme, which is the defect this check exists for.`,
+			);
+		}
+		if (!line.endsWith(";")) note(`${relative(indexPath)}: the ${name} import does not end with a semicolon.`);
 	}
-	if (!line.endsWith(";")) note(`${relative(indexPath)}: the ${bundleName} import does not end with a semicolon.`);
 }
 
-/** Every source file that pulls the bundle in, so a second unlayered import cannot hide. */
+/** Every source file that pulls a token source in, so a second unlayered import cannot hide. */
 function sourceFiles(directory) {
 	const found = [];
 	for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -101,15 +107,19 @@ function sourceFiles(directory) {
 	return found;
 }
 
+const tokenSourcePaths = new Set(tokenSourceNames.map((name) => path.join(adminRoot, "src", name)));
+
 for (const file of sourceFiles(adminRoot)) {
-	if (file === indexPath) continue;
-	if (path.basename(file) === bundleName) continue;
+	if (file === indexPath || tokenSourcePaths.has(file)) continue;
 	const text = readFileSync(file, "utf8");
-	if (new RegExp(`@import\\s+["'][^"']*${bundleName}`).test(text)) {
-		note(
-			`${relative(file)} imports ${bundleName} as well as ${relative(indexPath)}. One import, in the layer, or the ` +
-				`ordering this check removed comes back through the other door.`,
-		);
+	for (const name of tokenSourceNames) {
+		if (new RegExp(`@import\\s+["'][^"']*${escapeRegExp(name)}`).test(text)) {
+			note(
+				`${relative(file)} imports ${name} as well as ${relative(indexPath)}. One import, in the layer, or the ` +
+					`ordering this check removed comes back through the other door.`,
+			);
+			break;
+		}
 	}
 }
 
