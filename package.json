@@ -27,6 +27,6 @@
   "verify:implementation": "node --test tooling/ux/implementation-audit.test.mjs && node tooling/ux/verify-implementation-status.mjs"
   },
   "devDependencies": {
-    "turbo": "^2.10.11"
+    "turbo": "^2.11.5"
   }
 }
