@@ -23,3 +23,30 @@
 # Remove this entry when miniflare pins undici 7.29.1 or later. The expiry makes
 # the check fail again on that date, so it is re-checked rather than forgotten.
 CVE-2026-85024 exp:2026-12-31
+
+# CVE-2026-93687 (GHSA-vfj7-8cjw-p6xm, high) — braces' brace-pattern parser can
+# be driven into exponential backtracking by a crafted pattern, so a malicious
+# glob string spins the process. Exposure is dev-only OpenAPI tooling:
+# @stoplight/prism-cli and @stoplight/spectral-cli reach braces through
+# postman-collection, and no patched release exists to move to. The waiver is by
+# id because Trivy reports this advisory under its CVE.
+#
+# Reason: dev-only OpenAPI tooling with no patched release to override to.
+# Removal condition: Remove this entry when a fixed braces release is published
+# and the OpenAPI tooling accepts it. The expiry (2026-11-05) makes the check
+# fail again on that date, so it is re-checked rather than forgotten.
+CVE-2026-93687 exp:2026-11-05
+
+# GHSA-wq5f-xc86-pv6w (high) — sharp's bundled libvips decodes a crafted image
+# with an out-of-bounds write. Exposure is dev-only through miniflare (the
+# wrangler dev server and @cloudflare/vitest-pool-workers); no parent release
+# ships sharp >=0.35.5 yet, and sharp's native platform packages are not
+# exercised by the tests. This advisory has no CVE id, so Trivy is silenced by
+# GHSA id.
+#
+# Reason: dev-only through miniflare, with no parent release shipping
+# sharp >=0.35.5 yet.
+# Removal condition: Remove this entry when a miniflare release ships
+# sharp >=0.35.5. The expiry (2026-11-05) makes the check fail again on that
+# date, so it is re-checked rather than forgotten.
+GHSA-wq5f-xc86-pv6w exp:2026-11-05
