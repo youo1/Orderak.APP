@@ -40,7 +40,7 @@ function findLineIndexContaining(text: string, re: RegExp): number {
   return lines.findIndex((l) => re.test(l));
 }
 
-function nearbyTextBefore(text: string, lineIndex: number, before = 20): string {
+function nearbyTextBefore(text: string, lineIndex: number, before = 25): string {
   const lines = text.split(/\r?\n/);
   return lines.slice(Math.max(0, lineIndex - before), lineIndex + 1).join('\n');
 }
@@ -56,6 +56,13 @@ function extractIgnoreGhsas(text: string): string[] {
     ids.push(m[1]);
   }
   return ids;
+}
+
+function activeTrivyLines(text: string): string[] {
+  return text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0 && !l.startsWith('#'));
 }
 
 describe('pnpm-workspace.yaml: new bounded overrides', () => {
@@ -90,52 +97,78 @@ describe('pnpm-workspace.yaml: new bounded overrides', () => {
     expect(ctx).toContain('GHSA-68fv-2mgg-jv7q');
   });
 
-  it('overrides sharp to >=0.35.5 <0.36 (upper bound preserved), citing its advisory', () => {
-    const idx = findLineIndexContaining(workspaceYaml, /sharp(@\S+)?:\s*">=0\.35\.5 <0\.36"/);
-    expect(idx).toBeGreaterThanOrEqual(0);
-    const ctx = nearbyTextBefore(workspaceYaml, idx);
-    expect(ctx).toContain('GHSA-wq5f-xc86-pv6w');
+  it('does not override sharp (owner declined: no parent release ships a patched sharp)', () => {
+    expect(/^\s*sharp(@\S+)?:\s*"/m.test(workspaceYaml)).toBe(false);
+  });
+
+  it('does not override braces (no patched release exists)', () => {
+    expect(/^\s*braces(@\S+)?:\s*"/m.test(workspaceYaml)).toBe(false);
   });
 });
 
-describe('pnpm-workspace.yaml: braces waiver', () => {
-  it('ignoreGhsas is exactly the two existing ids plus GHSA-vfj7-8cjw-p6xm', () => {
+describe('pnpm-workspace.yaml: braces and sharp waivers', () => {
+  it('ignoreGhsas is exactly the two existing ids plus the braces and sharp waivers', () => {
     const ids = extractIgnoreGhsas(workspaceYaml);
     expect(new Set(ids)).toEqual(
-      new Set(['GHSA-qxc2-j82w-r537', 'GHSA-rgj7-g3m4-5g8c', 'GHSA-vfj7-8cjw-p6xm']),
+      new Set([
+        'GHSA-qxc2-j82w-r537',
+        'GHSA-rgj7-g3m4-5g8c',
+        'GHSA-vfj7-8cjw-p6xm',
+        'GHSA-wq5f-xc86-pv6w',
+      ]),
     );
   });
 
   it('the GHSA-vfj7-8cjw-p6xm entry documents CVE, reason and 2026-11-05 expiry', () => {
     const idx = findLineIndexContaining(workspaceYaml, /-\s*GHSA-vfj7-8cjw-p6xm\s*$/);
     expect(idx).toBeGreaterThanOrEqual(0);
-    const ctx = nearbyTextBefore(workspaceYaml, idx, 25).toLowerCase();
+    const ctx = nearbyTextBefore(workspaceYaml, idx).toLowerCase();
     expect(ctx).toContain('cve-2026-93687');
     expect(ctx).toContain('@stoplight/prism-cli');
     expect(ctx).toContain('@stoplight/spectral-cli');
     expect(ctx).toContain('no patched release');
     expect(ctx).toContain('2026-11-05');
   });
+
+  it('the GHSA-wq5f-xc86-pv6w entry documents the miniflare/sharp reason and 2026-11-05 expiry', () => {
+    const idx = findLineIndexContaining(workspaceYaml, /-\s*GHSA-wq5f-xc86-pv6w\s*$/);
+    expect(idx).toBeGreaterThanOrEqual(0);
+    const ctx = nearbyTextBefore(workspaceYaml, idx).toLowerCase();
+    expect(ctx).toContain('miniflare');
+    expect(ctx).toContain('sharp');
+    expect(ctx).toContain('0.35.5');
+    expect(ctx).toContain('2026-11-05');
+  });
 });
 
-describe('.trivyignore: braces waiver', () => {
-  it('contains exactly the existing undici waiver and the new CVE-2026-93687 waiver', () => {
-    const active = trivyIgnore
-      .split(/\r?\n/)
-      .map((l) => l.trim())
-      .filter((l) => l.length > 0 && !l.startsWith('#'));
-    expect(new Set(active)).toEqual(
-      new Set(['CVE-2026-85024 exp:2026-12-31', 'CVE-2026-93687 exp:2026-11-05']),
+describe('.trivyignore: braces and sharp waivers', () => {
+  it('contains exactly the existing undici waiver plus the new braces and sharp waivers', () => {
+    expect(new Set(activeTrivyLines(trivyIgnore))).toEqual(
+      new Set([
+        'CVE-2026-85024 exp:2026-12-31',
+        'CVE-2026-93687 exp:2026-11-05',
+        'GHSA-wq5f-xc86-pv6w exp:2026-11-05',
+      ]),
     );
   });
 
   it('the CVE-2026-93687 entry documents the reason and 2026-11-05 expiry', () => {
     const idx = findLineIndexContaining(trivyIgnore, /^CVE-2026-93687 exp:2026-11-05$/);
     expect(idx).toBeGreaterThanOrEqual(0);
-    const ctx = nearbyTextBefore(trivyIgnore, idx, 25).toLowerCase();
+    const ctx = nearbyTextBefore(trivyIgnore, idx).toLowerCase();
     expect(ctx).toContain('@stoplight/prism-cli');
     expect(ctx).toContain('@stoplight/spectral-cli');
     expect(ctx).toContain('no patched release');
+    expect(ctx).toContain('2026-11-05');
+  });
+
+  it('the GHSA-wq5f-xc86-pv6w entry documents the miniflare/sharp reason and 2026-11-05 expiry', () => {
+    const idx = findLineIndexContaining(trivyIgnore, /^GHSA-wq5f-xc86-pv6w exp:2026-11-05$/);
+    expect(idx).toBeGreaterThanOrEqual(0);
+    const ctx = nearbyTextBefore(trivyIgnore, idx).toLowerCase();
+    expect(ctx).toContain('miniflare');
+    expect(ctx).toContain('sharp');
+    expect(ctx).toContain('0.35.5');
     expect(ctx).toContain('2026-11-05');
   });
 });
@@ -175,12 +208,15 @@ describe('pnpm-lock.yaml: resolved versions land inside the overridden ranges', 
     }
   });
 
-  it('sharp resolves to >=0.35.5 <0.36 everywhere it appears', () => {
+  it('sharp keeps its pre-existing resolved versions with no override-forced upgrade', () => {
     const versions = collectVersions(lockfile, 'sharp');
     expect(versions.length).toBeGreaterThan(0);
-    for (const v of versions) {
-      expect(gte(v, '0.35.5')).toBe(true);
-      expect(lt(v, '0.36.0')).toBe(true);
-    }
+    expect(new Set(versions)).toEqual(new Set(['0.35.2', '0.35.4']));
+  });
+
+  it('braces still resolves to 3.0.3 (no fixed release exists to move to)', () => {
+    const versions = collectVersions(lockfile, 'braces');
+    expect(versions.length).toBeGreaterThan(0);
+    expect(versions.every((v) => v === '3.0.3')).toBe(true);
   });
 });
