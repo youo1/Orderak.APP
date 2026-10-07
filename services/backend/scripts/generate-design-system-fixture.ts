@@ -1,13 +1,36 @@
+import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import {
 	DEFAULT_DESIGN_SYSTEM_SOURCE,
 	LEGACY_DEFAULT_THEME,
+	designSystemCss,
 	generateDesignSystem,
 } from "../src/domains/design/design-system";
 
-const workspace = resolve(process.cwd(), "..", "..");
+/**
+ * The repository root that owns the generated outputs.
+ *
+ * `pnpm --dir services/backend run design-system:*` puts the script's cwd at
+ * `services/backend`, and the fixture test runs a copy from a sandbox's
+ * `services/backend`. Walking up to the first ancestor that holds the canonical
+ * fixture keeps both working and also tolerates an invocation from the
+ * repository root, which would otherwise resolve one directory too high and
+ * make both write and check look at empty paths.
+ */
+function findWorkspace(start: string): string {
+	let current = resolve(start);
+	for (;;) {
+		if (existsSync(resolve(current, "design", "design-system.default.json"))) return current;
+		const parent = resolve(current, "..");
+		if (parent === current) return resolve(start, "..", "..");
+		current = parent;
+	}
+}
+
+const workspace = findWorkspace(process.cwd());
 const fixturePath = resolve(workspace, "design", "design-system.default.json");
+const adminBundlePath = resolve(workspace, "apps", "admin-web", "src", "orderak-tokens.css");
 const themeDir = resolve(
 	workspace,
 	"apps",
@@ -264,20 +287,27 @@ internal object DesignSystemContract {
 }
 `;
 	const schemes = renderKotlinSchemes(snapshot as Parameters<typeof renderKotlinSchemes>[0]);
+	// The committed admin bundle is the direct, unmodified return value of the
+	// emitter the Worker uses, with only the font URL base switched to the
+	// relative `./fonts/` prefix. No wrapping, prepending or post-processing.
+	const adminBundle = designSystemCss(snapshot, { fontUrlBase: "./fonts/" });
 
 	if (process.argv.includes("--write")) {
 		await writeFile(fixturePath, fixture);
 		await writeFile(androidContractPath, kotlin);
 		await writeFile(androidSchemesPath, schemes);
+		await writeFile(adminBundlePath, adminBundle);
 		console.log(`Wrote ${fixturePath}`);
 		console.log(`Wrote ${androidContractPath}`);
 		console.log(`Wrote ${androidSchemesPath}`);
+		console.log(`Wrote ${adminBundlePath}`);
 	} else {
 		const currentFixture = await readFile(fixturePath, "utf8").catch(() => "");
 		const currentKotlin = await readFile(androidContractPath, "utf8").catch(() => "");
 		const currentSchemes = await readFile(androidSchemesPath, "utf8").catch(() => "");
-		if (currentFixture !== fixture || currentKotlin !== kotlin || currentSchemes !== schemes) {
-			console.error("Generated design-system fallback drift detected. Run npm run design-system:generate.");
+		const currentBundle = await readFile(adminBundlePath, "utf8").catch(() => "");
+		if (currentFixture !== fixture || currentKotlin !== kotlin || currentSchemes !== schemes || currentBundle !== adminBundle) {
+			console.error("Generated design-system fallback drift detected. Run pnpm run design-system:generate.");
 			process.exitCode = 1;
 		} else {
 			console.log(`Design-system fixture is current (${snapshot.contentHash}).`);
