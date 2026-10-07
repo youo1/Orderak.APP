@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Adaptive-icon foreground: the Orderak mark (plan item B9, direction B) in primaryContainer, the smile cut out so the primary background shows through. Generated from design/assets/brand; do not edit by hand. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="0.58"
+        android:scaleY="0.58"
+        android:translateX="19.2"
+        android:translateY="19.2">
+        <path
+            android:fillColor="#B0EEEE"
+            android:fillType="evenOdd"
+            android:pathData="M30 16.5H90A8 8 0 0 1 97.9 23.3L104 78.5A12 12 0 0 1 92 90.5H50L28 103.5L32 90.5H28A12 12 0 0 1 16 78.5L22.1 23.3A8 8 0 0 1 30 16.5ZM40 34.5A20 20 0 0 0 80 34.5A4 4 0 0 0 72 34.5A12 12 0 0 1 48 34.5A4 4 0 0 0 40 34.5Z" />
+    </group>
+</vector>

@@ -1,0 +1,40 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>html,body{margin:0;background:transparent;overflow:hidden}svg{display:block}</style></head>
+<body>
+<script>
+// Draws one raster variant of the B9 mark, filling the viewport. Variant and size come from the hash: #variant/size
+const BAG = "M30 16.5H90A8 8 0 0 1 97.9 23.3L104 78.5A12 12 0 0 1 92 90.5H50L28 103.5L32 90.5H28A12 12 0 0 1 16 78.5L22.1 23.3A8 8 0 0 1 30 16.5Z";
+const SMILE = "M40 34.5A20 20 0 0 0 80 34.5A4 4 0 0 0 72 34.5A12 12 0 0 1 48 34.5A4 4 0 0 0 40 34.5Z";
+const SMILE_SMALL = "M35 36.5A25 25 0 0 0 85 36.5A6.5 6.5 0 0 0 72 36.5A12 12 0 0 1 48 36.5A6.5 6.5 0 0 0 35 36.5Z";
+const PRIMARY = "#014D4E", ON_PRIMARY = "#FFFFFF", CONTAINER = "#B0EEEE";
+const [variant, sizeText] = location.hash.slice(1).split("/");
+const S = Number(sizeText);
+// The mark's box on its grid is x 16..104, y 16.5..103.5 (88 x 87); centre 60,60.
+function mark(height, cx, cy, bag, holeOrSmile, small) {
+  const k = height / 87, tx = cx - 60 * k, ty = cy - 60 * k;
+  const smile = small ? SMILE_SMALL : SMILE;
+  if (holeOrSmile === "hole") return `<path transform="translate(${tx} ${ty}) scale(${k})" d="${BAG}${smile}" fill="${bag}" fill-rule="evenodd"/>`;
+  return `<g transform="translate(${tx} ${ty}) scale(${k})"><path d="${BAG}" fill="${bag}"/><path d="${smile}" fill="${holeOrSmile}"/></g>`;
+}
+let body = "";
+const c = S / 2;
+if (variant === "legacy-square") {
+  const inset = S * 2 / 48, inner = S - 2 * inset;
+  body = `<rect x="${inset}" y="${inset}" width="${inner}" height="${inner}" rx="${inner * 0.2}" fill="${PRIMARY}"/>` + mark(inner * 0.6, c, c, CONTAINER, "hole");
+} else if (variant === "legacy-round") {
+  const inset = S * 2 / 48, d = S - 2 * inset;
+  body = `<circle cx="${c}" cy="${c}" r="${d / 2}" fill="${PRIMARY}"/>` + mark(d * 0.56, c, c, CONTAINER, "hole");
+} else if (variant === "favicon") {
+  // small cut, framed tight: the 92-unit frame around the bag fills the canvas
+  const k = S / 92, tx = -14 * k, ty = -14 * k;
+  body = `<g transform="translate(${tx} ${ty}) scale(${k})"><path d="${BAG}" fill="${PRIMARY}"/><path d="${SMILE_SMALL}" fill="${ON_PRIMARY}"/></g>`;
+} else if (variant === "full-bleed") {
+  body = `<rect width="${S}" height="${S}" fill="${PRIMARY}"/>` + mark(S * 0.5, c, c, CONTAINER, "hole");
+} else if (variant === "maskable") {
+  body = `<rect width="${S}" height="${S}" fill="${PRIMARY}"/>` + mark(S * 0.42, c, c, CONTAINER, "hole");
+} else if (variant === "rounded") {
+  body = `<rect width="${S}" height="${S}" rx="${S * 0.2}" fill="${PRIMARY}"/>` + mark(S * 0.56, c, c, CONTAINER, "hole");
+}
+document.body.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="${S}" height="${S}" viewBox="0 0 ${S} ${S}">${body}</svg>`;
+</script>
+</body></html>
