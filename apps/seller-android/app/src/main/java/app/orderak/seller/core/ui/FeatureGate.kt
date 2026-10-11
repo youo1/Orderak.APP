@@ -117,7 +117,11 @@ private fun LockedByPlanNotice(
                 )
             }
             if (onUpgrade != null) {
-                SemanticChip(SemanticRole.Commerce, stringResource(R.string.gate_upgrade_action))
+                FeatureAvailabilityChip(
+                    availability = FeatureAvailability.LockedByPlan,
+                    upgradeLabel = stringResource(R.string.gate_upgrade_action),
+                    unavailableLabel = stringResource(R.string.gate_not_built_badge),
+                )
             }
         }
     }
@@ -156,7 +160,11 @@ private fun NotBuiltNotice(modifier: Modifier = Modifier) {
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
-            SemanticChip(SemanticRole.Neutral, stringResource(R.string.gate_not_built_badge))
+            FeatureAvailabilityChip(
+                availability = FeatureAvailability.NotBuilt,
+                upgradeLabel = stringResource(R.string.gate_upgrade_action),
+                unavailableLabel = stringResource(R.string.gate_not_built_badge),
+            )
         }
     }
 }

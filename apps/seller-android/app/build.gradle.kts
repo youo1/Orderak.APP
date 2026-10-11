@@ -226,7 +226,6 @@ dependencies {
     ksp(libs.androidx.hilt.compiler)
     implementation(libs.mlkit.text)            // on-device OCR for payment proof (S6a)
     implementation(libs.libphonenumber)
-    implementation(libs.osmdroid)
     implementation(libs.billing.ktx)
 
     // Room: single source of truth from Stage 2 onward (deps wired now per plan)
