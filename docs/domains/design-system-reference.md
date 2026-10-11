@@ -9,7 +9,9 @@ applies_to: [production, staging]
 
 The reference for every visual decision in Orderak: what the tokens are and
 how to choose between them. Generated from the brand seed `#014D4E` and
-validated at generation.
+validated at generation. The per-component inventory — every Android `core/ui`
+composable and admin kit export, with its states, callers and rule — lives in
+the [design-system components inventory](design-system-components.md).
 
 Values have one authority and one fallback:
 

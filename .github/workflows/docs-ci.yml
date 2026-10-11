@@ -131,6 +131,15 @@ jobs:
       - name: Verify the admin panel has one component kit
         run: node tooling/repository/verify-admin-primitives.mjs
 
+      # The kit's own inventory, and the proof that the guard reading it can
+      # fail. The test runs first so a broken guard fails as a broken guard,
+      # not as a green tick.
+      - name: Test the design-system component inventory guard
+        run: node --test tooling/repository/verify-design-system-components.test.mjs
+
+      - name: Verify the design-system component inventory
+        run: node tooling/repository/verify-design-system-components.mjs
+
       # D1 is the system of record and Room is a cache of it (ADR-012). That rule
       # is only as strong as the narrowest place it can be broken, which is one
       # productDao().upsert() in a view model written by someone reasonably
