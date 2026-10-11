@@ -74,21 +74,29 @@ function withoutComments(source) {
 		.join("\n");
 }
 
-function escapeRegExp(value) {
-	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function isWordChar(char) {
+	return char !== undefined && /\w/.test(char);
 }
 
-/** True for an occurrence matcher preferring the receiver form for SemanticRole.colors(). */
-function occurrencePattern(name) {
-	if (name === "SemanticRole.colors") return /\bSemanticRole(?:\.\w+)?\.colors\b/g;
-	return new RegExp(`\\b${escapeRegExp(name)}\\b`, "g");
-}
-
-function countOccurrences(text, name) {
-	const pattern = occurrencePattern(name);
+/**
+ * Whole-word occurrences of an identifier, the same count as `\bname\b`.
+ *
+ * Found with indexOf rather than a RegExp built from the name: Semgrep's
+ * detect-non-literal-regexp (a required check) refuses a pattern assembled from
+ * a variable, and a plain identifier needs no pattern at all.
+ */
+function wholeWordCount(text, name) {
 	let count = 0;
-	while (pattern.exec(text) !== null) count++;
+	for (let at = text.indexOf(name); at !== -1; at = text.indexOf(name, at + name.length)) {
+		if (!isWordChar(text[at - 1]) && !isWordChar(text[at + name.length])) count++;
+	}
 	return count;
+}
+
+/** Occurrences of a component name, preferring the receiver form for SemanticRole.colors(). */
+function countOccurrences(text, name) {
+	if (name === "SemanticRole.colors") return (text.match(/\bSemanticRole(?:\.\w+)?\.colors\b/g) ?? []).length;
+	return wholeWordCount(text, name);
 }
 
 // ---- Android ---------------------------------------------------------------
@@ -168,11 +176,10 @@ function adminComponentsWithCallers() {
 	const files = collectFiles(ADMIN_SRC, (name) => /\.(tsx|ts)$/.test(name));
 	const withCallers = new Set();
 	for (const component of components) {
-		const pattern = new RegExp(`\\b${escapeRegExp(component.name)}\\b`);
 		const caller = files.find((file) => {
 			if (file === component.file) return false;
 			if (isTestFile(relative(file))) return false;
-			return pattern.test(withoutComments(readFileSync(file, "utf8")));
+			return wholeWordCount(withoutComments(readFileSync(file, "utf8")), component.name) > 0;
 		});
 		if (caller) withCallers.add(`${component.name}@@${component.relative}`);
 	}
