@@ -107,6 +107,50 @@ test("fails on an unused Android composable, naming it and its file", () => {
 	assert.match(result.output, /ZzUnusedProbe\.kt/);
 });
 
+test("distinguishes same-name, same-basename components in separate directories", () => {
+	const root = sandbox();
+	// Two distinct composables share both a name and a source-file basename.
+	// Both have callers, so the only problem is that neither has an inventory
+	// row: the guard must key each by its full repository-relative path and
+	// report both, instead of collapsing them into a single inventory key.
+	const declaration = (pkg, name) =>
+		[
+			`package ${pkg}`,
+			"",
+			"import androidx.compose.runtime.Composable",
+			"",
+			"@Composable",
+			`fun ${name}(label: String) {`,
+			"    SemanticChip(SemanticRole.Info, label)",
+			"}",
+			"",
+		].join("\n");
+	write(root, path.join(CORE_UI, "ZzTwinProbe.kt"), declaration("app.orderak.seller.core.ui", "ZzTwinProbe"));
+	write(
+		root,
+		path.join(CORE_UI, "nested", "ZzTwinProbe.kt"),
+		declaration("app.orderak.seller.core.ui.nested", "ZzTwinProbe"),
+	);
+	write(
+		root,
+		path.join("apps", "seller-android", "app", "src", "main", "java", "app", "orderak", "seller", "feature", "orders", "ZzTwinProbeCaller.kt"),
+		[
+			"package app.orderak.seller.feature.orders",
+			"",
+			"import app.orderak.seller.core.ui.ZzTwinProbe",
+			"",
+			"fun probeCaller() {",
+			'    ZzTwinProbe("x")',
+			"}",
+			"",
+		].join("\n"),
+	);
+	const result = run(root);
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /core\/ui\/ZzTwinProbe\.kt/);
+	assert.match(result.output, /core\/ui\/nested\/ZzTwinProbe\.kt/);
+});
+
 test("fails on an unused admin component export, naming it and its file", () => {
 	const root = sandbox();
 	const card = path.join(root, ADMIN_UI, "card.tsx");

@@ -174,7 +174,7 @@ function adminComponentsWithCallers() {
 			if (isTestFile(relative(file))) return false;
 			return pattern.test(withoutComments(readFileSync(file, "utf8")));
 		});
-		if (caller) withCallers.add(`${component.name}@@${path.basename(component.file)}`);
+		if (caller) withCallers.add(`${component.name}@@${component.relative}`);
 	}
 	return { components, withCallers };
 }
@@ -217,9 +217,9 @@ function readInventory() {
 		if (cells.every((cell) => /^:?-{2,}:?$/.test(cell.trim()))) continue;
 		if (cells.length <= Math.max(nameIndex, fileIndex)) continue;
 		const name = normaliseName(cells[nameIndex]);
-		const file = cells[fileIndex].replace(/`/g, "").trim();
+		const file = cells[fileIndex].replace(/`/g, "").trim().replace(/\\/g, "/");
 		if (!name || !file) continue;
-		entries.push({ name, file: path.basename(file) });
+		entries.push({ name, file });
 	}
 	return entries;
 }
@@ -236,23 +236,23 @@ for (const declaration of declarations) {
 	const callers = androidCallerCount(declaration, declarations, androidTexts);
 	if (callers <= 0) {
 		problems.push(
-			`Android composable ${declaration.name} (${path.basename(declaration.relative)}) has no caller ` +
+			`Android composable ${declaration.name} (${declaration.relative}) has no caller ` +
 				`in apps/seller-android/app/src/main outside its declaration.`,
 		);
 	}
-	androidKeys.push(`${declaration.name}@@${path.basename(declaration.file)}`);
+	androidKeys.push(`${declaration.name}@@${declaration.relative}`);
 }
 
 const { components: adminEntries, withCallers: adminWithCallers } = adminComponentsWithCallers();
 for (const component of adminEntries) {
-	if (!adminWithCallers.has(`${component.name}@@${path.basename(component.file)}`)) {
+	if (!adminWithCallers.has(`${component.name}@@${component.relative}`)) {
 		problems.push(
-			`Admin component ${component.name} (${path.basename(component.relative)}) has no caller outside its ` +
+			`Admin component ${component.name} (${component.relative}) has no caller outside its ` +
 				"declaring file and outside tests.",
 		);
 	}
 }
-const adminKeys = adminEntries.map((component) => `${component.name}@@${path.basename(component.file)}`);
+const adminKeys = adminEntries.map((component) => `${component.name}@@${component.relative}`);
 
 const inventory = readInventory();
 if (inventory === null) {
@@ -260,7 +260,7 @@ if (inventory === null) {
 		`${INVENTORY_LABEL} is missing or has no inventory table with "Component" and "Source file" columns.`,
 	);
 } else {
-	const inventoryKeys = new Set(inventory.map((entry) => `${entry.name}@@${path.basename(entry.file)}`));
+	const inventoryKeys = new Set(inventory.map((entry) => `${entry.name}@@${entry.file}`));
 	const treeKeys = new Map();
 	for (const key of [...androidKeys, ...adminKeys]) {
 		treeKeys.set(key, key);
@@ -275,7 +275,7 @@ if (inventory === null) {
 		}
 	}
 	for (const entry of inventory) {
-		const key = `${entry.name}@@${path.basename(entry.file)}`;
+		const key = `${entry.name}@@${entry.file}`;
 		if (!treeKeys.has(key)) {
 			problems.push(
 				`${INVENTORY_LABEL} lists ${entry.name} (${entry.file}), which is not a component in the tree. ` +
@@ -286,7 +286,7 @@ if (inventory === null) {
 	// Duplicate keys collapse overloads; the inventory wants one row per key.
 	const seen = new Map();
 	for (const entry of inventory) {
-		const key = `${entry.name}@@${path.basename(entry.file)}`;
+		const key = `${entry.name}@@${entry.file}`;
 		seen.set(key, (seen.get(key) ?? 0) + 1);
 	}
 	for (const [key, count] of seen) {
@@ -301,12 +301,12 @@ if (reportMode) {
 	console.log(`Android composables: ${androidKeys.length}`);
 	for (const declaration of declarations) {
 		const callers = androidCallerCount(declaration, declarations, androidTexts);
-		console.log(`  ${callers > 0 ? "OK " : "MISS"} ${declaration.name} (${path.basename(declaration.file)}) callers=${callers}`);
+		console.log(`  ${callers > 0 ? "OK " : "MISS"} ${declaration.name} (${declaration.relative}) callers=${callers}`);
 	}
 	console.log(`Admin components: ${adminEntries.length}`);
 	for (const component of adminEntries) {
-		const has = adminWithCallers.has(`${component.name}@@${path.basename(component.file)}`);
-		console.log(`  ${has ? "OK " : "MISS"} ${component.name} (${path.basename(component.file)})`);
+		const has = adminWithCallers.has(`${component.name}@@${component.relative}`);
+		console.log(`  ${has ? "OK " : "MISS"} ${component.name} (${component.relative})`);
 	}
 	console.log(`Inventory rows: ${inventory === null ? "MISSING" : inventory.length}`);
 }
