@@ -263,8 +263,12 @@ describe("designSystemCss emits /theme.css and the admin bundle from one functio
 			for (const [name, value] of Object.entries(snapshot.shapes)) expect(root).toContain(`--orderak-shape-${kebab(name)}:${value}px`);
 			expect(root).toContain("--orderak-minimum-touch-target:48px");
 			const plain = stripComments(css);
-			expect(plain).not.toMatch(/@keyframes|\.ork-|:focus-visible|prefers-reduced-motion/);
-			expect(plain).not.toMatch(/--orderak-(?:shadow|duration|motion|easing|hover|focus|breakpoint|mark|state|disabled)-[a-z-]+\s*:/);
+			expect(plain).not.toMatch(/@keyframes|\.ork-|:focus-visible/);
+			expect(plain).not.toMatch(/--orderak-(?:breakpoint|mark)-[a-z-]+\s*:/);
+			expect(plain).toMatch(/--orderak-motion-drawer\s*:/);
+			expect(plain).toMatch(/--orderak-focus-ring\s*:/);
+			expect(plain).toMatch(/--orderak-shadow-card\s*:/);
+			expect(plain).toMatch(/prefers-reduced-motion/);
 		}
 	});
 

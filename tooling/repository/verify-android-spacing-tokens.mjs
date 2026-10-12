@@ -52,27 +52,23 @@ const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url))
 const androidMain = path.join(repositoryRoot, "apps", "seller-android", "app", "src", "main");
 const themeFolder = path.join(androidMain, "java", "app", "orderak", "seller", "core", "ui", "theme");
 
-// The theme file IS the token definition; a literal there is the token.
-const themeText = readFileSync(path.join(themeFolder, "Theme.kt"), "utf8");
+// The generated constants are the token definition Theme.kt consumes; a
+// literal in a screen is the departure this guard detects.
+const generatedText = readFileSync(path.join(themeFolder, "GeneratedDesignSystem.kt"), "utf8");
 
-/** Every value `OrderakSpacing` declares, as the numbers a call site may use. */
+/** Every value the generated spacing family declares, as the numbers a call site may use. */
 function declaredSpacingValues() {
-	const block = themeText.match(/data class OrderakSpacing\(([\s\S]*?)\n\)/);
-	if (!block) throw new Error("Theme.kt no longer declares `data class OrderakSpacing` — this guard cannot tell which values are tokens.");
 	const values = new Set();
-	for (const m of block[1].matchAll(/val\s+\w+\s*:\s*Dp\s*=\s*(\d+(?:\.\d+)?)\.dp/g)) {
-		values.add(Number(m[1]));
-	}
-	if (values.size === 0) throw new Error("OrderakSpacing declares no `val name: Dp = N.dp` field — this guard cannot tell which values are tokens.");
+	for (const m of generatedText.matchAll(/const val SPACING_[A-Z0-9_]+_DP\s*=\s*(\d+(?:\.\d+)?)f/g)) values.add(Number(m[1]));
+	if (values.size === 0) throw new Error("GeneratedDesignSystem.kt declares no SPACING_*_DP constants — this guard cannot tell which values are tokens.");
 	return values;
 }
 
 /** The Material shape slots a hand-written radius may be replaced by. */
 function declaredShapeSlots() {
-	const block = themeText.match(/val OrderakShapes = Shapes\(([\s\S]*?)\n\)/);
-	if (!block) throw new Error("Theme.kt no longer declares `val OrderakShapes`.");
-	const slots = new Set();
-	for (const m of block[1].matchAll(/(\w+)\s*=/g)) slots.add(m[1]);
+	const slots = new Set(["extraSmall", "small", "medium", "large", "extraLarge", "full"]);
+	const block = generatedText.match(/val shapes: Map<String, Float> = mapOf\(([\s\S]*?)\n\s*\)/);
+	if (block) for (const m of block[1].matchAll(/"(\w+)"\s*to/g)) slots.add(m[1]);
 	return slots;
 }
 
@@ -90,10 +86,11 @@ function nearestToken(dp) {
 }
 
 function tokenFieldFor(value) {
-	const block = themeText.match(/data class OrderakSpacing\(([\s\S]*?)\n\)/);
-	const found = [...block[1].matchAll(/val\s+(\w+)\s*:\s*Dp\s*=\s*(\d+(?:\.\d+)?)\.dp/g)].find(
-		(m) => Number(m[2]) === value,
-	);
+	const block = generatedText.match(/const val SPACING_([A-Z0-9_]+)_DP\s*=\s*(\d+(?:\.\d+)?)f/g) ?? [];
+	const found = block.map((entry) => /const val SPACING_([A-Z0-9_]+)_DP/.exec(entry)).find((m) => {
+		const literal = generatedText.match(new RegExp(`const val SPACING_${m[1]}_DP\\s*=\\s*(\\d+(?:\\.\\d+)?)f`));
+		return literal ? Number(literal[1]) === value : false;
+	});
 	return found ? found[1] : null;
 }
 
@@ -151,8 +148,8 @@ for (const file of kotlinFiles(androidMain)) {
 						text: `${match[0].trim()}  →  ${literal}`,
 						rule: `${position.name} takes a design-system token, not a literal`,
 						remedy: isToken
-							? `that value is OrderakSpacing.${field} — read LocalOrderakSpacing.current and use it`
-							: `${value}.dp is not on the scale; the nearest token is ${nearest}.dp (OrderakSpacing.${field})`,
+							? `that value is GeneratedDesignSystem.SPACING_${field}_DP — read LocalOrderakSpacing.current and use it`
+							: `${value}.dp is not on the scale; the nearest token is ${nearest}.dp (GeneratedDesignSystem.SPACING_${field}_DP)`,
 					});
 				}
 			}

@@ -2,16 +2,16 @@
 
 /* The committed token bundle is a FALLBACK, not the authority.
  *
- * `orderak-tokens.css` is the generated snapshot and `orderak-tokens-pending.css`
- * holds the generator-unowned rules that B2 will fold back into the emitter.
- * The live values come from the published design-system revision, which the
- * edge Worker serves at /theme.css. Both declare the same custom properties on
- * `:root`, so whichever stylesheet the browser parses last used to win — and the
- * built HTML always put the application bundle last, because Vite injects its
- * CSS link at the end of <head>. The generated snapshot therefore overrode every
- * published revision: pressing "Apply as current" in the Theme Builder changed
- * nothing for anybody, and the one administrator who pressed it saw their own tab
- * restyle because the builder also writes inline styles onto documentElement.
+ * `orderak-tokens.css` is the generated snapshot and `orderak-admin.css` holds
+ * the live admin rules that consume it. The live values come from the published
+ * design-system revision, which the edge Worker serves at /theme.css. Both
+ * declare the same custom properties on `:root`, so whichever stylesheet the
+ * browser parses last used to win — and the built HTML always put the
+ * application bundle last, because Vite injects its CSS link at the end of
+ * <head>. The generated snapshot therefore overrode every published revision:
+ * pressing "Apply as current" in the Theme Builder changed nothing for anybody,
+ * and the one administrator who pressed it saw their own tab restyle because the
+ * builder also writes inline styles onto documentElement.
  *
  * A cascade layer fixes this without depending on stylesheet order.
  * Unlayered author styles always beat layered ones, so the published theme
@@ -22,7 +22,7 @@
  * Do not move these imports out of the layer. Order-based fixes are what broke
  * this in the first place. */
 @import "./orderak-tokens.css" layer(orderak-fallback);
-@import "./orderak-tokens-pending.css" layer(orderak-fallback);
+@import "./orderak-admin.css" layer(orderak-fallback);
 
 @theme inline {
   --color-primary: var(--orderak-primary, var(--primary));

@@ -165,6 +165,7 @@ function renderSelector(suffix: string, returnType: string): string {
 }
 
 function renderKotlinSchemes(snapshot: {
+	schemaVersion: number;
 	generatorVersion: string;
 	contentHash: string;
 	schemes: Record<string, Record<string, Record<string, string>>>;
@@ -173,6 +174,11 @@ function renderKotlinSchemes(snapshot: {
 	spacing: { tokens: Record<string, number> };
 	shapes: Record<string, number>;
 	components: { minimumTouchTargetDp: number };
+	motion?: { durations: { instant: number; short: number; medium: number; long: number; extraLong: number } };
+	shapeFull?: { androidPercent: number };
+	componentDimensions?: { fabClearance: number; thumbnail: number };
+	icons?: { small: number; medium: number; hero: number };
+	layout?: { contentMaxWidth: number; wideLayoutMinWidth: number };
 	source: { colors: { defaultContrast: string } };
 }): string {
 	const schemes: string[] = [];
@@ -194,6 +200,33 @@ function renderKotlinSchemes(snapshot: {
 	const shapes = Object.entries(snapshot.shapes)
 		.map(([name, value]) => `        "${name}" to ${value}f,`)
 		.join("\n");
+	const spacingConstants = Object.entries(snapshot.spacing.tokens)
+		.map(([token, value]) => `    const val SPACING_${token.toUpperCase()}_DP = ${value}f`)
+		.join("\n");
+	const motion = snapshot.motion;
+	const motionConstants = motion ? [
+		`    const val MOTION_INSTANT_MS = ${motion.durations.instant}`,
+		`    const val MOTION_SHORT_MS = ${motion.durations.short}`,
+		`    const val MOTION_MEDIUM_MS = ${motion.durations.medium}`,
+		`    const val MOTION_LONG_MS = ${motion.durations.long}`,
+		`    const val MOTION_EXTRA_LONG_MS = ${motion.durations.extraLong}`,
+	].join("\n") : "";
+	const icons = snapshot.icons;
+	const iconConstants = icons ? [
+		`    const val SPACING_ICON_SMALL_DP = ${icons.small}f`,
+		`    const val SPACING_ICON_MEDIUM_DP = ${icons.medium}f`,
+		`    const val SPACING_ICON_HERO_DP = ${icons.hero}f`,
+	].join("\n") : "";
+	const dimensions = snapshot.componentDimensions;
+	const dimensionConstants = dimensions ? [
+		`    const val SPACING_FAB_CLEARANCE_DP = ${dimensions.fabClearance}f`,
+		`    const val SPACING_THUMBNAIL_DP = ${dimensions.thumbnail}f`,
+	].join("\n") : "";
+	const layout = snapshot.layout;
+	const layoutConstants = layout ? [
+		`    const val LAYOUT_CONTENT_MAX_WIDTH_DP = ${layout.contentMaxWidth}f`,
+		`    const val LAYOUT_WIDE_LAYOUT_MIN_WIDTH_DP = ${layout.wideLayoutMinWidth}f`,
+	].join("\n") : "";
 
 	return `package app.orderak.seller.core.ui.theme
 
@@ -225,9 +258,16 @@ internal data class GeneratedTypeRole(
 internal object GeneratedDesignSystem {
     const val GENERATOR_VERSION = "${snapshot.generatorVersion}"
     const val CONTENT_HASH = "${snapshot.contentHash}"
+    const val SCHEMA_VERSION = ${snapshot.schemaVersion}
     const val MINIMUM_TOUCH_TARGET_DP = ${snapshot.components.minimumTouchTargetDp}f
+    const val SHAPE_FULL_PERCENT = ${snapshot.shapeFull?.androidPercent ?? 0}
     const val FONT_FAMILY = "${snapshot.typography.family}"
     const val DEFAULT_CONTRAST = "${snapshot.source.colors.defaultContrast}"
+${motionConstants}
+${spacingConstants}
+${iconConstants}
+${dimensionConstants}
+${layoutConstants}
 
     val contrasts: List<String> = listOf(${CONTRASTS.map((c) => `"${c}"`).join(", ")})
 
@@ -281,7 +321,7 @@ async function main() {
 
 /** Generated fallback identity checked by verifyDesignSystemContract. */
 internal object DesignSystemContract {
-    const val SCHEMA_VERSION = 2
+    const val SCHEMA_VERSION = ${snapshot.schemaVersion}
     const val GENERATOR_VERSION = "${snapshot.generatorVersion}"
     const val DEFAULT_FALLBACK_HASH = "${snapshot.contentHash}"
 }
