@@ -60,11 +60,108 @@ JVM unit tests. No emulator needed. Covers:
 - OTP timing/state, authentication-operation generation, and logout ordering
 - Data formatting helpers
 - ViewModel logic
+- The accessibility preview audit (`app.orderak.seller.a11y.AccessibilityPreviewAuditTest`)
 
 ```cmd
 cd apps/seller-android
 gradlew.bat testStagingDebugUnitTest
 ```
+
+### Accessibility preview audit (`AccessibilityPreviewAuditTest`)
+
+The audit compiles the screenshot preview declarations into the unit-test
+artifact (`app/src/screenshotTest/java` is added to the `test` source set) and
+renders every source `@PreviewTest` under Robolectric 4.17 with
+`GraphicsMode.NATIVE`, SDK 35, and the `ar-w411dp-h891dp-xxhdpi` qualifiers. It
+runs on a plain `Application` so Firebase/Hilt initialization never starts, and
+the Gradle test tasks pin `user.language=en`, `user.country=US`, and
+`user.timezone=UTC`, exactly like the screenshot tasks.
+
+The source is the authority. The audit parses `app/src/screenshotTest/java` with
+the anchored matcher `(?m)^\s*@PreviewTest\s*$` to decide which functions are
+states and which locales they render; it parses the multipreview annotations in
+`app/src/main/java/app/orderak/seller/core/ui` for their constituent locales.
+Compose runtime's public `getDeclaredComposableMethod` resolves each parsed state
+function; reflection never infers a `@Preview` or picks a neighbouring helper. A
+missing source directory, an unresolvable state, or an unresolvable multipreview
+locale fails loudly, and the runtime annotation count must equal the number of
+audited cases. The observed figure is **280 `@PreviewTest` annotations in 22
+source files**, against the manager's approximate 320-state estimate (a
+discrepancy of ~40); the audit prints the measured values rather than hardcoding
+either number.
+
+One `@PreviewTest` declaration is one JUnit case, named for its compiled
+`<File>ScreenshotTestKt` facade and function. A declaration with several locale
+variants gets a single `setContent` call whose host reads a mutable locale
+variant, copies the current configuration and applies the parsed locale (so the
+SDK, size, and density qualifiers survive), and provides `LocalConfiguration`,
+`LocalContext`, `LocalResources`, and `LocalLayoutDirection` from the same
+locale context built with `createConfigurationContext`. `LocalResources` matters:
+Compose UI reads `stringResource`/`pluralStringResource` from it, so without it
+every `en`/`fr` preview would audit Arabic strings while reported as `en`/`fr`.
+The host also re-provides `LocalActivityResultRegistryOwner` and
+`LocalOnBackPressedDispatcherOwner` read from the test activity before the locale
+context replaces `LocalContext`, because both have context-derived defaults and
+the auth screens register activity-result launchers through them. The host proves
+the switch by checking that a known string differs between the `ar` and `en`
+variants of the same preview. Previews with no explicit locale use
+the app default, and the audit never calls `RuntimeEnvironment.setQualifiers`
+after the Compose activity starts and never calls `setContent` twice per rule.
+
+`auditAccessibility(rule, preview)` audits content the caller has already set; it
+never calls `setContent`. It returns one diagnostic per violation and every
+diagnostic names the preview and locale, the rule (`Label`, `Target`, or
+`Contrast`), the node text or position, and the measured value where applicable.
+The rules run as follows:
+
+| Rule | Tree | Check | Threshold |
+|------|------|-------|-----------|
+| 1 — `Label` | merged | every node with an `OnClick` action or `ToggleableState` exposes `ContentDescription` or `Text` | non-blank |
+| 2 — `Target` | merged | Compose `touchBoundsInRoot` at least 48dp on both axes, and no overlap with another actionable node unless one is an ancestor | ≥ 48dp |
+| 3 — `Contrast` | unmerged | for every semantics root (`onAllNodes(isRoot())`, so dialog windows are audited too) crop each text node's `boundsInRoot` from that root's `captureToImage()` and measure the WCAG contrast of the crop | ≥ 4.5:1 normal; ≥ 3:1 large (≥ 18sp, or ≥ 14sp at weight ≥ 700) |
+
+Disabled nodes and zero-size nodes are skipped. Rule 2 uses Compose touch bounds,
+never drawn component dimensions. Rule 3 measures one text node at a time, never
+merged row pixels; the large-text decision comes from the node's
+`GetTextLayoutResult`, and an unspecified size counts as normal. Empty or
+out-of-image text crops are reported as audit failures with the preview and node
+context. Image-only nodes produce no `Contrast` diagnostic, and the audit never
+touches the network.
+
+The three isolated proofs in `AccessibilityAuditRulesAcceptanceTest` (an
+unlabelled `IconButton`, two adjacent 20dp clickables, and grey text on white
+below 3:1) must each fail with a diagnostic naming its intended rule, with
+accessible controls that produce no diagnostics, so an audit that fails
+everything cannot satisfy them.
+
+**Spike conclusion.** Compose accessibility checks (`enableAccessibilityChecks`,
+`tryPerformAccessibilityChecks`) and ATF's `AccessibilityHierarchyAndroid` do not
+inspect Compose semantics nodes under Robolectric, so they cannot back this
+audit. The audit therefore reads the Compose semantics tree directly and uses
+pixel capture only for contrast.
+
+**LocalInspectionMode.** `LocalInspectionMode` is `false` under the Compose test
+rule, while the screenshot preview renderer sets it `true`. Previews must not
+branch onto inspection-only shortcuts that would hide a real state from the
+audit; the shared string-resource and theme paths are exercised either way.
+
+**Timing.** `:app:testStagingDebugUnitTest` elapsed time is measured before and
+after adding the audit under comparable conditions: same machine/CI runner, warm
+Gradle daemon, `--console=plain`, no other work in flight, staging debug variant.
+The offline executor sandbox cannot run Gradle or the Android checks, so the
+before/after figures and the incremental seconds are recorded by the full
+Android run rather than invented here.
+
+**Phase-R and blocked findings.** A pixel-changing finding cannot be corrected
+until the supervisor supplies the exact affected reference PNG paths and each
+path is individually added to `allowed_files`; `updateStagingDebugScreenshotTest`
+is never run by hand. Findings that require only semantics (a missing label from
+an existing string) are corrected in place. Findings that change pixels are
+reported with the preview, rule, finding, and planned minimal fix, and are left
+as a deferred phase-R redesign rather than weakening a rule, marking a node
+`Disabled`, or skipping a preview. If a required label has no existing string,
+the finding and the required string are reported because `src/main/res/**` is out
+of scope.
 
 ### Lint (`lintStagingDebug`)
 
@@ -83,8 +180,9 @@ gradlew.bat lintStagingDebug
 ### Screenshot validation (`validateStagingDebugScreenshotTest`)
 
 Compose Preview Screenshot Testing. Compares rendered screenshots against
-approved goldens stored in `app/src/screenshotTestDebug/reference/`.
-Covers Arabic, English, and French.
+approved goldens stored in
+`app/src/screenshotTestStagingDebug/reference/`. Covers Arabic, English, and
+French, and the locale/multipreview matrix described above.
 
 ```cmd
 gradlew.bat validateStagingDebugScreenshotTest
@@ -196,6 +294,7 @@ back out.
 | `pnpm test` | `pnpm test` |
 | `npx tsc --noEmit` | `npx tsc --noEmit` |
 | `gradlew.bat testStagingDebugUnitTest` | `gradlew.bat testStagingDebugUnitTest` |
+| `gradlew.bat testStagingDebugUnitTest --tests app.orderak.seller.a11y.AccessibilityPreviewAuditTest` (accessibility audit) | `gradlew.bat testStagingDebugUnitTest --tests app.orderak.seller.a11y.AccessibilityPreviewAuditTest` (accessibility audit) |
 | `gradlew.bat lintStagingDebug` | `gradlew.bat lintStagingDebug` |
 | `gradlew.bat verifyLocalizationContract` | `gradlew.bat validateStagingDebugScreenshotTest` |
 | `gradlew.bat verifyAuthPhase1Contract verifySellerApiContract` | `gradlew.bat verifyAuthPhase1Contract verifySellerApiContract` |
