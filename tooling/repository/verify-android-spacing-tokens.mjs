@@ -86,12 +86,10 @@ function nearestToken(dp) {
 }
 
 function tokenFieldFor(value) {
-	const block = generatedText.match(/const val SPACING_([A-Z0-9_]+)_DP\s*=\s*(\d+(?:\.\d+)?)f/g) ?? [];
-	const found = block.map((entry) => /const val SPACING_([A-Z0-9_]+)_DP/.exec(entry)).find((m) => {
-		const literal = generatedText.match(new RegExp(`const val SPACING_${m[1]}_DP\\s*=\\s*(\\d+(?:\\.\\d+)?)f`));
-		return literal ? Number(literal[1]) === value : false;
-	});
-	return found ? found[1] : null;
+	for (const m of generatedText.matchAll(/const val SPACING_([A-Z0-9_]+)_DP\s*=\s*(\d+(?:\.\d+)?)f/g)) {
+		if (Number(m[2]) === value) return m[1];
+	}
+	return null;
 }
 
 /** Positions where a number is a distance, not a size. */
