@@ -203,6 +203,108 @@ describe('verify-design-system-components.mjs', () => {
     expect(result.output).toContain('design-system-components.md');
   }, 120_000);
 
+  it('fails when an inventory row keeps the right basename but points at the wrong directory', () => {
+    const root = sandbox();
+    const inventory = path.join(root, INVENTORY);
+    const lines = readFileSync(inventory, 'utf8').split(/\r?\n/);
+    const rows = rowsNaming(lines, 'FeatureAvailabilityChip');
+    expect(rows, 'exactly one inventory row names FeatureAvailabilityChip').toHaveLength(1);
+    const original = lines[rows[0]];
+    const correctPath = 'apps/seller-android/app/src/main/java/app/orderak/seller/core/ui/SemanticChip.kt';
+    const wrongPath = 'apps/seller-android/app/src/main/java/app/orderak/seller/core/ui/theme/SemanticChip.kt';
+    expect(original).toContain(correctPath);
+    lines[rows[0]] = original.replace(correctPath, wrongPath);
+    writeFileSync(inventory, lines.join('\n'));
+    const result = run(root);
+    expect(result.status, result.output).not.toBe(0);
+    expect(result.output).toContain('FeatureAvailabilityChip');
+    expect(result.output).toContain(correctPath);
+    expect(result.output).toContain(wrongPath);
+  }, 120_000);
+
+  it('tells apart two same-basename components in different core/ui directories by full path', () => {
+    const root = sandbox();
+    const declaration = (pkg: string, name: string): string =>
+      [
+        `package ${pkg}`,
+        '',
+        'import androidx.compose.runtime.Composable',
+        '',
+        '@Composable',
+        `fun ${name}(label: String) {`,
+        '    SemanticChip(SemanticRole.Info, label)',
+        '}',
+        '',
+      ].join('\n');
+    write(root, path.join(CORE_UI, 'ZzTwinDirProbe.kt'), declaration('app.orderak.seller.core.ui', 'ZzTwinDirProbe'));
+    write(
+      root,
+      path.join(CORE_UI, 'variant', 'ZzTwinDirProbe.kt'),
+      declaration('app.orderak.seller.core.ui.variant', 'ZzTwinDirProbe'),
+    );
+    write(
+      root,
+      path.join('apps', 'seller-android', 'app', 'src', 'main', 'java', 'app', 'orderak', 'seller', 'feature', 'orders', 'ZzTwinDirCaller.kt'),
+      [
+        'package app.orderak.seller.feature.orders',
+        '',
+        'import app.orderak.seller.core.ui.ZzTwinDirProbe',
+        'import app.orderak.seller.core.ui.variant.ZzTwinDirProbe',
+        '',
+        'fun probeCaller() {',
+        '    ZzTwinDirProbe("a")',
+        '}',
+        '',
+      ].join('\n'),
+    );
+    const result = run(root);
+    expect(result.status, result.output).not.toBe(0);
+    expect(result.output).toContain('core/ui/ZzTwinDirProbe.kt');
+    expect(result.output).toContain('core/ui/variant/ZzTwinDirProbe.kt');
+  }, 120_000);
+
+  it('fails on a one-line "@Composable fun" declaration with no caller', () => {
+    const root = sandbox();
+    write(
+      root,
+      path.join(CORE_UI, 'ZzOneLinerProbe.kt'),
+      [
+        'package app.orderak.seller.core.ui',
+        '',
+        'import androidx.compose.runtime.Composable',
+        'import androidx.compose.material3.Text',
+        '',
+        '@Composable fun ZzOneLinerProbe(label: String) { Text(label) }',
+        '',
+      ].join('\n'),
+    );
+    const result = run(root);
+    expect(result.status, result.output).not.toBe(0);
+    expect(result.output).toContain('ZzOneLinerProbe');
+    expect(result.output).toContain('ZzOneLinerProbe.kt');
+  }, 120_000);
+
+  it('fails when an inventory row is missing a caller the guard computes', () => {
+    const root = sandbox();
+    const inventory = path.join(root, INVENTORY);
+    const lines = readFileSync(inventory, 'utf8').split(/\r?\n/);
+    const headerIndex = lines.findIndex((line) => cells(line).map((cell) => cell.trim()).includes('Callers'));
+    expect(headerIndex, 'inventory header names a Callers column').not.toBe(-1);
+    const callersIndex = cells(lines[headerIndex]).map((cell) => cell.trim()).indexOf('Callers');
+    const rows = rowsNaming(lines, 'SyncStatusBanner');
+    expect(rows, 'exactly one inventory row names SyncStatusBanner').toHaveLength(1);
+    const rowCells = cells(lines[rows[0]]);
+    expect(rowCells[callersIndex]).toContain('MainScreen.kt');
+    rowCells[callersIndex] = ' ';
+    lines[rows[0]] = `|${rowCells.join('|')}|`;
+    writeFileSync(inventory, lines.join('\n'));
+    const result = run(root);
+    expect(result.status, result.output).not.toBe(0);
+    expect(result.output).toContain('SyncStatusBanner');
+    expect(result.output).toContain('MainScreen.kt');
+    expect(result.output).toContain('design-system-components.md');
+  }, 120_000);
+
   it('has a companion node:test suite that passes', () => {
     const testFile = path.join(repositoryRoot, 'tooling', 'repository', GUARD_TEST);
     expect(existsSync(testFile)).toBe(true);

@@ -177,3 +177,102 @@ test("fails when an inventory row is removed, naming the component, file and inv
 	assert.match(result.output, /SemanticChip\.kt/);
 	assert.match(result.output, /design-system-components\.md/);
 });
+
+test("fails when an inventory source path has the right basename but the wrong directory", () => {
+	const root = sandbox();
+	const inventory = path.join(root, INVENTORY);
+	const lines = readFileSync(inventory, "utf8").split(/\r?\n/);
+	const row = findRow(lines, "FeatureAvailabilityChip");
+	assert.notEqual(row, -1, "the inventory names FeatureAvailabilityChip");
+	const correct = "apps/seller-android/app/src/main/java/app/orderak/seller/core/ui/SemanticChip.kt";
+	const wrong = "apps/seller-android/app/src/main/java/app/orderak/seller/core/ui/theme/SemanticChip.kt";
+	assert.ok(lines[row].includes(correct), lines[row]);
+	lines[row] = lines[row].replace(correct, wrong);
+	writeFileSync(inventory, lines.join("\n"));
+	const result = run(root);
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /FeatureAvailabilityChip/);
+	assert.ok(result.output.includes(correct), result.output);
+	assert.ok(result.output.includes(wrong), result.output);
+});
+
+test("fails on a same-line @Composable fun declaration with no caller", () => {
+	const root = sandbox();
+	write(
+		root,
+		path.join(CORE_UI, "ZzOneLineProbe.kt"),
+		[
+			"package app.orderak.seller.core.ui",
+			"",
+			"import androidx.compose.runtime.Composable",
+			"import androidx.compose.material3.Text",
+			"",
+			"@Composable fun ZzOneLineProbe(label: String) { Text(label) }",
+			"",
+		].join("\n"),
+	);
+	const result = run(root);
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /ZzOneLineProbe/);
+	assert.match(result.output, /ZzOneLineProbe\.kt/);
+});
+
+test("fails when an inventory Callers cell omits a caller file the guard computes", () => {
+	const root = sandbox();
+	const inventory = path.join(root, INVENTORY);
+	const lines = readFileSync(inventory, "utf8").split(/\r?\n/);
+	const header = lines.findIndex((line) => line.trim().startsWith("|") && cells(line).map((cell) => cell.trim()).includes("Callers"));
+	assert.notEqual(header, -1, "the inventory header names a Callers column");
+	const callersIndex = cells(lines[header]).map((cell) => cell.trim()).indexOf("Callers");
+	const row = findRow(lines, "SyncStatusBanner");
+	assert.notEqual(row, -1, "the inventory names SyncStatusBanner");
+	const rowCells = cells(lines[row]);
+	assert.match(rowCells[callersIndex], /MainScreen\.kt/);
+	rowCells[callersIndex] = " ";
+	lines[row] = `|${rowCells.join("|")}|`;
+	writeFileSync(inventory, lines.join("\n"));
+	const result = run(root);
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /SyncStatusBanner/);
+	assert.match(result.output, /MainScreen\.kt/);
+	assert.match(result.output, /design-system-components\.md/);
+});
+
+test("counts typed role.colors() but not an unrelated TextFieldDefaults.colors()", () => {
+	const typedRoot = sandbox();
+	write(
+		typedRoot,
+		path.join(CORE_UI, "ZzTypedColorsCaller.kt"),
+		[
+			"package app.orderak.seller.core.ui",
+			"",
+			"import androidx.compose.runtime.Composable",
+			"",
+			"@Composable",
+			"fun ZzTypedColorsCaller(role: SemanticRole) {",
+			"    role.colors()",
+			"}",
+			"",
+		].join("\n"),
+	);
+	const typed = run(typedRoot);
+	assert.notEqual(typed.status, 0, typed.output);
+	assert.match(typed.output, /SemanticRole\.colors/);
+	assert.match(typed.output, /ZzTypedColorsCaller\.kt/);
+
+	const unrelatedRoot = sandbox();
+	write(
+		unrelatedRoot,
+		path.join(CORE_UI, "ZzUnrelatedColorsCaller.kt"),
+		[
+			"package app.orderak.seller.core.ui",
+			"",
+			"fun zzUnrelatedColorsCaller() {",
+			"    TextFieldDefaults.colors()",
+			"}",
+			"",
+		].join("\n"),
+	);
+	const unrelated = run(unrelatedRoot);
+	assert.equal(unrelated.status, 0, unrelated.output);
+});
