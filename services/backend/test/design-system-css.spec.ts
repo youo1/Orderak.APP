@@ -33,15 +33,15 @@ const LEGACY_ALIASES = [
 const SEMANTIC_MAP: Array<[string, string]> = [
 	["--orderak-canvas", "background"], ["--orderak-ink", "on-surface"], ["--orderak-line", "outline-variant"],
 	["--orderak-muted", "on-surface-variant"], ["--orderak-primary-tint", "inverse-primary"],
-	["--orderak-primary-strong", "primary-container"], ["--orderak-primary-soft", "surface-container"],
+	["--orderak-primary-strong", "on-primary-container"], ["--orderak-primary-soft", "primary-container"],
 	["--orderak-accent", "secondary"], ["--orderak-danger", "error"], ["--orderak-danger-soft", "error-container"],
 	["--orderak-warning-soft", "warning-container"], ["--orderak-success-soft", "success-container"],
 	["--orderak-information-soft", "information-container"], ["--orderak-commerce-soft", "commerce-container"],
 ];
 const ON_ACCENT: [string, string] = ["--orderak-on-accent", "on-secondary"];
 const LEGACY_MAP: Array<[string, string]> = [
-	["--primary", "primary"], ["--primary-strong", "primary-container"], ["--primary-soft", "surface-container"],
-	["--primary-tint", "inverse-primary"], ["--canvas", "background"], ["--surface", "surface"], ["--ink", "on-surface"],
+	["--primary", "primary"], ["--primary-strong", "on-primary-container"], ["--primary-soft", "primary-container"],
+	["--primary-tint", "inverse-primary"], ["--canvas", "background"], ["--surface", "surface-container-lowest"], ["--ink", "on-surface"],
 	["--muted", "on-surface-variant"], ["--line", "outline-variant"], ["--danger", "error"],
 	["--danger-soft", "error-container"], ["--warning", "warning"], ["--warning-soft", "warning-container"],
 	["--accent", "secondary"],

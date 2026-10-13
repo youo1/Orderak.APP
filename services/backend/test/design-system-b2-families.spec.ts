@@ -235,7 +235,7 @@ describe("B2: the generator owns every remaining token family (schema 3)", () =>
 		checkColour(failures, ":root", light, "--orderak-focus-field-ring", primary, { alpha: 0.12, prefix: "0 0 0 3px" });
 		checkColour(failures, ":root", light, "--orderak-hover-surface", role("standard", "light", "surfaceContainerLow"));
 		checkColour(failures, ":root", light, "--orderak-hover-border", role("standard", "light", "outlineVariant"));
-		checkColour(failures, ":root", light, "--orderak-hover-tint", role("standard", "light", "surfaceContainer"));
+		checkColour(failures, ":root", light, "--orderak-hover-tint", role("standard", "light", "primaryContainer"));
 		for (const [name, geometry, alpha] of SHADOWS) {
 			checkColour(failures, ":root", light, name, role("standard", "light", "shadow"), { alpha, prefix: geometry });
 		}

@@ -230,6 +230,19 @@ describe('generated admin token bundle', () => {
     expect(aliasMissing).toEqual([]);
   });
 
+  it('maps the restored aliases to their approved generated roles and keeps the hover tint indirect', () => {
+    for (const declaration of [
+      '--primary-strong:var(--md-sys-color-on-primary-container);',
+      '--primary-soft:var(--md-sys-color-primary-container);',
+      '--surface:var(--md-sys-color-surface-container-lowest);',
+      '--orderak-primary-strong:var(--md-sys-color-on-primary-container);',
+      '--orderak-primary-soft:var(--md-sys-color-primary-container);',
+      '--orderak-hover-tint:var(--orderak-primary-soft);',
+    ]) {
+      expect(bundle).toContain(declaration);
+    }
+  });
+
   it('keeps the generated scrim opaque and never re-introduces a colour literal', () => {
     const scrim = fixture.snapshot.web.colors.standard.light.scrim;
     expect(scrim.oklch).not.toContain('/');
