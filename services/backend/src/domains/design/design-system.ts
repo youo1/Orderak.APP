@@ -105,7 +105,9 @@ export interface GeneratedInteractionFamily {
 export interface GeneratedShadowValue { geometry: string; alpha: number }
 
 export interface GeneratedDesignSystem {
-	schemaVersion: 3;
+	// The generator writes 3, but schema-2 revisions stay readable from D1 and
+	// travel as this same type; the schema-3 families below are optional for them.
+	schemaVersion: 2 | 3;
 	generatorVersion: string;
 	source: DesignSystemSource;
 	schemes: Record<ContrastName, Record<ThemeMode, Record<string, string>>>;
@@ -1083,13 +1085,11 @@ function schema3ColourDeclarations(
 		declarations.push(`--orderak-focus-field-ring:0 0 0 var(--orderak-focus-ring-width) color-mix(in oklch,var(--orderak-primary) ${alphaPercent(field)},transparent);`);
 		declarations.push("--orderak-hover-tint:var(--orderak-primary-soft);");
 	}
-	if (snapshot.interaction || snapshot.elevation) {
+	if (snapshot.interaction) {
 		const hoverSurface = mode === "dark" ? "surface-container-high" : "surface-container-low";
 		const hoverBorder = mode === "dark" ? "outline" : "outline-variant";
-		if (snapshot.interaction) {
-			declarations.push(`--orderak-hover-surface:var(--md-sys-color-${hoverSurface});`);
-			declarations.push(`--orderak-hover-border:var(--md-sys-color-${hoverBorder});`);
-		}
+		declarations.push(`--orderak-hover-surface:var(--md-sys-color-${hoverSurface});`);
+		declarations.push(`--orderak-hover-border:var(--md-sys-color-${hoverBorder});`);
 	}
 	if (snapshot.elevation) {
 		for (const [name, shadow] of Object.entries(snapshot.elevation.shadows)) {

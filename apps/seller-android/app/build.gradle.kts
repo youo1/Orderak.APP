@@ -1171,26 +1171,3 @@ androidComponents {
         tasks.matching { it.name == "pre${suffix}Build" }.configureEach { dependsOn(verify) }
     }
 }
-
-// ============================================================
-// Alias for a test class selected by fully-qualified name.
-//
-// A CI invocation may pass more than one test class after a single `--tests`
-// flag, e.g.
-//
-//     gradlew :app:testStagingDebugUnitTest --console=plain \
-//         --tests app.orderak.seller.core.ui.theme.ThemeSourceTokenLiteralsTest \
-//         app.orderak.seller.core.ui.theme.ThemeTokenValuesTest
-//
-// `--tests` takes exactly one value per flag, so Gradle reads the first class
-// as the test filter and resolves the second token as a task name. Without a
-// task of that name the whole invocation fails task selection before a single
-// test runs. This alias keeps that invocation working and depends on the real
-// unit-test task so it can never silently skip a test. The class itself still
-// runs in the unfiltered `:app:testStagingDebugUnitTest` invocation.
-// ============================================================
-tasks.register("app.orderak.seller.core.ui.theme.ThemeTokenValuesTest") {
-    group = "verification"
-    description = "Alias that lets a fully-qualified test class resolve as a task name for CI invocations."
-    dependsOn("testStagingDebugUnitTest")
-}

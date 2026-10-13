@@ -164,6 +164,13 @@ function renderSelector(suffix: string, returnType: string): string {
 	return branches.join("\n");
 }
 
+function requiredFamily<T>(family: T | undefined, name: string): T {
+	if (family === undefined) {
+		throw new Error(`The generated snapshot has no ${name} family; GeneratedDesignSystem.kt cannot be written without it.`);
+	}
+	return family;
+}
+
 function renderKotlinSchemes(snapshot: {
 	schemaVersion: number;
 	generatorVersion: string;
@@ -203,30 +210,34 @@ function renderKotlinSchemes(snapshot: {
 	const spacingConstants = Object.entries(snapshot.spacing.tokens)
 		.map(([token, value]) => `    const val SPACING_${token.toUpperCase()}_DP = ${value}f`)
 		.join("\n");
-	const motion = snapshot.motion;
-	const motionConstants = motion ? [
+	// Theme.kt reads every one of these families. A snapshot without one must
+	// stop generation here, not quietly write a 0 (a square "full" shape) or
+	// drop a constant.
+	const motion = requiredFamily(snapshot.motion, "motion");
+	const shapeFull = requiredFamily(snapshot.shapeFull, "shapeFull");
+	const icons = requiredFamily(snapshot.icons, "icons");
+	const dimensions = requiredFamily(snapshot.componentDimensions, "componentDimensions");
+	const layout = requiredFamily(snapshot.layout, "layout");
+	const motionConstants = [
 		`    const val MOTION_INSTANT_MS = ${motion.durations.instant}`,
 		`    const val MOTION_SHORT_MS = ${motion.durations.short}`,
 		`    const val MOTION_MEDIUM_MS = ${motion.durations.medium}`,
 		`    const val MOTION_LONG_MS = ${motion.durations.long}`,
 		`    const val MOTION_EXTRA_LONG_MS = ${motion.durations.extraLong}`,
-	].join("\n") : "";
-	const icons = snapshot.icons;
-	const iconConstants = icons ? [
+	].join("\n");
+	const iconConstants = [
 		`    const val SPACING_ICON_SMALL_DP = ${icons.small}f`,
 		`    const val SPACING_ICON_MEDIUM_DP = ${icons.medium}f`,
 		`    const val SPACING_ICON_HERO_DP = ${icons.hero}f`,
-	].join("\n") : "";
-	const dimensions = snapshot.componentDimensions;
-	const dimensionConstants = dimensions ? [
+	].join("\n");
+	const dimensionConstants = [
 		`    const val SPACING_FAB_CLEARANCE_DP = ${dimensions.fabClearance}f`,
 		`    const val SPACING_THUMBNAIL_DP = ${dimensions.thumbnail}f`,
-	].join("\n") : "";
-	const layout = snapshot.layout;
-	const layoutConstants = layout ? [
+	].join("\n");
+	const layoutConstants = [
 		`    const val LAYOUT_CONTENT_MAX_WIDTH_DP = ${layout.contentMaxWidth}f`,
 		`    const val LAYOUT_WIDE_LAYOUT_MIN_WIDTH_DP = ${layout.wideLayoutMinWidth}f`,
-	].join("\n") : "";
+	].join("\n");
 
 	return `package app.orderak.seller.core.ui.theme
 
@@ -260,7 +271,7 @@ internal object GeneratedDesignSystem {
     const val CONTENT_HASH = "${snapshot.contentHash}"
     const val SCHEMA_VERSION = ${snapshot.schemaVersion}
     const val MINIMUM_TOUCH_TARGET_DP = ${snapshot.components.minimumTouchTargetDp}f
-    const val SHAPE_FULL_PERCENT = ${snapshot.shapeFull?.androidPercent ?? 0}
+    const val SHAPE_FULL_PERCENT = ${shapeFull.androidPercent}
     const val FONT_FAMILY = "${snapshot.typography.family}"
     const val DEFAULT_CONTRAST = "${snapshot.source.colors.defaultContrast}"
 ${motionConstants}
