@@ -50,9 +50,9 @@ const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url))
 const adminRoot = path.join(repositoryRoot, "apps", "admin-web");
 const indexPath = path.join(adminRoot, "src", "index.css");
 const bundleName = "orderak-tokens.css";
-const pendingName = "orderak-tokens-pending.css";
-/** Both are token sources imported into the same cascade layer. */
-const tokenSourceNames = [bundleName, pendingName];
+const adminName = "orderak-admin.css";
+/** The generated bundle and the admin rules that consume it, imported into one layer. */
+const tokenSourceNames = [bundleName, adminName];
 const layerName = "orderak-fallback";
 const distAssets = path.join(adminRoot, "dist", "assets");
 

@@ -779,9 +779,9 @@ val verifyDesignSystemContract by tasks.registering {
         }
 
         requireContract(
-            "const val SCHEMA_VERSION = 2" in contract &&
-                "\"schemaVersion\": 2" in fixture,
-            "The schema-v2 fallback contract drifted."
+            "const val SCHEMA_VERSION = 3" in contract &&
+                "\"schemaVersion\": 3" in fixture,
+            "The schema-3 fallback contract drifted."
         )
 
         // The generator writes the hash into two files. If they disagree, one of

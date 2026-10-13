@@ -26,11 +26,35 @@ internal data class GeneratedTypeRole(
 )
 
 internal object GeneratedDesignSystem {
-    const val GENERATOR_VERSION = "orderak-mcu-0.3.0+3"
-    const val CONTENT_HASH = "6b95438c3fa8a37a8a7614882da4e0d44d2054ca7dd4317036c3040a62a6e0eb"
+    const val GENERATOR_VERSION = "orderak-mcu-0.3.0+4"
+    const val CONTENT_HASH = "636d200dbccdf997144c4096daa83b6fdbc1dd85079852b803a10dd5c4fc0782"
+    const val SCHEMA_VERSION = 3
     const val MINIMUM_TOUCH_TARGET_DP = 48f
+    const val SHAPE_FULL_PERCENT = 50
     const val FONT_FAMILY = "cairo"
     const val DEFAULT_CONTRAST = "standard"
+    const val MOTION_INSTANT_MS = 0
+    const val MOTION_SHORT_MS = 150
+    const val MOTION_MEDIUM_MS = 180
+    const val MOTION_LONG_MS = 200
+    const val MOTION_EXTRA_LONG_MS = 300
+    const val SPACING_SPACE0_DP = 0f
+    const val SPACING_SPACE1_DP = 4f
+    const val SPACING_SPACE2_DP = 8f
+    const val SPACING_SPACE3_DP = 12f
+    const val SPACING_SPACE4_DP = 16f
+    const val SPACING_SPACE6_DP = 24f
+    const val SPACING_SPACE8_DP = 32f
+    const val SPACING_SPACE10_DP = 40f
+    const val SPACING_SPACE12_DP = 48f
+    const val SPACING_SPACE16_DP = 64f
+    const val SPACING_ICON_SMALL_DP = 16f
+    const val SPACING_ICON_MEDIUM_DP = 20f
+    const val SPACING_ICON_HERO_DP = 44f
+    const val SPACING_FAB_CLEARANCE_DP = 80f
+    const val SPACING_THUMBNAIL_DP = 56f
+    const val LAYOUT_CONTENT_MAX_WIDTH_DP = 560f
+    const val LAYOUT_WIDE_LAYOUT_MIN_WIDTH_DP = 720f
 
     val contrasts: List<String> = listOf("standard", "medium", "high")
 

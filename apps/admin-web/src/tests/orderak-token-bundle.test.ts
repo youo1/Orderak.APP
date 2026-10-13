@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -23,6 +23,7 @@ type Mode = 'light' | 'dark';
 interface WebColor { hex: string; rgb: string; oklch: string }
 interface Fixture {
   snapshot: {
+    schemaVersion: number;
     generatorVersion: string;
     contentHash: string;
     web: { colors: Record<Contrast, Record<Mode, Record<string, WebColor>>> };
@@ -31,9 +32,10 @@ interface Fixture {
 
 const fixture = JSON.parse(read(path.join(repositoryRoot, 'design', 'design-system.default.json'))) as Fixture;
 const bundlePath = path.join(adminSrc, 'orderak-tokens.css');
+const adminPath = path.join(adminSrc, 'orderak-admin.css');
 const pendingPath = path.join(adminSrc, 'orderak-tokens-pending.css');
 const bundle = read(bundlePath);
-const pending = readIfPresent(pendingPath);
+const adminStylesheet = readIfPresent(adminPath);
 const indexCss = read(path.join(adminSrc, 'index.css'));
 const previewCss = read(path.join(adminSrc, 'features', 'theme', 'preview', 'preview.css'));
 
@@ -76,6 +78,27 @@ function bodies(css: string, opener: RegExp, topLevelOnly = false): string {
   return found.join('\n');
 }
 
+function declarations(body: string): Map<string, string> {
+  const found = new Map<string, string>();
+  for (const match of body.matchAll(/(?:^|[\s;{])(--[a-zA-Z0-9-]+)\s*:\s*([^;{}]+)/g)) found.set(match[1], match[2].trim());
+  return found;
+}
+
+// Standard declarations (width, border, outline, animation, ...) are not
+// custom properties, so the bundle scopes above stay custom-only; these live
+// rules are read with this splitter instead.
+function properties(body: string): Map<string, string> {
+  const found = new Map<string, string>();
+  for (const part of body.split(';')) {
+    const colon = part.indexOf(':');
+    if (colon < 0) continue;
+    const name = part.slice(0, colon).trim();
+    if (!name || name.startsWith('@')) continue;
+    found.set(name, part.slice(colon + 1).trim());
+  }
+  return found;
+}
+
 function rules(css: string): Array<{ selector: string; body: string }> {
   return [...stripComments(css).matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((match) => ({
     selector: match[1].trim(),
@@ -83,16 +106,50 @@ function rules(css: string): Array<{ selector: string; body: string }> {
   }));
 }
 
-function adminStylesheets(directory: string): string[] {
-  const found: string[] = [];
-  for (const entry of readdirSync(directory, { withFileTypes: true })) {
-    if (entry.name === 'node_modules' || entry.name === 'dist') continue;
-    const full = path.join(directory, entry.name);
-    if (entry.isDirectory()) found.push(...adminStylesheets(full));
-    else if (entry.name.endsWith('.css')) found.push(full);
-  }
-  return found;
+function topLevelRules(css: string): Array<{ selector: string; body: string }> {
+  return [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .filter((match) => depthAt(css, match.index ?? 0) === 0)
+    .map((match) => ({ selector: match[1].trim(), body: match[2] }));
 }
+
+interface Scope { decls: Map<string, string>; parent?: Scope }
+function resolve(scope: Scope, name: string, depth = 0): string | undefined {
+  if (depth > 40) return undefined;
+  for (let current: Scope | undefined = scope; current; current = current.parent) {
+    const value = current.decls.get(name);
+    if (value !== undefined) return substitute(current, value, depth + 1);
+  }
+  return undefined;
+}
+function substitute(scope: Scope, value: string, depth = 0): string {
+  let out = value;
+  for (let i = 0; i < 40 && out.includes('var('); i += 1) {
+    const next = out.replace(/var\(\s*(--[A-Za-z0-9-]+)\s*(?:,([^()]*))?\)/g, (_match, ref: string, fallback?: string) =>
+      resolve(scope, ref, depth) ?? fallback?.trim() ?? `<undefined ${ref}>`);
+    if (next === out) break;
+    out = next;
+  }
+  return out;
+}
+const canon = (value: string): string => value.replace(/!important/gi, '').trim()
+  .replace(/\s+/g, ' ')
+  .replace(/\s*([,()/])\s*/g, '$1')
+  .replace(/(-?\d*\.?\d+)(ms|s)\b/g, (_match, n: string, unit: string) =>
+    `${unit === 's' ? Math.round(parseFloat(n) * 1e6) / 1e3 : parseFloat(n)}ms`)
+  .replace(/-?\d*\.?\d+/g, (n) => String(parseFloat(n)));
+const mentions = (value: string, formats: WebColor): boolean => {
+  const v = value.toLowerCase().replace(/\s+/g, ' ');
+  return v.includes(formats.hex.toLowerCase()) || v.includes(formats.rgb) || v.includes(formats.oklch.toLowerCase());
+};
+
+const plainBundle = stripComments(bundle);
+const bundleRoot = declarations(bodies(plainBundle, /:root\s*\{/g, true));
+const bundleReduced = declarations(bodies(plainBundle, /@media\s*\(\s*prefers-reduced-motion\s*:\s*reduce\s*\)\s*\{/g));
+const light: Scope = { decls: bundleRoot };
+const reduced: Scope = { decls: new Map([...bundleRoot, ...bundleReduced]) };
+const plainAdmin = stripComments(adminStylesheet);
+const lightRoles = fixture.snapshot.web.colors.standard.light;
+const value = (scope: Scope, raw: string | undefined): string => canon(substitute(scope, raw ?? '<missing>'));
 
 const SEMANTIC_ALIASES = [
   '--orderak-canvas', '--orderak-ink', '--orderak-line', '--orderak-muted', '--orderak-primary-tint',
@@ -105,90 +162,41 @@ const LEGACY_ALIASES = [
   '--muted', '--line', '--danger', '--danger-soft', '--warning', '--warning-soft', '--accent',
 ];
 
-/** Hand-kept tokens and the values they carried before B1. */
-const PENDING_VALUES: Array<[string, string]> = [
-  ['--orderak-numeric-tabular', 'tabular-nums lining-nums'],
-  ['--orderak-shape-full', '999px'],
-  ['--orderak-shadow-card', '0 5px 18px rgba(20,20,31,.04)'],
-  ['--orderak-shadow-raised', '0 5px 14px rgba(20,20,31,.08)'],
-  ['--orderak-shadow-modal', '0 16px 40px rgba(13,21,20,.08)'],
-  ['--orderak-shadow-overlay', '0 30px 80px rgba(20,20,31,.14)'],
-  ['--orderak-duration-short', '150ms'],
-  ['--orderak-duration-medium', '180ms'],
-  ['--orderak-duration-long', '200ms'],
-  ['--orderak-easing-standard', 'cubic-bezier(.2,0,0,1)'],
-  ['--orderak-easing-linear', 'linear'],
-  ['--orderak-motion-fast', 'var(--orderak-duration-short) ease'],
-  ['--orderak-motion-drawer', 'var(--orderak-duration-long) ease'],
-  ['--orderak-state-hover', '0.08'],
-  ['--orderak-disabled-opacity-web', '0.5'],
-  ['--orderak-focus-ring-width', '3px'],
-  ['--orderak-focus-ring-offset', '2px'],
-  ['--orderak-focus-ring-color', 'rgba(30,58,138,.22)'],
-  ['--orderak-focus-ring', 'var(--orderak-focus-ring-width) solid var(--orderak-focus-ring-color)'],
-  ['--orderak-hover-surface', '#F0F3FA'],
-  ['--orderak-hover-surface', '#242B2C'],
-  ['--orderak-hover-tint', 'var(--orderak-primary-soft)'],
-  ['--orderak-breakpoint-medium', '860px'],
-  ['--orderak-grid-metric', 'repeat(4, minmax(0, 1fr))'],
-  ['--orderak-sidebar-width', '268px'],
-  ['--orderak-topbar-height', '64px'],
-  ['--orderak-mark-green', '#1DAB61'],
-  ['--orderak-font-family-tajawal', '"Orderak Tajawal",Tajawal,system-ui,sans-serif'],
-  ['--orderak-font-family-noto', '"Orderak Noto Arabic","Noto Sans Arabic",system-ui,sans-serif'],
-  ['--orderak-type-latin-floor', '12px'],
-  ['--shadow', 'var(--orderak-shadow-modal)'],
-  ['--g', 'var(--orderak-primary)'],
-  ['--bg', 'var(--orderak-canvas)'],
-  ['--tx', 'var(--orderak-ink)'],
-  ['--mut', 'var(--orderak-muted)'],
+/** Declarations the B2 generator owns; a schema-3 bundle must carry them. */
+const B2_FAMILIES = [
+  '--orderak-duration-instant', '--orderak-duration-short', '--orderak-duration-medium',
+  '--orderak-duration-long', '--orderak-duration-extra-long', '--orderak-duration-spinner',
+  '--orderak-duration-spinner-reduced', '--orderak-duration-safety-floor',
+  '--orderak-easing-standard', '--orderak-easing-linear',
+  '--orderak-motion-fast', '--orderak-motion-nav', '--orderak-motion-drawer', '--orderak-motion-state',
+  '--orderak-state-hover', '--orderak-disabled-opacity-web',
+  '--orderak-focus-ring-width', '--orderak-focus-ring-offset', '--orderak-focus-ring',
+  '--orderak-shadow-card', '--orderak-shadow-raised', '--orderak-shadow-modal', '--orderak-shadow-overlay',
+  '--orderak-shape-full', '--orderak-sidebar-width', '--orderak-topbar-height', '--orderak-numeric-tabular',
+  '--orderak-spinner-size',
 ];
 
-/** Non-token rules of the old bundle that must survive verbatim in the pending file. */
-const PENDING_RULES = [
-  '@keyframes ork-spin{to{transform:rotate(360deg)}}',
-  '.ork-spinner{width:26px;height:26px;border:3px solid var(--md-sys-color-surface-variant);border-top-color:var(--md-sys-color-primary);border-radius:50%;animation:ork-spin .9s var(--orderak-easing-linear) infinite}',
-  '.ork-numeric{font-variant-numeric:var(--orderak-numeric-tabular);font-feature-settings:"tnum" 1,"lnum" 1}',
-  '.ork-numeric-pair{font-variant-numeric:var(--orderak-numeric-tabular);direction:ltr;unicode-bidi:isolate}',
-  '.ork-display-large{font:var(--orderak-type-display-large-weight) var(--orderak-type-display-large-size)/var(--orderak-type-display-large-line-height) var(--orderak-font-family);letter-spacing:var(--orderak-type-display-large-tracking)}',
-  '.ork-label-small{font:var(--orderak-type-label-small-weight) var(--orderak-type-label-small-size)/var(--orderak-type-label-small-line-height) var(--orderak-font-family);letter-spacing:var(--orderak-type-label-small-tracking)}',
-  '.ork-interactive{position:relative;isolation:isolate}',
-  '.ork-interactive::after{content:"";position:absolute;inset:0;border-radius:inherit;background:currentColor;opacity:0;pointer-events:none;transition:opacity var(--orderak-duration-short) var(--orderak-easing-standard)}',
-  '.ork-interactive:hover::after{opacity:var(--orderak-state-hover)}',
-  '.ork-interactive:disabled,.ork-interactive[aria-disabled="true"]{opacity:var(--orderak-disabled-opacity-web);cursor:not-allowed}',
-  ':where(a,button,input,select,textarea,[tabindex]):focus-visible{outline:var(--orderak-focus-ring);outline-offset:var(--orderak-focus-ring-offset)}',
-  '.ork-page{width:min(var(--orderak-container-admin),100%);margin-inline:auto;padding:var(--orderak-page-padding-block) var(--orderak-gutter-admin) 70px}',
-  '.ork-grid-metric{display:grid;grid-template-columns:var(--orderak-grid-metric);gap:var(--orderak-grid-gap)}',
-  '.ork-grid-panel{display:grid;grid-template-columns:var(--orderak-grid-panel);gap:18px}',
-];
-
-/** The 18 properties the admin uses that only the old bundle defined. */
-const BUNDLE_ONLY_PROPERTIES = [
-  '--orderak-canvas', '--orderak-ink', '--orderak-line', '--orderak-primary-tint', '--orderak-success-soft',
-  '--orderak-duration-long', '--orderak-duration-medium', '--orderak-motion-drawer', '--orderak-motion-fast',
-  '--orderak-focus-ring', '--orderak-focus-ring-offset', '--orderak-hover-surface', '--orderak-numeric-tabular',
-  '--orderak-shadow-card', '--orderak-shadow-overlay', '--orderak-shape-full', '--orderak-sidebar-width',
-  '--orderak-topbar-height',
-];
-
-/** Tokens the generator does not own yet; none may appear in the generated bundle. */
-const HAND_KEPT_NAMES = [
-  '--orderak-font-family-tajawal', '--orderak-font-family-noto', '--orderak-type-latin-floor', '--orderak-hover-tint',
-  '--orderak-hover-surface', '--orderak-focus-ring', '--orderak-focus-ring-color', '--orderak-shadow-card',
-  '--orderak-shadow-modal', '--orderak-duration-short', '--orderak-motion-fast', '--orderak-easing-standard',
-  '--orderak-state-hover', '--orderak-breakpoint-medium', '--orderak-sidebar-width', '--orderak-topbar-height',
-  '--orderak-numeric-tabular', '--orderak-mark-green', '--orderak-shape-full', '--shadow', '--g', '--bg', '--tx', '--mut',
+/** The declarations B2 deletes and must never come back. */
+const DELETED = [
+  '--orderak-font-family-tajawal', '--orderak-font-family-noto', '--orderak-type-latin-floor',
+  '--orderak-mark-green', '--orderak-mark-badge', '--orderak-mark-wordmark', '--orderak-mark-tagline',
+  '--orderak-breakpoint-compact', '--orderak-breakpoint-medium', '--orderak-breakpoint-expanded',
+  '--orderak-container-storefront', '--orderak-container-admin', '--orderak-container-prose', '--orderak-container-phone',
+  '--orderak-appbar-height', '--orderak-navbar-height', '--orderak-fab-inset',
+  '--orderak-gutter-phone', '--orderak-gutter-storefront', '--orderak-gutter-admin', '--orderak-page-padding-block',
+  '--orderak-grid-metric', '--orderak-grid-panel', '--orderak-grid-gap',
+  '--shadow', '--g', '--bg', '--tx', '--mut',
 ];
 
 describe('generated admin token bundle', () => {
-  it('carries a generated header that matches the committed fixture snapshot', () => {
+  it('carries a generated header that matches the committed schema-3 fixture snapshot', () => {
     const header = /^\s*\/\*[\s\S]*?\*\//.exec(bundle)?.[0] ?? '';
     expect(header).toContain('designSystemCss');
     expect(header).toContain(fixture.snapshot.generatorVersion);
     expect(header).toContain(fixture.snapshot.contentHash);
     expect(header).toContain('pnpm run design-system:generate');
     expect(header).toMatch(/by hand/i);
-    expect(bundle).not.toContain('2026-09-04');
+    expect(fixture.snapshot.schemaVersion).toBe(3);
   });
 
   it('holds every web colour role for the six themes and for .orderak-dark', () => {
@@ -222,13 +230,24 @@ describe('generated admin token bundle', () => {
     expect(aliasMissing).toEqual([]);
   });
 
-  it('keeps the generated scrim opaque and drops the stale translucent fallback', () => {
+  it('keeps the generated scrim opaque and never re-introduces a colour literal', () => {
     const scrim = fixture.snapshot.web.colors.standard.light.scrim;
     expect(scrim.oklch).not.toContain('/');
     expect(bundle).toContain(`--orderak-scrim:${scrim.oklch}`);
     expect(bundle).not.toContain('rgba(8,12,30');
-    expect(pending).not.toContain('rgba(8,12,30');
-    expect(declares(pending, '--orderak-scrim')).toBe(false);
+    expect(adminStylesheet).not.toContain('rgba(8,12,30');
+    expect(declares(bundle, '--orderak-hover-surface')).toBe(true);
+    const roleProperties = new Set<string>();
+    for (const role of Object.keys(lightRoles)) {
+      roleProperties.add(`--md-sys-color-${kebab(role)}`);
+      roleProperties.add(`--md-sys-color-${kebab(role)}-rgb`);
+      roleProperties.add(`--orderak-${kebab(role)}`);
+    }
+    const literal = /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab|lab|lch|hwb)\(\s*[\d.]/i;
+    const offenders = [...bundleRoot]
+      .filter(([name, declaration]) => !roleProperties.has(name) && literal.test(declaration))
+      .map(([name, declaration]) => `${name}: ${declaration}`);
+    expect(offenders).toEqual([]);
   });
 
   it('loads all three families from unchanged files under src/fonts', () => {
@@ -244,95 +263,94 @@ describe('generated admin token bundle', () => {
     }
   });
 
-  it('contains generator-owned tokens only', () => {
-    const plain = stripComments(bundle);
-    expect(plain).not.toMatch(/@keyframes|\.ork-|:focus-visible|prefers-reduced-motion/);
-    const present = HAND_KEPT_NAMES.filter((name) => declares(bundle, name));
+  it('contains generator-owned tokens only, with the schema-3 families present', () => {
+    const plain = plainBundle;
+    expect(plain).not.toMatch(/@keyframes|\.ork-|:focus-visible/);
+    expect(plain).toMatch(/prefers-reduced-motion/);
+    const missing = B2_FAMILIES.filter((name) => !declares(bundle, name));
+    expect(missing).toEqual([]);
+    const present = DELETED.filter((name) => declares(bundle, name));
     expect(present).toEqual([]);
   });
-});
 
-describe('hand-kept pending tokens', () => {
-  it('exists with a header saying it is hand-kept until B2 deletes it', () => {
-    expect(pending).not.toBe('');
-    const header = /^\s*\/\*[\s\S]*?\*\//.exec(pending)?.[0] ?? '';
-    expect(header).toMatch(/hand[- ]?kept/i);
-    expect(header).toContain('B2');
-  });
-
-  it('preserves the unowned families verbatim', () => {
-    const plain = stripComments(pending);
-    const missing = PENDING_VALUES.filter(([name, value]) =>
-      !new RegExp(`(?:^|[\\s;{])${escapeRegExp(name)}\\s*:\\s*${escapeRegExp(value)}\\s*[;}]`).test(plain));
-    expect(missing).toEqual([]);
-    const root = bodies(plain, /:root\s*\{/g, true);
-    expect(root).toMatch(/--orderak-hover-surface\s*:\s*#F0F3FA/);
-    const rail = squash(bodies(plain, /\.orderak-dark\s*\{/g));
-    for (const declaration of ['--orderak-hover-surface:#242B2C', '--orderak-focus-ring-color:rgba(149,209,210,.34)', '--orderak-focus-field-ring:0 0 0 3px rgba(149,209,210,.18)', '--orderak-hover-border:#6B7A7C']) {
-      expect(rail, declaration).toContain(squash(declaration));
+  it('reduced motion zeroes the five durations and the ready-made transitions', () => {
+    for (const name of ['--orderak-duration-instant', '--orderak-duration-short', '--orderak-duration-medium', '--orderak-duration-long', '--orderak-duration-extra-long']) {
+      expect(value(reduced, bundleReduced.get(name))).toBe('0ms');
     }
-  });
-
-  it('preserves every non-token rule of the old bundle with its scoping', () => {
-    const all = squash(pending);
-    const missing = PENDING_RULES.filter((rule) => !all.includes(squash(rule)));
-    expect(missing).toEqual([]);
-    const plain = stripComments(pending);
-    const reduced = squash(bodies(plain, /@media\s*\(\s*prefers-reduced-motion\s*:\s*reduce\s*\)\s*\{/g));
-    for (const piece of [
-      '*,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important}',
-      '.ork-spinner{animation-duration:1.6s !important;animation-iteration-count:infinite !important}',
-      '--orderak-duration-long:0ms',
-      '--orderak-motion-fast:0ms linear',
-      '--orderak-motion-drawer:0ms linear',
-    ]) {
-      expect(reduced, piece).toContain(squash(piece));
-    }
-    expect(squash(bodies(plain, /@media\s*\(\s*max-width\s*:\s*1240px\s*\)\s*\{/g))).toContain(squash('.ork-grid-metric{grid-template-columns:repeat(2,minmax(0,1fr))}'));
-    const medium = squash(bodies(plain, /@media\s*\(\s*max-width\s*:\s*860px\s*\)\s*\{/g));
-    expect(medium).toContain(squash('.ork-grid-panel{grid-template-columns:1fr}'));
-    expect(medium).toContain(squash('.ork-page{padding-inline:var(--orderak-space4)}'));
-    expect(squash(bodies(plain, /@media\s*\(\s*max-width\s*:\s*600px\s*\)\s*\{/g))).toContain(squash('.ork-grid-metric{grid-template-columns:1fr}'));
-  });
-
-  it('holds no generator-owned tokens', () => {
-    const plain = stripComments(pending);
-    expect(plain).not.toContain('@font-face');
-    expect(plain).not.toMatch(/--md-sys-color-[a-z-]+\s*:/);
-    expect(plain).not.toMatch(/--orderak-type-[a-z-]+-(?:size|line-height|weight|tracking)\s*:/);
-    expect(plain).not.toMatch(/--orderak-space\d+\s*:/);
-    expect(plain).not.toMatch(/--orderak-shape-(?:extra-small|small|medium|large|extra-large)\s*:/);
-    expect(declares(plain, '--orderak-font-family')).toBe(false);
-    expect(declares(plain, '--orderak-minimum-touch-target')).toBe(false);
-    const owned = [
-      ...SEMANTIC_ALIASES,
-      '--orderak-on-accent',
-      ...LEGACY_ALIASES,
-      ...Object.keys(fixture.snapshot.web.colors.standard.light).map((role) => `--orderak-${kebab(role)}`),
-    ].filter((name) => declares(plain, name));
-    expect(owned).toEqual([]);
-    for (const name of ['--orderak-sidebar-width', '--orderak-motion-fast', '--orderak-focus-ring', '--orderak-shadow-card', '--orderak-hover-surface', '--orderak-shape-full']) {
-      expect(declares(bundle, name)).toBe(false);
-    }
-  });
-
-  it('leaves none of the 18 bundle-only properties the admin uses undefined', () => {
-    const undefinedProperties = BUNDLE_ONLY_PROPERTIES.filter((name) => !declares(bundle, name) && !declares(pending, name));
-    expect(undefinedProperties).toEqual([]);
-    for (const name of ['--orderak-canvas', '--orderak-ink', '--orderak-line', '--orderak-primary-tint', '--orderak-success-soft']) {
-      expect(declares(bundle, name)).toBe(true);
-    }
+    expect(value(reduced, bundleReduced.get('--orderak-motion-fast'))).toBe('0ms linear');
+    expect(value(reduced, bundleReduced.get('--orderak-motion-nav'))).toBe('0ms linear');
+    expect(value(reduced, bundleReduced.get('--orderak-motion-drawer'))).toBe('0ms linear');
+    expect(value(reduced, bundleReduced.get('--orderak-motion-state'))).toBe('opacity 0ms cubic-bezier(0.2,0,0,1)');
+    // The spinner durations are deliberately not zeroed.
+    expect(value(light, bundleRoot.get('--orderak-duration-spinner'))).toBe('900ms');
+    expect(value(light, bundleRoot.get('--orderak-duration-spinner-reduced'))).toBe('1600ms');
+    expect(value(light, bundleRoot.get('--orderak-duration-safety-floor'))).toBe('0.01ms');
   });
 });
 
-describe('admin stylesheet', () => {
+describe('orderak-admin.css', () => {
+  it('exists and declares no custom properties or hand-written token values', () => {
+    expect(adminStylesheet).not.toBe('');
+    expect(plainAdmin).not.toMatch(/(?:^|[\s;{])--[a-zA-Z0-9-]+\s*:/);
+    const withoutKeyframes = plainAdmin.replace(/@keyframes[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, '');
+    expect(withoutKeyframes.match(/(?<![\w-])\d*\.?\d+(?:px|ms|s|rem|em|vh|vw)\b/g) ?? []).toEqual([]);
+    expect(withoutKeyframes).not.toMatch(/#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab|lab|lch|hwb|color)\(/i);
+  });
+
+  it('contains only the permitted live rules', () => {
+    const classes = new Set(plainAdmin.match(/\.ork-[a-z0-9-]+/g) ?? []);
+    expect([...classes].sort()).toEqual(['.ork-label-small', '.ork-numeric', '.ork-spinner']);
+    expect(plainAdmin).toMatch(/@keyframes\s+ork-spin\s*\{/);
+    const top = topLevelRules(plainAdmin);
+    expect(top.some((rule) => rule.selector.includes(':focus-visible'))).toBe(true);
+    const reducedBody = bodies(plainAdmin, /@media\s*\(\s*prefers-reduced-motion\s*:\s*reduce\s*\)\s*\{/g);
+    const reducedRules = topLevelRules(reducedBody);
+    expect(reducedRules.some((rule) => rule.selector.startsWith('*'))).toBe(true);
+    expect(reducedRules.some((rule) => rule.selector === '.ork-spinner')).toBe(true);
+  });
+
+  it('resolves every custom property it reads through the generated bundle', () => {
+    const referenced = [...plainAdmin.matchAll(/var\(\s*(--[a-z0-9-]+)/g)].map((match) => match[1]);
+    expect(referenced.filter((name) => !bundleRoot.has(name) && !bundleReduced.has(name))).toEqual([]);
+  });
+
+  it('resolves the spinner to 26px square with a 3px border and 900ms animation', () => {
+    const spinner = properties(topLevelRules(plainAdmin).filter((rule) => rule.selector === '.ork-spinner').map((rule) => rule.body).join(';'));
+    expect(value(light, spinner.get('width'))).toBe('26px');
+    expect(value(light, spinner.get('height'))).toBe('26px');
+    expect(value(light, spinner.get('border') ?? spinner.get('border-width'))).toMatch(/^3px(?: |$)/);
+    expect(value(light, spinner.get('animation-duration') ?? spinner.get('animation'))).toContain('900ms');
+
+    const reducedBody = bodies(plainAdmin, /@media\s*\(\s*prefers-reduced-motion\s*:\s*reduce\s*\)\s*\{/g);
+    const reducedRules = topLevelRules(reducedBody);
+    const reducedSpinner = properties(reducedRules.filter((rule) => rule.selector === '.ork-spinner').map((rule) => rule.body).join(';'));
+    expect(value(reduced, reducedSpinner.get('animation-duration'))).toBe('1600ms');
+    const universal = properties(reducedRules.filter((rule) => rule.selector.startsWith('*')).map((rule) => rule.body).join(';'));
+    expect(value(reduced, universal.get('animation-duration'))).toBe('0.01ms');
+    expect(value(reduced, universal.get('transition-duration'))).toBe('0.01ms');
+  });
+
+  it('resolves the focus rule and the numeric helper from generated roles', () => {
+    const focus = properties(topLevelRules(plainAdmin).filter((rule) => rule.selector.includes(':focus-visible')).map((rule) => rule.body).join(';'));
+    const outline = substitute(light, focus.get('outline') ?? '<missing>');
+    expect(canon(outline).startsWith('3px solid ')).toBe(true);
+    expect(mentions(outline, lightRoles.primary)).toBe(true);
+    expect(value(light, focus.get('outline-offset'))).toBe('2px');
+    const numeric = properties(topLevelRules(plainAdmin).filter((rule) => rule.selector === '.ork-numeric').map((rule) => rule.body).join(';'));
+    expect(value(light, numeric.get('font-variant-numeric'))).toBe('tabular-nums lining-nums');
+  });
+});
+
+describe('admin stylesheet wiring', () => {
   const lines = indexCss.split(/\r?\n/);
   const isImportOf = (line: string, file: string): boolean =>
     line.trim().startsWith(IMPORT) && new RegExp(`["']\\./${escapeRegExp(file)}["']`).test(line);
 
-  it('imports each token source exactly once, adjacently, inside layer(orderak-fallback)', () => {
+  it('deletes the pending file and imports the bundle and admin stylesheet once inside the layer', () => {
+    expect(existsSync(pendingPath)).toBe(false);
+    expect(existsSync(adminPath)).toBe(true);
     const at: number[] = [];
-    for (const file of ['orderak-tokens.css', 'orderak-tokens-pending.css']) {
+    for (const file of ['orderak-tokens.css', 'orderak-admin.css']) {
       const matches = lines.map((line, index) => ({ line: line.trim(), index })).filter((entry) => isImportOf(entry.line, file));
       expect(matches, file).toHaveLength(1);
       expect(matches[0].line).toMatch(/layer\(\s*orderak-fallback\s*\)\s*;$/);
@@ -340,6 +358,8 @@ describe('admin stylesheet', () => {
     }
     const between = lines.slice(Math.min(at[0], at[1]) + 1, Math.max(at[0], at[1])).join('\n');
     expect(stripComments(between).trim()).toBe('');
+    expect(indexCss).not.toContain('orderak-tokens-pending');
+    for (const name of DELETED) expect(declares(indexCss, name), name).toBe(false);
   });
 
   it('keeps the fallback explanation and the rail rule', () => {
@@ -351,20 +371,6 @@ describe('admin stylesheet', () => {
     const comment = before.slice(before.lastIndexOf('/*'));
     expect(comment).toContain('.orderak-dark');
     expect(comment).toMatch(/directly/i);
-  });
-
-  it('uses only tokens that .orderak-dark redefines directly inside the navigation rail', () => {
-    const rail = /(?:^|[\s,>+~])(?:\.sidebar(?![\w-])|\.sidebar-user|\.brand(?![\w-])|\.brand-mark|\.mobile-close|\.command-trigger|kbd|\.nav-group)/;
-    const nonColour = /^--orderak-(?:type-|shape-|duration-|motion-|space\d|sidebar-width|topbar-height|font-family|minimum-touch-target)/;
-    const railDeclared = `${bodies(stripComments(bundle), /\.orderak-dark\s*\{/g)}\n${bodies(stripComments(pending), /\.orderak-dark\s*\{/g)}`;
-    const used = new Set<string>();
-    for (const rule of rules(indexCss)) {
-      if (!rail.test(` ${rule.selector}`) || /palette|workspace|navigation-hidden/.test(rule.selector)) continue;
-      for (const match of rule.body.matchAll(/var\(\s*(--[a-z0-9-]+)/g)) used.add(match[1]);
-    }
-    expect(used.size).toBeGreaterThan(10);
-    const missing = [...used].filter((name) => !nonColour.test(name) && !declares(railDeclared, name));
-    expect(missing).toEqual([]);
   });
 
   it('drops the #fff literal fallback for the primary foreground', () => {
@@ -391,22 +397,6 @@ describe('admin stylesheet', () => {
       expect(own.length).toBeGreaterThan(0);
       expect(own.some((rule) => mixed.test(rule.body)), cls).toBe(true);
     }
-  });
-
-  it('has no admin stylesheet painting the scrim as a background at full opacity', () => {
-    const offenders: string[] = [];
-    for (const file of adminStylesheets(adminSrc)) {
-      if (file === bundlePath || file === pendingPath) continue;
-      for (const rule of rules(read(file))) {
-        for (const match of rule.body.matchAll(/(?:^|[\s;])background(?:-color)?\s*:\s*([^;]+)/g)) {
-          const value = match[1].trim();
-          if (!/var\(\s*--orderak-scrim\s*\)/.test(value)) continue;
-          if (/^color-mix\(\s*in\s+oklch\s*,\s*var\(\s*--orderak-scrim\s*\)\s+48%\s*,\s*transparent\s*\)/.test(value)) continue;
-          offenders.push(`${path.relative(adminSrc, file)} ${rule.selector}: ${value}`);
-        }
-      }
-    }
-    expect(offenders).toEqual([]);
   });
 });
 

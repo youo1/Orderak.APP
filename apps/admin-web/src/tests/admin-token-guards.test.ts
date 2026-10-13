@@ -51,7 +51,7 @@ afterAll(() => {
 describe('verify-admin-token-conformance.mjs', () => {
   const CONFORMANCE = 'verify-admin-token-conformance.mjs';
 
-  it('passes on the committed tree, with pending tokens counted as declared', () => {
+  it('passes on the committed tree, with the generated bundle counted as declared', () => {
     const root = sandbox();
     const committed = run(root, CONFORMANCE);
     expect(committed.status, committed.output).toBe(0);
@@ -99,8 +99,8 @@ describe('verify-admin-token-conformance.mjs', () => {
     expect(preview.status, preview.output).not.toBe(0);
   }, 60_000);
 
-  it('exempts only the two exact token-source files, not their names elsewhere', () => {
-    for (const name of ['orderak-tokens.css', 'orderak-tokens-pending.css']) {
+  it('exempts only the exact token-source file, not its name elsewhere', () => {
+    for (const name of ['orderak-tokens.css', 'orderak-admin.css']) {
       const root = sandbox();
       write(root, `features/zz/${name}`, '.colour-probe { color: #123456; }\n');
       const result = run(root, CONFORMANCE);
@@ -140,7 +140,7 @@ describe('verify-theme-authority.mjs', () => {
     return trimmed.startsWith(IMPORT) && (trimmed.includes(`"./${file}"`) || trimmed.includes(`'./${file}'`));
   };
   const BUNDLE = 'orderak-tokens.css';
-  const PENDING = 'orderak-tokens-pending.css';
+  const ADMIN = 'orderak-admin.css';
 
   function editIndex(root: string, edit: (lines: string[]) => string[]): void {
     const text = readFileSync(indexPath(root), 'utf8');
@@ -154,7 +154,7 @@ describe('verify-theme-authority.mjs', () => {
   }, 60_000);
 
   it('fails when either import is missing', () => {
-    for (const file of [BUNDLE, PENDING]) {
+    for (const file of [BUNDLE, ADMIN]) {
       const root = sandbox();
       editIndex(root, (lines) => lines.filter((line) => !isImportOf(line, file)));
       const result = run(root, AUTHORITY);
@@ -163,7 +163,7 @@ describe('verify-theme-authority.mjs', () => {
   }, 60_000);
 
   it('fails when either import leaves layer(orderak-fallback)', () => {
-    for (const file of [BUNDLE, PENDING]) {
+    for (const file of [BUNDLE, ADMIN]) {
       const root = sandbox();
       let replaced = false;
       editIndex(root, (lines) => lines.map((line) => {
@@ -178,7 +178,7 @@ describe('verify-theme-authority.mjs', () => {
   }, 60_000);
 
   it('fails when index.css imports either source twice', () => {
-    for (const file of [BUNDLE, PENDING]) {
+    for (const file of [BUNDLE, ADMIN]) {
       const root = sandbox();
       editIndex(root, (lines) => lines.flatMap((line) => (isImportOf(line, file) ? [line, line] : [line])));
       const result = run(root, AUTHORITY);
@@ -186,9 +186,9 @@ describe('verify-theme-authority.mjs', () => {
     }
   }, 60_000);
 
-  it('fails when another stylesheet also imports the pending tokens', () => {
+  it('fails when another stylesheet also imports the admin tokens', () => {
     const root = sandbox();
-    write(root, 'features/zz-second-import.css', `${IMPORT} "../${PENDING}";\n`);
+    write(root, 'features/zz-second-import.css', `${IMPORT} "../${ADMIN}";\n`);
     const result = run(root, AUTHORITY);
     expect(result.status, result.output).not.toBe(0);
   }, 60_000);

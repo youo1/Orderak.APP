@@ -78,12 +78,11 @@ const adminSrc = path.join(repositoryRoot, "apps", "admin-web", "src");
 const reportMode = process.argv.includes("--report");
 
 /**
- * The two token sources are the only files allowed to carry raw literals:
- * `orderak-tokens.css` is emitted by designSystemCss() and
- * `orderak-tokens-pending.css` holds the generator-unowned declarations B2
- * will fold back into the emitter. Every other stylesheet consumes them.
+ * `orderak-tokens.css` is emitted by designSystemCss() and is the only file
+ * allowed to carry raw token literals. Every other stylesheet, including
+ * `orderak-admin.css`, consumes those properties with var().
  */
-const TOKEN_SOURCE_NAMES = ["orderak-tokens.css", "orderak-tokens-pending.css"];
+const TOKEN_SOURCE_NAMES = ["orderak-tokens.css"];
 const TOKEN_SOURCE_PATHS = new Set(TOKEN_SOURCE_NAMES.map((name) => path.join(adminSrc, name)));
 
 /**
@@ -177,7 +176,7 @@ const declared = new Set(RUNTIME_PROPERTIES);
 for (const text of source.values()) {
 	for (const match of text.matchAll(/(^|[\s;{])--([a-z0-9-]+)\s*:/g)) declared.add(`--${match[2]}`);
 }
-// Both token sources declare the whole token set, generated and pending.
+// The generated bundle declares the whole token set.
 for (const name of TOKEN_SOURCE_NAMES) {
 	const text = readFileSync(path.join(adminSrc, name), "utf8");
 	for (const match of text.matchAll(/(^|[\s;{])--([a-z0-9-]+)\s*:/g)) declared.add(`--${match[2]}`);
@@ -344,7 +343,7 @@ if (over.length > 0 || kitProblems.length > 0) {
 		...RULES.map((rule) => [rule.kind, rule.remedy]),
 		["unknown-var", "declare it, or fix the name"],
 		["weight-class", "only `font-normal` (400) and `font-medium` (500) exist in this system"],
-		["colour", "use a token or var(); literal colours belong only in the two token sources"],
+		["colour", "use a token or var(); literal colours belong only in orderak-tokens.css"],
 		["scrim", "backdrops must use color-mix(in oklch, var(--orderak-scrim) 48%, transparent)"],
 	]);
 	for (const kind of over) {

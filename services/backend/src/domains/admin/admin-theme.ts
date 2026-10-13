@@ -414,7 +414,7 @@ export async function publicDesignSystemResponse(request: Request, env: Env, sit
 	};
 	const body = {
 		ok: true,
-		schemaVersion: DESIGN_SYSTEM_SCHEMA_VERSION,
+		schemaVersion: revision.schemaVersion,
 		version: revision.contentHash,
 		revisionId: revision.id,
 		generatorVersion: revision.generatorVersion,

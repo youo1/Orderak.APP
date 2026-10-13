@@ -25,7 +25,10 @@ function apply(snapshot: Snapshot) {
   for (const [role, value] of Object.entries(snapshot.shapes)) {
     document.documentElement.style.setProperty(`--orderak-shape-${cssName(role)}`, `${value}px`);
   }
-  document.documentElement.style.setProperty('--orderak-shape-full', '999px');
+  document.documentElement.style.setProperty(
+    '--orderak-shape-full',
+    snapshot.schemaVersion === 3 && snapshot.shapeFull ? snapshot.shapeFull.css : '999px',
+  );
   document.documentElement.style.setProperty('--gap', `${snapshot.spacing.tokens.space4}px`);
   document.documentElement.style.setProperty('--touch', `${snapshot.components.minimumTouchTargetDp}px`);
   // The type scale, under the same names the published stylesheet uses.
@@ -101,10 +104,12 @@ function render(snapshot: Snapshot) {
 
 window.addEventListener('message', event => {
   if (event.origin !== parentOrigin || event.source !== window.parent) return;
-  if (event.data?.type !== 'orderak-theme-preview' || event.data?.schemaVersion !== 2) return;
+  if (event.data?.type !== 'orderak-theme-preview') return;
+  const schemaVersion = event.data?.schemaVersion;
+  if (schemaVersion !== 2 && schemaVersion !== 3) return;
   if (new Blob([JSON.stringify(event.data)]).size > MAX_MESSAGE_BYTES) return;
   const snapshot = event.data.snapshot as Snapshot;
-  if (snapshot?.schemaVersion !== 2 || !snapshot.validation) return;
+  if (!snapshot || snapshot.schemaVersion !== schemaVersion || !snapshot.validation) return;
   apply(snapshot);
 });
 

@@ -16,8 +16,8 @@ import {
 } from "@material/material-color-utilities";
 import { logError } from "../../platform/http/shared";
 
-export const DESIGN_SYSTEM_SCHEMA_VERSION = 2;
-export const DESIGN_SYSTEM_GENERATOR_VERSION = "orderak-mcu-0.3.0+3";
+export const DESIGN_SYSTEM_SCHEMA_VERSION = 3;
+export const DESIGN_SYSTEM_GENERATOR_VERSION = "orderak-mcu-0.3.0+4";
 export const MAX_PUBLIC_PAYLOAD_BYTES = 128 * 1024;
 export const MAX_REQUEST_BYTES = 64 * 1024;
 export const FIRST_SCHEMA_V2_ANDROID_VERSION_CODE = 2;
@@ -89,8 +89,25 @@ export interface ValidationSummary {
 	contrast: Array<{ path: string; ratio: number; required: number; valid: boolean }>;
 }
 
+export interface GeneratedMotionFamily {
+	durations: { instant: number; short: number; medium: number; long: number; extraLong: number; spinner: number; spinnerReduced: number; safetyFloor: number };
+	easings: { standard: string; decelerate: string; accelerate: string; linear: string };
+	transitions: { fast: string; nav: string; drawer: string; state: string };
+}
+
+export interface GeneratedInteractionFamily {
+	state: { hover: number; focus: number; pressed: number; dragged: number; selected: number };
+	disabled: { content: number; container: number; web: number };
+	focus: { ringWidthPx: number; ringOffsetPx: number };
+	lifts: { hover: string; pressed: string };
+}
+
+export interface GeneratedShadowValue { geometry: string; alpha: number }
+
 export interface GeneratedDesignSystem {
-	schemaVersion: 2;
+	// The generator writes 3, but schema-2 revisions stay readable from D1 and
+	// travel as this same type; the schema-3 families below are optional for them.
+	schemaVersion: 2 | 3;
 	generatorVersion: string;
 	source: DesignSystemSource;
 	schemes: Record<ContrastName, Record<ThemeMode, Record<string, string>>>;
@@ -103,6 +120,14 @@ export interface GeneratedDesignSystem {
 	spacing: { values: number[]; tokens: Record<string, number> };
 	shapes: Record<"extraSmall" | "small" | "medium" | "large" | "extraLarge", number>;
 	components: { minimumTouchTargetDp: 48 };
+	motion?: GeneratedMotionFamily;
+	interaction?: GeneratedInteractionFamily;
+	elevation?: { shadows: Record<"card" | "raised" | "storefront" | "modal" | "overlay", GeneratedShadowValue> };
+	shapeFull?: { css: string; androidPercent: number };
+	icons?: { small: number; medium: number; hero: number };
+	componentDimensions?: { fabClearance: number; thumbnail: number };
+	layout?: { sidebarWidth: number; topbarHeight: number; contentMaxWidth: number; wideLayoutMinWidth: number; numericTabular: string };
+	spinner?: { sizePx: number };
 	web: {
 		colors: Record<ContrastName, Record<ThemeMode, Record<string, { hex: string; rgb: string; oklch: string }>>>;
 	};
@@ -169,6 +194,57 @@ const HEX = /^#[0-9A-F]{6}$/;
 const CONTRAST_LEVEL: Record<ContrastName, number> = { standard: 0, medium: 0.5, high: 1 };
 const DENSITY: Record<DensityName, number> = { compact: 0.875, comfortable: 1, spacious: 1.125 };
 const SPACING_STEPS = [0, 1, 2, 3, 4, 6, 8, 10, 12, 16] as const;
+
+/**
+ * B2 token families. These are structural constants, not seller-editable
+ * source: the snapshot records them so every client reads one authority, and
+ * `designSystemCss()` gates each family on its own presence so a schema-2
+ * snapshot never receives a schema-3 value.
+ */
+const MOTION_FAMILY: GeneratedMotionFamily = {
+	durations: { instant: 0, short: 150, medium: 180, long: 200, extraLong: 300, spinner: 900, spinnerReduced: 1600, safetyFloor: 0.01 },
+	easings: {
+		standard: "cubic-bezier(.2,0,0,1)",
+		decelerate: "cubic-bezier(0,0,0,1)",
+		accelerate: "cubic-bezier(.3,0,1,1)",
+		linear: "linear",
+	},
+	transitions: {
+		fast: "150ms ease",
+		nav: "180ms ease",
+		drawer: "200ms ease",
+		state: "opacity 150ms cubic-bezier(.2,0,0,1)",
+	},
+};
+
+const INTERACTION_FAMILY: GeneratedInteractionFamily = {
+	state: { hover: 0.08, focus: 0.1, pressed: 0.1, dragged: 0.16, selected: 0.12 },
+	disabled: { content: 0.38, container: 0.12, web: 0.5 },
+	focus: { ringWidthPx: 3, ringOffsetPx: 2 },
+	lifts: { hover: "translateY(-1px)", pressed: "none" },
+};
+
+const ELEVATION_FAMILY: GeneratedDesignSystem["elevation"] = {
+	shadows: {
+		card: { geometry: "0 5px 18px", alpha: 0.04 },
+		raised: { geometry: "0 5px 14px", alpha: 0.08 },
+		storefront: { geometry: "0 1px 4px", alpha: 0.067 },
+		modal: { geometry: "0 16px 40px", alpha: 0.08 },
+		overlay: { geometry: "0 30px 80px", alpha: 0.14 },
+	},
+};
+
+const SHAPE_FULL_FAMILY: GeneratedDesignSystem["shapeFull"] = { css: "999px", androidPercent: 50 };
+const ICON_FAMILY: GeneratedDesignSystem["icons"] = { small: 16, medium: 20, hero: 44 };
+const COMPONENT_DIMENSION_FAMILY: GeneratedDesignSystem["componentDimensions"] = { fabClearance: 80, thumbnail: 56 };
+const LAYOUT_FAMILY: GeneratedDesignSystem["layout"] = {
+	sidebarWidth: 268,
+	topbarHeight: 64,
+	contentMaxWidth: 560,
+	wideLayoutMinWidth: 720,
+	numericTabular: "tabular-nums lining-nums",
+};
+const SPINNER_FAMILY: GeneratedDesignSystem["spinner"] = { sizePx: 26 };
 const COLOR_ROLES = [
 	"primary", "onPrimary", "primaryContainer", "onPrimaryContainer", "inversePrimary",
 	"secondary", "onSecondary", "secondaryContainer", "onSecondaryContainer",
@@ -574,7 +650,7 @@ export async function generateDesignSystem(rawSource: unknown): Promise<Generate
 	}
 	const errors = [...normalized.errors, ...contrastErrors];
 	const base = {
-		schemaVersion: DESIGN_SYSTEM_SCHEMA_VERSION as 2,
+		schemaVersion: DESIGN_SYSTEM_SCHEMA_VERSION as 3,
 		generatorVersion: DESIGN_SYSTEM_GENERATOR_VERSION,
 		source,
 		schemes,
@@ -583,6 +659,14 @@ export async function generateDesignSystem(rawSource: unknown): Promise<Generate
 		spacing: { values: spacingValues, tokens: Object.fromEntries(SPACING_STEPS.map((step, index) => [`space${step}`, spacingValues[index]])) },
 		shapes: { extraSmall: shapeValues[0], small: shapeValues[1], medium: shapeValues[2], large: shapeValues[3], extraLarge: shapeValues[4] },
 		components: { minimumTouchTargetDp: 48 as const },
+		motion: MOTION_FAMILY,
+		interaction: INTERACTION_FAMILY,
+		elevation: ELEVATION_FAMILY,
+		shapeFull: SHAPE_FULL_FAMILY,
+		icons: ICON_FAMILY,
+		componentDimensions: COMPONENT_DIMENSION_FAMILY,
+		layout: LAYOUT_FAMILY,
+		spinner: SPINNER_FAMILY,
 		web: { colors: web },
 		validation: { valid: errors.length === 0, errors, warnings, contrast: contrastChecks },
 	};
@@ -915,6 +999,123 @@ function aliasDeclarations(): string {
 		.join("");
 }
 
+/** A 0.22 alpha as the `22%` a `color-mix()` percentage expects. */
+function alphaPercent(alpha: number): string {
+	return `${Math.round(alpha * 1000) / 10}%`;
+}
+
+/**
+ * Non-colour schema-3 families. Each block is gated on its own family being
+ * present in the snapshot, so a schema-2 snapshot receives none of them.
+ */
+function schema3ThemeDeclarations(snapshot: GeneratedDesignSystem): string {
+	const declarations: string[] = [];
+	const motion = snapshot.motion;
+	if (motion) {
+		declarations.push(`--orderak-duration-instant:${motion.durations.instant}ms;`);
+		declarations.push(`--orderak-duration-short:${motion.durations.short}ms;`);
+		declarations.push(`--orderak-duration-medium:${motion.durations.medium}ms;`);
+		declarations.push(`--orderak-duration-long:${motion.durations.long}ms;`);
+		declarations.push(`--orderak-duration-extra-long:${motion.durations.extraLong}ms;`);
+		declarations.push(`--orderak-duration-spinner:${motion.durations.spinner}ms;`);
+		declarations.push(`--orderak-duration-spinner-reduced:${motion.durations.spinnerReduced}ms;`);
+		declarations.push(`--orderak-duration-safety-floor:${motion.durations.safetyFloor}ms;`);
+		declarations.push(`--orderak-easing-standard:${motion.easings.standard};`);
+		declarations.push(`--orderak-easing-decelerate:${motion.easings.decelerate};`);
+		declarations.push(`--orderak-easing-accelerate:${motion.easings.accelerate};`);
+		declarations.push(`--orderak-easing-linear:${motion.easings.linear};`);
+		declarations.push(`--orderak-motion-fast:${motion.transitions.fast};`);
+		declarations.push(`--orderak-motion-nav:${motion.transitions.nav};`);
+		declarations.push(`--orderak-motion-drawer:${motion.transitions.drawer};`);
+		declarations.push(`--orderak-motion-state:${motion.transitions.state};`);
+	}
+	const interaction = snapshot.interaction;
+	if (interaction) {
+		declarations.push(`--orderak-state-hover:${interaction.state.hover};`);
+		declarations.push(`--orderak-state-focus:${interaction.state.focus};`);
+		declarations.push(`--orderak-state-pressed:${interaction.state.pressed};`);
+		declarations.push(`--orderak-state-dragged:${interaction.state.dragged};`);
+		declarations.push(`--orderak-state-selected:${interaction.state.selected};`);
+		declarations.push(`--orderak-disabled-content-opacity:${interaction.disabled.content};`);
+		declarations.push(`--orderak-disabled-container-opacity:${interaction.disabled.container};`);
+		declarations.push(`--orderak-disabled-opacity-web:${interaction.disabled.web};`);
+		declarations.push(`--orderak-focus-ring-width:${interaction.focus.ringWidthPx}px;`);
+		declarations.push(`--orderak-focus-ring-offset:${interaction.focus.ringOffsetPx}px;`);
+		declarations.push(`--orderak-hover-lift:${interaction.lifts.hover};`);
+		declarations.push(`--orderak-pressed-lift:${interaction.lifts.pressed};`);
+	}
+	if (snapshot.shapeFull) declarations.push(`--orderak-shape-full:${snapshot.shapeFull.css};`);
+	if (snapshot.icons) {
+		declarations.push(`--orderak-icon-small:${snapshot.icons.small}px;`);
+		declarations.push(`--orderak-icon-medium:${snapshot.icons.medium}px;`);
+		declarations.push(`--orderak-icon-hero:${snapshot.icons.hero}px;`);
+	}
+	if (snapshot.componentDimensions) {
+		declarations.push(`--orderak-fab-clearance:${snapshot.componentDimensions.fabClearance}px;`);
+		declarations.push(`--orderak-thumbnail:${snapshot.componentDimensions.thumbnail}px;`);
+	}
+	if (snapshot.layout) {
+		declarations.push(`--orderak-sidebar-width:${snapshot.layout.sidebarWidth}px;`);
+		declarations.push(`--orderak-topbar-height:${snapshot.layout.topbarHeight}px;`);
+		declarations.push(`--orderak-content-max-width:${snapshot.layout.contentMaxWidth}px;`);
+		declarations.push(`--orderak-wide-layout-min-width:${snapshot.layout.wideLayoutMinWidth}px;`);
+		declarations.push(`--orderak-numeric-tabular:${snapshot.layout.numericTabular};`);
+	}
+	if (snapshot.spinner) declarations.push(`--orderak-spinner-size:${snapshot.spinner.sizePx}px;`);
+	return declarations.join("");
+}
+
+/**
+ * Colour-bearing schema-3 properties for one contrast/mode scope. Every value
+ * is a `var()`/`color-mix()` indirection through a generated role — never a
+ * literal — so a caller can redeclare the whole set in `.orderak-dark` without
+ * inheriting an already-resolved light colour.
+ */
+function schema3ColourDeclarations(
+	snapshot: GeneratedDesignSystem,
+	mode: ThemeMode,
+	rail: boolean,
+): string {
+	const declarations: string[] = [];
+	if (snapshot.interaction) {
+		const tint = rail ? 0.34 : 0.22;
+		const field = rail ? 0.18 : 0.12;
+		declarations.push(`--orderak-focus-ring-color:color-mix(in oklch,var(--orderak-primary) ${alphaPercent(tint)},transparent);`);
+		declarations.push(`--orderak-focus-ring:var(--orderak-focus-ring-width) solid var(--orderak-focus-ring-color);`);
+		declarations.push(`--orderak-focus-field-ring:0 0 0 var(--orderak-focus-ring-width) color-mix(in oklch,var(--orderak-primary) ${alphaPercent(field)},transparent);`);
+		declarations.push("--orderak-hover-tint:var(--orderak-primary-soft);");
+	}
+	if (snapshot.interaction) {
+		const hoverSurface = mode === "dark" ? "surface-container-high" : "surface-container-low";
+		const hoverBorder = mode === "dark" ? "outline" : "outline-variant";
+		declarations.push(`--orderak-hover-surface:var(--md-sys-color-${hoverSurface});`);
+		declarations.push(`--orderak-hover-border:var(--md-sys-color-${hoverBorder});`);
+	}
+	if (snapshot.elevation) {
+		for (const [name, shadow] of Object.entries(snapshot.elevation.shadows)) {
+			declarations.push(`--orderak-shadow-${name}:${shadow.geometry} color-mix(in oklch,var(--orderak-shadow) ${alphaPercent(shadow.alpha)},transparent);`);
+		}
+	}
+	return declarations.join("");
+}
+
+function reducedMotionDeclarations(snapshot: GeneratedDesignSystem): string {
+	const motion = snapshot.motion;
+	if (!motion) return "";
+	const declarations: string[] = [
+		"--orderak-duration-instant:0ms;",
+		"--orderak-duration-short:0ms;",
+		"--orderak-duration-medium:0ms;",
+		"--orderak-duration-long:0ms;",
+		"--orderak-duration-extra-long:0ms;",
+		"--orderak-motion-fast:0ms linear;",
+		"--orderak-motion-nav:0ms linear;",
+		"--orderak-motion-drawer:0ms linear;",
+		`--orderak-motion-state:opacity 0ms ${motion.easings.standard};`,
+	];
+	return `@media(prefers-reduced-motion:reduce){:root{${declarations.join("")}}}`;
+}
+
 export function designSystemCss(snapshot: GeneratedDesignSystem, options: DesignSystemCssOptions = {}): string {
 	const fontUrlBase = options.fontUrlBase ?? DEFAULT_FONT_URL_BASE;
 	const familyName = snapshot.typography.family === "cairo" ? "Orderak Cairo"
@@ -924,12 +1125,13 @@ export function designSystemCss(snapshot: GeneratedDesignSystem, options: Design
 		fontFaceCss(fontUrlBase),
 		":root{",
 	];
-	const appendColors = (contrast: ContrastName, mode: ThemeMode) => {
+	const appendColors = (contrast: ContrastName, mode: ThemeMode, rail = false) => {
 		const colors = snapshot.web.colors[contrast][mode];
 		for (const [role, formats] of Object.entries(colors)) {
 			const cssRole = roleName(role);
 			lines.push(`--md-sys-color-${cssRole}:${formats.hex};--md-sys-color-${cssRole}-rgb:${formats.rgb};--orderak-${cssRole}:${formats.oklch};`);
 		}
+		lines.push(schema3ColourDeclarations(snapshot, mode, rail));
 	};
 	appendColors("standard", "light");
 	lines.push(`--orderak-font-family:"${familyName}",Cairo,Tajawal,"Noto Sans Arabic",system-ui,sans-serif;`);
@@ -939,6 +1141,7 @@ export function designSystemCss(snapshot: GeneratedDesignSystem, options: Design
 	}
 	for (const [name, value] of Object.entries(snapshot.spacing.tokens)) lines.push(`--orderak-${name}:${value}px;`);
 	for (const [name, value] of Object.entries(snapshot.shapes)) lines.push(`--orderak-shape-${roleName(name)}:${value}px;`);
+	lines.push(schema3ThemeDeclarations(snapshot));
 	lines.push("--orderak-minimum-touch-target:48px;}");
 	// Aliases are re-declared in every colour scope. Custom properties resolve
 	// at the element that declares them, so an alias left only on :root would
@@ -959,8 +1162,9 @@ export function designSystemCss(snapshot: GeneratedDesignSystem, options: Design
 	// the element carries .orderak-dark, so every role and alias is declared
 	// directly on it rather than inherited from :root.
 	lines.push(".orderak-dark{");
-	appendColors("standard", "dark");
+	appendColors("standard", "dark", true);
 	lines.push(`${aliasDeclarations()}}`);
+	lines.push(reducedMotionDeclarations(snapshot));
 	return lines.join("");
 }
 

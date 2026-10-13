@@ -33,8 +33,8 @@
     }
   },
   "snapshot": {
-    "schemaVersion": 2,
-    "generatorVersion": "orderak-mcu-0.3.0+3",
+    "schemaVersion": 3,
+    "generatorVersion": "orderak-mcu-0.3.0+4",
     "source": {
       "colors": {
         "primary": "#014D4E",
@@ -667,6 +667,99 @@
     },
     "components": {
       "minimumTouchTargetDp": 48
+    },
+    "motion": {
+      "durations": {
+        "instant": 0,
+        "short": 150,
+        "medium": 180,
+        "long": 200,
+        "extraLong": 300,
+        "spinner": 900,
+        "spinnerReduced": 1600,
+        "safetyFloor": 0.01
+      },
+      "easings": {
+        "standard": "cubic-bezier(.2,0,0,1)",
+        "decelerate": "cubic-bezier(0,0,0,1)",
+        "accelerate": "cubic-bezier(.3,0,1,1)",
+        "linear": "linear"
+      },
+      "transitions": {
+        "fast": "150ms ease",
+        "nav": "180ms ease",
+        "drawer": "200ms ease",
+        "state": "opacity 150ms cubic-bezier(.2,0,0,1)"
+      }
+    },
+    "interaction": {
+      "state": {
+        "hover": 0.08,
+        "focus": 0.1,
+        "pressed": 0.1,
+        "dragged": 0.16,
+        "selected": 0.12
+      },
+      "disabled": {
+        "content": 0.38,
+        "container": 0.12,
+        "web": 0.5
+      },
+      "focus": {
+        "ringWidthPx": 3,
+        "ringOffsetPx": 2
+      },
+      "lifts": {
+        "hover": "translateY(-1px)",
+        "pressed": "none"
+      }
+    },
+    "elevation": {
+      "shadows": {
+        "card": {
+          "geometry": "0 5px 18px",
+          "alpha": 0.04
+        },
+        "raised": {
+          "geometry": "0 5px 14px",
+          "alpha": 0.08
+        },
+        "storefront": {
+          "geometry": "0 1px 4px",
+          "alpha": 0.067
+        },
+        "modal": {
+          "geometry": "0 16px 40px",
+          "alpha": 0.08
+        },
+        "overlay": {
+          "geometry": "0 30px 80px",
+          "alpha": 0.14
+        }
+      }
+    },
+    "shapeFull": {
+      "css": "999px",
+      "androidPercent": 50
+    },
+    "icons": {
+      "small": 16,
+      "medium": 20,
+      "hero": 44
+    },
+    "componentDimensions": {
+      "fabClearance": 80,
+      "thumbnail": 56
+    },
+    "layout": {
+      "sidebarWidth": 268,
+      "topbarHeight": 64,
+      "contentMaxWidth": 560,
+      "wideLayoutMinWidth": 720,
+      "numericTabular": "tabular-nums lining-nums"
+    },
+    "spinner": {
+      "sizePx": 26
     },
     "web": {
       "colors": {
@@ -4370,7 +4463,7 @@
         }
       ]
     },
-    "contentHash": "6b95438c3fa8a37a8a7614882da4e0d44d2054ca7dd4317036c3040a62a6e0eb"
+    "contentHash": "636d200dbccdf997144c4096daa83b6fdbc1dd85079852b803a10dd5c4fc0782"
   },
   "legacyProjection": {
     "primary": "#014D4E",

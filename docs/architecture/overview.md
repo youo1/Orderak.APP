@@ -152,7 +152,7 @@ snapshot copies it into a new higher-ID checkpoint. Owners may physically
 delete inactive revisions; rollback ancestry uses `ON DELETE SET NULL`, while
 the active pointer prevents deletion of the current revision.
 
-The public Worker serves additive schema-v2 JSON plus the old 14-token
+The public Worker serves additive schema-2/schema-3 JSON plus the old 14-token
 projection, stable and hashed CSS endpoints, and self-hosted font assets.
 Server-rendered landing, catalog, and legal pages inject active variables into
 `<head>` to prevent FOUC. The admin edge proxies `/theme.css`; unsaved preview

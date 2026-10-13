@@ -24,8 +24,8 @@ Two separate mechanisms live here and are often confused:
 
 | Constant | Value | Meaning |
 | --- | --- | --- |
-| `DESIGN_SYSTEM_SCHEMA_VERSION` | `2` | Payload contract version |
-| `DESIGN_SYSTEM_GENERATOR_VERSION` | `orderak-mcu-0.3.0+3` | Generator identity, recorded per revision |
+| `DESIGN_SYSTEM_SCHEMA_VERSION` | `3` | Payload contract version |
+| `DESIGN_SYSTEM_GENERATOR_VERSION` | `orderak-mcu-0.3.0+4` | Generator identity, recorded per revision |
 | `MAX_PUBLIC_PAYLOAD_BYTES` | 128 KB | Ceiling on what a client may download |
 | `MAX_REQUEST_BYTES` | 64 KB | Ceiling on an authoring request |
 | `MAX_OVERRIDES` | 128 | Ceiling on manual role overrides |

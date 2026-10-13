@@ -71,7 +71,7 @@ function PreviewFrame({ snapshot }: { snapshot: Snapshot | null }) {
   }, []);
   useEffect(() => {
     if (!ready || !snapshot || !ref.current?.contentWindow) return;
-    const payload = { type: 'orderak-theme-preview', schemaVersion: 2, snapshot };
+    const payload = { type: 'orderak-theme-preview', schemaVersion: snapshot.schemaVersion, snapshot };
     if (new Blob([JSON.stringify(payload)]).size <= 128 * 1024) ref.current.contentWindow.postMessage(payload, window.location.origin);
   }, [ready, snapshot]);
   // sandbox="allow-scripts allow-same-origin", and the second flag has to stay.

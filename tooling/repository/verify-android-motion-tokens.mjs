@@ -38,6 +38,21 @@ import { fileURLToPath } from "node:url";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const androidMain = path.join(repositoryRoot, "apps", "seller-android", "app", "src", "main");
+const themeFolder = path.join(androidMain, "java", "app", "orderak", "seller", "core", "ui", "theme");
+const generatedText = readFileSync(path.join(themeFolder, "GeneratedDesignSystem.kt"), "utf8");
+
+/** The generated motion durations, so a literal can name the token it should read. */
+const MOTION_VALUES = [...generatedText.matchAll(/const val MOTION_[A-Z_]+_MS\s*=\s*(\d+)/g)].map((m) => Number(m[1]));
+
+/** The nearest declared duration, ties going up the scale. */
+function nearestMotion(value) {
+	let best = null;
+	for (const candidate of MOTION_VALUES) {
+		const distance = Math.abs(candidate - value);
+		if (best === null || distance <= best.distance) best = { distance, value: candidate };
+	}
+	return best?.value;
+}
 
 /** A radius at or above this is an attempt at a pill, not a corner. */
 const PILL_FLOOR_DP = 100;
@@ -83,12 +98,15 @@ for (const file of files) {
 		for (const rule of RULES) {
 			for (const match of code.matchAll(rule.find)) {
 				if (rule.keep?.(match[1])) continue;
+				const nearest = rule.name === "hardcoded animation duration" ? nearestMotion(Number(match[1])) : undefined;
 				findings.push({
 					file: path.relative(repositoryRoot, file).replace(/\\/g, "/"),
 					line: index + 1,
 					rule: rule.name,
 					text: match[0].trim(),
-					remedy: rule.remedy,
+					remedy: nearest !== undefined
+						? `${rule.remedy}; the nearest duration token is ${nearest}ms`
+						: rule.remedy,
 				});
 			}
 		}

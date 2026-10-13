@@ -13,8 +13,8 @@ async function main() {
 	});
 	if (!response.ok) throw new Error(`Bootstrap failed: HTTP ${response.status}`);
 	const body = await response.json() as Record<string, unknown>;
-	if (body.schemaVersion !== 2 || !Number(body.revisionId) || typeof body.version !== "string") {
-		throw new Error("Bootstrap returned an invalid schema-v2 revision");
+	if (![2, 3].includes(body.schemaVersion as number) || !Number(body.revisionId) || typeof body.version !== "string") {
+		throw new Error("Bootstrap returned an invalid design-system revision (expected schema 2 or 3)");
 	}
 	const theme = body.theme as Record<string, unknown> | undefined;
 	if (!theme || typeof theme.primary !== "string" || typeof theme.accent !== "string") {
