@@ -56,6 +56,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
@@ -328,6 +329,7 @@ private fun WelcomeScreen(
                 painter = painterResource(R.drawable.ic_orderak_logo),
                 contentDescription = stringResource(R.string.app_name),
                 modifier = Modifier.size(if (compactHeight) 80.dp else 112.dp),
+                colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary),
             )
             Spacer(Modifier.height(if (compactHeight) 16.dp else 28.dp))
             Text(

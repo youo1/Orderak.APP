@@ -25,7 +25,7 @@ export function DataTable({ rows, onSelect, preferred = [] }: { rows: Row[]; onS
   const visible = filtered.slice(safePage * pageSize, (safePage + 1) * pageSize);
 
   return <div className="table-card">
-    <div className="table-tools"><label className="search-box"><Search size={16} /><input value={query} onChange={event => { setQuery(event.target.value); setPage(0); }} placeholder="Filter these results" /></label><span>{filtered.length.toLocaleString()} records</span></div>
+    <div className="table-tools"><label className="search-box"><Search size={16} /><span className="sr-only">Filter these results</span><input value={query} onChange={event => { setQuery(event.target.value); setPage(0); }} placeholder="Filter these results" /></label><span>{filtered.length.toLocaleString()} records</span></div>
     <div className="table-scroll"><table><thead><tr>{columns.map(column => <th key={column}>{humanize(column)}</th>)}</tr></thead><tbody>
       {!visible.length && <tr><td colSpan={Math.max(1, columns.length)}><div className="empty-state">No matching records</div></td></tr>}
       {visible.map((row, index) => <tr key={String(row.id ?? row.flag_key ?? row.capability_key ?? index)} onClick={() => onSelect?.(row)} className={onSelect ? 'clickable' : ''}>{columns.map(column => <td key={column}>{renderValue(column, row[column])}</td>)}</tr>)}
