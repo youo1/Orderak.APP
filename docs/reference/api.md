@@ -1056,7 +1056,7 @@ app) can read the live tokens from the public endpoint:
 
 ```http
 GET /api/v1/theme
-→ { "ok": true, "version": "<hash>", "theme": { "primary": "#1DAB61", ... },
+→ { "ok": true, "version": "<hash>", "theme": { "primary": "#014D4E", ... },
     "assets": { "logo": "https://orderak.app/static/orderak-logo.svg", ... } }
 ```
 

@@ -140,6 +140,18 @@ jobs:
       - name: Verify the design-system component inventory
         run: node tooling/repository/verify-design-system-components.mjs
 
+      # The D-14 mark is exported once under design/assets/brand and copied to
+      # Android, the backend and the admin panel. A served copy that drifts from
+      # its export, a colour off the design-system roles, or a manifest/landing/
+      # admin reference that points at a file nobody shipped would each show a
+      # different mark with nothing failing. Its own test runs first, for the
+      # same reason the component inventory's does.
+      - name: Test the Orderak brand asset guard
+        run: node --test tooling/repository/verify-orderak-brand-assets.test.mjs
+
+      - name: Verify the Orderak brand assets
+        run: node tooling/repository/verify-orderak-brand-assets.mjs
+
       # D1 is the system of record and Room is a cache of it (ADR-012). That rule
       # is only as strong as the narrowest place it can be broken, which is one
       # productDao().upsert() in a view model written by someone reasonably
