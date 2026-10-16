@@ -176,7 +176,14 @@ async function runAxe(): Promise<AxeResults> {
   return results;
 }
 
-async function checkEveryMode(label: string, fixture: () => ReactNode): Promise<void> {
+interface CheckOptions {
+  /** Puts the fixture into the state under test after it renders (clicks, typed input), in every mode. */
+  prepare?: () => Promise<void>;
+  /** A selector that must match before axe runs, so a state that failed to render cannot pass vacuously. */
+  rendered?: string;
+}
+
+async function checkEveryMode(label: string, fixture: () => ReactNode, options: CheckOptions = {}): Promise<void> {
   for (const mode of MODES) {
     await applyMode(mode);
     cleanup();
@@ -188,6 +195,13 @@ async function checkEveryMode(label: string, fixture: () => ReactNode): Promise<
     // gives every fixture the same ordinary inset a section has in the app.
     render(<div style={{ padding: 24 }}>{fixture()}</div>);
     await settle();
+    if (options.prepare) {
+      await options.prepare();
+      await settle();
+    }
+    if (options.rendered) {
+      expect(document.querySelector(options.rendered), `${label} [${mode.name}]: ${options.rendered} did not render`).not.toBeNull();
+    }
     const results = await runAxe();
     const issues = blockingIssues(results);
     expect(issues, `${label} [${mode.name}]\n${formatIssues(issues)}`).toEqual([]);
@@ -360,6 +374,14 @@ describe('admin kit accessibility', () => {
     ));
   }, 120_000);
 
+  it('has no blocking axe findings for the empty data table', async () => {
+    await checkEveryMode('data table empty', () => (
+      <main>
+        <DataTable rows={[]} preferred={['store_name', 'status']} onSelect={() => undefined} />
+      </main>
+    ), { rendered: '.empty-state' });
+  }, 120_000);
+
   it('has no blocking axe findings for the slider in default and disabled states', async () => {
     await checkEveryMode('slider', () => (
       <main>
@@ -387,20 +409,31 @@ describe('admin kit accessibility', () => {
   }, 120_000);
 
   it('has no blocking axe findings for the open confirm dialog', async () => {
+    // The host is remounted in every mode and reads the pending confirmation when
+    // it mounts; `rendered` proves each mode audited an open alertdialog.
     askConfirm('Delete this record?', () => undefined);
-    await checkEveryMode('confirm', () => <ConfirmHost />);
+    await checkEveryMode('confirm', () => <ConfirmHost />, { rendered: '[role="alertdialog"]' });
   }, 120_000);
 
-  it('has no blocking axe findings for the disabled select', async () => {
-    await checkEveryMode('select disabled', () => (
+  it('has no blocking axe findings for the closed select, enabled and disabled', async () => {
+    await checkEveryMode('select closed', () => (
       <main>
+        <Select defaultValue="active">
+          <SelectTrigger aria-label="Store status">
+            <SelectValue placeholder="Choose status" />
+          </SelectTrigger>
+          <SelectContent aria-label="Store status options">
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="paused">Paused</SelectItem>
+          </SelectContent>
+        </Select>
         <Select disabled>
           <SelectTrigger aria-label="Disabled store status">
             <SelectValue placeholder="Unavailable" />
           </SelectTrigger>
         </Select>
       </main>
-    ));
+    ), { rendered: '[role="combobox"]:not([disabled])' });
   }, 120_000);
 
   it('has no blocking axe findings for the open select', async () => {
@@ -439,8 +472,44 @@ describe('admin kit accessibility', () => {
       <QueryClientProvider client={new QueryClient()}>
         <ActionDialog config={config} resourceKey="stores" close={() => undefined} />
       </QueryClientProvider>
+    ), { rendered: '[role="dialog"]' });
+
+    // Invalid: a required field is empty, so the submit button is disabled.
+    const invalid: ActionConfig = {
+      ...config,
+      fields: config.fields.map(field => field.name === 'store_name' ? { ...field, defaultValue: '' } : field),
+    };
+    await checkEveryMode('action dialog invalid', () => (
+      <QueryClientProvider client={new QueryClient()}>
+        <ActionDialog config={invalid} resourceKey="stores" close={() => undefined} />
+      </QueryClientProvider>
+    ), { rendered: '[role="dialog"] button:disabled' });
+
+    // Failed request: the API answers 500 and the dialog shows the error text.
+    const fetchSpy = vi.spyOn(window, 'fetch').mockImplementation(async () => new Response(
+      JSON.stringify({ code: 'internal', detail: 'The store could not be updated.' }),
+      { status: 500, headers: { 'content-type': 'application/json' } },
     ));
-  }, 120_000);
+    try {
+      await checkEveryMode('action dialog error', () => (
+        <QueryClientProvider client={new QueryClient()}>
+          <ActionDialog config={config} resourceKey="stores" close={() => undefined} />
+        </QueryClientProvider>
+      ), {
+        prepare: async () => {
+          const submit = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button'))
+            .find(button => button.textContent === config.label);
+          submit?.click();
+          for (let i = 0; i < 40 && !document.querySelector('[role="dialog"] .error-text'); i += 1) {
+            await new Promise<void>(resolve => setTimeout(resolve, 25));
+          }
+        },
+        rendered: '[role="dialog"] .error-text',
+      });
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  }, 240_000);
 
   it('has no blocking axe findings for a populated detail panel', async () => {
     await checkEveryMode('detail panel populated', () => (
@@ -467,8 +536,9 @@ describe('the axe gate detects injected defects', () => {
     render(<button type="button" />);
     await settle();
     const results = await runAxe();
-    const reported = [...results.violations, ...results.incomplete].some(result => result.id === 'button-name');
-    expect(reported, formatIssues([...results.violations, ...results.incomplete])).toBe(true);
+    // The gate's own filter must fail on it: an incomplete result the gate lets through is not detection.
+    const issues = blockingIssues(results);
+    expect(issues.some(result => result.id === 'button-name'), formatIssues(issues)).toBe(true);
   });
 
   it('reports two 16x16 CSS-pixel targets with no spacing as target-size', async () => {
@@ -480,15 +550,17 @@ describe('the axe gate detects injected defects', () => {
     );
     await settle();
     const results = await runAxe();
-    const reported = [...results.violations, ...results.incomplete].some(result => result.id === 'target-size');
-    expect(reported, formatIssues([...results.violations, ...results.incomplete])).toBe(true);
+    // The gate's own filter must fail on it: an incomplete result the gate lets through is not detection.
+    const issues = blockingIssues(results);
+    expect(issues.some(result => result.id === 'target-size'), formatIssues(issues)).toBe(true);
   });
 
   it('reports body text below 4.5:1 contrast as color-contrast', async () => {
     render(<p style={{ color: '#a8a8a8', backgroundColor: '#ffffff', margin: 0 }}>Low contrast body text</p>);
     await settle();
     const results = await runAxe();
-    const reported = [...results.violations, ...results.incomplete].some(result => result.id === 'color-contrast');
-    expect(reported, formatIssues([...results.violations, ...results.incomplete])).toBe(true);
+    // The gate's own filter must fail on it: an incomplete result the gate lets through is not detection.
+    const issues = blockingIssues(results);
+    expect(issues.some(result => result.id === 'color-contrast'), formatIssues(issues)).toBe(true);
   });
 });
