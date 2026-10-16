@@ -200,7 +200,7 @@ async function renderContentPage(env: PublicWorkerEnv, slug: string, lang: Local
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(row.title)}</title>
 <style>${designSystemCss(revision.snapshot)}
-  body{font-family:system-ui,'Segoe UI',Tahoma,Arial;max-width:720px;margin:40px auto;padding:0 20px;color:${t.ink};line-height:1.7}
+  body{font-family:var(--orderak-font-family,system-ui,sans-serif);max-width:720px;margin:40px auto;padding:0 20px;color:${t.ink};line-height:1.7}
   h1{color:${t.primary};font-size:24px}
 </style>
 </head>
