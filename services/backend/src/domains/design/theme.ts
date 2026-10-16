@@ -57,7 +57,7 @@ export const THEME_KEYS = Object.keys(DEFAULT_THEME) as (keyof Theme)[];
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
-/** True when the value is a plain 6-digit hex color like #1DAB61. */
+/** True when the value is a plain 6-digit hex color like #014D4E. */
 export function isHexColor(v: unknown): v is string {
 	return typeof v === "string" && HEX_RE.test(v);
 }
