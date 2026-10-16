@@ -246,10 +246,16 @@ function extractManifestReferences(document) {
 
 function resolveReference(relativeDocument, base, reference) {
 	if (isExternalReference(reference)) return null;
-	const withoutFragment = reference.split("#")[0].split("?")[0];
-	if (withoutFragment === "" || withoutFragment === "/" || !withoutFragment.startsWith("/")) return null;
+	let withoutFragment = reference.split("#")[0].split("?")[0];
+	if (withoutFragment === "" || withoutFragment === "/") return null;
 	const extension = path.posix.extname(withoutFragment).toLowerCase();
 	if (!STATIC_ASSET_EXTENSIONS.has(extension)) return null;
+	// The manifest (/manifest.json), the landing page (/) and the admin index
+	// (/) are all served from the site root, so a document-relative reference
+	// such as `missing-relative.png` resolves exactly like the equivalent
+	// root-relative `/missing-relative.png`. A local asset reference is never
+	// skipped; only external URLs, fragments and extensionless page routes are.
+	if (!withoutFragment.startsWith("/")) withoutFragment = `/${withoutFragment}`;
 	if (base === "backend" && withoutFragment.startsWith("/static/")) {
 		return { file: resolve(`${BACKEND_STATIC}/${withoutFragment.slice("/static/".length)}`), path: withoutFragment };
 	}

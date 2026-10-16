@@ -104,3 +104,15 @@ test("fails on a missing referenced asset, naming the reference document", () =>
 	assert.match(result.output, /services\/backend\/src\/landing\.ts/);
 	assert.match(result.output, /orderak-icon-180\.png/);
 });
+
+test("fails on a document-relative asset reference that does not exist, naming the manifest", () => {
+	const root = sandbox();
+	const manifestPath = path.join(root, "services", "backend", "assets", "manifest.json");
+	const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+	manifest.icons = [...(Array.isArray(manifest.icons) ? manifest.icons : []), { src: "missing-relative.png", sizes: "512x512", type: "image/png" }];
+	writeFileSync(manifestPath, `${JSON.stringify(manifest, null, "\t")}\n`);
+	const result = run(root);
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /services\/backend\/assets\/manifest\.json/);
+	assert.match(result.output, /missing-relative\.png/);
+});
