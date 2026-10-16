@@ -134,18 +134,40 @@ function normaliseHex(value) {
 
 const HEX_PATTERN = /#[0-9a-fA-F]{3,8}\b/g;
 
-/** Every hex colour that appears anywhere in the design system is a role value. */
+/**
+ * The role values: every colour the generated schemes and semantic roles assign, in every contrast and mode. Only
+ * these count. Seed colours, source overrides and validation records elsewhere in the file are not roles.
+ */
 function collectRoleHexes() {
 	const roles = new Set();
-	const visit = (value) => {
-		if (typeof value === "string") {
-			for (const match of value.matchAll(HEX_PATTERN)) roles.add(normaliseHex(match[0]));
-		} else if (value && typeof value === "object") {
-			for (const key of Object.keys(value)) visit(value[key]);
+	const snapshot = JSON.parse(readText("design/design-system.default.json")).snapshot ?? {};
+	for (const family of [snapshot.schemes, snapshot.semantic]) {
+		for (const modes of Object.values(family ?? {})) {
+			for (const roleValues of Object.values(modes ?? {})) {
+				for (const value of Object.values(roleValues ?? {})) {
+					if (typeof value === "string" && /^#[0-9a-fA-F]{3,8}$/.test(value)) roles.add(normaliseHex(value));
+				}
+			}
 		}
-	};
-	visit(JSON.parse(readText("design/design-system.default.json")));
+	}
+	if (roles.size === 0) problems.push("design/design-system.default.json: no scheme or semantic role colours found.");
 	return roles;
+}
+
+// Colour-bearing attributes and style properties in SVG and Android vector XML. A value there must be a role hex
+// (checked above) or one of these keywords; a named colour (`red`) or a functional notation (`rgb(…)`, `hsl(…)`)
+// would otherwise slip past a check that only reads hex literals.
+const COLOUR_PROPERTY = /(?:^|[\s"'{;])(fill|stroke|stop-color|flood-color|lighting-color|color|android:fillColor|android:strokeColor)\s*[=:]\s*["']?([^"';>}\s]+)/g;
+const COLOUR_KEYWORDS = new Set(["none", "transparent", "currentcolor", "inherit"]);
+
+function isAllowedColourValue(value) {
+	const lower = value.toLowerCase();
+	return (
+		/^#[0-9a-f]{3,8}$/i.test(value) || // a hex literal: the role check above decides it
+		COLOUR_KEYWORDS.has(lower) ||
+		/^url\(#[^)]+\)$/i.test(value) || // a gradient or pattern; its stops are checked as stop-color
+		value.startsWith("@") // an Android resource reference, resolved and checked where it is defined
+	);
 }
 
 const roleHexes = collectRoleHexes();
@@ -177,6 +199,14 @@ for (const file of COLOUR_FILES) {
 		if (!roleHexes.has(colour)) {
 			problems.push(
 				`${relativeFile}: colour ${match[0]} is not a colour role in design/design-system.default.json.`,
+			);
+		}
+	}
+	for (const match of text.matchAll(COLOUR_PROPERTY)) {
+		const [, property, value] = match;
+		if (!isAllowedColourValue(value)) {
+			problems.push(
+				`${relativeFile}: ${property} ${value} is not a hex colour role; named and functional colours are not allowed.`,
 			);
 		}
 	}

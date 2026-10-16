@@ -116,3 +116,27 @@ test("fails on a document-relative asset reference that does not exist, naming t
 	assert.match(result.output, /services\/backend\/assets\/manifest\.json/);
 	assert.match(result.output, /missing-relative\.png/);
 });
+
+for (const [name, value] of [["a named colour", "red"], ["a functional colour", "rgb(255,0,0)"]]) {
+	test(`fails on ${name} in a mark, naming the file`, () => {
+		const root = sandbox();
+		const source = path.join(root, "design", "assets", "brand", "svg", "orderak-mark-small.svg");
+		const text = readFileSync(source, "utf8");
+		writeFileSync(source, text.replace("</svg>", `<rect width="1" height="1" fill="${value}"/>\n</svg>`));
+		const result = run(root);
+		assert.notEqual(result.status, 0, result.output);
+		assert.match(result.output, /design\/assets\/brand\/svg\/orderak-mark-small\.svg/);
+		assert.ok(result.output.includes(value), result.output);
+	});
+}
+
+test("fails on a seed colour that is in the design-system file but is not a role value", () => {
+	// #4B6B69 is the secondary seed (decision D-11); no generated role has that exact value.
+	const root = sandbox();
+	const source = path.join(root, "design", "assets", "brand", "svg", "orderak-mark-small.svg");
+	const text = readFileSync(source, "utf8");
+	writeFileSync(source, text.replace("</svg>", '<rect width="1" height="1" fill="#4B6B69"/>\n</svg>'));
+	const result = run(root);
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /#4B6B69/);
+});
