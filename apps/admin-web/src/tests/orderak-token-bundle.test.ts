@@ -263,17 +263,16 @@ describe('generated admin token bundle', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('loads all three families from unchanged files under src/fonts', () => {
+  it('loads only the three Cairo faces from unchanged files under src/fonts', () => {
     const urls = [...bundle.matchAll(/url\(\s*["']?([^"')]+)["']?\s*\)/g)].map((match) => match[1]);
-    expect(urls.length).toBeGreaterThanOrEqual(12);
+    expect(urls.length).toBe(3);
     expect(bundle).not.toContain('/static/fonts/');
     for (const url of urls) {
       expect(url.startsWith('./fonts/')).toBe(true);
       expect(existsSync(path.join(adminSrc, url))).toBe(true);
     }
-    for (const family of ['Orderak Cairo', 'Orderak Tajawal', 'Orderak Noto Arabic']) {
-      expect(bundle).toMatch(new RegExp(`@font-face\\s*\\{[^}]*font-family:\\s*"${family}"`));
-    }
+    expect(bundle).toMatch(/@font-face\s*\{[^}]*font-family:\s*"Orderak Cairo"/);
+    expect(bundle).not.toMatch(/Tajawal|Noto/i);
   });
 
   it('contains generator-owned tokens only, with the schema-3 families present', () => {

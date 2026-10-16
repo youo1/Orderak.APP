@@ -314,4 +314,17 @@ describe("B2: the generator owns every remaining token family (schema 3)", () =>
 			expect(plain).not.toMatch(/\.ork-|@keyframes|:focus-visible/);
 		}
 	});
+
+	it("emits only the three Cairo faces for Cairo and for a stored retired-family snapshot", async () => {
+		for (const family of ["cairo", "tajawal", "noto-arabic"] as const) {
+			const base = await generateDesignSystem(DEFAULT_DESIGN_SYSTEM_SOURCE);
+			const snapshot = family === "cairo"
+				? base
+				: (JSON.parse(JSON.stringify({ ...base, source: { ...base.source, typography: { ...base.source.typography, family } }, typography: { ...base.typography, family } })) as Snapshot);
+			const css = emit(snapshot, { fontUrlBase: "./fonts/" });
+			expect((css.match(/@font-face\s*\{/g) ?? []).length).toBe(3);
+			expect(css).not.toMatch(/Tajawal|Noto/i);
+			expect(css).toContain('--orderak-font-family:"Orderak Cairo",Cairo,system-ui,sans-serif');
+		}
+	});
 });

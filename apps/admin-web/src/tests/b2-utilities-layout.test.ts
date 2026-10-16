@@ -241,6 +241,15 @@ describe('B2 admin token layout', () => {
     }
   });
 
+  it('emits only the three Cairo faces and no retired family', () => {
+    expect(stripComments(bundle).match(/@font-face\s*\{/g) ?? []).toHaveLength(3);
+    expect(stripComments(bundle)).not.toMatch(/Tajawal|Noto/i);
+    expect(stripComments(bundle)).toContain('--orderak-font-family:"Orderak Cairo",Cairo,system-ui,sans-serif');
+    for (const name of ['--orderak-font-family-tajawal', '--orderak-font-family-noto']) {
+      expect(declares(bundle, name), name).toBe(false);
+    }
+  });
+
   it('ships a schema-3 fixture whose hash heads the committed bundle', () => {
     expect(fixture.snapshot.schemaVersion).toBe(3);
     expect(fixture.snapshot.generatorVersion).toBe('orderak-mcu-0.3.0+4');

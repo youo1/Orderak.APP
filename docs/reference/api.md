@@ -1042,30 +1042,43 @@ All admin API routes live under `/api/admin/v1/*` and require a valid session.
 | GET | `/api/admin/v1/inbound-emails[/:id]` | List or read received messages |
 | POST | `/api/admin/v1/inbound-emails/:id/read` | Mark a received message read |
 
-**Theme (design tokens):** all project colors live in a 14-token WCAG AA
-contrast-verified schema (`primary`, `primary_strong`, `primary_soft`,
-`primary_tint`, `canvas`, `surface`, `ink`, `muted`, `line`, `danger`,
-`danger_soft`, `warning`, `warning_soft`, `accent` — defaults in
-`services/backend/src/domains/design/theme.ts`, mirrored in `design/tokens.json` and Android
-`core/ui/theme/Color.kt`). Every text/icon-usable token passes ≥4.5:1 against
-its assigned surface. The admin panel's
-**Theme** tab edits them in one click; overrides persist in the `settings`
-table (`theme_colors`) and immediately restyle the landing page, store
-catalog pages, legal pages, and the panel itself. Clients (e.g. the Android
-app) can read the live tokens from the public endpoint:
+**Theme (generated design system):** the active theme is a generated, versioned
+Material Color Utilities snapshot (`services/backend/src/domains/design/design-system.ts`),
+stored as an immutable revision in D1. Its standard-light roles are the colour
+source for the Android app and for the Worker landing, store, category, product,
+Terms and Privacy pages. The admin panel's **Theme** tab edits the source seeds
+and publishes new revisions. Older builds read the public endpoint:
 
 ```http
 GET /api/v1/theme
-→ { "ok": true, "version": "<hash>", "theme": { "primary": "#014D4E", ... },
-    "assets": { "logo": "https://orderak.app/static/orderak-logo.svg", ... } }
+→ {
+    "ok": true,
+    "schemaVersion": 3,
+    "version": "<content hash>",
+    "revisionId": 1,
+    "generatorVersion": "orderak-mcu-0.3.0+4",
+    "publishedAt": "2026-01-01 00:00:00",
+    "compatibility": {
+      "firstSchemaV2AndroidVersionCode": 2,
+      "legacyProjectionPresent": true,
+      "sunsetGate": "enforced_minimum_version_and_date"
+    },
+    "source": { ... },
+    "designSystem": { ... },
+    "theme": { "primary": "#014D4E", ... },
+    "assets": { "logo": "https://orderak.app/static/orderak-logo.svg", ... }
+  }
 ```
 
-The response is versioned for cheap polling: the `ETag` header is a content
-hash of the config, so clients that send `If-None-Match` receive a bodyless
-`304` when nothing changed (plus `Cache-Control: max-age=300`). The Android
-app's `BrandingRepository` uses this: compiled defaults render instantly,
-the last config is cached in DataStore, refreshes happen asynchronously and
-apply silently, and brand assets re-download only when their content changes.
+`designSystem` is the current payload. The 14-token `theme` field is
+compatibility data for older Android builds that predate `designSystem`; it is
+the stored `LegacyTheme` projection (`revision.legacyTheme`), not the active
+colour source for the current app or the public pages. Removing that field is
+gated by the enforced minimum app version and its effective date
+(`firstSchemaV2AndroidVersionCode` is `2`), not by adoption percentage. The
+response's `ETag` is the revision content hash, so clients that send
+`If-None-Match` receive a bodyless `304` when nothing changed
+(`Cache-Control: public, no-cache`, plus 60-second CDN revalidation).
 
 Reads require the `emails:view` permission, writes require `emails:manage`
 

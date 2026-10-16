@@ -28,7 +28,10 @@ export type SchemeVariant =
 export type ContrastName = "standard" | "medium" | "high";
 export type ThemeMode = "light" | "dark";
 export type SurfaceTemperature = "cool" | "neutral" | "warm";
-export type FontFamilyId = "cairo" | "tajawal" | "noto-arabic";
+// Owner decision D-07: Cairo is the only approved web font family. The
+// generator still accepts retired-family *stored* revisions without rewriting
+// them, but no new source may name anything else.
+export type FontFamilyId = "cairo";
 export type DensityName = "compact" | "comfortable" | "spacious";
 export type ShapePreset = "sharp" | "balanced" | "rounded" | "custom";
 
@@ -544,7 +547,7 @@ function validateSource(raw: unknown): { source: DesignSystemSource; errors: Val
 	if (!["tonal-spot", "vibrant", "expressive", "fidelity", "content", "neutral", "monochrome"].includes(variant)) errors.push({ code: "invalid_variant", path: "colors.variant", message: "Unsupported scheme variant.", severity: "error" });
 	if (!["cool", "neutral", "warm"].includes(surfaceTemperature)) errors.push({ code: "invalid_surface_temperature", path: "colors.surfaceTemperature", message: "Unsupported surface temperature.", severity: "error" });
 	if (!["standard", "medium", "high"].includes(defaultContrast)) errors.push({ code: "invalid_contrast", path: "colors.defaultContrast", message: "Unsupported default contrast.", severity: "error" });
-	if (!["cairo", "tajawal", "noto-arabic"].includes(family)) errors.push({ code: "font_not_approved", path: "typography.family", message: "Select an approved font family.", severity: "error" });
+	if (family !== "cairo") errors.push({ code: "font_not_approved", path: "typography.family", message: "Select an approved font family.", severity: "error" });
 	if (!["compact", "comfortable", "spacious"].includes(density)) errors.push({ code: "invalid_density", path: "spacing.density", message: "Unsupported density.", severity: "error" });
 	if (!["sharp", "balanced", "rounded", "custom"].includes(shapePreset)) errors.push({ code: "invalid_shape_preset", path: "shapes.preset", message: "Unsupported shape preset.", severity: "error" });
 	const multiplier = Number(typography.multiplier ?? 1);
@@ -690,6 +693,36 @@ export function legacyProjection(snapshot: GeneratedDesignSystem): LegacyTheme {
 		danger_soft: light.errorContainer,
 		warning: semantic.warning,
 		warning_soft: semantic.warningContainer,
+		accent: light.secondary,
+	};
+}
+
+/**
+ * D-07: colours for the six public Worker pages (landing, store, category,
+ * product, terms, privacy) come directly from the active generated snapshot's
+ * standard light roles, never from `revision.legacyTheme`/`legacyProjection()`.
+ *
+ * `primary_strong` deliberately reads `onPrimaryContainer` rather than
+ * `legacyProjection()`'s `primaryContainer`: white text on the landing hover
+ * surface must clear 4.5:1 contrast.
+ */
+export function pageThemeFromSnapshot(snapshot: GeneratedDesignSystem): LegacyTheme {
+	const light = snapshot.schemes.standard.light;
+	const semantic: Record<string, string> = snapshot.semantic?.standard?.light ?? {};
+	return {
+		primary: light.primary,
+		primary_strong: light.onPrimaryContainer,
+		primary_soft: light.primaryContainer,
+		primary_tint: light.inversePrimary,
+		canvas: light.background,
+		surface: light.surface,
+		ink: light.onSurface,
+		muted: light.onSurfaceVariant,
+		line: light.outlineVariant,
+		danger: light.error,
+		danger_soft: light.errorContainer,
+		warning: semantic.warning ?? LEGACY_DEFAULT_THEME.warning,
+		warning_soft: semantic.warningContainer ?? LEGACY_DEFAULT_THEME.warning_soft,
 		accent: light.secondary,
 	};
 }
@@ -1118,8 +1151,10 @@ function reducedMotionDeclarations(snapshot: GeneratedDesignSystem): string {
 
 export function designSystemCss(snapshot: GeneratedDesignSystem, options: DesignSystemCssOptions = {}): string {
 	const fontUrlBase = options.fontUrlBase ?? DEFAULT_FONT_URL_BASE;
-	const familyName = snapshot.typography.family === "cairo" ? "Orderak Cairo"
-		: snapshot.typography.family === "tajawal" ? "Orderak Tajawal" : "Orderak Noto Arabic";
+	// D-07: the stylesheet always resolves to Cairo, even for a stored revision
+	// whose snapshot still names a retired family. The snapshot itself is never
+	// rewritten, so its source/snapshot/hash/legacy projection stay intact.
+	const familyName = "Orderak Cairo";
 	const lines: string[] = [
 		generatedHeader(snapshot),
 		fontFaceCss(fontUrlBase),
@@ -1134,7 +1169,7 @@ export function designSystemCss(snapshot: GeneratedDesignSystem, options: Design
 		lines.push(schema3ColourDeclarations(snapshot, mode, rail));
 	};
 	appendColors("standard", "light");
-	lines.push(`--orderak-font-family:"${familyName}",Cairo,Tajawal,"Noto Sans Arabic",system-ui,sans-serif;`);
+	lines.push(`--orderak-font-family:"${familyName}",Cairo,system-ui,sans-serif;`);
 	for (const [role, token] of Object.entries(snapshot.typography.roles)) {
 		const name = roleName(role);
 		lines.push(`--orderak-type-${name}-size:${token.sizeRem}rem;--orderak-type-${name}-line-height:${token.lineHeight}rem;--orderak-type-${name}-weight:${token.weight};--orderak-type-${name}-tracking:${token.letterSpacingEm}em;`);
@@ -1169,14 +1204,11 @@ export function designSystemCss(snapshot: GeneratedDesignSystem, options: Design
 }
 
 export function designSystemFontPreload(
-	snapshot: GeneratedDesignSystem,
+	_snapshot: GeneratedDesignSystem,
 	script: "arabic" | "latin" = "arabic",
 ): string {
-	const source = snapshot.typography.family === "tajawal"
-		? `/static/fonts/tajawal-${script}-400.woff2`
-		: snapshot.typography.family === "noto-arabic"
-			? `/static/fonts/noto-sans-arabic-${script === "arabic" ? "variable" : "latin-core-variable"}.woff2`
-			: `/static/fonts/cairo-${script === "arabic" ? "arabic-variable" : "latin-core-variable"}.woff2`;
+	// D-07: every revision preloads Cairo regardless of the family it names.
+	const source = `/static/fonts/cairo-${script === "arabic" ? "arabic-variable" : "latin-core-variable"}.woff2`;
 	return `<link rel="preload" href="${source}" as="font" type="font/woff2" crossorigin>`;
 }
 
@@ -1195,25 +1227,16 @@ function face(
 }
 
 /**
- * All 12 faces are emitted on every call, not just the selected family: the
- * Theme Builder preview switches among Cairo, Tajawal and Noto Sans Arabic in
- * one document, so every family has to resolve. `fontUrlBase` is the only
- * difference between the Worker stylesheet and the committed admin bundle.
+ * D-07: only the three Cairo faces are emitted. Every family the Theme Builder
+ * could once preview has been retired, so a stored revision naming a retired
+ * family still resolves to Cairo. `fontUrlBase` is the only difference between
+ * the Worker stylesheet and the committed admin bundle.
  */
 function fontFaceCss(fontUrlBase: string): string {
 	const cairoMetrics = { size: 104, ascent: 130.3, descent: 57.1, gap: 0 };
-	const tajawalMetrics = { size: 114.54, ascent: 64.3, descent: 35.7, gap: 20 };
-	const notoMetrics = { size: 97.01, ascent: 137.4, descent: 73.8, gap: 0 };
 	return [
 		face("Orderak Cairo", `${fontUrlBase}cairo-arabic-variable.woff2`, "200 1000", ARABIC_RANGE, cairoMetrics),
 		face("Orderak Cairo", `${fontUrlBase}cairo-latin-core-variable.woff2`, "200 1000", LATIN_RANGE, cairoMetrics),
 		face("Orderak Cairo", `${fontUrlBase}cairo-latin-variable.woff2`, "200 1000", LATIN_EXT_RANGE, cairoMetrics),
-		...[400, 500, 700].flatMap((weight) => [
-			face("Orderak Tajawal", `${fontUrlBase}tajawal-arabic-${weight}.woff2`, String(weight), ARABIC_RANGE, tajawalMetrics),
-			face("Orderak Tajawal", `${fontUrlBase}tajawal-latin-${weight}.woff2`, String(weight), LATIN_RANGE, tajawalMetrics),
-		]),
-		face("Orderak Noto Arabic", `${fontUrlBase}noto-sans-arabic-variable.woff2`, "100 900", ARABIC_RANGE, notoMetrics),
-		face("Orderak Noto Arabic", `${fontUrlBase}noto-sans-arabic-latin-core-variable.woff2`, "100 900", LATIN_RANGE, notoMetrics),
-		face("Orderak Noto Arabic", `${fontUrlBase}noto-sans-arabic-latin-variable.woff2`, "100 900", LATIN_EXT_RANGE, notoMetrics),
 	].join("");
 }
