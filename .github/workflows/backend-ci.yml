@@ -47,6 +47,18 @@ jobs:
 
 
 
+      # The admin panel's accessibility gate runs axe-core in headless Chromium
+      # against the real admin stylesheet and generated token bundle. Chromium
+      # and its system libraries are not on the runner by default, so they are
+      # installed here, after the workspace dependencies and before the browser
+      # suite runs. `test` is the pull-request test gate; the separate
+      # `worker-budget` job measures bundle size and is not the place for it.
+      - name: Install Chromium for the admin accessibility gate
+        run: pnpm --dir apps/admin-web exec playwright install --with-deps chromium
+
+      - name: Run admin accessibility tests
+        run: pnpm --dir apps/admin-web run test:a11y
+
       - name: Run backend tests
         working-directory: services/backend
         run: pnpm test
