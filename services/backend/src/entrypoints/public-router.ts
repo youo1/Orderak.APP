@@ -15,7 +15,7 @@
 // ============================================================
 
 import { findStoreByIdentifier, storeUrl, validE164 } from "../domains/identity/identity";
-import { designSystemCss, loadActiveDesignSystem } from "../domains/design/design-system";
+import { designSystemCss, loadActiveDesignSystem, pageThemeFromSnapshot } from "../domains/design/design-system";
 import {
 	renderStorePage,
 	renderCategoryPage,
@@ -191,7 +191,7 @@ async function renderContentPage(env: PublicWorkerEnv, slug: string, lang: Local
 	if (!row) return notFound(lang);
 
 	const revision = await loadActiveDesignSystem(env);
-	const t = revision.legacyTheme;
+	const t = pageThemeFromSnapshot(revision.snapshot);
 	const dir = dirFor(lang);
 	const html = `<!doctype html>
 <html lang="${lang}" dir="${dir}">

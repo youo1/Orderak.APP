@@ -105,7 +105,10 @@ describe("the frozen schema-2 fixture", () => {
 		const header = /^\s*\/\*[\s\S]*?\*\//.exec(worker)?.[0] ?? "";
 		expect(header).toContain(V2_HASH);
 		expect(header).toContain("orderak-mcu-0.3.0+3");
-		expect((worker.match(/@font-face\s*\{/g) ?? []).length).toBe(12);
+		// D-07: Cairo is the only family, so the frozen schema-2 snapshot now
+		// renders exactly the three Cairo faces.
+		expect((worker.match(/@font-face\s*\{/g) ?? []).length).toBe(3);
+		expect(worker).not.toMatch(/Tajawal|Noto/i);
 
 		const plain = stripComments(worker);
 		const root = bodies(plain, /:root\s*\{/g, true);

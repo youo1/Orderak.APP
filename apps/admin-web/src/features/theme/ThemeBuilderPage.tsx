@@ -275,7 +275,7 @@ export default function ThemeBuilderPage() {
           </TabsContent>
           <TabsContent value="typography">
             <Card><CardHeader><CardTitle>Typography</CardTitle><CardDescription>The preset and multiplier are one value. OS/browser scaling is applied afterward.</CardDescription></CardHeader><CardContent className="builder-control-grid">
-              <FieldSelect label="Approved family" value={source.typography.family} options={['cairo','tajawal','noto-arabic']} onChange={value => changeSource('typography', { family: value as DesignSystemSource['typography']['family'] })} />
+              <div className="field-stack"><Label>Approved family</Label><span>Cairo (the only approved family)</span></div>
               <FieldSelect label="Scale preset" value={typePreset} options={['Compact','Standard','Large','Custom']} onChange={value => value !== 'Custom' && changeSource('typography', { multiplier: PRESETS[value] })} />
               <div><Label htmlFor="type-multiplier">Custom multiplier: {source.typography.multiplier.toFixed(2)}</Label><Slider id="type-multiplier" min={0.9} max={1.15} step={0.01} value={[source.typography.multiplier]} onValueChange={values => changeSource('typography', { multiplier: values[0] })} /></div>
             </CardContent></Card>

@@ -823,10 +823,8 @@ val verifyDesignSystemContract by tasks.registering {
             "The 48dp minimum touch target constraint changed."
         )
         requireContract(
-            listOf("cairo", "tajawal", "noto-arabic").any {
-                "const val FONT_FAMILY = \"$it\"" in generated
-            },
-            "The generated font family is not an approved Orderak font."
+            "const val FONT_FAMILY = \"cairo\"" in generated,
+            "The generated font family is not the approved Orderak font (cairo)."
         )
 
         // Colour must reach the UI only through the generator, because
@@ -886,8 +884,8 @@ val verifyDesignSystemContract by tasks.registering {
             "A semantic container lost its outline role."
         )
         requireContract(
-            "Tajawal" in type && "Noto Sans Arabic" in type,
-            "Approved Android font fallbacks are incomplete."
+            "Cairo" in type,
+            "Cairo must be the declared Android font family (D-07)."
         )
     }
 }

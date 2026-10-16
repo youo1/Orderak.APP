@@ -14,7 +14,7 @@ export interface DesignSystemSource {
     variant: 'tonal-spot' | 'vibrant' | 'expressive' | 'fidelity' | 'content' | 'neutral' | 'monochrome';
     defaultContrast: ContrastName;
   };
-  typography: { family: 'cairo' | 'tajawal' | 'noto-arabic'; multiplier: number };
+  typography: { family: 'cairo'; multiplier: number };
   spacing: { baseUnit: number; density: 'compact' | 'comfortable' | 'spacious' };
   shapes: { preset: 'sharp' | 'balanced' | 'rounded' | 'custom'; baseRadius?: number };
 }

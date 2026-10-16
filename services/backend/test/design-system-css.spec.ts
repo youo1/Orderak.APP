@@ -15,9 +15,6 @@ const CONTRASTS = ["standard", "medium", "high"] as const;
 const MODES = ["light", "dark"] as const;
 const FONT_FILES = [
 	"cairo-arabic-variable.woff2", "cairo-latin-core-variable.woff2", "cairo-latin-variable.woff2",
-	"tajawal-arabic-400.woff2", "tajawal-latin-400.woff2", "tajawal-arabic-500.woff2",
-	"tajawal-latin-500.woff2", "tajawal-arabic-700.woff2", "tajawal-latin-700.woff2",
-	"noto-sans-arabic-variable.woff2", "noto-sans-arabic-latin-core-variable.woff2", "noto-sans-arabic-latin-variable.woff2",
 ];
 const SEMANTIC_ALIASES = [
 	"--orderak-canvas", "--orderak-ink", "--orderak-line", "--orderak-muted", "--orderak-primary-tint",
@@ -158,18 +155,17 @@ describe("designSystemCss emits /theme.css and the admin bundle from one functio
 		}
 	});
 
-	it("declares font faces for Cairo, Tajawal and Noto Sans Arabic whatever family is selected", async () => {
+	it("declares only the three Cairo font faces, whatever family a stored snapshot names", async () => {
 		for (const family of ["cairo", "tajawal", "noto-arabic"] as const) {
 			const snapshot = await generateDesignSystem({
 				...DEFAULT_DESIGN_SYSTEM_SOURCE,
 				typography: { ...DEFAULT_DESIGN_SYSTEM_SOURCE.typography, family },
 			});
 			const css = emit(snapshot, { fontUrlBase: "./fonts/" });
-			for (const name of ["Orderak Cairo", "Orderak Tajawal", "Orderak Noto Arabic"]) {
-				expect(css).toMatch(new RegExp(`@font-face\\s*\\{[^}]*font-family:\\s*"${name}"`));
-			}
+			expect(css).toMatch(/@font-face\s*\{[^}]*font-family:\s*"Orderak Cairo"/);
+			expect(css).not.toMatch(/Tajawal|Noto/i);
 			for (const file of FONT_FILES) expect(css).toContain(`./fonts/${file}`);
-			expect((css.match(/@font-face\s*\{/g) ?? []).length).toBe(12);
+			expect((css.match(/@font-face\s*\{/g) ?? []).length).toBe(3);
 		}
 	});
 
@@ -244,14 +240,14 @@ describe("designSystemCss emits /theme.css and the admin bundle from one functio
 	});
 
 	it("keeps every token /theme.css already emitted and owns no hand-kept family", async () => {
-		for (const [family, familyName] of [["cairo", "Orderak Cairo"], ["tajawal", "Orderak Tajawal"], ["noto-arabic", "Orderak Noto Arabic"]] as const) {
+		for (const family of ["cairo", "tajawal", "noto-arabic"] as const) {
 			const snapshot = await generateDesignSystem({
 				...DEFAULT_DESIGN_SYSTEM_SOURCE,
 				typography: { ...DEFAULT_DESIGN_SYSTEM_SOURCE.typography, family },
 			});
 			const css = emit(snapshot);
 			const root = scopes(css)["standard.light"];
-			expect(root).toContain(`--orderak-font-family:"${familyName}",Cairo,Tajawal,"Noto Sans Arabic",system-ui,sans-serif`);
+			expect(root).toContain('--orderak-font-family:"Orderak Cairo",Cairo,system-ui,sans-serif');
 			for (const [role, token] of Object.entries(snapshot.typography.roles)) {
 				const name = kebab(role);
 				expect(root).toContain(`--orderak-type-${name}-size:${token.sizeRem}rem`);
