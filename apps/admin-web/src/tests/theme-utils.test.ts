@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RECOVERY_DAYS_MS, deepEqual, patchChanged, recoveryIsCurrent, recoveryKey } from '@/features/theme/theme-utils';
+import { RECOVERY_DAYS_MS, deepEqual, editableSource, namesRetiredFamily, patchChanged, recoveryIsCurrent, recoveryKey } from '@/features/theme/theme-utils';
 
 describe('design-system editor safety', () => {
   it('keys browser recovery by administrator and base revision', () => {
@@ -50,5 +50,24 @@ describe('design-system editor safety', () => {
     expect(patchChanged({ x: 1, y: 2 }, { x: 5, y: 6 }, { y: 2, x: 1 })).toEqual({ x: 5, y: 6 });
     expect(patchChanged(['a'], ['b'], ['a'])).toEqual(['b']);
     expect(patchChanged({ list: [1, 2] }, { list: [3] }, { list: [2, 1] })).toEqual({ list: [2, 1] });
+  });
+});
+
+describe('retired font families (decision D-07)', () => {
+  const stored = (family: string) => ({ colors: { primary: '#014D4E' }, typography: { family, multiplier: 1.05 } });
+
+  it('loads a source that names a retired family as Cairo, keeping every other value', () => {
+    for (const family of ['tajawal', 'noto-arabic']) {
+      const source = stored(family);
+      const editable = editableSource(source);
+      expect(editable).toEqual({ colors: { primary: '#014D4E' }, typography: { family: 'cairo', multiplier: 1.05 } });
+      expect(source.typography.family).toBe(family);            // the stored revision is not mutated
+      expect(namesRetiredFamily(source)).toBe(true);
+    }
+  });
+
+  it('leaves a Cairo source as it is', () => {
+    expect(editableSource(stored('cairo'))).toEqual(stored('cairo'));
+    expect(namesRetiredFamily(stored('cairo'))).toBe(false);
   });
 });

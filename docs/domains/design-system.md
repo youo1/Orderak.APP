@@ -14,10 +14,11 @@ when a bad revision ships.
 Two separate mechanisms live here and are often confused:
 
 - **The design system** — a generated, versioned Material Color Utilities token
-  set. Immutable revisions in D1 are the colour source for the Android app and
-  for the Worker's public pages: the landing page, the storefront catalogue
-  (store, category, product) and the Terms and Privacy content pages. The admin
-  panel reads the same emitted stylesheet.
+  set. Immutable revisions in D1 are the colour source for the Worker's public
+  pages: the landing page, the storefront catalogue (store, category, product)
+  and the Terms and Privacy content pages. The admin panel reads the same
+  emitted stylesheet. The Android app is not themed from D1: it compiles the
+  generated token set into the build (`GeneratedDesignSystem.kt`).
 - **The legacy theme module** — `theme.ts`, a 14-token `Theme` type with
   `DEFAULT_THEME`, `mergeTheme` and `isHexColor` helpers, retained as
   compatibility data alongside `design/tokens.json`. It is not the colour source
@@ -116,7 +117,9 @@ those pages — `mergeTheme` and `isHexColor` are retained compatibility helpers
 for the persisted `theme_colors` setting, and `DEFAULT_THEME` is their compiled
 fallback. `invalidateThemeCache()` is called by `admin-project.ts` after a
 `theme_colors` save; it drops the cached generated revision by way of
-`invalidateDesignSystemCache()` so the next render picks up the change.
+`invalidateDesignSystemCache()`. Such a save changes nothing the public pages
+render: they read the active revision's snapshot, and the `theme_colors`
+setting is read only once, to seed the first revision when none exists.
 
 The public `/api/v1/theme` response's `theme` field is **not** this module. It is
 the `LegacyTheme` projection from `design-system.ts`, read from the stored

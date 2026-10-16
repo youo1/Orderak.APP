@@ -15,7 +15,7 @@ import { Slider } from '@/shared/ui/slider';
 import { Switch } from '@/shared/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/tabs';
 import type { ActiveRevision, ContrastName, DesignSystemSource, RevisionSummary, Snapshot, ThemeGetResponse, ThemeMode } from './types';
-import { RECOVERY_DAYS_MS, clone, deepEqual, patchChanged, recoveryIsCurrent, recoveryKey } from './theme-utils';
+import { RECOVERY_DAYS_MS, clone, deepEqual, editableSource, namesRetiredFamily, patchChanged, recoveryIsCurrent, recoveryKey } from './theme-utils';
 
 const COLOR_SEEDS = ['primary', 'secondary', 'tertiary', 'error', 'warning', 'success', 'information'] as const;
 const PRESETS: Record<string, number> = { Compact: 0.94, Standard: 1, Large: 1.08 };
@@ -169,7 +169,7 @@ export default function ThemeBuilderPage() {
     const result = await api<ThemeGetResponse>('/api/admin/v1/theme');
     setPayload(result);
     setOriginal(result.active);
-    setSource(clone(result.active.source));
+    setSource(editableSource(result.active.source));
     setSnapshot(result.active.snapshot);
     const saved = localStorage.getItem(recoveryKey(auth.admin!.id, result.active.id));
     if (saved) {
@@ -223,7 +223,7 @@ export default function ThemeBuilderPage() {
       });
       localStorage.removeItem(recoveryKey(auth.admin!.id, original.id));
       setPayload(current => current ? { ...current, activeRevisionId: result.active.id, active: result.active } : current);
-      setOriginal(result.active); setSource(clone(result.active.source)); setSnapshot(result.active.snapshot);
+      setOriginal(result.active); setSource(editableSource(result.active.source)); setSnapshot(result.active.snapshot);
       setApplyOpen(false); setMessage(`Revision ${result.active.id} is now current.`);
       applySnapshotToAdmin(result.active.snapshot);
     } catch (error) {
@@ -236,7 +236,7 @@ export default function ThemeBuilderPage() {
   };
   const rebase = () => {
     if (!conflict) return;
-    setSource(patchChanged(conflict.original.source, conflict.current.source, conflict.localSource));
+    setSource(editableSource(patchChanged(conflict.original.source, conflict.current.source, conflict.localSource)));
     setOriginal(conflict.current); setConflict(null); setMessage('Local changes rebased. Review the new preview before publishing.');
   };
 
@@ -255,7 +255,8 @@ export default function ThemeBuilderPage() {
     </div>
     {message && <Alert><AlertTitle>Status</AlertTitle><AlertDescription>{message}</AlertDescription></Alert>}
     {payload?.generatorUpgradePreview && <Alert className="upgrade-alert"><AlertTriangle className="size-4" /><AlertTitle>Generator upgrade requires review</AlertTitle><AlertDescription>{payload.generatorUpgradePreview.from} → {payload.generatorUpgradePreview.to}. The active source has been regenerated for comparison; publication is never automatic.</AlertDescription><GeneratorUpgradeDiff active={original.snapshot} regenerated={payload.generatorUpgradePreview.snapshot} /></Alert>}
-    {recovery && <Alert><AlertTitle>Unsaved edits found</AlertTitle><AlertDescription>Edits from this revision are available for seven days.</AlertDescription><div className="alert-actions"><Button size="sm" onClick={() => { setSource(recovery.source); setRecovery(null); }}>Restore edits</Button><Button size="sm" variant="outline" onClick={() => { localStorage.removeItem(recoveryKey(auth.admin!.id, original.id)); setRecovery(null); }}>Discard</Button></div></Alert>}
+    {original && namesRetiredFamily(original.source) && <Alert><AlertTitle>Retired font family</AlertTitle><AlertDescription>This revision names {original.source.typography.family}. Cairo is now the only approved family (decision D-07), so the editor uses Cairo and saving records it.</AlertDescription></Alert>}
+    {recovery && <Alert><AlertTitle>Unsaved edits found</AlertTitle><AlertDescription>Edits from this revision are available for seven days.</AlertDescription><div className="alert-actions"><Button size="sm" onClick={() => { setSource(editableSource(recovery.source)); setRecovery(null); }}>Restore edits</Button><Button size="sm" variant="outline" onClick={() => { localStorage.removeItem(recoveryKey(auth.admin!.id, original.id)); setRecovery(null); }}>Discard</Button></div></Alert>}
     <div className="theme-builder-layout">
       <main>
         <Tabs defaultValue="colors">
@@ -310,7 +311,7 @@ export default function ThemeBuilderPage() {
     </DialogContent></Dialog>
     <Dialog open={Boolean(conflict)} onOpenChange={open => !open && setConflict(null)}><DialogContent><DialogHeader><DialogTitle>Revision conflict</DialogTitle><DialogDescription>Another administrator published first. Force overwrite is not available.</DialogDescription></DialogHeader>
       {conflict && <div className="three-way-diff"><DiffBlock title={`Original base #${conflict.original.id}`} value={conflict.original.source} /><DiffBlock title={`New active #${conflict.current.id}`} value={conflict.current.source} /><DiffBlock title="Your local changes" value={conflict.localSource} /></div>}
-      <DialogFooter><Button variant="outline" onClick={() => { if (conflict) { setOriginal(conflict.current); setSource(clone(conflict.current.source)); } setConflict(null); }}>Discard local changes</Button><Button onClick={rebase}>Rebase my changes</Button></DialogFooter>
+      <DialogFooter><Button variant="outline" onClick={() => { if (conflict) { setOriginal(conflict.current); setSource(editableSource(conflict.current.source)); } setConflict(null); }}>Discard local changes</Button><Button onClick={rebase}>Rebase my changes</Button></DialogFooter>
     </DialogContent></Dialog>
   </div>;
 }
