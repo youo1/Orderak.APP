@@ -7,6 +7,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +36,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -50,6 +52,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.LayoutDirection
@@ -175,11 +180,13 @@ fun ProductEditContent(
             Modifier.fillMaxSize().padding(padding).padding(spacing.space4).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(spacing.space4)
         ) {
+            val pickPhotoLabel = stringResource(R.string.product_pick_photo)
             Box(
                 Modifier
                     .fillMaxWidth()
                     .height(180.dp)
                     .clip(MaterialTheme.shapes.large)
+                    .semantics { contentDescription = pickPhotoLabel }
                     .clickable {
                         onPickImage()
                     },
@@ -230,8 +237,21 @@ fun ProductEditContent(
                     )
                 }
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Switch(checked = state.available, onCheckedChange = actions.onAvailable)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.toggleable(
+                    value = state.available,
+                    onValueChange = actions.onAvailable,
+                    role = Role.Switch,
+                ),
+            ) {
+                // onCheckedChange = null drops the Switch's own 48dp minimum interactive size; keep it, so the
+                // row lays out exactly as before and only its semantics change.
+                Switch(
+                    checked = state.available,
+                    onCheckedChange = null,
+                    modifier = Modifier.minimumInteractiveComponentSize(),
+                )
                 Text(stringResource(R.string.product_available), Modifier.padding(start = spacing.space2))
             }
 

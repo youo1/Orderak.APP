@@ -76,6 +76,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
@@ -331,7 +333,19 @@ private fun AccountInformationStep(
     )
     Spacer(Modifier.height(spacing.space4))
     val openYearLabel = stringResource(R.string.setup_birth_year_open_description)
-    Box(Modifier.fillMaxWidth()) {
+    // The clickable target is the field's own parent, so its semantics node is an
+    // ancestor of the read-only field's node. That labels the control without
+    // leaving a duplicate sibling click target with identical bounds.
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { contentDescription = openYearLabel }
+            .clickable(
+                onClickLabel = openYearLabel,
+                role = Role.Button,
+                onClick = { showYearDialog = true },
+            ),
+    ) {
         OutlinedTextField(
             value = state.birthYear?.toString().orEmpty(),
             onValueChange = {},
@@ -342,16 +356,9 @@ private fun AccountInformationStep(
             },
             readOnly = true,
             singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Box(
             modifier = Modifier
-                .matchParentSize()
-                .clickable(
-                    onClickLabel = openYearLabel,
-                    role = Role.Button,
-                    onClick = { showYearDialog = true },
-                ),
+                .fillMaxWidth()
+                .semantics { contentDescription = openYearLabel },
         )
     }
     Spacer(Modifier.height(spacing.space4))

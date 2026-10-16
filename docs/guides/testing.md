@@ -116,25 +116,30 @@ The rules run as follows:
 
 | Rule | Tree | Check | Threshold |
 |------|------|-------|-----------|
-| 1 — `Label` | merged | every node with an `OnClick` action or `ToggleableState` exposes `ContentDescription` or `Text` | non-blank |
+| 1 — `Label` | merged | every node with an `OnClick` action or `ToggleableState` exposes `ContentDescription` or `Text`; an inline text link (a range of an ancestor `AnnotatedString` carrying a `LinkAnnotation`) is named by its linked text | non-blank |
 | 2 — `Target` | merged | Compose `touchBoundsInRoot` at least 48dp on both axes, and no overlap with another actionable node unless one is an ancestor | ≥ 48dp |
 | 3 — `Contrast` | unmerged | for every semantics root (`onAllNodes(isRoot())`, so dialog windows are audited too) crop each text node's `boundsInRoot` from that root's `captureToImage()` and measure it with ATF's `ContrastSwatch`, built directly from a `BitmapImage` over the captured bitmap and the node's bounds | ≥ 4.5:1 normal; ≥ 3:1 large (≥ 18sp, or ≥ 14sp at weight ≥ 700) |
 
 A node counts as disabled when it or any ancestor (the `node.parent` chain)
 carries `SemanticsProperties.Disabled`: the unmerged `Text` child of a disabled
 `Button` has no `Disabled` flag itself, and WCAG 1.4.3/2.5.8 and ATF exempt
-inactive controls. Disabled and zero-size nodes are skipped for `Label`,
-`Target`, and `Contrast`. A node whose `boundsInRoot`/`touchBoundsInRoot` is
-empty, or whose text crop does not intersect that root's captured image, is off
-screen (clipped by scrolling or clipping ancestors): it is skipped and counted
-in the per-preview `println` summary, not reported. Rule 2 uses Compose touch
+inactive controls. Disabled, zero-size, and empty-`touchBoundsInRoot` nodes are
+skipped for `Label` and `Target`. The separately specified zero-size node
+exclusion is the only `Contrast` skip: a text node with non-zero size whose
+`boundsInRoot` is empty or whose crop does not intersect that root's captured
+image is an empty or out-of-image crop and fails the audit naming the preview,
+node text, and bounds, never a silent skip. Inline text links (WCAG 2.5.8) are
+exempt from the `Target` minimum because their target sits inside a sentence.
+Skipped nodes are counted in the per-preview `println` summary, not reported. Rule 2 uses Compose touch
 bounds, never drawn component dimensions. Rule 3 measures one text node at a
 time, never merged row pixels; the large-text decision comes from the node's
 `GetTextLayoutResult`, and an unspecified size counts as normal. Image-only nodes
 produce no `Contrast` diagnostic, and the audit never touches the network.
 `ContrastSwatch` is referenced directly at compile time, never reflectively, and
-there is no hand-written contrast fallback: a measurement failure fails the audit
-with the preview and node text. Each preview case aggregates the diagnostics from
+there is no hand-written contrast fallback: a crop ATF finds to be a single
+colour (the dialog window is not captured under Robolectric) is reported as
+`Contrast not measurable` rather than a fabricated ratio, and any other
+measurement failure fails the audit with the preview and node text. Each preview case aggregates the diagnostics from
 every locale variant; diagnostics not matched by `KNOWN_FINDINGS` fail the named
 `<File>ScreenshotTestKt <function>` case with the full finding text, so a real
 violation cannot leave the unit-test task green. A finding that cannot be fixed
@@ -159,16 +164,16 @@ item can be removed.
 
 | Preview | Rule | Node text / kind | Reason | Plan |
 |---|---|---|---|---|
-| `ProductEditScreenshotTestKt.productEditConfirmDelete` | Contrast | `text "إلغاء"` | Dialog text not drawn in the captured frame (1.00:1) | B5 — audit dialog window capture and colour tokens |
-| `ProductEditScreenshotTestKt.productEditConfirmDelete` | Contrast | `text "امسح المنتج"` | Dialog text not drawn in the captured frame (1.00:1) | B5 — audit dialog window capture and colour tokens |
-| `ProductEditScreenshotTestKt.productEditConfirmDelete` | Contrast | `text "تحذف المنتج؟ مش هينفع ترجّعه بعد كده."` | Dialog text not drawn in the captured frame (1.00:1) | B5 — audit dialog window capture and colour tokens |
-| `ProductEditScreenshotTestKt.productEditConfirmDelete` | Contrast | `text "حذف"` | Dialog text not drawn in the captured frame (1.00:1) | B5 — audit dialog window capture and colour tokens |
-| `ProductEditScreenshotTestKt.productEditStockConflictDark` | Contrast | `text "اكتب ١٢ برضه"` | Dialog text not drawn in the captured frame (1.00:1) | B5 — audit dialog window capture and colour tokens |
-| `ProductEditScreenshotTestKt.productEditStockConflictDark` | Contrast | `text "انت كتبت ١٢، والمحل دلوقتي عنده ٩ — جه طلب وانت بتعدّل. باقي تعديلاتك اتحفظت."` | Dialog text not drawn in the captured frame (1.00:1) | B5 — audit dialog window capture and colour tokens |
-| `ProductEditScreenshotTestKt.productEditStockConflictDark` | Contrast | `text "خليها ٩"` | Dialog text not drawn in the captured frame (1.00:1) | B5 — audit dialog window capture and colour tokens |
-| `ProductEditScreenshotTestKt.productEditStockConflict` | Contrast | `text "اكتب ١٢ برضه"` | Dialog text not drawn in the captured frame (1.00:1) | B5 — audit dialog window capture and colour tokens |
-| `ProductEditScreenshotTestKt.productEditStockConflict` | Contrast | `text "انت كتبت ١٢، والمحل دلوقتي عنده ٩ — جه طلب وانت بتعدّل. باقي تعديلاتك اتحفظت."` | Dialog text not drawn in the captured frame (1.00:1) | B5 — audit dialog window capture and colour tokens |
-| `ProductEditScreenshotTestKt.productEditStockConflict` | Contrast | `text "خليها ٩"` | Dialog text not drawn in the captured frame (1.00:1) | B5 — audit dialog window capture and colour tokens |
+| `ProductEditScreenshotTestKt.productEditConfirmDelete` | Contrast | `text "إلغاء"` | Dialog window not captured under Robolectric | R1 — audit dialog window capture and colour tokens |
+| `ProductEditScreenshotTestKt.productEditConfirmDelete` | Contrast | `text "امسح المنتج"` | Dialog window not captured under Robolectric | R1 — audit dialog window capture and colour tokens |
+| `ProductEditScreenshotTestKt.productEditConfirmDelete` | Contrast | `text "تحذف المنتج؟ مش هينفع ترجّعه بعد كده."` | Dialog window not captured under Robolectric | R1 — audit dialog window capture and colour tokens |
+| `ProductEditScreenshotTestKt.productEditConfirmDelete` | Contrast | `text "حذف"` | Dialog window not captured under Robolectric | R1 — audit dialog window capture and colour tokens |
+| `ProductEditScreenshotTestKt.productEditStockConflictDark` | Contrast | `text "اكتب ١٢ برضه"` | Dialog window not captured under Robolectric | R1 — audit dialog window capture and colour tokens |
+| `ProductEditScreenshotTestKt.productEditStockConflictDark` | Contrast | `text "انت كتبت ١٢، والمحل دلوقتي عنده ٩ — جه طلب وانت بتعدّل. باقي تعديلاتك اتحفظت."` | Dialog window not captured under Robolectric | R1 — audit dialog window capture and colour tokens |
+| `ProductEditScreenshotTestKt.productEditStockConflictDark` | Contrast | `text "خليها ٩"` | Dialog window not captured under Robolectric | R1 — audit dialog window capture and colour tokens |
+| `ProductEditScreenshotTestKt.productEditStockConflict` | Contrast | `text "اكتب ١٢ برضه"` | Dialog window not captured under Robolectric | R1 — audit dialog window capture and colour tokens |
+| `ProductEditScreenshotTestKt.productEditStockConflict` | Contrast | `text "انت كتبت ١٢، والمحل دلوقتي عنده ٩ — جه طلب وانت بتعدّل. باقي تعديلاتك اتحفظت."` | Dialog window not captured under Robolectric | R1 — audit dialog window capture and colour tokens |
+| `ProductEditScreenshotTestKt.productEditStockConflict` | Contrast | `text "خليها ٩"` | Dialog window not captured under Robolectric | R1 — audit dialog window capture and colour tokens |
 | `AccountScreenshotTestKt.accountContentLight` | Contrast | `text "رقم فودافون كاش"` | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
 | `AccountScreenshotTestKt.accountLoadingLight` | Contrast | `text "رقم فودافون كاش"` | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
 | `AuthScreenshotTestKt.authOtpDark` | Contrast | `text "رقم الموبايل"` | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
@@ -194,31 +199,6 @@ item can be removed.
 | `OrderScreensScreenshotTestKt.newOrderStockErrorDark` | Contrast | `text "−"` | Stepper glyph contrast below 3:1 | B5 — raise the stepper glyph token contrast |
 | `OrderScreensScreenshotTestKt.newOrderStockErrorLight` | Contrast | `text "+"` | Stepper glyph contrast below 3:1 | B5 — raise the stepper glyph token contrast |
 | `OrderScreensScreenshotTestKt.newOrderStockErrorLight` | Contrast | `text "−"` | Stepper glyph contrast below 3:1 | B5 — raise the stepper glyph token contrast |
-| `AuthScreenshotTestKt.authOtpResendable` | Label | (unlabelled actionable node) | Actionable node has no ContentDescription or Text | R1 — label the control or merge its sibling Text |
-| `CustomersScreenshotTestKt.customersSearchEmpty` | Label | (unlabelled actionable node) | Actionable node has no ContentDescription or Text | R1 — label the control or merge its sibling Text |
-| `ProductEditScreenshotTestKt.productEditConfirmDelete` | Label | (unlabelled actionable node) | Actionable node has no ContentDescription or Text | R1 — label the control or merge its sibling Text |
-| `ProductEditScreenshotTestKt.productEditContentDark` | Label | (unlabelled actionable node) | Actionable node has no ContentDescription or Text | R1 — label the control or merge its sibling Text |
-| `ProductEditScreenshotTestKt.productEditContentLight` | Label | (unlabelled actionable node) | Actionable node has no ContentDescription or Text | R1 — label the control or merge its sibling Text |
-| `ProductEditScreenshotTestKt.productEditNew` | Label | (unlabelled actionable node) | Actionable node has no ContentDescription or Text | R1 — label the control or merge its sibling Text |
-| `ProductEditScreenshotTestKt.productEditOfflineDark` | Label | (unlabelled actionable node) | Actionable node has no ContentDescription or Text | R1 — label the control or merge its sibling Text |
-| `ProductEditScreenshotTestKt.productEditOffline` | Label | (unlabelled actionable node) | Actionable node has no ContentDescription or Text | R1 — label the control or merge its sibling Text |
-| `ProductEditScreenshotTestKt.productEditPlanLimit` | Label | (unlabelled actionable node) | Actionable node has no ContentDescription or Text | R1 — label the control or merge its sibling Text |
-| `ProductEditScreenshotTestKt.productEditSaving` | Label | (unlabelled actionable node) | Actionable node has no ContentDescription or Text | R1 — label the control or merge its sibling Text |
-| `ProductEditScreenshotTestKt.productEditStockConflictDark` | Label | (unlabelled actionable node) | Actionable node has no ContentDescription or Text | R1 — label the control or merge its sibling Text |
-| `ProductEditScreenshotTestKt.productEditStockConflict` | Label | (unlabelled actionable node) | Actionable node has no ContentDescription or Text | R1 — label the control or merge its sibling Text |
-| `ProductEditScreenshotTestKt.productEditUnavailable` | Label | (unlabelled actionable node) | Actionable node has no ContentDescription or Text | R1 — label the control or merge its sibling Text |
-| `ProductEditScreenshotTestKt.productEditUnknownCategory` | Label | (unlabelled actionable node) | Actionable node has no ContentDescription or Text | R1 — label the control or merge its sibling Text |
-| `ShopSetupScreenshotTestKt.setupAccountDark` | Label | (unlabelled actionable node) | Actionable node has no ContentDescription or Text | R1 — label the control or merge its sibling Text |
-| `ShopSetupScreenshotTestKt.setupAccountEmpty` | Label | (unlabelled actionable node) | Actionable node has no ContentDescription or Text | R1 — label the control or merge its sibling Text |
-| `ShopSetupScreenshotTestKt.setupAccountInvalidEmail` | Label | (unlabelled actionable node) | Actionable node has no ContentDescription or Text | R1 — label the control or merge its sibling Text |
-| `ShopSetupScreenshotTestKt.setupAccountLight` | Label | (unlabelled actionable node) | Actionable node has no ContentDescription or Text | R1 — label the control or merge its sibling Text |
-| `ShopSetupScreenshotTestKt.setupAccountSaving` | Label | (unlabelled actionable node) | Actionable node has no ContentDescription or Text | R1 — label the control or merge its sibling Text |
-| `StoreScreenshotTestKt.storeSearchEmpty` | Label | (unlabelled actionable node) | Actionable node has no ContentDescription or Text | R1 — label the control or merge its sibling Text |
-| `ShopSetupScreenshotTestKt.setupAccountDark` | Target | `overlaps` | Two actionable nodes share identical touch bounds | R1 — merge or clear the duplicate semantics |
-| `ShopSetupScreenshotTestKt.setupAccountEmpty` | Target | `overlaps` | Two actionable nodes share identical touch bounds | R1 — merge or clear the duplicate semantics |
-| `ShopSetupScreenshotTestKt.setupAccountInvalidEmail` | Target | `overlaps` | Two actionable nodes share identical touch bounds | R1 — merge or clear the duplicate semantics |
-| `ShopSetupScreenshotTestKt.setupAccountLight` | Target | `overlaps` | Two actionable nodes share identical touch bounds | R1 — merge or clear the duplicate semantics |
-| `ShopSetupScreenshotTestKt.setupAccountSaving` | Target | `overlaps` | Two actionable nodes share identical touch bounds | R1 — merge or clear the duplicate semantics |
 | `OrdersScreenshotTestKt.ordersBothGroupsDark` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
 | `OrdersScreenshotTestKt.ordersBothGroupsLight` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
 | `OrdersScreenshotTestKt.ordersContentDark` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
@@ -227,6 +207,32 @@ item can be removed.
 | `OrdersScreenshotTestKt.ordersErrorLight` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
 | `OrdersScreenshotTestKt.ordersFilteredToNone` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
 | `OrdersScreenshotTestKt.ordersFilteredUnpaid` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
+| `AccountScreenshotTestKt.accountContentDark` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `AccountScreenshotTestKt.accountContentLight` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `AccountScreenshotTestKt.accountFreePlan` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `AccountScreenshotTestKt.accountFreePlanUpgradable` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `AccountScreenshotTestKt.accountLinkPending` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `AccountScreenshotTestKt.accountLoadingDark` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `AccountScreenshotTestKt.accountLoadingLight` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `AuthScreenshotTestKt.authCountryPicker` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `AuthScreenshotTestKt.authCountryPickerDark` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `AuthScreenshotTestKt.authCountryPickerSearch` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `BillingScreenshotTestKt.plansContentDark` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `BillingScreenshotTestKt.plansContentLight` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `BillingScreenshotTestKt.plansPurchaseOpen` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `OrdersScreenshotTestKt.ordersBothGroupsDark` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `OrdersScreenshotTestKt.ordersBothGroupsLight` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `OrdersScreenshotTestKt.ordersContentDark` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `OrdersScreenshotTestKt.ordersContentLight` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `OrdersScreenshotTestKt.ordersErrorDark` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `OrdersScreenshotTestKt.ordersErrorLight` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `OrdersScreenshotTestKt.ordersFilteredToNone` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `OrdersScreenshotTestKt.ordersFilteredUnpaid` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `StoreGroupScreenshotTestKt.storeInfoContentDark` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `StoreGroupScreenshotTestKt.storeInfoContentLight` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `StoreGroupScreenshotTestKt.storeInfoIdentityLight` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `StoreGroupScreenshotTestKt.storeInfoSaving` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `StoreGroupScreenshotTestKt.storeInfoSlugTaken` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
 
 **Spike conclusion.** Compose accessibility checks (`enableAccessibilityChecks`,
 `tryPerformAccessibilityChecks`) and ATF's `AccessibilityHierarchyAndroid` do not
@@ -239,17 +245,12 @@ rule, while the screenshot preview renderer sets it `true`. Previews must not
 branch onto inspection-only shortcuts that would hide a real state from the
 audit; the shared string-resource and theme paths are exercised either way.
 
-**Timing.** `:app:testStagingDebugUnitTest` elapsed time is measured before and
-after adding the audit under comparable conditions: same machine/CI runner, warm
-Gradle daemon, `--console=plain`, no other work in flight, staging debug variant.
-The offline executor sandbox cannot run Gradle or the Android checks, so the
-before/after figures and the incremental seconds are recorded by the full
-Android run rather than invented here. The supervisor's 2026-10-13 run of the
-281 audit cases reports `time="89.623"` seconds for
-`app.orderak.seller.a11y.AccessibilityPreviewAuditTest` in
-`app/build/test-results/testStagingDebugUnitTest/TEST-app.orderak.seller.a11y.AccessibilityPreviewAuditTest.xml`;
-that is the after figure for the audit class, and the same task without the
-audit is the before figure.
+**Timing.** Measured by the supervisor on 2026-10-17 (Windows 11, Intel Core
+i7-14650HX, 16 GB), with a warm Gradle daemon after one warm-up build, using
+`gradlew.bat :app:testStagingDebugUnitTest --console=plain --rerun` twice per
+tree. Without the audit (b98b5aa): 7.7 s and 7.0 s. With the audit: 53.3 s and
+51.9 s. The audit adds about 45 seconds to the unit-test task, almost all of it
+rendering the 281 preview states under Robolectric with native graphics.
 
 **Phase-R and blocked findings.** A pixel-changing finding cannot be corrected
 until the supervisor supplies the exact affected reference PNG paths and each
@@ -257,12 +258,29 @@ path is individually added to `allowed_files`; `updateStagingDebugScreenshotTest
 is never run by hand. Findings that change pixels are listed in the Blocked
 findings table above and in `KNOWN_FINDINGS` with the preview, rule, finding, and
 planned minimal fix, and are left as a deferred phase-R redesign rather than
-weakening a rule, marking a node `Disabled`, or skipping a preview. The table
-also carries the label and duplicate-semantics findings that need an R1 screen
-change; they stay in `KNOWN_FINDINGS` because the offline executor cannot compile
-the Android sources to verify an in-place edit. If a required label has no
-existing string, the finding and the required string are reported because
-`src/main/res/**` is out of scope.
+weakening a rule, marking a node `Disabled`, or skipping a preview. If a required
+label has no existing string, the finding and the required string are reported
+because `src/main/res/**` is out of scope.
+
+**Semantics-only fixes (no pixel change).** `Label` and duplicate-semantics
+`Target` findings never need a reference PNG, so they are fixed in `src/main`
+and removed from `KNOWN_FINDINGS`; the list carries only genuinely pixel-changing
+or phase-R findings. The fixes landed in this change are:
+
+| Screen source | Finding | Fix (existing string) |
+|---|---|---|
+| `core/ui/SearchField.kt` | `Label` on the search text field once a query is typed | field `contentDescription` = its `placeholder` (`products_search_hint`, `customers_search_hint`) |
+| `feature/products/ProductEditScreen.kt` | `Label` on the availability `Switch` with a sibling `Text`, and on the photo-picker box | row `toggleable(role = Role.Switch)`, `Switch(onCheckedChange = null)`; photo box `contentDescription` = `product_pick_photo` |
+| `feature/shopsetup/ShopSetupScreen.kt` | `Label` plus duplicate-bounds `Target` on the read-only birth-year field and its overlay click target | clickable moved to the field's parent with `contentDescription` = `setup_birth_year_open_description`; the duplicate overlay removed |
+| `feature/auth/AuthOtpForm.kt` | `Label` on the transparent OTP `BasicTextField` | field `contentDescription` = `auth_otp_title` |
+| `feature/shopsetup/ShopSetupScreen.kt` (`OnboardingLegalText`) | `Label` and `Target` on the inline terms/privacy links Compose creates for `withLink` | audit treats a link whose ancestor `Text` carries a `LinkAnnotation` and whose bounds sit inside it as named by the linked text and exempt from the 48dp target rule (WCAG 2.5.8) |
+
+The out-of-frame table rows above are the empty/out-of-image text crops the
+harness cannot measure; they are not screen-accessibility findings. The audit
+still returns a diagnostic for each one so a silent skip is impossible, and the
+two inline-link proof cases in `AccessibilityPreviewAuditTest` assert that a
+`withLink` link produces no `Label`/`Target` diagnostic while an icon-only
+clickable beside it still fails `Label`.
 
 ### Lint (`lintStagingDebug`)
 

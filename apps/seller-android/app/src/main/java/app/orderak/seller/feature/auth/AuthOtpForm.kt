@@ -43,6 +43,8 @@ import androidx.compose.ui.platform.LocalAutofillTree
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -188,6 +190,10 @@ private fun OtpCodeInput(
     length: Int,
 ) {
     val spacing = LocalOrderakSpacing.current
+    // The typed digits are painted transparent and exposed only as editable text,
+    // so the actionable field node needs a name. The screen's existing title
+    // names it; no new string and no pixel change.
+    val otpFieldLabel = stringResource(R.string.auth_otp_title)
     BasicTextField(
         value = code,
         onValueChange = { raw ->
@@ -215,6 +221,7 @@ private fun OtpCodeInput(
         singleLine = true,
         modifier = Modifier
             .fillMaxWidth()
+            .semantics { contentDescription = otpFieldLabel }
             .autofill(
                 autofillTypes = listOf(AutofillType.SmsOtpCode),
                 onFill = onCodeChanged,
