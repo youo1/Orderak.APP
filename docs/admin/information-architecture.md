@@ -121,7 +121,7 @@ The panel looking at itself: manifests, prompts, design assets, endpoint invento
 | Coverage manifests | `/internal/manifests` | `screens:view` | Android screens and backend endpoint coverage |
 | AI prompts | `/internal/prompts` | `prompts:view` | Prompt assets and effective runtime selection |
 | Docs & design | `/internal/docs` | `docs:view` | Documentation and design asset links |
-| Design assets | `/internal/design` | `design:view` | Figma, Canva and exported design references |
+| Design assets | `/internal/design` | `design:view` | The design library, Canva and exported design references |
 | Storefront locales | `/internal/locales` | `plans:view` | Supported locale definitions without architecture changes |
 | API endpoints | `/internal/endpoints` | `endpoints:view` | Backend endpoint manifest and ownership |
 

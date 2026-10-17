@@ -2,16 +2,19 @@ import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import * as React from 'react';
 import { cn } from '@/shared/lib/utils';
+import { Tooltip } from '@/shared/ui/tooltip';
 
 export const Dialog = DialogPrimitive.Root;
-export const DialogTrigger = DialogPrimitive.Trigger;
-export const DialogClose = DialogPrimitive.Close;
 export const DialogContent = React.forwardRef<React.ElementRef<typeof DialogPrimitive.Content>, React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>>(({ className, children, ...props }, ref) => (
   <DialogPrimitive.Portal>
     <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/60" />
     <DialogPrimitive.Content ref={ref} className={cn('fixed left-1/2 top-1/2 z-50 grid max-h-[90vh] w-[min(640px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-auto rounded-xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-xl', className)} {...props}>
       {children}
-      <DialogPrimitive.Close aria-label="Close dialog" className="absolute right-4 top-4 rounded-sm p-1 text-[var(--muted)] hover:bg-[var(--primary-soft)]"><X className="size-4" /></DialogPrimitive.Close>
+      {/* The positioning lives on the tooltip anchor, so the wrapper leaves the
+          dialog's grid flow while the Close button keeps its top-right place. */}
+      <Tooltip label="Close dialog" className="absolute right-4 top-4">
+        <DialogPrimitive.Close aria-label="Close dialog" className="rounded-sm p-1 text-[var(--muted)] hover:bg-[var(--primary-soft)]"><X className="size-4" /></DialogPrimitive.Close>
+      </Tooltip>
     </DialogPrimitive.Content>
   </DialogPrimitive.Portal>
 ));

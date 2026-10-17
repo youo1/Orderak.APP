@@ -5,7 +5,6 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import app.orderak.seller.data.billing.BillingManager
 import dagger.hilt.android.HiltAndroidApp
-import org.osmdroid.config.Configuration as OsmConfig
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -17,9 +16,6 @@ class OrderakApp : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
-
-        // Initialize OSMDroid
-        OsmConfig.getInstance().userAgentValue = packageName
 
         // The server catalog keeps this dormant while billing is disabled. Once
         // enabled, it reconciles Play purchases on every app start. Initialize

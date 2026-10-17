@@ -1,7 +1,7 @@
 // ============================================================
 // Admin routes + panel — project control center.
 // ============================================================
-import { jsonResponse, D1_IN_CHUNK } from "../../platform/http/shared";
+import { jsonResponse, D1_IN_CHUNK, parseLimitParam } from "../../platform/http/shared";
 import { Hono } from "hono";
 import { storeUrl } from "../identity/identity";
 import { pickLocale } from "../../platform/localization/i18n";
@@ -125,13 +125,13 @@ export async function handleAdminRoutes(req: Request, env: AdminWorkerEnv, url: 
 }
 
 async function listAudit(env: AdminWorkerEnv, url: URL): Promise<Response> {
-	const limit = Math.min(500, Math.max(1, Number(url.searchParams.get("limit")) || 100));
+	const limit = parseLimitParam(url.searchParams.get("limit"), 100, 500);
 	const { results } = await env.orderak_db.prepare("SELECT a.id,a.admin_id,a.action,a.entity,a.entity_id,a.details_json,a.ip,a.created_at,u.email AS admin_email FROM admin_audit a LEFT JOIN admin_users u ON u.id=a.admin_id ORDER BY a.id DESC LIMIT ?").bind(limit).all();
 	return jsonResponse({ ok: true, audit: results ?? [] });
 }
 
 async function listErrors(env: AdminWorkerEnv, url: URL): Promise<Response> {
-	const limit = Math.min(500, Math.max(1, Number(url.searchParams.get("limit")) || 100));
+	const limit = parseLimitParam(url.searchParams.get("limit"), 100, 500);
 	const { results } = await env.orderak_db.prepare("SELECT id,context,message,stack,path,method,ip,created_at FROM error_logs ORDER BY id DESC LIMIT ?").bind(limit).all();
 	return jsonResponse({ ok: true, errors: results ?? [] });
 }
@@ -147,7 +147,7 @@ async function stats(env: AdminWorkerEnv): Promise<Response> {
 }
 
 async function listStores(env: AdminWorkerEnv, url: URL): Promise<Response> {
-	const limit = Math.min(500, Math.max(1, Number(url.searchParams.get("limit")) || 100));
+	const limit = parseLimitParam(url.searchParams.get("limit"), 100, 500);
 	const q = (url.searchParams.get("q")??"").trim();
 	const base = "SELECT s.id,s.store_code,s.public_identifier,s.country_code,s.store_name,s.status,s.created_at,(SELECT COUNT(*) FROM products WHERE store_id=s.id) AS product_count,(SELECT COUNT(*) FROM categories WHERE store_id=s.id) AS category_count FROM sellers s";
 	const stmt = q ? env.orderak_db.prepare(base+" WHERE s.store_name LIKE ? OR s.store_code LIKE ? OR s.public_identifier LIKE ? ORDER BY s.created_at DESC LIMIT ?").bind('%'+q+'%','%'+q+'%','%'+q+'%',limit) : env.orderak_db.prepare(base+" ORDER BY s.created_at DESC LIMIT ?").bind(limit);

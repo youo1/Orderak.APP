@@ -1,5 +1,6 @@
 package app.orderak.seller.core.text
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -77,6 +78,20 @@ class SearchTextTest {
         assertFalse(SearchText.matches("احمد", "محمود"))
     }
 
+    @Test
+    fun `Persian kaf and yeh match the Arabic letters`() {
+        // Persian keyboards produce ک and ی where Arabic produces ك and ي.
+        assertTrue(SearchText.matches("کتاب", "كتاب"))
+        assertTrue(SearchText.matches("كتاب", "کتاب"))
+        assertTrue(SearchText.matches("علی", "علي"))
+        assertEquals("كريم", SearchText.fold("کریم"))
+    }
+
+    @Test
+    fun `Persian yeh at the end of a word matches alef maqsura`() {
+        assertTrue(SearchText.matches("مصطفی", "مصطفى"))
+    }
+
     // ---------- Digits ----------
 
     @Test
@@ -125,5 +140,27 @@ class SearchTextTest {
     @Test
     fun `surrounding whitespace in the query is ignored`() {
         assertTrue(SearchText.matches("  cola  ", "Cola 500ml"))
+    }
+
+    @Test
+    fun `runs of internal whitespace count as one space`() {
+        // A pasted name or code may carry a tab or a newline; one space is what
+        // the seller meant.
+        assertEquals("cola 500ml", SearchText.fold("Cola   500ml"))
+        assertEquals("cola 500ml", SearchText.fold("Cola\t\n 500ml"))
+        assertTrue(SearchText.matches("cola  500", "Cola 500ml"))
+        assertTrue(SearchText.matches("cola 500", "Cola    500ml"))
+        assertTrue(SearchText.matches("احمد   محمود", "أحمد محمود"))
+    }
+
+    @Test
+    fun `whitespace is collapsed and trimmed together`() {
+        assertEquals("a b", SearchText.fold("  a   b  "))
+        assertEquals("", SearchText.fold(" \t\n "))
+    }
+
+    @Test
+    fun `whitespace does not bridge separate words`() {
+        assertFalse(SearchText.matches("cola500", "Cola 500ml"))
     }
 }

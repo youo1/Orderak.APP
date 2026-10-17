@@ -1,13 +1,36 @@
+import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import {
 	DEFAULT_DESIGN_SYSTEM_SOURCE,
 	LEGACY_DEFAULT_THEME,
+	designSystemCss,
 	generateDesignSystem,
 } from "../src/domains/design/design-system";
 
-const workspace = resolve(process.cwd(), "..", "..");
+/**
+ * The repository root that owns the generated outputs.
+ *
+ * `pnpm --dir services/backend run design-system:*` puts the script's cwd at
+ * `services/backend`, and the fixture test runs a copy from a sandbox's
+ * `services/backend`. Walking up to the first ancestor that holds the canonical
+ * fixture keeps both working and also tolerates an invocation from the
+ * repository root, which would otherwise resolve one directory too high and
+ * make both write and check look at empty paths.
+ */
+function findWorkspace(start: string): string {
+	let current = resolve(start);
+	for (;;) {
+		if (existsSync(resolve(current, "design", "design-system.default.json"))) return current;
+		const parent = resolve(current, "..");
+		if (parent === current) return resolve(start, "..", "..");
+		current = parent;
+	}
+}
+
+const workspace = findWorkspace(process.cwd());
 const fixturePath = resolve(workspace, "design", "design-system.default.json");
+const adminBundlePath = resolve(workspace, "apps", "admin-web", "src", "orderak-tokens.css");
 const themeDir = resolve(
 	workspace,
 	"apps",
@@ -141,7 +164,15 @@ function renderSelector(suffix: string, returnType: string): string {
 	return branches.join("\n");
 }
 
+function requiredFamily<T>(family: T | undefined, name: string): T {
+	if (family === undefined) {
+		throw new Error(`The generated snapshot has no ${name} family; GeneratedDesignSystem.kt cannot be written without it.`);
+	}
+	return family;
+}
+
 function renderKotlinSchemes(snapshot: {
+	schemaVersion: number;
 	generatorVersion: string;
 	contentHash: string;
 	schemes: Record<string, Record<string, Record<string, string>>>;
@@ -150,6 +181,11 @@ function renderKotlinSchemes(snapshot: {
 	spacing: { tokens: Record<string, number> };
 	shapes: Record<string, number>;
 	components: { minimumTouchTargetDp: number };
+	motion?: { durations: { instant: number; short: number; medium: number; long: number; extraLong: number } };
+	shapeFull?: { androidPercent: number };
+	componentDimensions?: { fabClearance: number; thumbnail: number };
+	icons?: { small: number; medium: number; hero: number };
+	layout?: { contentMaxWidth: number; wideLayoutMinWidth: number };
 	source: { colors: { defaultContrast: string } };
 }): string {
 	const schemes: string[] = [];
@@ -171,6 +207,37 @@ function renderKotlinSchemes(snapshot: {
 	const shapes = Object.entries(snapshot.shapes)
 		.map(([name, value]) => `        "${name}" to ${value}f,`)
 		.join("\n");
+	const spacingConstants = Object.entries(snapshot.spacing.tokens)
+		.map(([token, value]) => `    const val SPACING_${token.toUpperCase()}_DP = ${value}f`)
+		.join("\n");
+	// Theme.kt reads every one of these families. A snapshot without one must
+	// stop generation here, not quietly write a 0 (a square "full" shape) or
+	// drop a constant.
+	const motion = requiredFamily(snapshot.motion, "motion");
+	const shapeFull = requiredFamily(snapshot.shapeFull, "shapeFull");
+	const icons = requiredFamily(snapshot.icons, "icons");
+	const dimensions = requiredFamily(snapshot.componentDimensions, "componentDimensions");
+	const layout = requiredFamily(snapshot.layout, "layout");
+	const motionConstants = [
+		`    const val MOTION_INSTANT_MS = ${motion.durations.instant}`,
+		`    const val MOTION_SHORT_MS = ${motion.durations.short}`,
+		`    const val MOTION_MEDIUM_MS = ${motion.durations.medium}`,
+		`    const val MOTION_LONG_MS = ${motion.durations.long}`,
+		`    const val MOTION_EXTRA_LONG_MS = ${motion.durations.extraLong}`,
+	].join("\n");
+	const iconConstants = [
+		`    const val SPACING_ICON_SMALL_DP = ${icons.small}f`,
+		`    const val SPACING_ICON_MEDIUM_DP = ${icons.medium}f`,
+		`    const val SPACING_ICON_HERO_DP = ${icons.hero}f`,
+	].join("\n");
+	const dimensionConstants = [
+		`    const val SPACING_FAB_CLEARANCE_DP = ${dimensions.fabClearance}f`,
+		`    const val SPACING_THUMBNAIL_DP = ${dimensions.thumbnail}f`,
+	].join("\n");
+	const layoutConstants = [
+		`    const val LAYOUT_CONTENT_MAX_WIDTH_DP = ${layout.contentMaxWidth}f`,
+		`    const val LAYOUT_WIDE_LAYOUT_MIN_WIDTH_DP = ${layout.wideLayoutMinWidth}f`,
+	].join("\n");
 
 	return `package app.orderak.seller.core.ui.theme
 
@@ -202,9 +269,16 @@ internal data class GeneratedTypeRole(
 internal object GeneratedDesignSystem {
     const val GENERATOR_VERSION = "${snapshot.generatorVersion}"
     const val CONTENT_HASH = "${snapshot.contentHash}"
+    const val SCHEMA_VERSION = ${snapshot.schemaVersion}
     const val MINIMUM_TOUCH_TARGET_DP = ${snapshot.components.minimumTouchTargetDp}f
+    const val SHAPE_FULL_PERCENT = ${shapeFull.androidPercent}
     const val FONT_FAMILY = "${snapshot.typography.family}"
     const val DEFAULT_CONTRAST = "${snapshot.source.colors.defaultContrast}"
+${motionConstants}
+${spacingConstants}
+${iconConstants}
+${dimensionConstants}
+${layoutConstants}
 
     val contrasts: List<String> = listOf(${CONTRASTS.map((c) => `"${c}"`).join(", ")})
 
@@ -258,26 +332,33 @@ async function main() {
 
 /** Generated fallback identity checked by verifyDesignSystemContract. */
 internal object DesignSystemContract {
-    const val SCHEMA_VERSION = 2
+    const val SCHEMA_VERSION = ${snapshot.schemaVersion}
     const val GENERATOR_VERSION = "${snapshot.generatorVersion}"
     const val DEFAULT_FALLBACK_HASH = "${snapshot.contentHash}"
 }
 `;
 	const schemes = renderKotlinSchemes(snapshot as Parameters<typeof renderKotlinSchemes>[0]);
+	// The committed admin bundle is the direct, unmodified return value of the
+	// emitter the Worker uses, with only the font URL base switched to the
+	// relative `./fonts/` prefix. No wrapping, prepending or post-processing.
+	const adminBundle = designSystemCss(snapshot, { fontUrlBase: "./fonts/" });
 
 	if (process.argv.includes("--write")) {
 		await writeFile(fixturePath, fixture);
 		await writeFile(androidContractPath, kotlin);
 		await writeFile(androidSchemesPath, schemes);
+		await writeFile(adminBundlePath, adminBundle);
 		console.log(`Wrote ${fixturePath}`);
 		console.log(`Wrote ${androidContractPath}`);
 		console.log(`Wrote ${androidSchemesPath}`);
+		console.log(`Wrote ${adminBundlePath}`);
 	} else {
 		const currentFixture = await readFile(fixturePath, "utf8").catch(() => "");
 		const currentKotlin = await readFile(androidContractPath, "utf8").catch(() => "");
 		const currentSchemes = await readFile(androidSchemesPath, "utf8").catch(() => "");
-		if (currentFixture !== fixture || currentKotlin !== kotlin || currentSchemes !== schemes) {
-			console.error("Generated design-system fallback drift detected. Run npm run design-system:generate.");
+		const currentBundle = await readFile(adminBundlePath, "utf8").catch(() => "");
+		if (currentFixture !== fixture || currentKotlin !== kotlin || currentSchemes !== schemes || currentBundle !== adminBundle) {
+			console.error("Generated design-system fallback drift detected. Run pnpm run design-system:generate.");
 			process.exitCode = 1;
 		} else {
 			console.log(`Design-system fixture is current (${snapshot.contentHash}).`);

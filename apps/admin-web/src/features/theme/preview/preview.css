@@ -1,8 +1,8 @@
 :root {
   color-scheme: light;
   font-family: var(--preview-font, system-ui, sans-serif);
-  background: var(--md-background, #f3fbfa);
-  color: var(--md-on-surface, #151d1d);
+  background: var(--md-background);
+  color: var(--md-on-surface);
 }
 :root[data-mode="dark"] { color-scheme: dark; }
 * { box-sizing: border-box; }

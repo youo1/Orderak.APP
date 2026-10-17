@@ -152,7 +152,7 @@ snapshot copies it into a new higher-ID checkpoint. Owners may physically
 delete inactive revisions; rollback ancestry uses `ON DELETE SET NULL`, while
 the active pointer prevents deletion of the current revision.
 
-The public Worker serves additive schema-v2 JSON plus the old 14-token
+The public Worker serves additive schema-2/schema-3 JSON plus the old 14-token
 projection, stable and hashed CSS endpoints, and self-hosted font assets.
 Server-rendered landing, catalog, and legal pages inject active variables into
 `<head>` to prevent FOUC. The admin edge proxies `/theme.css`; unsaved preview
@@ -429,3 +429,14 @@ export artifacts and hash-chained audit batches. Environment variables remain
 the top-level hard gates; the shared configuration evaluator applies version,
 trust, plan, store, targeting, and deterministic rollout rules before exposing
 an effective decision to Android or runtime consumers.
+
+The admin kit is tested in two layers. The ordinary Vite/Vitest suite runs in
+jsdom for behaviour and semantics, while a dedicated `test:a11y` entry point runs
+`src/tests/accessibility.test.tsx` in Vitest Browser Mode with headless
+Playwright Chromium. That browser suite renders every exported
+`src/shared/ui` component through the real `src/index.css` stylesheet and
+generated token bundle, runs axe-core against the WCAG 2.0, 2.1 and 2.2 A and AA
+rules in light, `.orderak-dark`, system dark and RTL Arabic modes, and fails on
+any violation or on an inconclusive `color-contrast` or `target-size` result.
+`backend-ci.yml` installs Chromium with its system dependencies and runs the gate
+in the `test` job on pull requests.

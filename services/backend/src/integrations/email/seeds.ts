@@ -35,13 +35,13 @@ function layout(dir: "rtl" | "ltr", bodyHtml: string): string {
 <body style="margin:0;background:#F5F6F8;font-family:system-ui,'Segoe UI',Tahoma,Arial">
   <div style="max-width:520px;margin:0 auto;padding:24px">
     <div style="text-align:center;padding:8px 0 16px">
-      <span style="font-size:22px;font-weight:800;color:#1DAB61">🛍️ Orderak</span>
+      <span style="font-size:22px;font-weight:800;color:#014D4E">🛍️ Orderak</span>
     </div>
     <div style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:24px;text-align:${align};color:#1C1B1A;line-height:1.7">
       ${bodyHtml}
     </div>
     <p style="text-align:center;color:#9ca3af;font-size:12px;margin-top:16px">
-      © Orderak · <a href="https://orderak.app" style="color:#1DAB61;text-decoration:none">orderak.app</a>
+      © Orderak · <a href="https://orderak.app" style="color:#014D4E;text-decoration:none">orderak.app</a>
     </p>
   </div>
 </body>
@@ -50,7 +50,7 @@ function layout(dir: "rtl" | "ltr", bodyHtml: string): string {
 
 const btn = (dir: "rtl" | "ltr", label: string, url: string) =>
 	`<div style="text-align:center;margin:20px 0">
-     <a href="${url}" style="background:#1DAB61;color:#fff;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:700;display:inline-block">${label}</a>
+     <a href="${url}" style="background:#014D4E;color:#fff;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:700;display:inline-block">${label}</a>
    </div>`;
 
 // ---------------------------------------------------------------------------
@@ -108,7 +108,7 @@ export const SEED_TEMPLATES: SeedTemplate[] = [
 					`<h2 style="margin:0 0 12px;font-size:18px">مرحبًا {{name|المشرف}}</h2>
 					 <p>وصلنا طلب لإعادة تعيين كلمة المرور لحسابك في أوردرك.</p>
 					 <p>استخدم الرمز التالي أو اضغط على الزر لإكمال العملية:</p>
-					 <p style="font-size:26px;font-weight:800;letter-spacing:3px;text-align:center;color:#1DAB61">{{code}}</p>
+					 <p style="font-size:26px;font-weight:800;letter-spacing:3px;text-align:center;color:#014D4E">{{code}}</p>
 					 ${btn("rtl", "إعادة تعيين كلمة المرور", "{{reset_url}}")}
 					 <p style="color:#6b7280;font-size:13px">إذا لم تطلب ذلك، تجاهل هذه الرسالة. ينتهي الرمز خلال 30 دقيقة.</p>`,
 				),
@@ -121,7 +121,7 @@ export const SEED_TEMPLATES: SeedTemplate[] = [
 					`<h2 style="margin:0 0 12px;font-size:18px">Hello {{name|Admin}}</h2>
 					 <p>We received a request to reset your Orderak admin password.</p>
 					 <p>Use the code below or click the button to continue:</p>
-					 <p style="font-size:26px;font-weight:800;letter-spacing:3px;text-align:center;color:#1DAB61">{{code}}</p>
+					 <p style="font-size:26px;font-weight:800;letter-spacing:3px;text-align:center;color:#014D4E">{{code}}</p>
 					 ${btn("ltr", "Reset password", "{{reset_url}}")}
 					 <p style="color:#6b7280;font-size:13px">If you didn't request this, ignore this email. The code expires in 30 minutes.</p>`,
 				),

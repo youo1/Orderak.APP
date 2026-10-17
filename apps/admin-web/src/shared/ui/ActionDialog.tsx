@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/shared/api/client';
 import { STEP_UP_UNAVAILABLE, useStepUp } from '@/shared/api/step-up';
 import { Button } from '@/shared/ui/button';
+import { Checkbox } from '@/shared/ui/checkbox';
 import { askConfirm } from '@/shared/ui/confirm';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/dialog';
 import { Field } from '@/shared/ui/field';
@@ -63,7 +64,7 @@ export function ActionDialog({ config, resourceKey, close, onSuccess }: { config
 }
 
 function FormField({ field, value, set }: { field: ActionField; value: unknown; set: (value: unknown) => void }) {
-  if (field.type === 'checkbox') return <label className="checkbox-field"><input type="checkbox" checked={Boolean(value)} onChange={event => set(event.target.checked)} /><span><strong>{field.label}</strong></span></label>;
+  if (field.type === 'checkbox') return <Checkbox className="checkbox-field" checked={Boolean(value)} onCheckedChange={set} label={field.label} />;
   return <Field label={<>{field.label}{field.required && ' *'}</>} className={field.type === 'textarea' ? 'wide' : undefined}>{field.type === 'select' ? <NativeSelect value={String(value)} onChange={event => set(event.target.value)}>{field.options?.map(option => <option key={option}>{option}</option>)}</NativeSelect> : field.type === 'textarea' ? <Textarea rows={4} value={String(value)} placeholder={field.placeholder} onChange={event => set(event.target.value)} /> : <Input type={field.type === 'number' ? 'number' : field.type === 'datetime' ? 'datetime-local' : 'text'} value={String(value)} placeholder={field.placeholder} onChange={event => set(field.type === 'number' ? event.target.valueAsNumber : event.target.value)} />}</Field>;
 }
 

@@ -3,6 +3,8 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import { Bell, ChevronDown, Command, LogOut, Menu, Search, ShieldCheck, X } from 'lucide-react';
 import { sections } from '@/app/config/sections';
 import { ConfirmHost } from '@/shared/ui/confirm';
+import { ToastProvider } from '@/shared/ui/toast';
+import { Tooltip } from '@/shared/ui/tooltip';
 import { useAuth } from '@/features/auth/auth-context';
 
 export function AppShell() {
@@ -59,7 +61,7 @@ export function AppShell() {
   const navigationExpanded = isMobile ? mobileOpen : !desktopHidden;
   const navigationLabel = isMobile ? 'Open navigation' : desktopHidden ? 'Show navigation' : 'Hide navigation';
 
-  return <div className={`app-shell ${desktopHidden ? 'navigation-hidden' : ''}`}>
+  return <ToastProvider><div className={`app-shell ${desktopHidden ? 'navigation-hidden' : ''}`}>
     {mobileOpen && <button className="mobile-overlay" aria-label="Close navigation" onClick={() => setMobileOpen(false)} />}
     {/* orderak-dark pins the generated dark scheme to the rail, so it stays a
         dark surface in both page schemes and its children can use ordinary
@@ -71,7 +73,7 @@ export function AppShell() {
       <div className="sidebar-user"><div className="avatar">{auth.admin?.name?.[0] || auth.admin?.email[0].toUpperCase()}</div><div><strong>{auth.admin?.name || 'Administrator'}</strong><span>{auth.admin?.role}</span></div><button aria-label="Sign out" onClick={auth.logout}><LogOut size={17} /></button></div>
     </aside>
     <div className="workspace">
-      <header className="topbar"><button className="menu-button" aria-controls="admin-navigation" aria-expanded={navigationExpanded} aria-label={navigationLabel} onClick={toggleNavigation}><Menu size={19} /></button><div className="breadcrumb"><Link to="/">Admin</Link><span>/</span><strong>{current?.label || 'Control Center'}</strong></div><div className="topbar-actions"><span className="secure-label"><ShieldCheck size={15} /> Secure session</span><button className="icon-button" aria-label="Security alerts" onClick={() => navigate('/system/security')}><Bell size={18} /></button><button className="profile-button" onClick={() => navigate('/system/security')}><span>{auth.admin?.email}</span><ChevronDown size={14} /></button></div></header>
+      <header className="topbar"><Tooltip label={navigationLabel}><button className="menu-button" aria-controls="admin-navigation" aria-expanded={navigationExpanded} aria-label={navigationLabel} onClick={toggleNavigation}><Menu size={19} /></button></Tooltip><div className="breadcrumb"><Link to="/">Admin</Link><span>/</span><strong>{current?.label || 'Control Center'}</strong></div><div className="topbar-actions"><span className="secure-label"><ShieldCheck size={15} /> Secure session</span><button className="icon-button" aria-label="Security alerts" onClick={() => navigate('/system/security')}><Bell size={18} /></button><button className="profile-button" onClick={() => navigate('/system/security')}><span>{auth.admin?.email}</span><ChevronDown size={14} /></button></div></header>
       {/* One boundary for every routed page, because they are all code-split
           now. Inside <main> rather than around the shell, so the navigation and
           header stay painted while a destination chunk loads — a fallback that
@@ -84,7 +86,7 @@ export function AppShell() {
         mutation can invalidate its own query and re-render the page before the
         operator has answered. */}
     <ConfirmHost />
-  </div>;
+  </div></ToastProvider>;
 }
 
 function CommandPalette({ sections: visible, close, navigate }: { sections: typeof sections; close: () => void; navigate: (path: string) => void }) {

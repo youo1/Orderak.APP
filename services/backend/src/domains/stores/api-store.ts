@@ -1088,8 +1088,32 @@ type ProductFields = {
 };
 
 async function readProductFields(env: Env, storeId: string, raw: Row): Promise<ProductFields | Response> {
-	const name = String(raw.name ?? "").trim().slice(0, 80);
-	if (!name) return jsonResponse({ error: "name_required" }, 400);
+	// The name is validated, never repaired. Coercion is what turned a number, a
+	// boolean or an array into the string "12345" / "true" / "Mango", and the
+	// slice silently shortened anything too long — so a caller learned nothing and
+	// the catalogue recorded a name nobody submitted. A name outside the published
+	// contract (a string, 1–80 trimmed characters, no U+0000–U+001F controls) is
+	// refused with the existing `name_required` vocabulary the client already
+	// handles. Controls are checked on the raw string, before trimming, so a
+	// leading tab is refused rather than quietly removed.
+	const rawName = raw.name;
+	// The control scan walks code units rather than matching a
+	// /[\u0000-\u001f]/ literal: same meaning, without the lint warning a
+	// literal control-character range raises.
+	let hasControlCharacter = false;
+	if (typeof rawName === "string") {
+		for (let index = 0; index < rawName.length; index += 1) {
+			if (rawName.charCodeAt(index) <= 0x1f) {
+				hasControlCharacter = true;
+				break;
+			}
+		}
+	}
+	if (typeof rawName !== "string" || hasControlCharacter) {
+		return jsonResponse({ error: "name_required" }, 400);
+	}
+	const name = rawName.trim();
+	if (!name || name.length > 80) return jsonResponse({ error: "name_required" }, 400);
 
 	// A malformed price is refused, not read as zero.
 	//

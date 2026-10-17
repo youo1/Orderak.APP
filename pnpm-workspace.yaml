@@ -95,6 +95,26 @@ overrides:
   # the consumer declares. Held inside major 3 this is 3.15.1 to 3.15.2, a patch
   # within the minor already resolved. Same hazard as fast-uri, same fix.
   js-yaml@<3.15.2: ">=3.15.2 <4"
+  # GHSA-rfgv-xxqx-mfg5 (high) and GHSA-w293-vg96-wgc3 (high) — undici's
+  # WebSocket permessage-deflate path mis-scopes inflate state, so a crafted
+  # frame can corrupt memory or crash the process. Fixed in 7.29.1; the upper
+  # bound keeps the pin inside major 7, the range miniflare declares.
+  # Reaches the tree only through miniflare (wrangler dev and the Workers test
+  # pool) and jsdom in the admin tests, never in a bundled Worker.
+  undici@<7.29.1: ">=7.29.1 <8"
+  # GHSA-qhr7-859c-m2p7 (high) and GHSA-6j4f-fj2g-mc7p (high) — brace-expansion
+  # allocates without bound on crafted `{a,b,c}` patterns, so a small input
+  # exhausts memory. Fixed in 1.1.20. The major-specific selector keeps the 1.x
+  # line from resolving to the unrelated 5.x release.
+  brace-expansion@1: ">=1.1.20 <2"
+  # GHSA-qhr7-859c-m2p7 (high) and GHSA-6j4f-fj2g-mc7p (high) — the same brace
+  # exhaustion in the 5.x rewrite. Fixed in 5.0.11; the major-specific selector
+  # keeps 5.x bounded and separate from the 1.x line above.
+  brace-expansion@5: ">=5.0.11 <6"
+  # GHSA-68fv-2mgg-jv7q (high) — source-map-js can be confused by a crafted
+  # source map, so a consumer reads attacker-influenced locations. Fixed in
+  # 1.2.2; bounded to major 1.
+  source-map-js@<1.2.2: ">=1.2.2 <2"
 
 # Two advisories are not fixed here, because neither fix is one this tree can
 # take.
@@ -143,9 +163,26 @@ overrides:
 # This entry goes when Cloudflare ships a vitest-pool-workers built on
 # miniflare 5.20260910.0-alpha or later. Re-check on the next audit failure.
 auditConfig:
+  # GHSA-vfj7-8cjw-p6xm (high, CVE-2026-93687) — braces' brace-pattern parser can
+  # be driven into exponential backtracking by a crafted pattern, so a malicious
+  # glob string spins the process. It is dev-only OpenAPI tooling: it reaches the
+  # tree through @stoplight/prism-cli and @stoplight/spectral-cli, and there is
+  # no patched release to override to. Waived by id rather than overridden.
+  # Expires 2026-11-05: remove when a fixed braces release is published and the
+  # OpenAPI tooling accepts it.
+  #
+  # GHSA-wq5f-xc86-pv6w (high) — sharp's bundled libvips decodes a crafted image
+  # with an out-of-bounds write. It is dev-only through miniflare, which backs
+  # the wrangler dev server and the Workers vitest pool; no parent release ships
+  # sharp >=0.35.5 yet (latest miniflare still resolves 0.35.4), and sharp's
+  # native platform packages are not exercised by the tests. Waived, not
+  # overridden. Expires 2026-11-05: remove when a miniflare release ships
+  # sharp >=0.35.5.
   ignoreGhsas:
     - GHSA-qxc2-j82w-r537
     - GHSA-rgj7-g3m4-5g8c
+    - GHSA-vfj7-8cjw-p6xm
+    - GHSA-wq5f-xc86-pv6w
 
 minimumReleaseAgeExclude:
   - miniflare@5.20260910.0-alpha

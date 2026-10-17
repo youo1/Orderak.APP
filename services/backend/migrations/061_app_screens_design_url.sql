@@ -1,0 +1,26 @@
+-- 061_app_screens_design_url.sql
+--
+-- Rename app_screens.figma_url to design_url.
+--
+-- rollout: expand-contract — production-deploy.yml applies migrations before it
+-- deploys the Worker, so the previous release serves traffic against the new
+-- schema in between. That previous Worker names figma_url in exactly two places,
+-- both in the admin screen create and update statements in
+-- src/domains/admin/admin-project.ts. For the minutes between this migration
+-- and the deploy, an operator's screen create or update fails against the new
+-- column name, and works again once the deploy completes.
+--
+-- No seller, storefront, or manifest-sync path names the column. The screen
+-- list still runs SELECT *; readers of that response only see the new key name,
+-- design_url, and no admin page reads the old key. The column is renamed rather
+-- than dropped, so every stored value is preserved exactly.
+--
+-- ROLLBACK
+--   ALTER TABLE app_screens RENAME COLUMN design_url TO figma_url;
+--   Perform this only after reverting the Worker, so the running code and the
+--   column name agree again. No data is touched by the rename or its inverse.
+--
+-- This migration does not add a compatibility column and does not alter any
+-- other workflow column.
+
+ALTER TABLE app_screens RENAME COLUMN figma_url TO design_url;
