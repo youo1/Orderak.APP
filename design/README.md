@@ -2,11 +2,12 @@
 
 Orderak branding, iconography, and screen design.
 
-## Figma
+## Design library
 
-No canonical Figma URL is recorded yet. Add the project link here after access
-and ownership have been confirmed; do not commit access tokens or private share
-credentials.
+The approved design library is [the private Claude design library](https://claude.ai/artifact/JF3vjyHqbWBRrhB2zmXzda).
+It is private to the owner, and Orchestra's design tasks read it. It is
+re-synced from `design-system.default.json` after any change to the fixture, the
+mark, or the admin kit. Do not commit access tokens or private share credentials.
 
 ## Canva
 
@@ -42,5 +43,5 @@ pnpm run design-system:check
 ```
 
 The check also verifies the Android fallback hash in
-`ui/theme/DesignSystemContract.kt`. Approved web fonts and their license copies
-are in `services/backend/assets/static/fonts/`.
+`ui/theme/DesignSystemContract.kt`.
+Cairo is the one approved web font (decision D-07); its licence is in `services/backend/assets/static/fonts/`.

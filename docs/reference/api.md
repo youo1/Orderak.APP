@@ -1032,7 +1032,7 @@ All admin API routes live under `/api/admin/v1/*` and require a valid session.
 | GET / POST | `/api/admin/v1/ads` | List or create/update an ad |
 | DELETE | `/api/admin/v1/ads/:id` | Delete an ad |
 | GET | `/api/admin/v1/overview` | Project-admin summary |
-| GET / POST; PUT / DELETE by ID | `/api/admin/v1/roadmap`, `/api/admin/v1/tasks`, `/api/admin/v1/screens`, `/api/admin/v1/endpoints`, `/api/admin/v1/prompts`, `/api/admin/v1/design-assets`, `/api/admin/v1/releases`, `/api/admin/v1/bugs`, `/api/admin/v1/project-docs` | Manage project-admin records under resource-specific RBAC |
+| GET / POST; PUT / DELETE by ID | `/api/admin/v1/roadmap`, `/api/admin/v1/tasks`, `/api/admin/v1/screens`, `/api/admin/v1/endpoints`, `/api/admin/v1/prompts`, `/api/admin/v1/design-assets`, `/api/admin/v1/releases`, `/api/admin/v1/bugs`, `/api/admin/v1/project-docs` | Manage project-admin records under resource-specific RBAC. Screen create and update take `design_url`, a link into the design library (the column was `figma_url` before migration 061), and a design asset's type defaults to `design-library`, with `figma` still accepted for existing rows. |
 | POST | `/api/admin/v1/screens/sync` | Synchronize the compiled screen manifest |
 | GET; PUT by key | `/api/admin/v1/settings` | Read or update project settings |
 | GET / POST; PUT or activate by slug/language | `/api/admin/v1/content-pages` | Manage versioned Terms and Privacy content |
