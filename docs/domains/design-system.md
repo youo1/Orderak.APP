@@ -14,9 +14,15 @@ when a bad revision ships.
 Two separate mechanisms live here and are often confused:
 
 - **The design system** — a generated, versioned Material Color Utilities token
-  set that styles the Android app. Immutable revisions in D1.
-- **The store theme** — a small set of seller-chosen colours that style that
-  seller's public pages. Mutable, cached, per-installation.
+  set. Immutable revisions in D1 are the colour source for the Worker's public
+  pages: the landing page, the storefront catalogue (store, category, product)
+  and the Terms and Privacy content pages. The admin panel reads the same
+  emitted stylesheet. The Android app is not themed from D1: it compiles the
+  generated token set into the build (`GeneratedDesignSystem.kt`).
+- **The legacy theme module** — `theme.ts`, a 14-token `Theme` type with
+  `DEFAULT_THEME`, `mergeTheme` and `isHexColor` helpers, retained as
+  compatibility data alongside `design/tokens.json`. It is not the colour source
+  for those public pages.
 
 ## The design system
 
@@ -24,22 +30,25 @@ Two separate mechanisms live here and are often confused:
 
 | Constant | Value | Meaning |
 | --- | --- | --- |
-| `DESIGN_SYSTEM_SCHEMA_VERSION` | `2` | Payload contract version |
-| `DESIGN_SYSTEM_GENERATOR_VERSION` | `orderak-mcu-0.3.0+3` | Generator identity, recorded per revision |
+| `DESIGN_SYSTEM_SCHEMA_VERSION` | `3` | Payload contract version |
+| `DESIGN_SYSTEM_GENERATOR_VERSION` | `orderak-mcu-0.3.0+4` | Generator identity, recorded per revision |
 | `MAX_PUBLIC_PAYLOAD_BYTES` | 128 KB | Ceiling on what a client may download |
 | `MAX_REQUEST_BYTES` | 64 KB | Ceiling on an authoring request |
-| `MAX_OVERRIDES` | 128 | Ceiling on manual role overrides |
 | `FIRST_SCHEMA_V2_ANDROID_VERSION_CODE` | `2` | First client build that understands v2 |
 
 The source describes intent, not pixels: a seed colour plus `SchemeVariant`,
 `ContrastName` (`standard` / `medium` / `high`), `ThemeMode`,
-`SurfaceTemperature` (`cool` / `neutral` / `warm`), `FontFamilyId` (`cairo`,
-`tajawal`, `noto-arabic`), `DensityName`, and a `ShapePreset`. Tokens are
-derived from that description; `RoleOverride` entries patch individual roles
-afterwards, capped at 128.
+`SurfaceTemperature` (`cool` / `neutral` / `warm`), `FontFamilyId`, `DensityName`,
+and a `ShapePreset`. Tokens are derived from that description; colour comes only
+from the seeds, so every emitted value has passed contrast validation.
 
-All three font families are Arabic-first. That is the design constraint the
-whole system is built around, not a localisation afterthought.
+`FontFamilyId` is `cairo` only. Owner decision D-07 (2026-09-28) retired every
+other font family, and `generateDesignSystem()` rejects any other value with
+`font_not_approved`. Cairo is the single Arabic-first family the system is
+built around. `designSystemCss()` and `designSystemFontPreload()` always emit
+and preload Cairo, even for a stored revision whose source and snapshot still
+name a retired family; those stored revisions keep their persisted source,
+snapshot, content hash and legacy projection unchanged.
 
 ### Revisions are immutable
 
@@ -72,12 +81,19 @@ transient D1 problem must not unstyle the app.
 `FIRST_SCHEMA_V2_ANDROID_VERSION_CODE` gates by client build, so older
 installations keep receiving a payload they can parse.
 
-Two consumers take the same revision by different routes, and only one of them
-can be declared authoritative in a stylesheet:
+The generated revision reaches its consumers by different routes, and only the
+generated values can be declared authoritative in a stylesheet:
 
 - **Android** compiles the token set into the build and keeps the generated map
   as its offline fallback. A published revision reaches the device only through
   a client build that understands it, which is what the version gate is for.
+- **The Worker public pages** — landing, store, category, product, terms and
+  privacy — read the active revision's standard-light roles directly through
+  `pageThemeFromSnapshot()`: `primary` from `primary`, `primary_strong` from
+  `onPrimaryContainer`, `primary_soft` from `primaryContainer`, `canvas` from
+  `background`, `surface` from `surface`, `ink` from `onSurface`, `muted` from
+  `onSurfaceVariant`, and `danger` from `error`. They do not read
+  `revision.legacyTheme` and they have no dark-mode styling.
 - **The admin panel** loads the revision as a live stylesheet from
   `/api/theme.css`, by way of the edge Worker's `/theme.css`. That stylesheet is
   unlayered and therefore outranks the flattened snapshot checked in beside the
@@ -91,16 +107,25 @@ When a bad revision does reach production, use the
 `pnpm run design-system:recovery-sql` in `services/backend` to generate the
 statements.
 
-## The store theme
+## The legacy theme module
 
 `services/backend/src/domains/design/theme.ts` is much smaller and unrelated in
-mechanism. `DEFAULT_THEME` plus saved overrides, merged by `mergeTheme`, with
-`isHexColor` validating every value. It is cached at module level for about 60
-seconds — Workers isolates keep that between requests — and `invalidateThemeCache()`
-drops it after a save so the next render picks up new colours.
+mechanism. Its `Theme` type is the colour shape the public page renderers accept;
+`pageThemeFromSnapshot()` produces a value of that shape from a generated
+snapshot. `DEFAULT_THEME`, `mergeTheme` and `isHexColor` have no caller among
+those pages — `mergeTheme` and `isHexColor` are retained compatibility helpers
+for the persisted `theme_colors` setting, and `DEFAULT_THEME` is their compiled
+fallback. `invalidateThemeCache()` is called by `admin-project.ts` after a
+`theme_colors` save; it drops the cached generated revision by way of
+`invalidateDesignSystemCache()`. Such a save changes nothing the public pages
+render: they read the active revision's snapshot, and the `theme_colors`
+setting is read only once, to seed the first revision when none exists.
 
-Cache invalidation is explicit rather than time-only because a seller who
-changes their brand colour expects to see it immediately.
+The public `/api/v1/theme` response's `theme` field is **not** this module. It is
+the `LegacyTheme` projection from `design-system.ts`, read from the stored
+`legacy_projection_json` and exposed as `revision.legacyTheme` for older Android
+builds. It is compatibility data; the generated `designSystem` field is the
+current payload.
 
 ## The app screen manifest
 
@@ -116,13 +141,15 @@ manifest in the same commit.
 
 ## Boundaries
 
-- **Token data itself** lives in `design/tokens.json` and
-  `design/design-system.default.json` at the repository root, outside `docs/`.
+- **Token data itself** lives in `design/design-system.default.json` at the
+  repository root, outside `docs/`. `design/tokens.json` is retained
+  compatibility data, not the active source.
 - **How Android renders the tokens** is a platform concern; the Compose theme
   adapter is in
   `apps/seller-android/app/src/main/java/app/orderak/seller/core/ui/theme`.
 - **Which locales and fonts are permitted** is the
   [localization architecture](../architecture/localization-architecture.md).
+  Cairo is the only approved design-system font family.
 - **Publishing a revision** is an administrator operation in
   `domains/admin/admin-theme.ts`, part of the admin control plane.
 

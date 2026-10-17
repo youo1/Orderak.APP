@@ -60,11 +60,219 @@ JVM unit tests. No emulator needed. Covers:
 - OTP timing/state, authentication-operation generation, and logout ordering
 - Data formatting helpers
 - ViewModel logic
+- The accessibility preview audit (`app.orderak.seller.a11y.AccessibilityPreviewAuditTest`)
 
 ```cmd
 cd apps/seller-android
 gradlew.bat testStagingDebugUnitTest
 ```
+
+### Accessibility preview audit (`AccessibilityPreviewAuditTest`)
+
+The audit compiles the screenshot preview declarations into the unit-test
+artifact (`app/src/screenshotTest/java` is added to the `test` source set) and
+renders every source `@PreviewTest` under Robolectric 4.17 with
+`GraphicsMode.NATIVE`, SDK 35, and the `ar-w411dp-h891dp-xxhdpi` qualifiers. It
+runs on a plain `Application` so Firebase/Hilt initialization never starts, and
+the Gradle test tasks pin `user.language=en`, `user.country=US`, and
+`user.timezone=UTC`, exactly like the screenshot tasks.
+
+The source is the authority. The audit parses `app/src/screenshotTest/java` with
+the anchored matcher `(?m)^\s*@PreviewTest\s*$` to decide which functions are
+states and which locales they render; it parses the multipreview annotations in
+`app/src/main/java/app/orderak/seller/core/ui` for their constituent locales.
+Compose runtime's public `getDeclaredComposableMethod` resolves each parsed state
+function; reflection never infers a `@Preview` or picks a neighbouring helper. A
+missing source directory, an unresolvable state, or an unresolvable multipreview
+locale fails loudly, and the runtime annotation count must equal the number of
+audited cases. The observed figure is **280 `@PreviewTest` annotations in 22
+source files**, against the manager's approximate 320-state estimate (a
+discrepancy of ~40); the audit prints the measured values rather than hardcoding
+either number.
+
+One `@PreviewTest` declaration is one JUnit case, named for its compiled
+`<File>ScreenshotTestKt` facade and function. A declaration with several locale
+variants gets a single `setContent` call whose host reads a mutable locale
+variant, copies the current configuration and applies the parsed locale (so the
+SDK, size, and density qualifiers survive), and provides `LocalConfiguration`,
+`LocalContext`, `LocalResources`, and `LocalLayoutDirection` from the same
+locale context built with `createConfigurationContext`. `LocalResources` matters:
+Compose UI reads `stringResource`/`pluralStringResource` from it, so without it
+every `en`/`fr` preview would audit Arabic strings while reported as `en`/`fr`.
+The host also re-provides `LocalActivityResultRegistryOwner` and
+`LocalOnBackPressedDispatcherOwner` read from the test activity before the locale
+context replaces `LocalContext`, because both have context-derived defaults and
+the auth screens register activity-result launchers through them. The host proves
+the switch by checking that a known string differs between the `ar` and `en`
+variants of the same preview. Previews with no explicit locale use
+the app default, and the audit never calls `RuntimeEnvironment.setQualifiers`
+after the Compose activity starts and never calls `setContent` twice per rule.
+
+`auditAccessibility(rule, preview)` audits content the caller has already set; it
+never calls `setContent`. It returns one diagnostic per violation and every
+diagnostic names the preview and locale, the rule (`Label`, `Target`, or
+`Contrast`), the node text or position, and the measured value where applicable.
+The rules run as follows:
+
+| Rule | Tree | Check | Threshold |
+|------|------|-------|-----------|
+| 1 — `Label` | merged | every node with an `OnClick` action or `ToggleableState` exposes `ContentDescription` or `Text` | non-blank |
+| 2 — `Target` | merged | Compose `touchBoundsInRoot` at least 48dp on both axes, and no overlap with another actionable node unless one is an ancestor | ≥ 48dp |
+| 3 — `Contrast` | unmerged | for every semantics root (`onAllNodes(isRoot())`, so dialog windows are audited too) crop each text node's `boundsInRoot` from that root's `captureToImage()` and measure it with ATF's `ContrastSwatch`, built directly from a `BitmapImage` over the captured bitmap and the node's bounds | ≥ 4.5:1 normal; ≥ 3:1 large (≥ 18sp, or ≥ 14sp at weight ≥ 700) |
+
+A node counts as disabled when it or any ancestor (the `node.parent` chain)
+carries `SemanticsProperties.Disabled`: the unmerged `Text` child of a disabled
+`Button` has no `Disabled` flag itself, and WCAG 1.4.3/2.5.8 and ATF exempt
+inactive controls. Disabled, zero-size, and empty-`touchBoundsInRoot` nodes are
+skipped for `Label` and `Target`. The separately specified zero-size node
+exclusion is the only `Contrast` skip: a text node with non-zero size whose
+`boundsInRoot` is empty or whose crop does not intersect that root's captured
+image is an empty or out-of-image crop and fails the audit naming the preview,
+node text, and bounds, never a silent skip. Skipped nodes are counted in the per-preview `println` summary, not reported. Rule 2 uses Compose touch
+bounds, never drawn component dimensions. Rule 3 measures one text node at a
+time, never merged row pixels; the large-text decision comes from the node's
+`GetTextLayoutResult`, and an unspecified size counts as normal. Image-only nodes
+produce no `Contrast` diagnostic, and the audit never touches the network.
+`ContrastSwatch` is referenced directly at compile time, never reflectively, and
+there is no hand-written contrast fallback: a crop ATF finds to be a single
+colour (the dialog window is not captured under Robolectric) is reported as
+`Contrast not measurable` rather than a fabricated ratio, and any other
+measurement failure fails the audit with the preview and node text. Each preview case aggregates the diagnostics from
+every locale variant; diagnostics not matched by `KNOWN_FINDINGS` fail the named
+`<File>ScreenshotTestKt <function>` case with the full finding text, so a real
+violation cannot leave the unit-test task green. A finding that cannot be fixed
+without new reference PNGs, or that requires a phase-R redesign, is listed in
+`KNOWN_FINDINGS` in the test and in the blocked-findings table below with its
+preview, rule, finding, and planned minimal fix instead of weakening a rule or
+skipping a preview. Each entry absorbs exactly one diagnostic, the most specific
+matching entry first, so an entry never covers a second finding of its kind: a
+new unlabelled control or another out-of-frame text in a listed preview fails
+like any other. A listed finding that no longer occurs also fails its case, so
+the list always matches what the audit finds, in number as well as in kind.
+
+The three isolated proofs in `AccessibilityAuditRulesAcceptanceTest` (an
+unlabelled `IconButton`, two adjacent 20dp clickables, and grey text on white
+below 3:1) must each fail with a diagnostic naming its intended rule, with
+accessible controls that produce no diagnostics, so an audit that fails
+everything cannot satisfy them.
+
+**Blocked findings (`KNOWN_FINDINGS`).** Findings whose smallest correct fix
+changes pixels, while the exact affected reference PNG is not individually
+listed in `allowed_files`, are recorded in the `KNOWN_FINDINGS` list in
+`AccessibilityPreviewAuditTest.kt` and below. Every other diagnostic fails its
+preview case, and so does an entry that no longer occurs. Text inside a disabled
+control is not measured, because WCAG 1.4.3 exempts inactive components.
+
+| Preview | Rule | Node text / kind | Reason | Plan |
+|---|---|---|---|---|
+| `ProductEditScreenshotTestKt.productEditConfirmDelete` | Contrast | `text "إلغاء"` | Dialog window not captured under Robolectric | R1 — audit dialog window capture and colour tokens |
+| `ProductEditScreenshotTestKt.productEditConfirmDelete` | Contrast | `text "امسح المنتج"` | Dialog window not captured under Robolectric | R1 — audit dialog window capture and colour tokens |
+| `ProductEditScreenshotTestKt.productEditConfirmDelete` | Contrast | `text "تحذف المنتج؟ مش هينفع ترجّعه بعد كده."` | Dialog window not captured under Robolectric | R1 — audit dialog window capture and colour tokens |
+| `ProductEditScreenshotTestKt.productEditConfirmDelete` | Contrast | `text "حذف"` | Dialog window not captured under Robolectric | R1 — audit dialog window capture and colour tokens |
+| `ProductEditScreenshotTestKt.productEditStockConflictDark` | Contrast | `text "اكتب ١٢ برضه"` | Dialog window not captured under Robolectric | R1 — audit dialog window capture and colour tokens |
+| `ProductEditScreenshotTestKt.productEditStockConflictDark` | Contrast | `text "انت كتبت ١٢، والمحل دلوقتي عنده ٩ — جه طلب وانت بتعدّل. باقي تعديلاتك اتحفظت."` | Dialog window not captured under Robolectric | R1 — audit dialog window capture and colour tokens |
+| `ProductEditScreenshotTestKt.productEditStockConflictDark` | Contrast | `text "خليها ٩"` | Dialog window not captured under Robolectric | R1 — audit dialog window capture and colour tokens |
+| `ProductEditScreenshotTestKt.productEditStockConflict` | Contrast | `text "اكتب ١٢ برضه"` | Dialog window not captured under Robolectric | R1 — audit dialog window capture and colour tokens |
+| `ProductEditScreenshotTestKt.productEditStockConflict` | Contrast | `text "انت كتبت ١٢، والمحل دلوقتي عنده ٩ — جه طلب وانت بتعدّل. باقي تعديلاتك اتحفظت."` | Dialog window not captured under Robolectric | R1 — audit dialog window capture and colour tokens |
+| `ProductEditScreenshotTestKt.productEditStockConflict` | Contrast | `text "خليها ٩"` | Dialog window not captured under Robolectric | R1 — audit dialog window capture and colour tokens |
+| `AccountScreenshotTestKt.accountContentLight` | Contrast | `text "رقم فودافون كاش"` | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
+| `AccountScreenshotTestKt.accountLoadingLight` | Contrast | `text "رقم فودافون كاش"` | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
+| `OrdersScreenshotTestKt.ordersBothGroupsDark` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
+| `OrdersScreenshotTestKt.ordersBothGroupsLight` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
+| `OrdersScreenshotTestKt.ordersContentDark` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
+| `OrdersScreenshotTestKt.ordersContentLight` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
+| `OrdersScreenshotTestKt.ordersErrorDark` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
+| `OrdersScreenshotTestKt.ordersErrorLight` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
+| `OrdersScreenshotTestKt.ordersFilteredToNone` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
+| `OrdersScreenshotTestKt.ordersFilteredUnpaid` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
+| `AccountScreenshotTestKt.accountContentDark` | Contrast | out of frame, 6: "إجراءات الحساب", "احفظ", "تسجيل خروج", "حالة طلب الحذف", "طلب حذف الحساب", "لغة التطبيق" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `AccountScreenshotTestKt.accountContentLight` | Contrast | out of frame, 6: "إجراءات الحساب", "احفظ", "تسجيل خروج", "حالة طلب الحذف", "طلب حذف الحساب", "لغة التطبيق" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `AccountScreenshotTestKt.accountFreePlan` | Contrast | out of frame, 7: "إجراءات الحساب", "احفظ", "تسجيل خروج", "حالة طلب الحذف", "رقم فودافون كاش", "طلب حذف الحساب", "لغة التطبيق" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `AccountScreenshotTestKt.accountFreePlanUpgradable` | Contrast | out of frame, 7: "إجراءات الحساب", "احفظ", "تسجيل خروج", "حالة طلب الحذف", "رقم فودافون كاش", "طلب حذف الحساب", "لغة التطبيق" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `AccountScreenshotTestKt.accountLinkPending` | Contrast | out of frame, 7: "إجراءات الحساب", "احفظ", "تسجيل خروج", "حالة طلب الحذف", "رقم فودافون كاش", "طلب حذف الحساب", "لغة التطبيق" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `AccountScreenshotTestKt.accountLoadingDark` | Contrast | out of frame, 6: "إجراءات الحساب", "احفظ", "تسجيل خروج", "حالة طلب الحذف", "طلب حذف الحساب", "لغة التطبيق" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `AccountScreenshotTestKt.accountLoadingLight` | Contrast | out of frame, 6: "إجراءات الحساب", "احفظ", "تسجيل خروج", "حالة طلب الحذف", "طلب حذف الحساب", "لغة التطبيق" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `AuthScreenshotTestKt.authCountryPicker` | Contrast | out of frame, 2: "+372", "🇪🇪  إستونيا" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `AuthScreenshotTestKt.authCountryPickerDark` | Contrast | out of frame, 2: "+372", "🇪🇪  إستونيا" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `AuthScreenshotTestKt.authCountryPickerSearch` | Contrast | out of frame, 2: "+213", "🇩🇿  الجزائر" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `BillingScreenshotTestKt.plansContentDark` | Contrast | out of frame, 4: "برو", "غير محدود" ×2, "متاح" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `BillingScreenshotTestKt.plansContentLight` | Contrast | out of frame, 4: "برو", "غير محدود" ×2, "متاح" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `BillingScreenshotTestKt.plansPurchaseOpen` | Contrast | out of frame, 4: "برو", "غير محدود" ×2, "متاح" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `OrdersScreenshotTestKt.ordersBothGroupsDark` | Contrast | out of frame, 1: "جديد" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `OrdersScreenshotTestKt.ordersBothGroupsLight` | Contrast | out of frame, 1: "جديد" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `OrdersScreenshotTestKt.ordersContentDark` | Contrast | out of frame, 1: "جديد" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `OrdersScreenshotTestKt.ordersContentLight` | Contrast | out of frame, 1: "جديد" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `OrdersScreenshotTestKt.ordersErrorDark` | Contrast | out of frame, 1: "جديد" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `OrdersScreenshotTestKt.ordersErrorLight` | Contrast | out of frame, 1: "جديد" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `OrdersScreenshotTestKt.ordersFilteredToNone` | Contrast | out of frame, 1: "جديد" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `OrdersScreenshotTestKt.ordersFilteredUnpaid` | Contrast | out of frame, 1: "جديد" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `StoreGroupScreenshotTestKt.storeInfoContentDark` | Contrast | out of frame, 4: "احفظ", "التصنيف الفرعي", "الشعار", "صورة الغلاف" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `StoreGroupScreenshotTestKt.storeInfoContentLight` | Contrast | out of frame, 4: "احفظ", "التصنيف الفرعي", "الشعار", "صورة الغلاف" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `StoreGroupScreenshotTestKt.storeInfoIdentityLight` | Contrast | out of frame, 4: "احفظ", "التصنيف الفرعي", "الشعار", "صورة الغلاف" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `StoreGroupScreenshotTestKt.storeInfoSaving` | Contrast | out of frame, 3: "التصنيف الفرعي", "الشعار", "صورة الغلاف" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `StoreGroupScreenshotTestKt.storeInfoSlugTaken` | Contrast | out of frame, 4: "احفظ", "التصنيف الفرعي", "الشعار", "صورة الغلاف" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `ShopSetupScreenshotTestKt.setupAccountDark` | Label | 2 inline links (terms, privacy) | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
+| `ShopSetupScreenshotTestKt.setupAccountEmpty` | Label | 2 inline links (terms, privacy) | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
+| `ShopSetupScreenshotTestKt.setupAccountInvalidEmail` | Label | 2 inline links (terms, privacy) | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
+| `ShopSetupScreenshotTestKt.setupAccountLight` | Label | 2 inline links (terms, privacy) | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
+| `ShopSetupScreenshotTestKt.setupAccountSaving` | Label | 2 inline links (terms, privacy) | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
+
+**Spike conclusion.** Compose accessibility checks (`enableAccessibilityChecks`,
+`tryPerformAccessibilityChecks`) and ATF's `AccessibilityHierarchyAndroid` do not
+inspect Compose semantics nodes under Robolectric, so they cannot back this
+audit. The audit therefore reads the Compose semantics tree directly and uses
+pixel capture only for contrast.
+
+**LocalInspectionMode.** `LocalInspectionMode` is `false` under the Compose test
+rule, while the screenshot preview renderer sets it `true`. Previews must not
+branch onto inspection-only shortcuts that would hide a real state from the
+audit; the shared string-resource and theme paths are exercised either way.
+
+**Timing.** Measured by the supervisor on 2026-10-17 (Windows 11, Intel Core
+i7-14650HX, 16 GB), with a warm Gradle daemon after one warm-up build, using
+`gradlew.bat :app:testStagingDebugUnitTest --console=plain --rerun` twice per
+tree. Without the audit (b98b5aa): 7.7 s and 7.0 s. With the audit: 53.3 s and
+51.9 s. The audit adds about 45 seconds to the unit-test task, almost all of it
+rendering the 280 `@PreviewTest` cases under Robolectric with native graphics.
+
+**Phase-R and blocked findings.** A pixel-changing finding cannot be corrected
+until the supervisor supplies the exact affected reference PNG paths and each
+path is individually added to `allowed_files`; `updateStagingDebugScreenshotTest`
+is never run by hand. Findings that change pixels are listed in the Blocked
+findings table above and in `KNOWN_FINDINGS` with the preview, rule, finding, and
+planned minimal fix, and are left as a deferred phase-R redesign rather than
+weakening a rule, marking a node `Disabled`, or skipping a preview. If a required
+label has no existing string, the finding and the required string are reported
+because `src/main/res/**` is out of scope.
+
+**Semantics-only fixes (no pixel change).** `Label` and duplicate-semantics
+`Target` findings normally need no reference PNG, so they are fixed in `src/main`
+and removed from `KNOWN_FINDINGS`; the list carries only genuinely pixel-changing
+or phase-R findings. The lone exception is the inline `withLink` links, whose
+generated semantics nodes cannot carry a label without a redesign, so they are
+deferred to R3 as recorded in the table above. The fixes landed in this change are:
+
+| Screen source | Finding | Fix (existing string) |
+|---|---|---|
+| `core/ui/SearchField.kt` | `Label` on the search text field once a query is typed | field `contentDescription` = its `placeholder` (`products_search_hint`, `customers_search_hint`) |
+| `feature/products/ProductEditScreen.kt` | `Label` on the availability `Switch` with a sibling `Text`, and on the photo-picker box | row `toggleable(role = Role.Switch)`, `Switch(onCheckedChange = null)`; photo box `contentDescription` = `product_pick_photo` while a photo is shown (without one, its visible label names it) |
+| `feature/shopsetup/ShopSetupScreen.kt` | `Label` plus duplicate-bounds `Target` on the read-only birth-year field and its overlay click target | clickable full-size overlay sibling declared last in the `Box` with `contentDescription` = `setup_birth_year_open_description`, and the read-only field wrapped in `clearAndSetSemantics {}` so the control exposes one labelled actionable node while the overlay still receives every tap; the overlay carries the chosen year as its `stateDescription` |
+| `feature/auth/AuthOtpForm.kt` | `Label` on the transparent OTP `BasicTextField` | field `contentDescription` = `auth_otp_title` |
+
+The out-of-frame table rows above are the empty/out-of-image text crops the
+harness cannot measure; they are not screen-accessibility findings. The audit
+still returns a diagnostic for each one so a silent skip is impossible. Inline
+text links are audited like every other actionable node: Compose gives each
+`withLink` range its own clickable semantics node with no `Text` of its own, so
+the terms/privacy links in `OnboardingLegalText` are recorded in
+`KNOWN_FINDINGS` with plan R3 rather than exempted. They have no `Target`
+finding on their own merit: Compose widens a small clickable's touch area to
+the 48dp minimum, and `Target` reads that touch area. Measured by the supervisor
+on 2026-10-17: a one-word 14sp link draws 38.7 × 24dp and reports
+`touchBoundsInRoot` of 48 × 48dp. `AccessibilityAuditRulesAcceptanceTest` keeps
+the three isolated proofs (an
+unlabelled `IconButton`, two adjacent 20dp clickables, and grey text on white
+below 3:1) failing only for their intended rule.
 
 ### Lint (`lintStagingDebug`)
 
@@ -83,8 +291,9 @@ gradlew.bat lintStagingDebug
 ### Screenshot validation (`validateStagingDebugScreenshotTest`)
 
 Compose Preview Screenshot Testing. Compares rendered screenshots against
-approved goldens stored in `app/src/screenshotTestDebug/reference/`.
-Covers Arabic, English, and French.
+approved goldens stored in
+`app/src/screenshotTestStagingDebug/reference/`. Covers Arabic, English, and
+French, and the locale/multipreview matrix described above.
 
 ```cmd
 gradlew.bat validateStagingDebugScreenshotTest
@@ -196,6 +405,7 @@ back out.
 | `pnpm test` | `pnpm test` |
 | `npx tsc --noEmit` | `npx tsc --noEmit` |
 | `gradlew.bat testStagingDebugUnitTest` | `gradlew.bat testStagingDebugUnitTest` |
+| `gradlew.bat testStagingDebugUnitTest --tests app.orderak.seller.a11y.AccessibilityPreviewAuditTest` (accessibility audit) | `gradlew.bat testStagingDebugUnitTest --tests app.orderak.seller.a11y.AccessibilityPreviewAuditTest` (accessibility audit) |
 | `gradlew.bat lintStagingDebug` | `gradlew.bat lintStagingDebug` |
 | `gradlew.bat verifyLocalizationContract` | `gradlew.bat validateStagingDebugScreenshotTest` |
 | `gradlew.bat verifyAuthPhase1Contract verifySellerApiContract` | `gradlew.bat verifyAuthPhase1Contract verifySellerApiContract` |

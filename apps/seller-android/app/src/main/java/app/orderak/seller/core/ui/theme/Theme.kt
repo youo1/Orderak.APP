@@ -38,17 +38,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.core.view.WindowCompat
 
 // ============================================================
-// Shape tokens — Material 3 small / medium / large
-// ============================================================
-val OrderakShapes = Shapes(
-    extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
-    small = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
-    medium = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
-    large = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-    extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
-)
-
-// ============================================================
 // Extended color tokens (roles without a stock M3 slot)
 // ============================================================
 // Defaulted to the generated standard/light roles rather than a hand-written
@@ -58,17 +47,17 @@ val LocalOrderakExtendedColors = staticCompositionLocalOf {
 }
 
 data class OrderakSpacing(
-    val space0: Dp = 0.dp,
-    val space1: Dp = 4.dp,
-    val space2: Dp = 8.dp,
-    val space3: Dp = 12.dp,
-    val space4: Dp = 16.dp,
-    val space6: Dp = 24.dp,
-    val space8: Dp = 32.dp,
-    val space10: Dp = 40.dp,
-    val space12: Dp = 48.dp,
-    val space16: Dp = 64.dp,
-    val minimumTouchTarget: Dp = 48.dp,
+    val space0: Dp = GeneratedDesignSystem.SPACING_SPACE0_DP.dp,
+    val space1: Dp = GeneratedDesignSystem.SPACING_SPACE1_DP.dp,
+    val space2: Dp = GeneratedDesignSystem.SPACING_SPACE2_DP.dp,
+    val space3: Dp = GeneratedDesignSystem.SPACING_SPACE3_DP.dp,
+    val space4: Dp = GeneratedDesignSystem.SPACING_SPACE4_DP.dp,
+    val space6: Dp = GeneratedDesignSystem.SPACING_SPACE6_DP.dp,
+    val space8: Dp = GeneratedDesignSystem.SPACING_SPACE8_DP.dp,
+    val space10: Dp = GeneratedDesignSystem.SPACING_SPACE10_DP.dp,
+    val space12: Dp = GeneratedDesignSystem.SPACING_SPACE12_DP.dp,
+    val space16: Dp = GeneratedDesignSystem.SPACING_SPACE16_DP.dp,
+    val minimumTouchTarget: Dp = GeneratedDesignSystem.MINIMUM_TOUCH_TARGET_DP.dp,
     /**
      * Trailing clearance for a list a floating action button floats over.
      *
@@ -83,7 +72,7 @@ data class OrderakSpacing(
      * would hide the bottom of the last order the seller is scrolling to. Change
      * this number only together with the FAB's size or its padding.
      */
-    val fabClearance: Dp = 80.dp,
+    val fabClearance: Dp = GeneratedDesignSystem.SPACING_FAB_CLEARANCE_DP.dp,
     /**
      * The catalogue thumbnail, in a list row.
      *
@@ -97,7 +86,7 @@ data class OrderakSpacing(
      * If a redesign changes it, change it here and let the store-surface
      * baselines show the result.
      */
-    val thumbnail: Dp = 56.dp,
+    val thumbnail: Dp = GeneratedDesignSystem.SPACING_THUMBNAIL_DP.dp,
     /**
      * An icon drawn inside a label, a chip, a row or a button.
      *
@@ -106,7 +95,7 @@ data class OrderakSpacing(
      * the spacing scale already has between [space3] and [space4], so the icon
      * group does not introduce a fifth number into the system.
      */
-    val iconSmall: Dp = 16.dp,
+    val iconSmall: Dp = GeneratedDesignSystem.SPACING_ICON_SMALL_DP.dp,
     /**
      * A standalone icon: a leading slot, a control, an inline progress spinner.
      *
@@ -114,7 +103,7 @@ data class OrderakSpacing(
      * not visible at any of them; keeping both would mean the next icon has to
      * choose between two values that mean the same thing.
      */
-    val iconMedium: Dp = 20.dp,
+    val iconMedium: Dp = GeneratedDesignSystem.SPACING_ICON_MEDIUM_DP.dp,
     /**
      * A decorative icon that stands for a whole action on its own — the
      * fingerprint on the passkey button, which is the only one of these.
@@ -123,7 +112,7 @@ data class OrderakSpacing(
      * button's own label, and [iconMedium] would leave it reading as a bullet
      * beside the text rather than as the subject of the button.
      */
-    val iconHero: Dp = 44.dp,
+    val iconHero: Dp = GeneratedDesignSystem.SPACING_ICON_HERO_DP.dp,
 )
 
 /**
@@ -146,7 +135,7 @@ data class OrderakLayout(
      * right. A tablet or an unfolded phone gets wider margins instead of longer
      * lines, which is why the value is fixed rather than proportional.
      */
-    val contentMaxWidth: Dp = 560.dp,
+    val contentMaxWidth: Dp = GeneratedDesignSystem.LAYOUT_CONTENT_MAX_WIDTH_DP.dp,
     /**
      * The window width at which a screen switches from one column to two.
      *
@@ -154,7 +143,7 @@ data class OrderakLayout(
      * screen that branches on this agrees with the platform's own classification
      * instead of carrying a second opinion about what "wide" means.
      */
-    val wideLayoutMinWidth: Dp = 720.dp,
+    val wideLayoutMinWidth: Dp = GeneratedDesignSystem.LAYOUT_WIDE_LAYOUT_MIN_WIDTH_DP.dp,
 )
 
 val LocalOrderakLayout = staticCompositionLocalOf { OrderakLayout() }
@@ -181,10 +170,10 @@ val LocalOrderakSpacing = staticCompositionLocalOf { OrderakSpacing() }
  * once here is what stops each new animation from having to remember.
  */
 data class OrderakMotion(
-    val instant: Int = 0,
-    val short: Int = 150,
-    val medium: Int = 180,
-    val long: Int = 200,
+    val instant: Int = GeneratedDesignSystem.MOTION_INSTANT_MS,
+    val short: Int = GeneratedDesignSystem.MOTION_SHORT_MS,
+    val medium: Int = GeneratedDesignSystem.MOTION_MEDIUM_MS,
+    val long: Int = GeneratedDesignSystem.MOTION_LONG_MS,
 ) {
     /** Every duration zeroed, for a device with animation turned off. */
     fun reduced(): OrderakMotion = OrderakMotion(instant, instant, instant, instant)
@@ -202,7 +191,7 @@ val LocalOrderakMotion = staticCompositionLocalOf { OrderakMotion() }
  * on anything taller than 200dp.
  */
 val Shapes.full: RoundedCornerShape
-    get() = RoundedCornerShape(percent = 50)
+    get() = RoundedCornerShape(percent = GeneratedDesignSystem.SHAPE_FULL_PERCENT)
 
 // ============================================================
 // Generated design-system accessors
@@ -215,36 +204,18 @@ val Shapes.full: RoundedCornerShape
 // ============================================================
 
 private fun generatedShapes(): Shapes {
-    val values = GeneratedDesignSystem.shapes
-    fun radius(name: String, fallback: Dp): Dp =
-        values[name]?.takeIf { it in 0f..40f }?.dp ?: fallback
+    fun radius(name: String): Dp =
+        requireNotNull(GeneratedDesignSystem.shapes[name]) { "generated shape $name is missing" }.dp
     return Shapes(
-        extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(radius("extraSmall", 4.dp)),
-        small = androidx.compose.foundation.shape.RoundedCornerShape(radius("small", 8.dp)),
-        medium = androidx.compose.foundation.shape.RoundedCornerShape(radius("medium", 12.dp)),
-        large = androidx.compose.foundation.shape.RoundedCornerShape(radius("large", 16.dp)),
-        extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(radius("extraLarge", 24.dp)),
+        extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(radius("extraSmall")),
+        small = androidx.compose.foundation.shape.RoundedCornerShape(radius("small")),
+        medium = androidx.compose.foundation.shape.RoundedCornerShape(radius("medium")),
+        large = androidx.compose.foundation.shape.RoundedCornerShape(radius("large")),
+        extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(radius("extraLarge")),
     )
 }
 
-private fun generatedSpacing(): OrderakSpacing {
-    val tokens = GeneratedDesignSystem.spacing
-    fun token(name: String, fallback: Dp): Dp =
-        tokens[name]?.takeIf { it in 0f..144f }?.dp ?: fallback
-    return OrderakSpacing(
-        space0 = token("space0", 0.dp),
-        space1 = token("space1", 4.dp),
-        space2 = token("space2", 8.dp),
-        space3 = token("space3", 12.dp),
-        space4 = token("space4", 16.dp),
-        space6 = token("space6", 24.dp),
-        space8 = token("space8", 32.dp),
-        space10 = token("space10", 40.dp),
-        space12 = token("space12", 48.dp),
-        space16 = token("space16", 64.dp),
-        minimumTouchTarget = maxOf(48f, GeneratedDesignSystem.MINIMUM_TOUCH_TARGET_DP).dp,
-    )
-}
+private fun generatedSpacing(): OrderakSpacing = OrderakSpacing()
 
 // ============================================================
 // Main Theme Composable

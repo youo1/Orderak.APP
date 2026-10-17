@@ -121,7 +121,7 @@ class BillingManager @Inject constructor(
         scope.launch {
             _state.value = BillingState.Verifying
             val phone = sessionStore.phone.first().orEmpty()
-            val secret = sessionStore.getOrCreateSecret()
+            val secret = sessionStore.currentSecret()
             if (phone.isBlank()) {
                 _state.value = BillingState.Error("session_missing")
                 return@launch
@@ -190,7 +190,7 @@ class BillingManager @Inject constructor(
             val offer = details.subscriptionOfferDetails?.firstOrNull { it.basePlanId == basePlanId }
             if (offer == null) { _state.value = BillingState.Error("offer_not_found"); return@launch }
             val phone = sessionStore.phone.first().orEmpty()
-            val secret = sessionStore.getOrCreateSecret()
+            val secret = sessionStore.currentSecret()
             val snapshot = backendApi.getEntitlements(phone, secret)
             val organizationId = snapshot.organization_id
             if (!snapshot.ok || organizationId.isNullOrBlank()) {

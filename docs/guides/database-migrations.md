@@ -105,6 +105,7 @@ trigger's final semicolon when replaying a fresh remote D1 database.
 - [058_product_client_request_id.sql](#058_product_client_request_idsql)
 - [059_stock_movements_product_code_not_null.sql](#059_stock_movements_product_code_not_nullsql)
 - [060_retire_dead_tables.sql](#060_retire_dead_tablessql)
+- [061_app_screens_design_url.sql](#061_app_screens_design_urlsql)
 
 ## 001_init.sql
 
@@ -203,7 +204,7 @@ trigger's final semicolon when replaying a fresh remote D1 database.
 ### What it does
 
 - Creates the admin-managed application-screen inventory.
-- Tracks screen descriptions, implementation status, Android routes, Figma links, notes, ordering, and timestamps.
+- Tracks screen descriptions, implementation status, Android routes, design links, notes, ordering, and timestamps.
 
 ## 012_legal_versions.sql
 
@@ -694,6 +695,16 @@ trigger's final semicolon when replaying a fresh remote D1 database.
 
 - Retires two tables nothing reads, in the reversible form. `items` was created by 001 and `content_pages` by 003; a search for a statement naming either returns nothing across `src/`, `scripts/` and `test/`. The count a name search gives is not the check: `items` appears 62 times in `src/` and every one is the English word - a response field, a loop variable, `items: z.array(OrderItemSchema)` - which is exactly how a dead table survives a review. The check is SQL context, and 044 states `items` is dead in its own comment.
 - The rename rather than a drop is the whole point of the migration. "No code reads it" is a fact about reachability, not about emptiness: nobody has counted the rows, and there is no verified backup in this repository to restore them from. Dropping would destroy data on the strength of an inference, and applied migrations are immutable history - a drop could not be undone by editing this file afterwards. A rename clears every reader's path exactly as a drop would, makes the name say what the table is, and leaves the data one statement away: `ALTER TABLE zz_retired_items RENAME TO items`.
-- `retired_tables` is new here and exists so the follow-up that drops them has the date and the reason without reconstructing it from git history. The drop is migration 061, and it is a deliberate second step after a backup rather than an oversight.
+- `retired_tables` is new here and exists so the follow-up that drops them has the date and the reason without reconstructing it from git history. The drop is a later deliberate migration after a backup rather than an oversight, and it is not assigned a number here.
 - `geo_city_names` and `geo_city_search` were proposed for deletion alongside these two and are deliberately not here. They are unreferenced from `src/` in the same way, but three maintenance paths still treat them as live: `scripts/import-geonames.mjs` (wired as `pnpm run geo:build-geonames-rollback`) writes both, `scripts/d1-search-index-rebuild.sql` rebuilds the search index from `geo_city_names`, and the schema-extras exporter names them. Retiring a table out from under a recovery script is how a bad night gets worse, so they go when the `city_catalog*` set is confirmed to have replaced them in production - tables, importer and rebuild script in one change.
 - The rollout marker is present and honest. `production-deploy.yml` applies migrations before deploying the Workers, so the previous release serves traffic against the new schema in between; that window is safe here because no release of the Worker names either table, which was verified against the code rather than assumed from the age of the tables.
+
+## 061_app_screens_design_url.sql
+
+**Source:** `services/backend/migrations/061_app_screens_design_url.sql`
+
+### What it does
+
+- Renames `app_screens.figma_url` to `design_url` with `ALTER TABLE ... RENAME COLUMN`, so every stored value is preserved exactly. It does not add a compatibility column and does not alter any other workflow column.
+- The rollout marker answers the window honestly. `production-deploy.yml` applies migrations before deploying the Worker, so the previous release serves traffic against the new schema in between; that previous Worker names figma_url only in the admin screen create and update statements in `src/domains/admin/admin-project.ts`, so for the minutes between the migration and the deploy an operator's screen create or update fails, and works again after the deploy. No seller, storefront, or manifest-sync path names the column, and `SELECT *` readers only see the new key name, which no admin page reads.
+- Rollback is `ALTER TABLE app_screens RENAME COLUMN design_url TO figma_url;`, performed after the Worker is reverted so the code and the column name agree again. No value is lost by the rename or its inverse.

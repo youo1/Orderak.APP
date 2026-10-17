@@ -171,6 +171,28 @@ android {
     }
     buildFeatures { compose = true; buildConfig = true }
 
+    // The accessibility preview audit resolves and renders every @PreviewTest
+    // declaration from the screenshot source set on the JVM, so those sources
+    // have to compile into the unit-test artifact. The screenshotTest source
+    // set itself is untouched; this only adds its directory to `test`. Both the
+    // Java and Kotlin source directories are named because AGP's built-in
+    // Kotlin compilation reads the latter, and the audit must be able to
+    // Class.forName each <File>ScreenshotTestKt facade at runtime.
+    sourceSets {
+        getByName("test") {
+            java.srcDir("src/screenshotTest/java")
+            kotlin.srcDir("src/screenshotTest/java")
+        }
+    }
+
+    testOptions {
+        unitTests {
+            // Robolectric needs the merged Android resources on the unit-test
+            // runtime classpath (strings, plurals, themes, fonts).
+            isIncludeAndroidResources = true
+        }
+    }
+
     // Room exports the schema here so a future migration can be written and
     // tested against the shipped one rather than against a description of it.
     ksp { arg("room.schemaLocation", "$projectDir/schemas") }
@@ -226,7 +248,6 @@ dependencies {
     ksp(libs.androidx.hilt.compiler)
     implementation(libs.mlkit.text)            // on-device OCR for payment proof (S6a)
     implementation(libs.libphonenumber)
-    implementation(libs.osmdroid)
     implementation(libs.billing.ktx)
 
     // Room: single source of truth from Stage 2 onward (deps wired now per plan)
@@ -238,6 +259,14 @@ dependencies {
     testImplementation(libs.coroutines.test)
     testImplementation(libs.turbine)
     testImplementation(libs.sqlite.jdbc)
+    // The accessibility preview audit runs the real composables on the JVM.
+    testImplementation(libs.robolectric)
+    testImplementation(libs.accessibility.test.framework)
+    testImplementation(composeBom)
+    testImplementation(libs.compose.ui.test.junit4)
+    testImplementation(libs.androidx.test.ext.junit)
+    testImplementation(libs.screenshot.validation.api)
+    testImplementation(libs.compose.ui.tooling)
     androidTestImplementation(composeBom)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
@@ -275,6 +304,17 @@ dependencies {
  * render would still read the host.
  */
 tasks.withType<Test>().matching { it.name.contains("ScreenshotTest") }.configureEach {
+    systemProperty("user.timezone", "UTC")
+    systemProperty("user.language", "en")
+    systemProperty("user.country", "US")
+}
+
+/**
+ * The accessibility preview audit renders the same translated surfaces as the
+ * screenshot tests, so it is pinned the same way. The predicate excludes the
+ * ScreenshotTest tasks so those are not configured twice.
+ */
+tasks.withType<Test>().matching { !it.name.contains("ScreenshotTest") }.configureEach {
     systemProperty("user.timezone", "UTC")
     systemProperty("user.language", "en")
     systemProperty("user.country", "US")
@@ -555,6 +595,39 @@ val verifyAuthPhase1Contract by tasks.registering {
                 "sessionLogoutManager.logout()" in entryRouting,
             "A rejected credential must clear the local session (via SessionLogoutManager) before EntryRouteResolver reaches Auth."
         )
+        val navHost = mainRoot.resolve(
+            "java/app/orderak/seller/app/navigation/OrderakNavHost.kt"
+        ).readText()
+        val sessionRouteMonitor = mainRoot.resolve(
+            "java/app/orderak/seller/data/session/SessionRouteMonitor.kt"
+        ).readText()
+        requireContract(
+            // Guarantee 23, the recurring sign-out loop. A 401 is a verdict about
+            // the secret one request carried, not about whatever secret the
+            // device holds when the answer lands. The logout revocation always
+            // carries the secret being retired, so its own 401 used to survive as
+            // a pending signal and sign the *next* session straight back out.
+            // Every consumer must compare the signal's credential to the current
+            // one before acting on it.
+            "val credentialFingerprint: String" in sessionRouteMonitor &&
+                "fun SessionRouteSignal.appliesTo(currentSecret: String?)" in sessionRouteMonitor &&
+                "credentialFingerprint(sentSecret)" in backendApi &&
+                "pendingSignal?.takeIf { it.appliesTo(secret) }" in entryRouting &&
+                "sessionRoutingViewModel.shouldReroute(signal)" in navHost,
+            "Session route signals must name the credential they reject, and only a signal about the current credential may reroute or sign out."
+        )
+        val mintingCallers = mainRoot.resolve("java").walkTopDown()
+            .filter { it.isFile && it.extension == "kt" && "getOrCreateSecret()" in it.readText() }
+            .map { it.name }
+            .toSet()
+        requireContract(
+            // Only the three requests that make the server provision a secret may
+            // mint one. A background caller minting after a sign-out produced a
+            // secret the server had never seen, whose 401 later matched the
+            // session the next sign-in provisioned with that same value.
+            mintingCallers == setOf("SessionStore.kt", "AuthViewModel.kt", "ShopSetupViewModel.kt"),
+            "getOrCreateSecret() is for sign-in only; other callers must use currentSecret(). Found in: $mintingCallers"
+        )
         requireContract(
             "completePhoneAuth(" in authViewModel &&
                 "terms_accepted" !in authViewModel &&
@@ -747,9 +820,9 @@ val verifyDesignSystemContract by tasks.registering {
         }
 
         requireContract(
-            "const val SCHEMA_VERSION = 2" in contract &&
-                "\"schemaVersion\": 2" in fixture,
-            "The schema-v2 fallback contract drifted."
+            "const val SCHEMA_VERSION = 3" in contract &&
+                "\"schemaVersion\": 3" in fixture,
+            "The schema-3 fallback contract drifted."
         )
 
         // The generator writes the hash into two files. If they disagree, one of
@@ -791,10 +864,8 @@ val verifyDesignSystemContract by tasks.registering {
             "The 48dp minimum touch target constraint changed."
         )
         requireContract(
-            listOf("cairo", "tajawal", "noto-arabic").any {
-                "const val FONT_FAMILY = \"$it\"" in generated
-            },
-            "The generated font family is not an approved Orderak font."
+            "const val FONT_FAMILY = \"cairo\"" in generated,
+            "The generated font family is not the approved Orderak font (cairo)."
         )
 
         // Colour must reach the UI only through the generator, because
@@ -854,8 +925,8 @@ val verifyDesignSystemContract by tasks.registering {
             "A semantic container lost its outline role."
         )
         requireContract(
-            "Tajawal" in type && "Noto Sans Arabic" in type,
-            "Approved Android font fallbacks are incomplete."
+            "Cairo" in type,
+            "Cairo must be the declared Android font family (D-07)."
         )
     }
 }

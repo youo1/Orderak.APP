@@ -87,7 +87,7 @@ class SellerRefresher @Inject constructor(
     private suspend fun refresh(): Boolean {
         val phone = sessionStore.phone.first() ?: return false
         val shopName = sessionStore.shopName.first() ?: return false
-        val secret = sessionStore.getOrCreateSecret()
+        val secret = sessionStore.currentSecret()
 
         // Country: onboarding choice wins; fall back to the phone dial prefix.
         val countryIso = sessionStore.countryIso.first()

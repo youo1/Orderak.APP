@@ -182,7 +182,7 @@ class OrderRepository @Inject constructor(
         if (order.remoteId != null) return OrderPushOutcome.Accepted
         val key = order.idempotencyKey ?: return OrderPushOutcome.NotReady
         val phone = sessionStore.phone.first() ?: return OrderPushOutcome.Retryable("no_session")
-        val secret = sessionStore.getOrCreateSecret()
+        val secret = sessionStore.currentSecret()
         val lines = orderDao.itemsOf(orderId)
         val items = lines.mapNotNull { item ->
             // The code the item carries first, and the cache only as a fallback.
@@ -315,7 +315,7 @@ class OrderRepository @Inject constructor(
             runCatching { pushOrder(id) }.getOrNull() is OrderPushOutcome.Accepted
         val remoteNo = (if (pushed) orderDao.byId(id)?.remoteId else null) ?: return false
         val phone = sessionStore.phone.first() ?: return false
-        val secret = sessionStore.getOrCreateSecret()
+        val secret = sessionStore.currentSecret()
         val response = api.setOrderStatus(phone, secret, remoteNo, target.name)
         if (!response.ok) return false
         // Mirror the server, not the request: on a repeat it answers with the

@@ -14,6 +14,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -118,6 +120,8 @@ class SessionStore @Inject constructor(
         val BILLING_VERIFICATION_ID = stringPreferencesKey("billing_verification_id")
         val BILLING_VERIFICATION_RETRY_AT = longPreferencesKey("billing_verification_retry_at")
     }
+
+    private val secretMutex = Mutex()
 
     private val secureSecretPrefs: SharedPreferences by lazy {
         val masterKey = MasterKey.Builder(context)
@@ -426,22 +430,44 @@ class SessionStore @Inject constructor(
     }
 
 
-    /** سر ثابت للجهاز بيمثّل هوية التطبيق عند الباك اند (بيتولد مرة واحدة). */
-    suspend fun getOrCreateSecret(): String {
+    /**
+     * The device secret to hand the server for provisioning, minted if absent.
+     *
+     * **Sign-in only**: phone completion, passkey completion, and onboarding
+     * completion — the three requests that make the server accept a new secret.
+     * Every other request uses [currentSecret], which never mints.
+     *
+     * Minting anywhere else used to create credentials the server had never seen.
+     * A background request that read the phone just before a sign-out minted a
+     * fresh secret just after it, sent it, got a 401, and that secret then became
+     * the one the next sign-in provisioned — so the stale 401 described the new,
+     * valid session. The mutex keeps two concurrent callers from minting two
+     * different values and each believing its own was stored.
+     */
+    suspend fun getOrCreateSecret(): String = secretMutex.withLock {
         val encrypted = secureSecretPrefs.getString(SECRET_PREFS_KEY, null)
-        if (!encrypted.isNullOrBlank()) return encrypted
+        if (!encrypted.isNullOrBlank()) return@withLock encrypted
 
         val legacy = context.dataStore.data.map { it[Keys.LEGACY_SECRET] }.first()
         if (!legacy.isNullOrBlank()) {
             secureSecretPrefs.edit().putString(SECRET_PREFS_KEY, legacy).apply()
             context.dataStore.edit { it.remove(Keys.LEGACY_SECRET) }
-            return legacy
+            return@withLock legacy
         }
 
         val secret = java.util.UUID.randomUUID().toString()
         secureSecretPrefs.edit().putString(SECRET_PREFS_KEY, secret).apply()
-        return secret
+        secret
     }
+
+    /**
+     * The device secret for an authenticated request, or "" when signed out.
+     *
+     * Never mints. BackendApi refuses to send a seller request with an empty
+     * secret, so a caller that races a sign-out gets a local error result
+     * instead of a network 401 — and cannot raise a session route signal.
+     */
+    suspend fun currentSecret(): String = readExistingSecret().orEmpty()
 
     fun saveOnboardingToken(token: String) {
         secureSecretPrefs.edit().putString(ONBOARDING_TOKEN_PREFS_KEY, token).apply()

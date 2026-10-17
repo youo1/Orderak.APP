@@ -16,7 +16,7 @@
     "cf-typegen": "wrangler types src/edge/worker-configuration.d.ts --config wrangler.edge.jsonc --env-interface EdgeEnv --strict-vars=false --include-runtime=false",
     "cf-types:check": "wrangler types src/edge/worker-configuration.d.ts --config wrangler.edge.jsonc --env-interface EdgeEnv --strict-vars=false --include-runtime=false --check",
     "test": "vitest run",
-    "test:a11y": "vitest run src/tests/accessibility.test.tsx",
+    "test:a11y": "vitest run --config vitest.a11y.config.ts",
     "test:e2e": "playwright test"
   },
   "dependencies": {
@@ -48,6 +48,8 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
     "@vitejs/plugin-react": "^6.1.0",
+    "@vitest/browser-playwright": "4.1.11",
+    "axe-core": "4.14.0",
     "jsdom": "^28.0.0",
     "oxlint": "^1.80.0",
     "tailwindcss": "^4.3.3",

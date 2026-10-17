@@ -113,6 +113,8 @@ jobs:
           output: security-reports/trivy.sarif
           exit-code: '1'
           skip-dirs: node_modules,site,apps/seller-android/.gradle,apps/seller-android/build
+          # Findings ignored by id, each with its reason and an expiry.
+          trivyignores: .trivyignore
 
       - name: Upload Trivy report
         if: always() && hashFiles('security-reports/trivy.sarif') != ''

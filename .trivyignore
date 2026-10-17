@@ -1,0 +1,52 @@
+# Trivy findings ignored by id, each with its reason and the condition that
+# removes it. Same rule as auditConfig.ignoreGhsas in pnpm-workspace.yaml: one
+# id, never a severity threshold or a package.
+
+# CVE-2026-85024 (medium) — undici's WebSocket permessage-deflate cleanup drops
+# the inflate stream's error listener, so a peer that sends a payload past the
+# 128 MiB limit followed by a malformed DEFLATE byte crashes the process. Fixed
+# in 7.29.1. It reached the vulnerability database on 2026-09-28 or 29, which is
+# why this check began failing every pull request at once.
+#
+# The vulnerable copy is 7.29.0, and every miniflare release pins
+# `undici: 7.29.0` exactly, including the latest (5.20260926.0-alpha), so no
+# upgrade reaches the fix. An override would hand miniflare a version it never
+# declared, the trade pnpm-workspace.yaml refuses for sharp in the same place.
+#
+# Exposure: undici arrives through miniflare (the wrangler dev server and
+# @cloudflare/vitest-pool-workers) and jsdom (the admin tests). Trivy counts it
+# as a production dependency only because @sentry/cloudflare names wrangler as an
+# optional peer. A Worker never bundles undici — Workers use the runtime's own
+# fetch and WebSocket — and nothing in the dev server or the tests opens a
+# WebSocket to an untrusted peer.
+#
+# Remove this entry when miniflare pins undici 7.29.1 or later. The expiry makes
+# the check fail again on that date, so it is re-checked rather than forgotten.
+CVE-2026-85024 exp:2026-12-31
+
+# CVE-2026-93687 (GHSA-vfj7-8cjw-p6xm, high) — braces' brace-pattern parser can
+# be driven into exponential backtracking by a crafted pattern, so a malicious
+# glob string spins the process. Exposure is dev-only OpenAPI tooling:
+# @stoplight/prism-cli and @stoplight/spectral-cli reach braces through
+# postman-collection, and no patched release exists to move to. The waiver is by
+# id because Trivy reports this advisory under its CVE.
+#
+# Reason: dev-only OpenAPI tooling with no patched release to override to.
+# Removal condition: Remove this entry when a fixed braces release is published
+# and the OpenAPI tooling accepts it. The expiry (2026-11-05) makes the check
+# fail again on that date, so it is re-checked rather than forgotten.
+CVE-2026-93687 exp:2026-11-05
+
+# GHSA-wq5f-xc86-pv6w (high) — sharp's bundled libvips decodes a crafted image
+# with an out-of-bounds write. Exposure is dev-only through miniflare (the
+# wrangler dev server and @cloudflare/vitest-pool-workers); no parent release
+# ships sharp >=0.35.5 yet, and sharp's native platform packages are not
+# exercised by the tests. This advisory has no CVE id, so Trivy is silenced by
+# GHSA id.
+#
+# Reason: dev-only through miniflare, with no parent release shipping
+# sharp >=0.35.5 yet.
+# Removal condition: Remove this entry when a miniflare release ships
+# sharp >=0.35.5. The expiry (2026-11-05) makes the check fail again on that
+# date, so it is re-checked rather than forgotten.
+GHSA-wq5f-xc86-pv6w exp:2026-11-05

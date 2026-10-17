@@ -28,7 +28,7 @@ class StoreIdentityResolver @Inject constructor(
 
         // Fetch from the backend and persist for next time.
         val phone = sessionStore.phone.first()?.ifBlank { null } ?: return null
-        val secret = sessionStore.getOrCreateSecret()
+        val secret = sessionStore.currentSecret()
         val store = api.getStore(phone, secret).store ?: return null
         val pid = store.public_identifier?.ifBlank { null } ?: return null
 

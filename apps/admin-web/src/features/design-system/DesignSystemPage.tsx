@@ -2,9 +2,13 @@ import { useState } from 'react';
 import { PageHeader } from '@/shared/ui/Page';
 import { Button } from '@/shared/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/card';
+import { Checkbox } from '@/shared/ui/checkbox';
 import { askConfirm } from '@/shared/ui/confirm';
+import { EmptyState } from '@/shared/ui/empty-state';
 import { Field } from '@/shared/ui/field';
 import { Input } from '@/shared/ui/input';
+import { Tooltip } from '@/shared/ui/tooltip';
+import { useToast } from '@/shared/ui/toast';
 import { STEP_UP_UNAVAILABLE, useStepUp } from '@/shared/api/step-up';
 
 /**
@@ -58,7 +62,9 @@ const STATUSES = ['positive', 'negative', 'warning', 'neutral'];
 
 export default function DesignSystemPage() {
   const stepUp = useStepUp();
+  const { enqueue } = useToast();
   const [confirming, setConfirming] = useState(false);
+  const [checked, setChecked] = useState(true);
 
   return (
     <>
@@ -158,7 +164,7 @@ export default function DesignSystemPage() {
               <div className="form-grid">
                 <Field label="Store name *"><Input defaultValue="متجر النور" /></Field>
                 <Field label="Note (optional)"><Input placeholder="Anything the operator should know" /></Field>
-                <label className="checkbox-field"><input type="checkbox" defaultChecked /><span><strong>Accepting orders</strong></span></label>
+                <Checkbox className="checkbox-field" checked={checked} onCheckedChange={setChecked} label="Accepting orders" />
               </div>
             </CardContent>
           </Card>
@@ -185,6 +191,59 @@ export default function DesignSystemPage() {
                 <div className="metric-icon">EGP</div>
                 <div><span>Today</span><strong className="ork-numeric">4,812.00</strong><small>12 orders</small></div>
               </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      <section className="resource-group">
+        <div className="section-heading"><h2>Checkbox, tooltip, toast and empty states</h2><span>B5 primitives</span></div>
+        <div className="dashboard-grid">
+          <Card>
+            <CardHeader>
+              <CardTitle>Checkbox</CardTitle>
+              <CardDescription>A choice applied when the form is saved.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="form-grid">
+                <Checkbox checked={checked} onCheckedChange={setChecked} label="Active administrator" hint="Can sign in with their role. Turning this off ends their sessions." />
+                <Checkbox checked={false} onCheckedChange={() => undefined} label="Unchecked" />
+                <Checkbox checked={false} onCheckedChange={() => undefined} disabled label="Disabled" />
+                <Checkbox checked onCheckedChange={() => undefined} disabled label="Disabled and on" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Tooltip</CardTitle>
+              <CardDescription>The control's aria-label, repeated for sighted pointer and keyboard users.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Tooltip label="Previous page">
+                <Button variant="outline" aria-label="Previous page">Hover or focus me</Button>
+              </Tooltip>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Toast</CardTitle>
+              <CardDescription>One polite live region; success only, never errors.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button variant="outline" onClick={() => enqueue({ message: 'Runtime configuration saved.' })}>Show a toast</Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Empty states</CardTitle>
+              <CardDescription>None yet is not the same as no match.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <EmptyState variant="none-yet" title="No bug reports yet" body="Bug reports appear here when a seller files one." />
+              <EmptyState variant="no-match" records="stores" query="acme corp" total={1284} onClear={() => undefined} />
             </CardContent>
           </Card>
         </div>

@@ -14,7 +14,7 @@ export interface DesignSystemSource {
     variant: 'tonal-spot' | 'vibrant' | 'expressive' | 'fidelity' | 'content' | 'neutral' | 'monochrome';
     defaultContrast: ContrastName;
   };
-  typography: { family: 'cairo' | 'tajawal' | 'noto-arabic'; multiplier: number };
+  typography: { family: 'cairo'; multiplier: number };
   spacing: { baseUnit: number; density: 'compact' | 'comfortable' | 'spacious' };
   shapes: { preset: 'sharp' | 'balanced' | 'rounded' | 'custom'; baseRadius?: number };
 }
@@ -28,7 +28,7 @@ export interface Validation {
 }
 
 export interface Snapshot {
-  schemaVersion: 2;
+  schemaVersion: 2 | 3;
   generatorVersion: string;
   source: DesignSystemSource;
   schemes: Record<ContrastName, Record<ThemeMode, Record<string, string>>>;
@@ -37,6 +37,15 @@ export interface Snapshot {
   spacing: { values: number[]; tokens: Record<string, number> };
   shapes: Record<string, number>;
   components: { minimumTouchTargetDp: 48 };
+  /** Present from schema 3; the preview sources the pill radius from here. */
+  shapeFull?: { css: string; androidPercent: number };
+  motion?: { durations: Record<string, number>; easings: Record<string, string>; transitions: Record<string, string> };
+  interaction?: Record<string, unknown>;
+  elevation?: { shadows: Record<string, { geometry: string; alpha: number }> };
+  icons?: Record<string, number>;
+  componentDimensions?: Record<string, number>;
+  layout?: Record<string, number | string>;
+  spinner?: { sizePx: number };
   validation: Validation;
   contentHash: string;
 }
@@ -44,6 +53,7 @@ export interface Snapshot {
 export interface ActiveRevision {
   id: number;
   name: string | null;
+  schemaVersion: number;
   source: DesignSystemSource;
   snapshot: Snapshot;
   validation: Validation;

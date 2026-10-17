@@ -89,7 +89,7 @@ class CustomerWriteRepository @Inject constructor(
         note: String,
     ): CustomerWriteResult {
         val phone = sessionStore.phone.first() ?: return CustomerWriteResult.Offline
-        val secret = sessionStore.getOrCreateSecret()
+        val secret = sessionStore.currentSecret()
         val res = api.updateCustomer(
             phone, secret, customerKey,
             CustomerUpdateReq(

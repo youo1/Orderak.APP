@@ -134,7 +134,7 @@ On mismatch → `401`.
 
 ### Device secrets
 
-- Generated on first launch as a random string.
+- Generated as a random string at sign-in, when none is stored.
 - Stored **hashed** in D1 (`seller_devices.secret_hash`).
 - Legacy plaintext secrets in `sellers.secret` are transparently re-hashed on
   the seller's next authenticated request — no re-registration needed.
@@ -169,6 +169,18 @@ On mismatch → `401`.
   phone, country, and routing stage use one atomic DataStore transaction.
   Credential signals produced by requests from the previous seller context are
   acknowledged rather than allowed to replace an active Auth/Shop Setup route.
+- A `401`/`403` route signal names the credential the rejected request carried
+  (a SHA-256 fingerprint, never the secret). The entry gate and the navigation
+  host act on it only when it matches the secret the device holds now; any
+  other signal is acknowledged and the live status check decides. Without
+  this, the logout revocation — which always carries the credential being
+  retired — left a pending rejection that signed the next session straight
+  back out.
+- Android mints a device secret only for the three requests that provision
+  one: phone completion, Passkey completion, and onboarding completion. Every
+  other request reads the stored secret without minting and is refused locally
+  when there is none, so no request can carry a secret the server has never
+  seen. `verifyAuthPhase1Contract` enforces both rules.
 
 ### Firebase ID token verification
 

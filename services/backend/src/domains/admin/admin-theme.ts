@@ -13,7 +13,7 @@ import {
 	loadActiveDesignSystem,
 	type DesignSystemRevision,
 } from "../design/design-system";
-import { checkRateLimit, jsonResponse } from "../../platform/http/shared";
+import { checkRateLimit, jsonResponse, parseLimitParam } from "../../platform/http/shared";
 import { Hono } from "hono";
 import type { AdminEnv } from "./admin-context";
 
@@ -109,7 +109,7 @@ th.get(TB, async (c) => {
 			activeRevisionId: active.id,
 			active: publicRevision(active),
 			defaults: DEFAULT_DESIGN_SYSTEM_SOURCE,
-			approvedFonts: ["cairo", "tajawal", "noto-arabic"],
+			approvedFonts: ["cairo"],
 			capabilities: {
 				schemaVersion: DESIGN_SYSTEM_SCHEMA_VERSION,
 				generatorVersion: DESIGN_SYSTEM_GENERATOR_VERSION,
@@ -160,7 +160,7 @@ th.get(`${TB}/revisions`, async (c) => {
 		const env = c.env, url = new URL(c.req.url), gate = c.get("gate");
 		const denied = gate("theme:view");
 		if (denied) return denied;
-		const limit = Math.min(50, Math.max(1, Number(url.searchParams.get("limit")) || 20));
+		const limit = parseLimitParam(url.searchParams.get("limit"), 20, 50);
 		const before = Number(url.searchParams.get("beforeRevisionId")) || Number.MAX_SAFE_INTEGER;
 		const kind = url.searchParams.get("kind") ?? "all";
 		if (!["saved", "checkpoint", "all"].includes(kind)) {
@@ -414,7 +414,7 @@ export async function publicDesignSystemResponse(request: Request, env: Env, sit
 	};
 	const body = {
 		ok: true,
-		schemaVersion: DESIGN_SYSTEM_SCHEMA_VERSION,
+		schemaVersion: revision.schemaVersion,
 		version: revision.contentHash,
 		revisionId: revision.id,
 		generatorVersion: revision.generatorVersion,

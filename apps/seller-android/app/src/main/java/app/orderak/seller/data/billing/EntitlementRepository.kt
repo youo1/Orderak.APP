@@ -80,7 +80,7 @@ class EntitlementRepository @Inject constructor(
         // Never send a validator when its cached representation is missing or
         // corrupt; otherwise a valid 304 could leave the app with no config.
         val etag = prefs[Keys.ETAG].takeIf { _state.value.config != null }
-        val secret = sessionStore.getOrCreateSecret()
+        val secret = sessionStore.currentSecret()
         try {
             when (val result = backendApi.fetchEntitlements(phone, secret, etag)) {
                 is EntitlementFetchResult.Updated -> {

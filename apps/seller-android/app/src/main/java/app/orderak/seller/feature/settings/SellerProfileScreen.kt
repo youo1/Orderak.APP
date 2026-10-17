@@ -139,7 +139,7 @@ class SellerProfileViewModel @Inject constructor(
 
     fun uploadProfilePhoto(uri: Uri, onResult: (String?) -> Unit) = viewModelScope.launch {
         val phone = sessionStore.phone.first() ?: return@launch
-        val secret = sessionStore.getOrCreateSecret()
+        val secret = sessionStore.currentSecret()
         val prepared = withContext(Dispatchers.IO) { prepareImage(uri) }
         val (bytes, mime) = prepared ?: run { onResult(null); return@launch }
         if (bytes.isEmpty()) { onResult(null); return@launch }
@@ -160,7 +160,7 @@ class SellerProfileViewModel @Inject constructor(
 
     fun resendEmailVerification(onReauthenticate: () -> Unit) = viewModelScope.launch {
         val phone = sessionStore.phone.first() ?: return@launch
-        val secret = sessionStore.getOrCreateSecret()
+        val secret = sessionStore.currentSecret()
         val recent = sessionStore.readRecentAuthToken()
         if (recent.isNullOrBlank()) {
             onReauthenticate()

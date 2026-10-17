@@ -106,7 +106,7 @@ class CategoriesViewModel @Inject constructor(
         _loading.value = true
         _error.value = null
         val phone = sessionStore.phone.first() ?: run { _loading.value = false; return@launch }
-        val secret = sessionStore.getOrCreateSecret()
+        val secret = sessionStore.currentSecret()
         val res = api.listCategories(phone, secret)
         if (res.ok) {
             _categories.value = res.categories
@@ -123,7 +123,7 @@ class CategoriesViewModel @Inject constructor(
         if (n.isBlank()) { onResult(false); return@launch }
         _busy.value = true
         val phone = sessionStore.phone.first() ?: run { _busy.value = false; onResult(false); return@launch }
-        val secret = sessionStore.getOrCreateSecret()
+        val secret = sessionStore.currentSecret()
         val response = api.createCategory(phone, secret, CategoryReq(name = n))
         _busy.value = false
         if (response.ok) {
@@ -147,7 +147,7 @@ class CategoriesViewModel @Inject constructor(
         if (n.isBlank()) return@launch
         _busy.value = true
         val phone = sessionStore.phone.first() ?: run { _busy.value = false; return@launch }
-        val secret = sessionStore.getOrCreateSecret()
+        val secret = sessionStore.currentSecret()
         // Reports its failure, as create and delete do. It used to swallow one:
         // the dialog closed either way, so a rename that never reached the
         // server looked exactly like one that did until the list refused to
@@ -160,7 +160,7 @@ class CategoriesViewModel @Inject constructor(
     fun delete(code: String) = viewModelScope.launch {
         _busy.value = true
         val phone = sessionStore.phone.first() ?: run { _busy.value = false; return@launch }
-        val secret = sessionStore.getOrCreateSecret()
+        val secret = sessionStore.currentSecret()
         if (api.deleteCategory(phone, secret, code).ok) refresh() else _error.value = "delete_failed"
         _busy.value = false
     }

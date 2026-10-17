@@ -154,7 +154,7 @@ class OperationsViewModel @Inject constructor(
 
     private suspend fun credentials(): Credentials? {
         val phone = session.phone.first().orEmpty()
-        return if (phone.isBlank()) null else Credentials(phone, session.getOrCreateSecret())
+        return if (phone.isBlank()) null else Credentials(phone, session.currentSecret())
     }
 
     fun loadSupport() = launchRequest {

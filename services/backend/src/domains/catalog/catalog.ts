@@ -23,7 +23,7 @@ import { publicSiteUrl, storeUrl, newUuid } from "../identity/identity";
 import { requireTenantWrite, resolveTenantContextForStore, tenantUnavailableResponse } from "../../platform/tenancy/tenant-routing";
 import { getPlanLimit, limitReached } from "../commerce/plan-limits";
 import type { Theme } from "../design/theme";
-import { designSystemCss, designSystemFontPreload, loadActiveDesignSystem } from "../design/design-system";
+import { designSystemCss, designSystemFontPreload, loadActiveDesignSystem, pageThemeFromSnapshot } from "../design/design-system";
 import { dirFor, t, type Locale } from "../../platform/localization/i18n";
 import { entitlementLimitReached, reserveUsage, voidUsageReservation } from "../commerce/entitlements";
 import { storeCapabilityEnabled } from "../operations/capabilities";
@@ -494,7 +494,7 @@ export async function renderStorePage(env: Env, store: Store, lang: Locale): Pro
 	}${products.length ? orderForm(store, lang, pageCurrency(products), turnstileKey) : ""}`;
 
 	const revision = await loadActiveDesignSystem(env);
-	const theme = revision.legacyTheme;
+	const theme = pageThemeFromSnapshot(revision.snapshot);
 	const head = seoHead({
 		title: `${String(store.store_name)} — أوردرك`,
 		description: (store.description as string) || t(lang, "catalog.shop_description", { store: String(store.store_name) }),
@@ -523,7 +523,7 @@ ${cards || `<p style='text-align:center'>${esc(t(lang, "catalog.category_empty")
 ${products.length ? orderForm(store, lang, pageCurrency(products), turnstileKey) : ""}`;
 
 	const revision = await loadActiveDesignSystem(env);
-	const theme = revision.legacyTheme;
+	const theme = pageThemeFromSnapshot(revision.snapshot);
 	const head = seoHead({
 		title: `${String(category.name)} — ${String(store.store_name)}`,
 		description: t(lang, "catalog.category_description", { category: String(category.name), store: String(store.store_name) }),
@@ -582,7 +582,7 @@ ${inStock ? orderForm(store, lang, productCurrency, turnstileKey) : ""}
 <script type="application/ld+json">${jsonInScript(jsonLd)}</script>`;
 
 	const revision = await loadActiveDesignSystem(env);
-	const theme = revision.legacyTheme;
+	const theme = pageThemeFromSnapshot(revision.snapshot);
 	const head = seoHead({
 		title: `${String(product.name)} — ${String(store.store_name)}`,
 		description: (product.description as string) || `${product.name} — ${price} ${t(lang, "catalog.currency")} — ${store.store_name}.`,

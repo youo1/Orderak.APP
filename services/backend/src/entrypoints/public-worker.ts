@@ -21,7 +21,7 @@ import { markQueuedEmailDeadLetter, processQueuedEmail, type QueuedEmailMessage 
 import { handleConfigRoute, loadClientConfig, versionGateRefusal } from "../platform/config/config";
 import { landingPageHtml } from "../landing";
 import { publicDesignSystemCss, publicDesignSystemResponse } from "../domains/admin/admin-theme";
-import { designSystemCss, designSystemFontPreload, loadActiveDesignSystem } from "../domains/design/design-system";
+import { designSystemCss, designSystemFontPreload, loadActiveDesignSystem, pageThemeFromSnapshot } from "../domains/design/design-system";
 import { createOrder } from "../domains/catalog/catalog";
 import { publicSiteUrl } from "../domains/identity/identity";
 import { authSeller, logError, jsonResponse, methodNotAllowed, corsHeaders, allowedCorsOrigin, readCreds, checkRateLimit, recordDeviceMetadata, enforceRequestBodyLimit, type AuthenticatedSeller, clientIpOf } from "../platform/http/shared";
@@ -451,7 +451,7 @@ app.all("/api/v1/*", async (c) => {
 app.get("/", (c) => cachedPublicGet(c.req.raw, c.env, wctx(c), async () => {
 	const revision = await loadActiveDesignSystem(c.env, c.req.raw);
 	return new Response(landingPageHtml(
-		revision.legacyTheme,
+		pageThemeFromSnapshot(revision.snapshot),
 		designSystemCss(revision.snapshot),
 		designSystemFontPreload(revision.snapshot, "arabic"),
 	), {

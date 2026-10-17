@@ -148,7 +148,7 @@ class SupportTicketViewModel @Inject constructor(
             _busy.value = false
             return@launch
         }
-        val result = api.getSupportTicket(phone, session.getOrCreateSecret(), id)
+        val result = api.getSupportTicket(phone, session.currentSecret(), id)
         _ticket.value = result.ticket
         _messages.value = result.messages
         _error.value = result.error
@@ -163,7 +163,7 @@ class SupportTicketViewModel @Inject constructor(
             _replyError.value = "no_session"
             return@launch
         }
-        val result = api.replySupportTicket(phone, session.getOrCreateSecret(), id, message.trim())
+        val result = api.replySupportTicket(phone, session.currentSecret(), id, message.trim())
         if (result.ok) {
             // Only now. The caller clears the field, and clearing it on a send
             // that never left the phone destroys what the seller wrote about a

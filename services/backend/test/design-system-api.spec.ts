@@ -24,7 +24,7 @@ describe("public design-system contract", () => {
 		env.ADMIN_JWT_SECRET = "test-admin-secret";
 	});
 
-	it("serves schema v2 and the unchanged legacy projection together", async () => {
+	it("serves schema v3 and the unchanged legacy projection together", async () => {
 		const response = await SELF.fetch("https://api.orderak.app/api/v1/theme");
 		expect(response.status).toBe(200);
 		expect(response.headers.get("cache-control")).toBe("public, no-cache");
@@ -32,10 +32,10 @@ describe("public design-system contract", () => {
 		const text = await response.text();
 		expect(new TextEncoder().encode(text).byteLength).toBeLessThan(MAX_PUBLIC_PAYLOAD_BYTES);
 		const body = JSON.parse(text);
-		expect(body.schemaVersion).toBe(2);
-		expect(body.designSystem.schemaVersion).toBe(2);
+		expect(body.schemaVersion).toBe(3);
+		expect(body.designSystem.schemaVersion).toBe(3);
 		expect(body.theme.primary).toBe("#014D4E");
-		expect(body.theme.accent).toBe("#9B4500");
+		expect(body.theme.accent).toBe("#386664");
 		expect(body.version).toHaveLength(64);
 
 		const notModified = await SELF.fetch("https://api.orderak.app/api/v1/theme", {
