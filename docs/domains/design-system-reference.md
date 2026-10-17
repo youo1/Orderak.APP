@@ -9,7 +9,9 @@ applies_to: [production, staging]
 
 The reference for every visual decision in Orderak: what the tokens are and
 how to choose between them. Generated from the brand seed `#014D4E` and
-validated at generation.
+validated at generation. The per-component inventory — every Android `core/ui`
+composable and admin kit export, with its states, callers and rule — lives in
+the [design-system components inventory](design-system-components.md).
 
 Values have one authority and one fallback:
 
@@ -79,15 +81,18 @@ Cairo, one family for both scripts. Fifteen Material 3 roles. Weight is 400 or
 | `label-medium` | 0.75rem | 1rem | 500 | `0.0417em` |
 | `label-small` | 0.6875rem | 1rem | 500 | `0.0455em` |
 
-Utility classes: `.ork-display-large` … `.ork-label-small`, one per element.
-Never mix one role's size with another's weight.
+Each role is generated as `--orderak-type-<role>-size`, `-line-height`, `-weight`
+and `-tracking`. The admin keeps one ready-made class, `.ork-label-small`; every
+other role is applied from its four properties. One role per element: never mix
+one role's size with another's weight.
 
 **Two system-level rules that make Cairo work**, rather than changing the font:
 
 - **Tabular figures** on every number in a column, a total or a counted pair —
-  `.ork-numeric`, or `.ork-numeric-pair` when it must also stay LTR inside
-  Arabic (`14 / 20` reorders otherwise). Cairo's lining figures are
-  proportional and shift column to column without this.
+  `.ork-numeric`. A pair that must also stay LTR inside Arabic (`14 / 20`
+  reorders otherwise) adds `direction: ltr; unicode-bidi: isolate` on its own
+  element. Cairo's lining figures are proportional and shift column to column
+  without this.
 - **12px floor for Latin text** a user must read. `labelSmall` (11px) is fine in
   Arabic and marginal in Latin; use it for glanceable chips only.
 
@@ -159,15 +164,21 @@ Short and unremarkable: a seller is working, not being entertained. 150ms for
 hover and colour, 180ms for the sidebar slide, 200ms for switches and drawers.
 M3 standard easing curves. Nothing bounces, nothing springs, nothing has an
 entrance animation. One keyframe animation exists in the product — the spinner.
-`prefers-reduced-motion` zeroes every duration token.
+`prefers-reduced-motion` zeroes the five interaction durations (instant, short,
+medium, long, extra-long) and rewrites the ready-made fast/nav/drawer transitions
+to `0ms linear` and the state transition to `opacity 0ms cubic-bezier(.2,0,0,1)`,
+keeping each property list. The spinner keeps its own cadence: the normal spinner
+duration stays `900ms`, the reduced spinner duration is `1600ms`, and the
+universal safety floor stays `0.01ms`.
 
 ## Interactive states
 
 Material 3 **state layers**: a translucent overlay of the content colour over
 the container, where the opacity carries the state. Hover 8%, focus 10%,
 pressed 10%, dragged 16%, selected 12%. One set of numbers covers every
-component, so nothing invents its own hover colour. `.ork-interactive` applies
-them to any element.
+component, so nothing invents its own hover colour. They are generated as
+`--orderak-state-hover`, `-focus`, `-pressed`, `-dragged` and `-selected`; a
+component reads them rather than typing its own opacity.
 
 - **Focus is always visible** — a 3px ring at 2px offset, applied globally.
   Never `outline: none`. This is the one rule with no exceptions.
@@ -185,8 +196,9 @@ Three regimes that do not share a grid, because they do not share a device.
 | Storefront (buyer) | one 520px column, centred, 16px padding. Never widen it. |
 | Admin (staff) | 268px rail + fluid content capped at 1560px; breakpoints 1240 / 860 / 600 |
 
-Ready-made classes: `.ork-page`, `.ork-grid-metric` (4 → 2 → 1 up),
-`.ork-grid-panel` (2 → 1 up).
+There are no ready-made page or grid classes. The admin's fixed measures are
+generated (`--orderak-sidebar-width`, `--orderak-topbar-height`), and each page
+lays out its own grid with them.
 
 Two measurements repeat often enough on the phone to be named rather than typed.
 `OrderakLayout.contentMaxWidth` (560dp) is the reading measure the auth and
@@ -237,7 +249,7 @@ Egyptian colloquial.
 
 - **No hard-coded direction.** Logical properties only; every layout mirrors.
 - Directional icons auto-mirror; brand marks and media controls do not.
-- Force LTR on numeric runs (`.ork-numeric-pair`).
+- Force LTR on numeric runs (`direction: ltr; unicode-bidi: isolate`).
 - Design for French expansion — it runs ~20% longer than English.
 
 ## Accessibility
@@ -263,3 +275,40 @@ Run this against any screen before calling it done.
 - Layout mirrors, and numeric runs are LTR-isolated.
 - Motion uses a duration token and survives reduced-motion.
 - Empty, loading and error states exist, and each says what to do next.
+
+## B2 change report — computed web custom properties
+
+Schema 3 moves the remaining hand-kept colour-bearing properties onto generated
+roles. Every value below is the computed value (var()/color-mix() resolved
+through the generated role properties); properties not listed are unchanged.
+Retired literal colours (`#1E3A8A`-family navy, `#F0F3FA`, `#B8C0D4`, `#242B2C`,
+`#6B7A7C`, `rgba(20,20,31,…)`, `rgba(13,21,20,…)`, `rgba(0,0,0,.067)`) are gone.
+
+Before B2 the dark media scope redeclared none of these properties, so its old
+computed values are the light `:root` literals. `.orderak-dark` redeclared only
+the ring colour, the field ring, the hover surface and the hover border; it
+inherited everything else, including `--orderak-focus-ring` and
+`--orderak-hover-tint`, as already resolved on `:root`. That is why the rail's
+old focus ring was the light navy one even though the rail declared its own ring
+colour.
+
+| Property | Light `:root` old → new | Dark media old → new | `.orderak-dark` old → new |
+| --- | --- | --- | --- |
+| `--orderak-focus-ring-color` | `rgba(30,58,138,.22)` → primary #014D4E @22% | `rgba(30,58,138,.22)` → primary #95D1D2 @22% | `rgba(149,209,210,.34)` → primary #95D1D2 @34% |
+| `--orderak-focus-ring` | `3px solid rgba(30,58,138,.22)` → `3px solid` primary #014D4E @22% | `3px solid rgba(30,58,138,.22)` → `3px solid` primary #95D1D2 @22% | `3px solid rgba(30,58,138,.22)` (inherited) → `3px solid` primary #95D1D2 @34% |
+| `--orderak-focus-field-ring` | `0 0 0 3px rgba(30,58,138,.12)` → `0 0 0 3px` primary #014D4E @12% | `0 0 0 3px rgba(30,58,138,.12)` → `0 0 0 3px` primary #95D1D2 @12% | `0 0 0 3px rgba(149,209,210,.18)` → `0 0 0 3px` primary #95D1D2 @18% |
+| `--orderak-hover-surface` | `#F0F3FA` → surfaceContainerLow #EDF5F6 | `#F0F3FA` → surfaceContainerHigh #242B2C | `#242B2C` → surfaceContainerHigh #242B2C |
+| `--orderak-hover-border` | `#B8C0D4` → outlineVariant #BAC9CB | `#B8C0D4` → outline #849495 | `#6B7A7C` → outline #849495 |
+| `--orderak-hover-tint` | surfaceContainer #E7EFF0 (unchanged) | surfaceContainer #192122 (unchanged) | light surfaceContainer #E7EFF0 (inherited) → dark surfaceContainer #192122 |
+| `--orderak-shadow-card` | `0 5px 18px rgba(20,20,31,.04)` → `0 5px 18px` shadow #000000 @4% | `0 5px 18px rgba(20,20,31,.04)` → `0 5px 18px` shadow #000000 @4% | `0 5px 18px rgba(20,20,31,.04)` (inherited) → `0 5px 18px` shadow #000000 @4% |
+| `--orderak-shadow-raised` | `0 5px 14px rgba(20,20,31,.08)` → `0 5px 14px` shadow #000000 @8% | `0 5px 14px rgba(20,20,31,.08)` → `0 5px 14px` shadow #000000 @8% | `0 5px 14px rgba(20,20,31,.08)` (inherited) → `0 5px 14px` shadow #000000 @8% |
+| `--orderak-shadow-storefront` | `0 1px 4px rgba(0,0,0,.067)` → `0 1px 4px` shadow #000000 @6.7% | `0 1px 4px rgba(0,0,0,.067)` → `0 1px 4px` shadow #000000 @6.7% | `0 1px 4px rgba(0,0,0,.067)` (inherited) → `0 1px 4px` shadow #000000 @6.7% |
+| `--orderak-shadow-modal` | `0 16px 40px rgba(13,21,20,.08)` → `0 16px 40px` shadow #000000 @8% | `0 16px 40px rgba(13,21,20,.08)` → `0 16px 40px` shadow #000000 @8% | `0 16px 40px rgba(13,21,20,.08)` (inherited) → `0 16px 40px` shadow #000000 @8% |
+| `--orderak-shadow-overlay` | `0 30px 80px rgba(20,20,31,.14)` → `0 30px 80px` shadow #000000 @14% | `0 30px 80px rgba(20,20,31,.14)` → `0 30px 80px` shadow #000000 @14% | `0 30px 80px rgba(20,20,31,.14)` (inherited) → `0 30px 80px` shadow #000000 @14% |
+
+Geometry, alpha, layout sizes, durations, easings, motion, state/disabled
+opacities, the numeric helper, the pill shape and the spinner sizes are
+unchanged; they are now emitted by `designSystemCss()` instead of a hand-kept
+stylesheet. The high-contrast scopes additionally redeclare the mode-dependent
+hover roles, so `:root[data-orderak-theme="dark"][data-orderak-contrast="…"]` keeps
+the dark mapping on a light page.

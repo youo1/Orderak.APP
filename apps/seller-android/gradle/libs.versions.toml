@@ -26,7 +26,6 @@ hiltWork = "1.4.0"
 coil = "3.6.0"
 mlkitText = "16.0.1"
 libphonenumber = "9.0.38"
-osmdroid = "6.1.20"
 billing = "9.1.0"
 firebaseBom = "34.18.0"
 firebaseCrashlyticsGradle = "3.0.8"
@@ -77,7 +76,6 @@ androidx-hilt-work = { group = "androidx.hilt", name = "hilt-work", version.ref 
 androidx-hilt-compiler = { group = "androidx.hilt", name = "hilt-compiler", version.ref = "hiltWork" }
 mlkit-text = { group = "com.google.mlkit", name = "text-recognition", version.ref = "mlkitText" }
 libphonenumber = { group = "com.googlecode.libphonenumber", name = "libphonenumber", version.ref = "libphonenumber" }
-osmdroid = { group = "org.osmdroid", name = "osmdroid-android", version.ref = "osmdroid" }
 billing-ktx = { group = "com.android.billingclient", name = "billing", version.ref = "billing" }
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }

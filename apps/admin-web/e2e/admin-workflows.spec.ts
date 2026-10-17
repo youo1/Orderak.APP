@@ -276,7 +276,7 @@ test('theme manager previews and applies an immutable generated checkpoint', asy
       activeRevisionId: 1,
       active,
       defaults: snapshot.source,
-      approvedFonts: ['cairo', 'tajawal', 'noto-arabic'],
+      approvedFonts: ['cairo'],
       capabilities: { generatorVersion: snapshot.generatorVersion, maxOverrides: 128, maxBodyBytes: 65_536 },
       generatorUpgradePreview: null,
     });
@@ -323,7 +323,7 @@ test('revision history groups current, saved, and recent checkpoints with manage
       activeRevisionId: active.id,
       active,
       defaults: snapshot.source,
-      approvedFonts: ['cairo', 'tajawal', 'noto-arabic'],
+      approvedFonts: ['cairo'],
       capabilities: { generatorVersion: snapshot.generatorVersion, maxOverrides: 128, maxBodyBytes: 65_536 },
       generatorUpgradePreview: null,
     });

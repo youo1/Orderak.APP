@@ -1,0 +1,24 @@
+/* orderak-admin.css
+ *
+ * The admin panel's live rules that are not part of the generated token
+ * snapshot. Every value is read with var() from the generated bundle
+ * (orderak-tokens.css) or the live /theme.css; this file declares no custom
+ * properties and no hand-written token values.
+ */
+
+.ork-numeric{font-variant-numeric:var(--orderak-numeric-tabular);font-feature-settings:"tnum" 1,"lnum" 1}
+
+.ork-label-small{font:var(--orderak-type-label-small-weight) var(--orderak-type-label-small-size)/var(--orderak-type-label-small-line-height) var(--orderak-font-family);letter-spacing:var(--orderak-type-label-small-tracking)}
+
+@keyframes ork-spin{to{transform:rotate(360deg)}}
+.ork-spinner{width:var(--orderak-spinner-size);height:var(--orderak-spinner-size);border:var(--orderak-focus-ring-width) solid var(--md-sys-color-surface-variant);border-top-color:var(--md-sys-color-primary);border-radius:50%;animation:ork-spin var(--orderak-duration-spinner) var(--orderak-easing-linear) infinite}
+
+/* Reduced motion is honoured, not approximated; the spinner keeps turning at
+   its own slower cadence while everything else falls to the safety floor. */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:var(--orderak-duration-safety-floor) !important;animation-iteration-count:1 !important;transition-duration:var(--orderak-duration-safety-floor) !important;scroll-behavior:auto !important}
+  .ork-spinner{animation-duration:var(--orderak-duration-spinner-reduced) !important;animation-iteration-count:infinite !important}
+}
+
+/* Focus is never removed. This is the one rule with no exceptions. */
+:where(a,button,input,select,textarea,[tabindex]):focus-visible{outline:var(--orderak-focus-ring);outline-offset:var(--orderak-focus-ring-offset)}

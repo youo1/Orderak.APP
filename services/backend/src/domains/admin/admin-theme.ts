@@ -109,7 +109,7 @@ th.get(TB, async (c) => {
 			activeRevisionId: active.id,
 			active: publicRevision(active),
 			defaults: DEFAULT_DESIGN_SYSTEM_SOURCE,
-			approvedFonts: ["cairo", "tajawal", "noto-arabic"],
+			approvedFonts: ["cairo"],
 			capabilities: {
 				schemaVersion: DESIGN_SYSTEM_SCHEMA_VERSION,
 				generatorVersion: DESIGN_SYSTEM_GENERATOR_VERSION,
@@ -414,7 +414,7 @@ export async function publicDesignSystemResponse(request: Request, env: Env, sit
 	};
 	const body = {
 		ok: true,
-		schemaVersion: DESIGN_SYSTEM_SCHEMA_VERSION,
+		schemaVersion: revision.schemaVersion,
 		version: revision.contentHash,
 		revisionId: revision.id,
 		generatorVersion: revision.generatorVersion,

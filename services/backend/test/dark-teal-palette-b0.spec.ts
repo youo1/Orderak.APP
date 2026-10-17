@@ -6,6 +6,8 @@ import {
 	legacyProjection,
 } from "../src/domains/design/design-system";
 import { DEFAULT_THEME } from "../src/domains/design/theme";
+import defaultFixture from "../../../design/design-system.default.json";
+import schemaV2Fixture from "./fixtures/design-system.schema-v2.json";
 
 // Plan item B0 / owner decision D-11: the Dark Teal palette's secondary,
 // tertiary and commerce seeds, and the legacy accent derived from them.
@@ -55,9 +57,11 @@ describe("Dark Teal palette defaults (B0 / D-11)", () => {
 		});
 	});
 
-	it("generates the expected snapshot: hash prefix, 264 passing contrast pairs, accent = light secondary", async () => {
+	it("generates the expected snapshot: schema-3 hash, 264 passing contrast pairs, accent = light secondary", async () => {
 		const snapshot = await generateDesignSystem(DEFAULT_DESIGN_SYSTEM_SOURCE);
-		expect(snapshot.contentHash.startsWith("6b95438c3fa8a37a")).toBe(true);
+		expect(snapshot.contentHash).toBe(defaultFixture.snapshot.contentHash);
+		expect(schemaV2Fixture.snapshot.schemaVersion).toBe(2);
+		expect(schemaV2Fixture.snapshot.contentHash.startsWith("6b95438c3fa8a37a")).toBe(true);
 		expect(snapshot.validation.valid).toBe(true);
 		expect(snapshot.validation.errors).toEqual([]);
 		expect(snapshot.validation.contrast).toHaveLength(264);

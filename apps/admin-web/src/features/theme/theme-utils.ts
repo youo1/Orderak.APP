@@ -4,6 +4,22 @@ export function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+/**
+ * A copy of a stored source that this editor can publish. A revision stored before decision D-07 may name a
+ * retired family (`tajawal`, `noto-arabic`). The backend now accepts only Cairo and the family selector is gone,
+ * so the editor would otherwise load a source it can never save, with Reset as the only way out.
+ */
+export function editableSource<T extends { typography: { family: string } }>(source: T): T {
+  const copy = clone(source);
+  copy.typography = { ...copy.typography, family: 'cairo' };
+  return copy;
+}
+
+/** True when a stored source names a family other than Cairo, retired by decision D-07. */
+export function namesRetiredFamily(source: { typography: { family: string } }): boolean {
+  return source.typography.family !== 'cairo';
+}
+
 export function recoveryKey(adminId: number, revisionId: number) {
   return `orderak:theme-recovery:${adminId}:${revisionId}`;
 }

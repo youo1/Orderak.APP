@@ -30,7 +30,7 @@ the signal repeats within five minutes.
 3. Confirm `status`, schema/generator versions, JSON parseability, validation
    summary, content hash, and payload size.
 4. Request `/api/v1/theme` and `/api/theme.css` without cache and verify matching
-   hashes and a complete v2 payload.
+   hashes and a complete schema-2 or schema-3 payload.
 5. Check the latest `design_system.published`, `.revision_activated`,
    `.revision_named`, `.revision_deleted`, `.publish_conflict`, and
    `.fallback_activated` audit evidence.

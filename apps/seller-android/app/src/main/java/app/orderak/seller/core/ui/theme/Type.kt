@@ -15,9 +15,9 @@ import app.orderak.seller.R
  * certificate resource below (standard Android boilerplate, add once).
  *
  * Why one family for both scripts: Roboto (Android's system default) has no
- * Arabic glyphs, so Arabic text silently falls back to Noto Sans Arabic under
- * the hood — different weight/x-height than Roboto, so English and Arabic UI
- * end up visually mismatched. Cairo is designed for both scripts together,
+ * Arabic glyphs, so Arabic text silently falls back to a system Arabic font
+ * under the hood — different weight/x-height than Roboto, so English and Arabic
+ * UI end up visually mismatched. Cairo is designed for both scripts together,
  * so headings, buttons, and body text look like one typeface regardless of
  * which language is showing.
  *
@@ -32,8 +32,6 @@ private val googleFontProvider = GoogleFont.Provider(
 )
 
 private val cairoFont = GoogleFont("Cairo")
-private val tajawalFont = GoogleFont("Tajawal")
-private val notoArabicFont = GoogleFont("Noto Sans Arabic")
 
 val CairoFontFamily = FontFamily(
     GoogleFontRef(googleFont = cairoFont, fontProvider = googleFontProvider, weight = FontWeight.Normal),
@@ -160,9 +158,11 @@ val OrderakTypography = Typography(
     ),
 )
 
+// D-07: Cairo is the only approved family. A stored revision naming a retired
+// family still resolves to Cairo here; nothing renders differently because the
+// generated FONT_FAMILY has been cairo since the decision.
 private fun generatedFontFamily(id: String): FontFamily = when (id) {
-    "tajawal" -> TajawalFontFamily
-    "noto-arabic" -> NotoArabicFontFamily
+    "cairo" -> CairoFontFamily
     else -> CairoFontFamily
 }
 
@@ -213,15 +213,3 @@ fun Typography.withGenerated(): Typography {
         labelSmall = role("labelSmall", labelSmall),
     )
 }
-
-private val TajawalFontFamily = FontFamily(
-    GoogleFontRef(googleFont = tajawalFont, fontProvider = googleFontProvider, weight = FontWeight.Normal),
-    GoogleFontRef(googleFont = tajawalFont, fontProvider = googleFontProvider, weight = FontWeight.Medium),
-    GoogleFontRef(googleFont = tajawalFont, fontProvider = googleFontProvider, weight = FontWeight.Bold),
-)
-
-private val NotoArabicFontFamily = FontFamily(
-    GoogleFontRef(googleFont = notoArabicFont, fontProvider = googleFontProvider, weight = FontWeight.Normal),
-    GoogleFontRef(googleFont = notoArabicFont, fontProvider = googleFontProvider, weight = FontWeight.Medium),
-    GoogleFontRef(googleFont = notoArabicFont, fontProvider = googleFontProvider, weight = FontWeight.Bold),
-)

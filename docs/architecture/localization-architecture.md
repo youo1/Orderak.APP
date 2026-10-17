@@ -160,6 +160,10 @@ recolored; approved baseline updates must record the active fallback hash. The
 default locale, supported locale set, per-app language API, generated
 LocaleConfig, and language-split policy remain unchanged.
 
+On 2026-09-28 owner decision D-07 retired Tajawal and Noto Sans Arabic, so the
+generated design-system screenshot matrix now covers Cairo only; no locale,
+language bundle, or screenshot baseline contract changes.
+
 ## Intentional change procedure
 
 If a new language or different fallback is intentionally required:
