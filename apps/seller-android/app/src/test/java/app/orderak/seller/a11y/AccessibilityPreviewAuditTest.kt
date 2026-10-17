@@ -28,6 +28,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.reflect.getDeclaredComposableMethod
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.node.LayoutNode
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -309,15 +310,9 @@ private val KNOWN_FINDINGS: List<KnownFinding> = """
 }
 fun auditAccessibility(rule: ComposeTestRule, preview: String): List<String> {
     val diagnostics = mutableListOf<String>()
-    // The caller may pass only a preview name, so derive the active locale here
-    // (the preview harness passes an explicit "[locale]" suffix and keeps it).
-    val previewLabel = if (LOCALE_SUFFIX.containsMatchIn(preview)) {
-        preview
-    } else {
-        val tag = ApplicationProvider.getApplicationContext<Context>()
-            .resources.configuration.locales[0].toLanguageTag()
-        "$preview [$tag]"
-    }
+    // The content's locale is only visible on the audited nodes themselves, so
+    // each diagnostic reads it from the node it is about. The preview harness
+    // already passes an explicit "[locale]" suffix and keeps that label as-is.
     val density = rule.density.density
     val minimumTouchPx = 48f * density
     var skippedDisabled = 0
@@ -340,8 +335,8 @@ fun auditAccessibility(rule: ComposeTestRule, preview: String): List<String> {
                     val texts = node.config.getOrNull(SemanticsProperties.Text).orEmpty()
                     val labelled = (descriptions + texts.map { it.text }).any { it.isNotBlank() }
                     if (!labelled) {
-                        diagnostics += "$previewLabel Label: actionable node at ${node.boundsInRoot} " +
-                            "has no ContentDescription or Text"
+                        diagnostics += "${previewLabel(node, preview)} Label: actionable node at " +
+                            "${node.boundsInRoot} has no ContentDescription or Text"
                     }
                 }
             }
@@ -355,7 +350,7 @@ fun auditAccessibility(rule: ComposeTestRule, preview: String): List<String> {
                 continue
             }
             if (touch.width < minimumTouchPx - 0.5f || touch.height < minimumTouchPx - 0.5f) {
-                diagnostics += "$previewLabel Target: touch target " +
+                diagnostics += "${previewLabel(node, preview)} Target: touch target " +
                     "${touch.width / density}x${touch.height / density}dp at $touch is smaller than 48dp"
             }
         }
@@ -372,7 +367,8 @@ fun auditAccessibility(rule: ComposeTestRule, preview: String): List<String> {
                     !isAncestor(a, b) &&
                     !isAncestor(b, a)
                 ) {
-                    diagnostics += "$previewLabel Target: ${a.touchBoundsInRoot} overlaps ${b.touchBoundsInRoot}"
+                    diagnostics += "${previewLabel(a, preview)} Target: " +
+                        "${a.touchBoundsInRoot} overlaps ${b.touchBoundsInRoot}"
                 }
             }
         }
@@ -398,7 +394,7 @@ fun auditAccessibility(rule: ComposeTestRule, preview: String): List<String> {
                     val right = ceil(bounds.right).toInt().coerceAtMost(bitmap.width)
                     val bottom = ceil(bounds.bottom).toInt().coerceAtMost(bitmap.height)
                     if (right <= left || bottom <= top) {
-                        diagnostics += "$previewLabel Contrast: text \"$content\" at $bounds " +
+                        diagnostics += "${previewLabel(node, preview)} Contrast: text \"$content\" at $bounds " +
                             "is outside the captured image"
                     } else {
                         val ratio = try {
@@ -407,17 +403,18 @@ fun auditAccessibility(rule: ComposeTestRule, preview: String): List<String> {
                                 ?: throw IllegalStateException("ATF returned no contrast ratio")
                         } catch (error: Throwable) {
                             throw AssertionError(
-                                "$previewLabel Contrast: failed to measure text \"$content\" at $bounds",
+                                "${previewLabel(node, preview)} Contrast: failed to measure " +
+                                    "text \"$content\" at $bounds",
                                 error,
                             )
                         }
                         val threshold = if (isLargeText(node, density)) 3.0 else 4.5
                         if (ratio <= 1.0) {
-                            diagnostics += "$previewLabel Contrast: text \"$content\" at $bounds " +
+                            diagnostics += "${previewLabel(node, preview)} Contrast: text \"$content\" at $bounds " +
                                 "is not measurable (single-colour crop)"
                         } else if (ratio < threshold) {
-                            diagnostics += "$previewLabel Contrast: text \"$content\" at $bounds measured " +
-                                "${formatRatio(ratio)}:1, below ${formatRatio(threshold)}:1"
+                            diagnostics += "${previewLabel(node, preview)} Contrast: text \"$content\" at $bounds " +
+                                "measured ${formatRatio(ratio)}:1, below ${formatRatio(threshold)}:1"
                         }
                     }
                 }
@@ -427,10 +424,19 @@ fun auditAccessibility(rule: ComposeTestRule, preview: String): List<String> {
         visitUnmerged(unmergedNodes[index])
     }
     println(
-        "auditAccessibility[$previewLabel] diagnostics=${diagnostics.size} " +
+        "auditAccessibility[$preview] diagnostics=${diagnostics.size} " +
             "skippedDisabled=$skippedDisabled skippedEmptyTargets=$skippedEmptyTargets",
     )
     return diagnostics
+}
+private fun previewLabel(node: SemanticsNode, preview: String): String {
+    if (LOCALE_SUFFIX.containsMatchIn(preview)) return preview
+    val layoutNode = node.layoutInfo as? LayoutNode
+    val configuration = layoutNode?.compositionLocalMap?.get(LocalConfiguration)
+    val tag = configuration?.locales?.get(0)?.toLanguageTag()
+        ?: ApplicationProvider.getApplicationContext<Context>()
+            .resources.configuration.locales[0].toLanguageTag()
+    return "$preview [$tag]"
 }
 private fun isAncestor(ancestor: SemanticsNode, node: SemanticsNode): Boolean {
     var parent = node.parent
