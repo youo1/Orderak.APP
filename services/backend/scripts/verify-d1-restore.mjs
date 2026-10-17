@@ -30,6 +30,10 @@
 // between any two backups regardless of --max-prune-drop — their count is
 // "held or not," not a population retention prunes a slice of.
 //
+// A table a migration retired on purpose (renamed to zz_retired_<name> and
+// recorded in retired_tables; see retiredTables() below) is not "missing" when
+// its renamed copy restored with at least the rows the previous backup had.
+//
 // Exit code 0 means the export restored cleanly; non-zero means the backup is
 // not recoverable and the run should fail loudly.
 // ============================================================
@@ -95,6 +99,36 @@ function prunedTables() {
  * that moves with a retention window the way prunedTables() tracks.
  */
 const ALWAYS_MAY_EMPTY_TABLES = new Set(["operational_leases"]);
+
+/**
+ * Tables a migration retired on purpose, read from the restored export itself.
+ *
+ * 060_retire_dead_tables.sql renamed `items` and `content_pages` to
+ * `zz_retired_items` and `zz_retired_content_pages`, and recorded each old name
+ * in `retired_tables` so a later drop has its date and reason. From the first
+ * production backup after that migration, every nightly drill compared against
+ * the last manifest that still listed the old names and failed with
+ *
+ *   FAIL: table "items" was in the previous backup and is missing now.
+ *
+ * Nothing was lost: the rows were in the renamed tables of the same export. But
+ * the guard could not tell a recorded rename from a vanished table, so from
+ * 2026-09-27 to 2026-10-17 production had no verified backup at all, and the
+ * production deploy (which requires one from the last 24 hours) was blocked.
+ *
+ * Read from the restored database rather than from the migration files, so the
+ * record and the rows it vouches for come from the same backup: a `retired_tables`
+ * row that names a table whose `zz_retired_` copy is gone, or that holds fewer
+ * rows than the previous backup, still fails below. A table missing with no record
+ * fails exactly as before. The `zz_retired_` prefix is 060's convention; a
+ * migration that later drops a retired table must record that too, or the drill
+ * will fail on it, which is the right default.
+ */
+function retiredTables(db, tables) {
+	if (!tables.includes("retired_tables")) return new Map();
+	const rows = db.prepare("SELECT table_name, retired_at, migration FROM retired_tables").all();
+	return new Map(rows.map((row) => [row.table_name, row]));
+}
 
 function parseArgs(argv) {
 	const [file, ...rest] = argv;
@@ -230,13 +264,29 @@ try {
 
 	if (previous) {
 		const pruned = prunedTables();
+		const retired = retiredTables(db, tables);
 		for (const [table, before] of Object.entries(previous.tables ?? {})) {
 			const now = counts[table];
 			if (now === undefined) {
-				// A table vanishing is always wrong, pruned or not — retention
-				// deletes rows, never the table.
-				console.error(`FAIL: table "${table}" was in the previous backup and is missing now.`);
-				failed = true;
+				const record = retired.get(table);
+				const renamed = `zz_retired_${table}`;
+				const kept = counts[renamed];
+				if (!record) {
+					// A table vanishing is always wrong, pruned or not — retention
+					// deletes rows, never the table.
+					console.error(`FAIL: table "${table}" was in the previous backup and is missing now.`);
+					failed = true;
+				} else if (kept === undefined || kept < before) {
+					console.error(
+						`FAIL: table "${table}" was retired by ${record.migration}, but "${renamed}" ` +
+							(kept === undefined ? "is missing." : `holds ${kept} rows, fewer than the ${before} the previous backup had.`),
+					);
+					failed = true;
+				} else {
+					console.log(
+						`  note: "${table}" was retired by ${record.migration} on ${record.retired_at}; its rows are in "${renamed}" (${before} -> ${kept}).`,
+					);
+				}
 			} else if (options.compareExact) {
 				// Same bytes, same counts. Nothing legitimate moves between an
 				// export and a drill of that same export, so pruning earns no

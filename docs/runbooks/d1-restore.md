@@ -118,7 +118,15 @@ node scripts/verify-d1-restore.mjs ../../restore.sql --compare ../../restore.man
 ```
 
 Stop if this fails. A backup that does not replay is not a recovery option, and
-you still have Time Travel. Delete `restore.sql` once the drill or the actual
+you still have Time Travel.
+
+A table that is missing compared with the older manifest fails the drill,
+unless a migration retired it on purpose: renamed it to `zz_retired_<name>` and
+recorded the old name in `retired_tables` (as `060_retire_dead_tables.sql` did
+for `items` and `content_pages`). Then the drill prints a note and checks that
+the renamed table holds at least the rows the older manifest recorded. A
+retirement with no `retired_tables` row, or whose renamed copy lost rows, still
+fails. Delete `restore.sql` once the drill or the actual
 restore is done — it is plaintext containing seller phone numbers.
 
 ## 3. Restore into a NEW database
