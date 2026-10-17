@@ -422,5 +422,6 @@ td, .metric-card strong, .attention em, .snapshot dd, .pagination { font-variant
   .auth-card { padding: 28px 22px; }
   .message { width: 92%; }
   .control-row { grid-template-columns: 42px 1fr; }
-  .control-row > .status { grid-column: 2; }  .one-time-secret { grid-template-columns: 1fr; }
+  .control-row > .status { grid-column: 2; }
+  .one-time-secret { grid-template-columns: 1fr; }
 }
