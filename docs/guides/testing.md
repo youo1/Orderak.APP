@@ -144,9 +144,11 @@ violation cannot leave the unit-test task green. A finding that cannot be fixed
 without new reference PNGs, or that requires a phase-R redesign, is listed in
 `KNOWN_FINDINGS` in the test and in the blocked-findings table below with its
 preview, rule, finding, and planned minimal fix instead of weakening a rule or
-skipping a preview. A listed finding that no longer occurs also fails its case,
-so the list always matches what the audit finds and a stale entry cannot hide a
-later regression on the same node.
+skipping a preview. Each entry absorbs exactly one diagnostic, the most specific
+matching entry first, so an entry never covers a second finding of its kind: a
+new unlabelled control or another out-of-frame text in a listed preview fails
+like any other. A listed finding that no longer occurs also fails its case, so
+the list always matches what the audit finds, in number as well as in kind.
 
 The three isolated proofs in `AccessibilityAuditRulesAcceptanceTest` (an
 unlabelled `IconButton`, two adjacent 20dp clickables, and grey text on white
@@ -183,37 +185,37 @@ control is not measured, because WCAG 1.4.3 exempts inactive components.
 | `OrdersScreenshotTestKt.ordersErrorLight` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
 | `OrdersScreenshotTestKt.ordersFilteredToNone` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
 | `OrdersScreenshotTestKt.ordersFilteredUnpaid` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
-| `AccountScreenshotTestKt.accountContentDark` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `AccountScreenshotTestKt.accountContentLight` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `AccountScreenshotTestKt.accountFreePlan` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `AccountScreenshotTestKt.accountFreePlanUpgradable` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `AccountScreenshotTestKt.accountLinkPending` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `AccountScreenshotTestKt.accountLoadingDark` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `AccountScreenshotTestKt.accountLoadingLight` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `AuthScreenshotTestKt.authCountryPicker` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `AuthScreenshotTestKt.authCountryPickerDark` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `AuthScreenshotTestKt.authCountryPickerSearch` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `BillingScreenshotTestKt.plansContentDark` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `BillingScreenshotTestKt.plansContentLight` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `BillingScreenshotTestKt.plansPurchaseOpen` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `OrdersScreenshotTestKt.ordersBothGroupsDark` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `OrdersScreenshotTestKt.ordersBothGroupsLight` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `OrdersScreenshotTestKt.ordersContentDark` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `OrdersScreenshotTestKt.ordersContentLight` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `OrdersScreenshotTestKt.ordersErrorDark` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `OrdersScreenshotTestKt.ordersErrorLight` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `OrdersScreenshotTestKt.ordersFilteredToNone` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `OrdersScreenshotTestKt.ordersFilteredUnpaid` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `StoreGroupScreenshotTestKt.storeInfoContentDark` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `StoreGroupScreenshotTestKt.storeInfoContentLight` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `StoreGroupScreenshotTestKt.storeInfoIdentityLight` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `StoreGroupScreenshotTestKt.storeInfoSaving` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `StoreGroupScreenshotTestKt.storeInfoSlugTaken` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `ShopSetupScreenshotTestKt.setupAccountEmpty` | Label | `has no ContentDescription or Text` | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
-| `ShopSetupScreenshotTestKt.setupAccountLight` | Label | `has no ContentDescription or Text` | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
-| `ShopSetupScreenshotTestKt.setupAccountDark` | Label | `has no ContentDescription or Text` | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
-| `ShopSetupScreenshotTestKt.setupAccountInvalidEmail` | Label | `has no ContentDescription or Text` | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
-| `ShopSetupScreenshotTestKt.setupAccountSaving` | Label | `has no ContentDescription or Text` | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
+| `AccountScreenshotTestKt.accountContentDark` | Contrast | out of frame, 6: "إجراءات الحساب", "احفظ", "تسجيل خروج", "حالة طلب الحذف", "طلب حذف الحساب", "لغة التطبيق" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `AccountScreenshotTestKt.accountContentLight` | Contrast | out of frame, 6: "إجراءات الحساب", "احفظ", "تسجيل خروج", "حالة طلب الحذف", "طلب حذف الحساب", "لغة التطبيق" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `AccountScreenshotTestKt.accountFreePlan` | Contrast | out of frame, 7: "إجراءات الحساب", "احفظ", "تسجيل خروج", "حالة طلب الحذف", "رقم فودافون كاش", "طلب حذف الحساب", "لغة التطبيق" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `AccountScreenshotTestKt.accountFreePlanUpgradable` | Contrast | out of frame, 7: "إجراءات الحساب", "احفظ", "تسجيل خروج", "حالة طلب الحذف", "رقم فودافون كاش", "طلب حذف الحساب", "لغة التطبيق" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `AccountScreenshotTestKt.accountLinkPending` | Contrast | out of frame, 7: "إجراءات الحساب", "احفظ", "تسجيل خروج", "حالة طلب الحذف", "رقم فودافون كاش", "طلب حذف الحساب", "لغة التطبيق" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `AccountScreenshotTestKt.accountLoadingDark` | Contrast | out of frame, 6: "إجراءات الحساب", "احفظ", "تسجيل خروج", "حالة طلب الحذف", "طلب حذف الحساب", "لغة التطبيق" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `AccountScreenshotTestKt.accountLoadingLight` | Contrast | out of frame, 6: "إجراءات الحساب", "احفظ", "تسجيل خروج", "حالة طلب الحذف", "طلب حذف الحساب", "لغة التطبيق" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `AuthScreenshotTestKt.authCountryPicker` | Contrast | out of frame, 2: "+372", "🇪🇪  إستونيا" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `AuthScreenshotTestKt.authCountryPickerDark` | Contrast | out of frame, 2: "+372", "🇪🇪  إستونيا" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `AuthScreenshotTestKt.authCountryPickerSearch` | Contrast | out of frame, 2: "+213", "🇩🇿  الجزائر" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `BillingScreenshotTestKt.plansContentDark` | Contrast | out of frame, 4: "برو", "غير محدود" ×2, "متاح" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `BillingScreenshotTestKt.plansContentLight` | Contrast | out of frame, 4: "برو", "غير محدود" ×2, "متاح" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `BillingScreenshotTestKt.plansPurchaseOpen` | Contrast | out of frame, 4: "برو", "غير محدود" ×2, "متاح" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `OrdersScreenshotTestKt.ordersBothGroupsDark` | Contrast | out of frame, 1: "جديد" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `OrdersScreenshotTestKt.ordersBothGroupsLight` | Contrast | out of frame, 1: "جديد" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `OrdersScreenshotTestKt.ordersContentDark` | Contrast | out of frame, 1: "جديد" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `OrdersScreenshotTestKt.ordersContentLight` | Contrast | out of frame, 1: "جديد" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `OrdersScreenshotTestKt.ordersErrorDark` | Contrast | out of frame, 1: "جديد" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `OrdersScreenshotTestKt.ordersErrorLight` | Contrast | out of frame, 1: "جديد" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `OrdersScreenshotTestKt.ordersFilteredToNone` | Contrast | out of frame, 1: "جديد" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `OrdersScreenshotTestKt.ordersFilteredUnpaid` | Contrast | out of frame, 1: "جديد" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `StoreGroupScreenshotTestKt.storeInfoContentDark` | Contrast | out of frame, 4: "احفظ", "التصنيف الفرعي", "الشعار", "صورة الغلاف" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `StoreGroupScreenshotTestKt.storeInfoContentLight` | Contrast | out of frame, 4: "احفظ", "التصنيف الفرعي", "الشعار", "صورة الغلاف" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `StoreGroupScreenshotTestKt.storeInfoIdentityLight` | Contrast | out of frame, 4: "احفظ", "التصنيف الفرعي", "الشعار", "صورة الغلاف" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `StoreGroupScreenshotTestKt.storeInfoSaving` | Contrast | out of frame, 3: "التصنيف الفرعي", "الشعار", "صورة الغلاف" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `StoreGroupScreenshotTestKt.storeInfoSlugTaken` | Contrast | out of frame, 4: "احفظ", "التصنيف الفرعي", "الشعار", "صورة الغلاف" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `ShopSetupScreenshotTestKt.setupAccountDark` | Label | 2 inline links (terms, privacy) | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
+| `ShopSetupScreenshotTestKt.setupAccountEmpty` | Label | 2 inline links (terms, privacy) | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
+| `ShopSetupScreenshotTestKt.setupAccountInvalidEmail` | Label | 2 inline links (terms, privacy) | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
+| `ShopSetupScreenshotTestKt.setupAccountLight` | Label | 2 inline links (terms, privacy) | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
+| `ShopSetupScreenshotTestKt.setupAccountSaving` | Label | 2 inline links (terms, privacy) | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
 
 **Spike conclusion.** Compose accessibility checks (`enableAccessibilityChecks`,
 `tryPerformAccessibilityChecks`) and ATF's `AccessibilityHierarchyAndroid` do not
@@ -231,7 +233,7 @@ i7-14650HX, 16 GB), with a warm Gradle daemon after one warm-up build, using
 `gradlew.bat :app:testStagingDebugUnitTest --console=plain --rerun` twice per
 tree. Without the audit (b98b5aa): 7.7 s and 7.0 s. With the audit: 53.3 s and
 51.9 s. The audit adds about 45 seconds to the unit-test task, almost all of it
-rendering the 281 preview states under Robolectric with native graphics.
+rendering the 280 `@PreviewTest` cases under Robolectric with native graphics.
 
 **Phase-R and blocked findings.** A pixel-changing finding cannot be corrected
 until the supervisor supplies the exact affected reference PNG paths and each

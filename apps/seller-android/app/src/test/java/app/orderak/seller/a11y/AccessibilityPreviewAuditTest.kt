@@ -1,7 +1,8 @@
-// Retained because androidx.compose.runtime.reflect.ComposableMethod.invoke is
-// exposed only through internal Kotlin metadata; without these suppressions the
-// compiler reports the call as an invisible reference/member. Remove them only
-// if the file compiles without them.
+// Retained for two Compose internals: androidx.compose.runtime.reflect.
+// ComposableMethod.invoke, exposed only through internal Kotlin metadata, and
+// LayoutNode.compositionLocalMap, which previewLabel reads to name the locale a
+// node was composed with. Both can move on a Compose BOM upgrade; remove these
+// suppressions only if the file compiles without them.
 @file:Suppress("INVISIBLE_REFERENCE", "INVISIBLE_MEMBER")
 @file:OptIn(
     androidx.compose.runtime.InternalComposeApi::class,
@@ -136,17 +137,23 @@ class AccessibilityPreviewAuditTest(private val caseName: String) {
                 allDiagnostics += diagnostic
             }
         }
-        val unknown = allDiagnostics.filterNot { diagnostic ->
-            KNOWN_FINDINGS.any { it.matches(diagnostic) }
+        // Each entry absorbs exactly one diagnostic, the most specific matching
+        // entry first, so a listed preview cannot hide a second finding of the
+        // same kind: the list says how many of each are known, per locale run.
+        val remaining = KNOWN_FINDINGS
+            .filter { it.preview == declaration.id }
+            .sortedByDescending { it.needle.length }
+            .toMutableList()
+        val unknown = allDiagnostics.filter { diagnostic ->
+            val index = remaining.indexOfFirst { it.matches(diagnostic) }
+            if (index >= 0) remaining.removeAt(index)
+            index < 0
         }
         assertTrue(
             "Accessibility findings for ${declaration.id}:\n" + unknown.joinToString("\n"),
             unknown.isEmpty(),
         )
-        val stale = KNOWN_FINDINGS.filter { entry ->
-            entry.preview == declaration.id &&
-                allDiagnostics.none { diagnostic -> entry.matches(diagnostic) }
-        }
+        val stale = remaining
         // A stale entry would hide a regression on the same node, so the list
         // must match what the audit finds today, in both directions.
         assertTrue(
@@ -266,36 +273,105 @@ private val KNOWN_FINDINGS: List<KnownFinding> = """
         TS|OrdersScreenshotTestKt.ordersErrorLight|Target|touch target
         TS|OrdersScreenshotTestKt.ordersFilteredToNone|Target|touch target
         TS|OrdersScreenshotTestKt.ordersFilteredUnpaid|Target|touch target
-        CO|AccountScreenshotTestKt.accountContentDark|Contrast|is outside the captured image
-        CO|AccountScreenshotTestKt.accountContentLight|Contrast|is outside the captured image
-        CO|AccountScreenshotTestKt.accountFreePlan|Contrast|is outside the captured image
-        CO|AccountScreenshotTestKt.accountFreePlanUpgradable|Contrast|is outside the captured image
-        CO|AccountScreenshotTestKt.accountLinkPending|Contrast|is outside the captured image
-        CO|AccountScreenshotTestKt.accountLoadingDark|Contrast|is outside the captured image
-        CO|AccountScreenshotTestKt.accountLoadingLight|Contrast|is outside the captured image
-        CO|AuthScreenshotTestKt.authCountryPicker|Contrast|is outside the captured image
-        CO|AuthScreenshotTestKt.authCountryPickerDark|Contrast|is outside the captured image
-        CO|AuthScreenshotTestKt.authCountryPickerSearch|Contrast|is outside the captured image
-        CO|BillingScreenshotTestKt.plansContentDark|Contrast|is outside the captured image
-        CO|BillingScreenshotTestKt.plansContentLight|Contrast|is outside the captured image
-        CO|BillingScreenshotTestKt.plansPurchaseOpen|Contrast|is outside the captured image
-        CO|OrdersScreenshotTestKt.ordersBothGroupsDark|Contrast|is outside the captured image
-        CO|OrdersScreenshotTestKt.ordersBothGroupsLight|Contrast|is outside the captured image
-        CO|OrdersScreenshotTestKt.ordersContentDark|Contrast|is outside the captured image
-        CO|OrdersScreenshotTestKt.ordersContentLight|Contrast|is outside the captured image
-        CO|OrdersScreenshotTestKt.ordersErrorDark|Contrast|is outside the captured image
-        CO|OrdersScreenshotTestKt.ordersErrorLight|Contrast|is outside the captured image
-        CO|OrdersScreenshotTestKt.ordersFilteredToNone|Contrast|is outside the captured image
-        CO|OrdersScreenshotTestKt.ordersFilteredUnpaid|Contrast|is outside the captured image
-        CO|StoreGroupScreenshotTestKt.storeInfoContentDark|Contrast|is outside the captured image
-        CO|StoreGroupScreenshotTestKt.storeInfoContentLight|Contrast|is outside the captured image
-        CO|StoreGroupScreenshotTestKt.storeInfoIdentityLight|Contrast|is outside the captured image
-        CO|StoreGroupScreenshotTestKt.storeInfoSaving|Contrast|is outside the captured image
-        CO|StoreGroupScreenshotTestKt.storeInfoSlugTaken|Contrast|is outside the captured image
-        IL|ShopSetupScreenshotTestKt.setupAccountEmpty|Label|has no ContentDescription or Text
-        IL|ShopSetupScreenshotTestKt.setupAccountLight|Label|has no ContentDescription or Text
+        CO|AccountScreenshotTestKt.accountContentDark|Contrast|text "إجراءات الحساب" at
+        CO|AccountScreenshotTestKt.accountContentDark|Contrast|text "احفظ" at
+        CO|AccountScreenshotTestKt.accountContentDark|Contrast|text "تسجيل خروج" at
+        CO|AccountScreenshotTestKt.accountContentDark|Contrast|text "حالة طلب الحذف" at
+        CO|AccountScreenshotTestKt.accountContentDark|Contrast|text "طلب حذف الحساب" at
+        CO|AccountScreenshotTestKt.accountContentDark|Contrast|text "لغة التطبيق" at
+        CO|AccountScreenshotTestKt.accountContentLight|Contrast|text "إجراءات الحساب" at
+        CO|AccountScreenshotTestKt.accountContentLight|Contrast|text "احفظ" at
+        CO|AccountScreenshotTestKt.accountContentLight|Contrast|text "تسجيل خروج" at
+        CO|AccountScreenshotTestKt.accountContentLight|Contrast|text "حالة طلب الحذف" at
+        CO|AccountScreenshotTestKt.accountContentLight|Contrast|text "طلب حذف الحساب" at
+        CO|AccountScreenshotTestKt.accountContentLight|Contrast|text "لغة التطبيق" at
+        CO|AccountScreenshotTestKt.accountFreePlan|Contrast|text "إجراءات الحساب" at
+        CO|AccountScreenshotTestKt.accountFreePlan|Contrast|text "احفظ" at
+        CO|AccountScreenshotTestKt.accountFreePlan|Contrast|text "تسجيل خروج" at
+        CO|AccountScreenshotTestKt.accountFreePlan|Contrast|text "حالة طلب الحذف" at
+        CO|AccountScreenshotTestKt.accountFreePlan|Contrast|text "رقم فودافون كاش" at
+        CO|AccountScreenshotTestKt.accountFreePlan|Contrast|text "طلب حذف الحساب" at
+        CO|AccountScreenshotTestKt.accountFreePlan|Contrast|text "لغة التطبيق" at
+        CO|AccountScreenshotTestKt.accountFreePlanUpgradable|Contrast|text "إجراءات الحساب" at
+        CO|AccountScreenshotTestKt.accountFreePlanUpgradable|Contrast|text "احفظ" at
+        CO|AccountScreenshotTestKt.accountFreePlanUpgradable|Contrast|text "تسجيل خروج" at
+        CO|AccountScreenshotTestKt.accountFreePlanUpgradable|Contrast|text "حالة طلب الحذف" at
+        CO|AccountScreenshotTestKt.accountFreePlanUpgradable|Contrast|text "رقم فودافون كاش" at
+        CO|AccountScreenshotTestKt.accountFreePlanUpgradable|Contrast|text "طلب حذف الحساب" at
+        CO|AccountScreenshotTestKt.accountFreePlanUpgradable|Contrast|text "لغة التطبيق" at
+        CO|AccountScreenshotTestKt.accountLinkPending|Contrast|text "إجراءات الحساب" at
+        CO|AccountScreenshotTestKt.accountLinkPending|Contrast|text "احفظ" at
+        CO|AccountScreenshotTestKt.accountLinkPending|Contrast|text "تسجيل خروج" at
+        CO|AccountScreenshotTestKt.accountLinkPending|Contrast|text "حالة طلب الحذف" at
+        CO|AccountScreenshotTestKt.accountLinkPending|Contrast|text "رقم فودافون كاش" at
+        CO|AccountScreenshotTestKt.accountLinkPending|Contrast|text "طلب حذف الحساب" at
+        CO|AccountScreenshotTestKt.accountLinkPending|Contrast|text "لغة التطبيق" at
+        CO|AccountScreenshotTestKt.accountLoadingDark|Contrast|text "إجراءات الحساب" at
+        CO|AccountScreenshotTestKt.accountLoadingDark|Contrast|text "احفظ" at
+        CO|AccountScreenshotTestKt.accountLoadingDark|Contrast|text "تسجيل خروج" at
+        CO|AccountScreenshotTestKt.accountLoadingDark|Contrast|text "حالة طلب الحذف" at
+        CO|AccountScreenshotTestKt.accountLoadingDark|Contrast|text "طلب حذف الحساب" at
+        CO|AccountScreenshotTestKt.accountLoadingDark|Contrast|text "لغة التطبيق" at
+        CO|AccountScreenshotTestKt.accountLoadingLight|Contrast|text "إجراءات الحساب" at
+        CO|AccountScreenshotTestKt.accountLoadingLight|Contrast|text "احفظ" at
+        CO|AccountScreenshotTestKt.accountLoadingLight|Contrast|text "تسجيل خروج" at
+        CO|AccountScreenshotTestKt.accountLoadingLight|Contrast|text "حالة طلب الحذف" at
+        CO|AccountScreenshotTestKt.accountLoadingLight|Contrast|text "طلب حذف الحساب" at
+        CO|AccountScreenshotTestKt.accountLoadingLight|Contrast|text "لغة التطبيق" at
+        CO|AuthScreenshotTestKt.authCountryPicker|Contrast|text "+372" at
+        CO|AuthScreenshotTestKt.authCountryPicker|Contrast|text "🇪🇪  إستونيا" at
+        CO|AuthScreenshotTestKt.authCountryPickerDark|Contrast|text "+372" at
+        CO|AuthScreenshotTestKt.authCountryPickerDark|Contrast|text "🇪🇪  إستونيا" at
+        CO|AuthScreenshotTestKt.authCountryPickerSearch|Contrast|text "+213" at
+        CO|AuthScreenshotTestKt.authCountryPickerSearch|Contrast|text "🇩🇿  الجزائر" at
+        CO|BillingScreenshotTestKt.plansContentDark|Contrast|text "برو" at
+        CO|BillingScreenshotTestKt.plansContentDark|Contrast|text "غير محدود" at
+        CO|BillingScreenshotTestKt.plansContentDark|Contrast|text "غير محدود" at
+        CO|BillingScreenshotTestKt.plansContentDark|Contrast|text "متاح" at
+        CO|BillingScreenshotTestKt.plansContentLight|Contrast|text "برو" at
+        CO|BillingScreenshotTestKt.plansContentLight|Contrast|text "غير محدود" at
+        CO|BillingScreenshotTestKt.plansContentLight|Contrast|text "غير محدود" at
+        CO|BillingScreenshotTestKt.plansContentLight|Contrast|text "متاح" at
+        CO|BillingScreenshotTestKt.plansPurchaseOpen|Contrast|text "برو" at
+        CO|BillingScreenshotTestKt.plansPurchaseOpen|Contrast|text "غير محدود" at
+        CO|BillingScreenshotTestKt.plansPurchaseOpen|Contrast|text "غير محدود" at
+        CO|BillingScreenshotTestKt.plansPurchaseOpen|Contrast|text "متاح" at
+        CO|OrdersScreenshotTestKt.ordersBothGroupsDark|Contrast|text "جديد" at
+        CO|OrdersScreenshotTestKt.ordersBothGroupsLight|Contrast|text "جديد" at
+        CO|OrdersScreenshotTestKt.ordersContentDark|Contrast|text "جديد" at
+        CO|OrdersScreenshotTestKt.ordersContentLight|Contrast|text "جديد" at
+        CO|OrdersScreenshotTestKt.ordersErrorDark|Contrast|text "جديد" at
+        CO|OrdersScreenshotTestKt.ordersErrorLight|Contrast|text "جديد" at
+        CO|OrdersScreenshotTestKt.ordersFilteredToNone|Contrast|text "جديد" at
+        CO|OrdersScreenshotTestKt.ordersFilteredUnpaid|Contrast|text "جديد" at
+        CO|StoreGroupScreenshotTestKt.storeInfoContentDark|Contrast|text "احفظ" at
+        CO|StoreGroupScreenshotTestKt.storeInfoContentDark|Contrast|text "التصنيف الفرعي" at
+        CO|StoreGroupScreenshotTestKt.storeInfoContentDark|Contrast|text "الشعار" at
+        CO|StoreGroupScreenshotTestKt.storeInfoContentDark|Contrast|text "صورة الغلاف" at
+        CO|StoreGroupScreenshotTestKt.storeInfoContentLight|Contrast|text "احفظ" at
+        CO|StoreGroupScreenshotTestKt.storeInfoContentLight|Contrast|text "التصنيف الفرعي" at
+        CO|StoreGroupScreenshotTestKt.storeInfoContentLight|Contrast|text "الشعار" at
+        CO|StoreGroupScreenshotTestKt.storeInfoContentLight|Contrast|text "صورة الغلاف" at
+        CO|StoreGroupScreenshotTestKt.storeInfoIdentityLight|Contrast|text "احفظ" at
+        CO|StoreGroupScreenshotTestKt.storeInfoIdentityLight|Contrast|text "التصنيف الفرعي" at
+        CO|StoreGroupScreenshotTestKt.storeInfoIdentityLight|Contrast|text "الشعار" at
+        CO|StoreGroupScreenshotTestKt.storeInfoIdentityLight|Contrast|text "صورة الغلاف" at
+        CO|StoreGroupScreenshotTestKt.storeInfoSaving|Contrast|text "التصنيف الفرعي" at
+        CO|StoreGroupScreenshotTestKt.storeInfoSaving|Contrast|text "الشعار" at
+        CO|StoreGroupScreenshotTestKt.storeInfoSaving|Contrast|text "صورة الغلاف" at
+        CO|StoreGroupScreenshotTestKt.storeInfoSlugTaken|Contrast|text "احفظ" at
+        CO|StoreGroupScreenshotTestKt.storeInfoSlugTaken|Contrast|text "التصنيف الفرعي" at
+        CO|StoreGroupScreenshotTestKt.storeInfoSlugTaken|Contrast|text "الشعار" at
+        CO|StoreGroupScreenshotTestKt.storeInfoSlugTaken|Contrast|text "صورة الغلاف" at
         IL|ShopSetupScreenshotTestKt.setupAccountDark|Label|has no ContentDescription or Text
+        IL|ShopSetupScreenshotTestKt.setupAccountDark|Label|has no ContentDescription or Text
+        IL|ShopSetupScreenshotTestKt.setupAccountEmpty|Label|has no ContentDescription or Text
+        IL|ShopSetupScreenshotTestKt.setupAccountEmpty|Label|has no ContentDescription or Text
         IL|ShopSetupScreenshotTestKt.setupAccountInvalidEmail|Label|has no ContentDescription or Text
+        IL|ShopSetupScreenshotTestKt.setupAccountInvalidEmail|Label|has no ContentDescription or Text
+        IL|ShopSetupScreenshotTestKt.setupAccountLight|Label|has no ContentDescription or Text
+        IL|ShopSetupScreenshotTestKt.setupAccountLight|Label|has no ContentDescription or Text
+        IL|ShopSetupScreenshotTestKt.setupAccountSaving|Label|has no ContentDescription or Text
         IL|ShopSetupScreenshotTestKt.setupAccountSaving|Label|has no ContentDescription or Text
 """.trimIndent().lines().filter { it.isNotBlank() }.map { line ->
     val parts = line.split("|", limit = 4)
