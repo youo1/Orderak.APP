@@ -286,7 +286,7 @@ async function syncScreens(env: AdminWorkerEnv, admin: AdminClaims): Promise<Res
 		}
 
 		// Structure comes from the manifest and is overwritten on every sync;
-		// design_status, development_status, figma_url and screenshot_url are the
+		// design_status, development_status, design_url and screenshot_url are the
 		// admin's own workflow columns and are deliberately left alone.
 		const transitions = JSON.stringify(screen.transitions);
 		const states = JSON.stringify(screen.states);
@@ -324,8 +324,8 @@ async function createScreen(request: Request, env: AdminWorkerEnv, admin: AdminC
 	// parent_id links this screen into the navigation tree (null = root).
 	const parentId = b.parent_id ? Number(b.parent_id) : null;
 	const row = await env.orderak_db.prepare(
-		"INSERT INTO app_screens (name, description, status, design_status, development_status, figma_url, screenshot_url, android_route, sort_order, parent_id, source) VALUES (?,?,?,?,?,?,?,?,?,?,'manual') RETURNING id"
-	).bind(name,String(b.description??""),String(b.status??"planned"),String(b.design_status??"not_started"),String(b.development_status??"not_started"),String(b.figma_url??""),String(b.screenshot_url??""),String(b.android_route??""),Math.floor(Number(b.sort_order)||0),parentId).first();
+		"INSERT INTO app_screens (name, description, status, design_status, development_status, design_url, screenshot_url, android_route, sort_order, parent_id, source) VALUES (?,?,?,?,?,?,?,?,?,?,'manual') RETURNING id"
+	).bind(name,String(b.description??""),String(b.status??"planned"),String(b.design_status??"not_started"),String(b.development_status??"not_started"),String(b.design_url??""),String(b.screenshot_url??""),String(b.android_route??""),Math.floor(Number(b.sort_order)||0),parentId).first();
 	await auditDb(env, admin, "screen.created", { id: (row as any).id });
 	return jsonResponse({ ok: true, id: (row as any).id }, 201);
 }
@@ -341,12 +341,12 @@ async function updateScreen(request: Request, env: AdminWorkerEnv, id: number, a
 	// Only include parent_id in the update if it was explicitly provided
 	if (parentId !== undefined) {
 		await env.orderak_db.prepare(
-			"UPDATE app_screens SET name=?,description=?,status=?,design_status=?,development_status=?,figma_url=?,screenshot_url=?,android_route=?,sort_order=?,parent_id=?,updated_at=datetime('now') WHERE id=?"
-		).bind(String(b.name??""),String(b.description??""),String(b.status??"planned"),String(b.design_status??"not_started"),String(b.development_status??"not_started"),String(b.figma_url??""),String(b.screenshot_url??""),String(b.android_route??""),Math.floor(Number(b.sort_order)||0),parentId,id).run();
+			"UPDATE app_screens SET name=?,description=?,status=?,design_status=?,development_status=?,design_url=?,screenshot_url=?,android_route=?,sort_order=?,parent_id=?,updated_at=datetime('now') WHERE id=?"
+		).bind(String(b.name??""),String(b.description??""),String(b.status??"planned"),String(b.design_status??"not_started"),String(b.development_status??"not_started"),String(b.design_url??""),String(b.screenshot_url??""),String(b.android_route??""),Math.floor(Number(b.sort_order)||0),parentId,id).run();
 	} else {
 		await env.orderak_db.prepare(
-			"UPDATE app_screens SET name=?,description=?,status=?,design_status=?,development_status=?,figma_url=?,screenshot_url=?,android_route=?,sort_order=?,updated_at=datetime('now') WHERE id=?"
-		).bind(String(b.name??""),String(b.description??""),String(b.status??"planned"),String(b.design_status??"not_started"),String(b.development_status??"not_started"),String(b.figma_url??""),String(b.screenshot_url??""),String(b.android_route??""),Math.floor(Number(b.sort_order)||0),id).run();
+			"UPDATE app_screens SET name=?,description=?,status=?,design_status=?,development_status=?,design_url=?,screenshot_url=?,android_route=?,sort_order=?,updated_at=datetime('now') WHERE id=?"
+		).bind(String(b.name??""),String(b.description??""),String(b.status??"planned"),String(b.design_status??"not_started"),String(b.development_status??"not_started"),String(b.design_url??""),String(b.screenshot_url??""),String(b.android_route??""),Math.floor(Number(b.sort_order)||0),id).run();
 	}
 	await auditDb(env, admin, "screen.updated", { id });
 	return jsonResponse({ ok: true });
@@ -431,7 +431,7 @@ async function createDesignAsset(request: Request, env: AdminWorkerEnv, admin: A
 	if (!name || !url2) return jsonResponse({ error: "name_and_url_required" }, 400);
 	const row = await env.orderak_db.prepare(
 		"INSERT INTO design_assets (name, type, url, screen_ref) VALUES (?,?,?,?) RETURNING id"
-	).bind(name, String(b.type??"figma"), url2, String(b.screen_ref??"")).first();
+	).bind(name, String(b.type??"design-library"), url2, String(b.screen_ref??"")).first();
 	await auditDb(env, admin, "design_asset.created", { id: (row as any).id });
 	return jsonResponse({ ok: true, id: (row as any).id }, 201);
 }
@@ -439,7 +439,7 @@ async function updateDesignAsset(request: Request, env: AdminWorkerEnv, id: numb
 	const b = (await request.json().catch(() => ({}))) as Record<string, unknown>;
 	await env.orderak_db.prepare(
 		"UPDATE design_assets SET name=?, type=?, url=?, screen_ref=? WHERE id=?"
-	).bind(String(b.name??""), String(b.type??"figma"), String(b.url??""), String(b.screen_ref??""), id).run();
+	).bind(String(b.name??""), String(b.type??"design-library"), String(b.url??""), String(b.screen_ref??""), id).run();
 	await auditDb(env, admin, "design_asset.updated", { id });
 	return jsonResponse({ ok: true });
 }

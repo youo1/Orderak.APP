@@ -11,6 +11,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.text.KeyboardOptions
 import app.orderak.seller.R
@@ -51,6 +53,12 @@ fun SearchField(
         },
         singleLine = true,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-        modifier = modifier.fillMaxWidth(),
+        // The placeholder is a visible sibling only while the field is empty, so
+        // it cannot label the actionable text-field node once a query is typed.
+        // Name the field against the placeholder it was given: an existing string,
+        // no pixel change.
+        modifier = modifier
+            .fillMaxWidth()
+            .semantics { contentDescription = placeholder },
     )
 }
