@@ -184,9 +184,6 @@ for (const name of TOKEN_SOURCE_NAMES) {
 
 const counts = {};
 const details = {};
-for (const [kind, rule] of RULES.entries()) {
-	void kind;
-}
 for (const rule of RULES) {
 	counts[rule.kind] = 0;
 	details[rule.kind] = [];
