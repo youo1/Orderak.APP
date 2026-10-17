@@ -186,7 +186,9 @@ fun ProductEditContent(
                     .fillMaxWidth()
                     .height(180.dp)
                     .clip(MaterialTheme.shapes.large)
-                    .semantics { contentDescription = pickPhotoLabel }
+                    // Named only while a photo is shown: without one, the visible label below already names
+                    // the box, and a description would make TalkBack read it twice.
+                    .semantics { if (state.imagePath != null) contentDescription = pickPhotoLabel }
                     .clickable {
                         onPickImage()
                     },

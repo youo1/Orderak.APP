@@ -255,7 +255,7 @@ deferred to R3 as recorded in the table above. The fixes landed in this change a
 | Screen source | Finding | Fix (existing string) |
 |---|---|---|
 | `core/ui/SearchField.kt` | `Label` on the search text field once a query is typed | field `contentDescription` = its `placeholder` (`products_search_hint`, `customers_search_hint`) |
-| `feature/products/ProductEditScreen.kt` | `Label` on the availability `Switch` with a sibling `Text`, and on the photo-picker box | row `toggleable(role = Role.Switch)`, `Switch(onCheckedChange = null)`; photo box `contentDescription` = `product_pick_photo` |
+| `feature/products/ProductEditScreen.kt` | `Label` on the availability `Switch` with a sibling `Text`, and on the photo-picker box | row `toggleable(role = Role.Switch)`, `Switch(onCheckedChange = null)`; photo box `contentDescription` = `product_pick_photo` while a photo is shown (without one, its visible label names it) |
 | `feature/shopsetup/ShopSetupScreen.kt` | `Label` plus duplicate-bounds `Target` on the read-only birth-year field and its overlay click target | clickable full-size overlay sibling declared last in the `Box` with `contentDescription` = `setup_birth_year_open_description`, and the read-only field wrapped in `clearAndSetSemantics {}` so the control exposes one labelled actionable node while the overlay still receives every tap; the overlay carries the chosen year as its `stateDescription` |
 | `feature/auth/AuthOtpForm.kt` | `Label` on the transparent OTP `BasicTextField` | field `contentDescription` = `auth_otp_title` |
 
