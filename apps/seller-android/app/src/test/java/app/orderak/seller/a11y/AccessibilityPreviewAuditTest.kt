@@ -146,12 +146,13 @@ class AccessibilityPreviewAuditTest(private val caseName: String) {
             entry.preview == declaration.id &&
                 allDiagnostics.none { diagnostic -> entry.matches(diagnostic) }
         }
-        if (stale.isNotEmpty()) {
-            println(
-                "KNOWN_FINDINGS entries for ${declaration.id} no longer occur (remove them): " +
-                    stale.joinToString("; ") { "${it.rule}: ${it.needle}" },
-            )
-        }
+        // A stale entry would hide a regression on the same node, so the list
+        // must match what the audit finds today, in both directions.
+        assertTrue(
+            "KNOWN_FINDINGS entries for ${declaration.id} no longer occur (remove them): " +
+                stale.joinToString("; ") { "${it.rule}: ${it.needle}" },
+            stale.isEmpty(),
+        )
         val english = textsByLocale["en"]
         val arabic = textsByLocale["ar"]
         if (english != null && arabic != null) {
@@ -199,26 +200,6 @@ class AccessibilityAuditHarnessTest {
         }
     }
     @Test
-    fun inlineTextLinkIsNamedByItsLinkedText() {
-        rule.setContent {
-            Text(
-                buildAnnotatedString {
-                    append("اقرأ ")
-                    withLink(LinkAnnotation.Url("https://orderak.app/terms")) {
-                        append("الشروط والأحكام")
-                    }
-                },
-            )
-        }
-        rule.waitForIdle()
-        val findings = auditAccessibility(rule, "proofInlineTextLink")
-            .filter { "Label:" in it || "Target:" in it }
-        assertTrue(
-            "An inline text link is named by the linked text and exempt from Target: $findings",
-            findings.isEmpty(),
-        )
-    }
-    @Test
     fun iconOnlyClickableBesideLinkStillFailsLabel() {
         rule.setContent {
             Column {
@@ -244,19 +225,24 @@ private data class KnownFinding(
     val reason: String,
     val plan: String,
 ) {
-    fun matches(diagnostic: String): Boolean =
-        diagnostic.startsWith("$preview ") &&
-            "$rule:" in diagnostic &&
-            (needle.isEmpty() || needle in diagnostic)
+    fun matches(diagnostic: String): Boolean {
+        if (!diagnostic.startsWith(preview)) return false
+        val boundary = diagnostic.getOrNull(preview.length)
+        if (boundary != ' ' && boundary != '[') return false
+        return "$rule:" in diagnostic && (needle.isEmpty() || needle in diagnostic)
+    }
 }
 private data class KnownKind(val reason: String, val plan: String)
 private val KNOWN_KINDS: Map<String, KnownKind> = mapOf(
     "TS" to KnownKind("Touch target is below the 48dp minimum", "B5: enlarge the kit control to a 48dp target"),
     "CF" to KnownKind("Field label colour is below the 4.5:1 threshold", "R1: use the accessible onSurfaceVariant token"),
-    "CS" to KnownKind("Stepper glyph contrast is below the 3:1 threshold", "B5: raise the stepper glyph token contrast"),
     "CD" to KnownKind("Dialog window not captured under Robolectric", "R1: audit dialog window capture and colour tokens"),
     "CG" to KnownKind("Text colour is below the WCAG threshold", "R1: use the accessible design-system colour token"),
     "CO" to KnownKind("Text crop is outside the captured frame in this preview", "R1: keep the audited text node inside the visible frame"),
+    "IL" to KnownKind(
+        "Inline text link has no semantics label of its own",
+        "R3: present the terms and privacy links as their own controls in the redesigned setup",
+    ),
 )
 private val KNOWN_FINDINGS: List<KnownFinding> = """
         CD|ProductEditScreenshotTestKt.productEditConfirmDelete|Contrast|text "إلغاء"
@@ -271,29 +257,6 @@ private val KNOWN_FINDINGS: List<KnownFinding> = """
         CD|ProductEditScreenshotTestKt.productEditStockConflict|Contrast|text "خليها ٩"
         CF|AccountScreenshotTestKt.accountContentLight|Contrast|text "رقم فودافون كاش"
         CF|AccountScreenshotTestKt.accountLoadingLight|Contrast|text "رقم فودافون كاش"
-        CF|AuthScreenshotTestKt.authOtpDark|Contrast|text "رقم الموبايل"
-        CF|AuthScreenshotTestKt.authOtpExpired|Contrast|text "رقم الموبايل"
-        CF|AuthScreenshotTestKt.authOtpLight|Contrast|text "رقم الموبايل"
-        CF|AuthScreenshotTestKt.authOtpResendable|Contrast|text "رقم الموبايل"
-        CF|AuthScreenshotTestKt.authOtpVerifying|Contrast|text "رقم الموبايل"
-        CF|AuthScreenshotTestKt.authOtpWrongCodeDark|Contrast|text "رقم الموبايل"
-        CF|AuthScreenshotTestKt.authOtpWrongCode|Contrast|text "رقم الموبايل"
-        CF|AuthScreenshotTestKt.authPhoneSendingDark|Contrast|text "رقم الموبايل"
-        CF|AuthScreenshotTestKt.authPhoneSending|Contrast|text "رقم الموبايل"
-        CF|StoreGroupScreenshotTestKt.sellerProfileContentDark|Contrast|text "رقم الهاتف (معرف الحساب)"
-        CF|StoreGroupScreenshotTestKt.sellerProfileContentLight|Contrast|text "رقم الهاتف (معرف الحساب)"
-        CF|StoreGroupScreenshotTestKt.sellerProfilePhotoUploadFailed|Contrast|text "رقم الهاتف (معرف الحساب)"
-        CF|StoreGroupScreenshotTestKt.sellerProfileSaving|Contrast|text "رقم الهاتف (معرف الحساب)"
-        CF|StoreGroupScreenshotTestKt.sellerProfileVerificationError|Contrast|text "رقم الهاتف (معرف الحساب)"
-        CS|OrderScreensScreenshotTestKt.newOrderContentDark|Contrast|text "−"
-        CS|OrderScreensScreenshotTestKt.newOrderContentLight|Contrast|text "−"
-        CS|OrderScreensScreenshotTestKt.newOrderFilled|Contrast|text "+"
-        CS|OrderScreensScreenshotTestKt.newOrderPhoneInvalid|Contrast|text "−"
-        CS|OrderScreensScreenshotTestKt.newOrderSaving|Contrast|text "−"
-        CS|OrderScreensScreenshotTestKt.newOrderStockErrorDark|Contrast|text "+"
-        CS|OrderScreensScreenshotTestKt.newOrderStockErrorDark|Contrast|text "−"
-        CS|OrderScreensScreenshotTestKt.newOrderStockErrorLight|Contrast|text "+"
-        CS|OrderScreensScreenshotTestKt.newOrderStockErrorLight|Contrast|text "−"
         TS|OrdersScreenshotTestKt.ordersBothGroupsDark|Target|touch target
         TS|OrdersScreenshotTestKt.ordersBothGroupsLight|Target|touch target
         TS|OrdersScreenshotTestKt.ordersContentDark|Target|touch target
@@ -328,6 +291,11 @@ private val KNOWN_FINDINGS: List<KnownFinding> = """
         CO|StoreGroupScreenshotTestKt.storeInfoIdentityLight|Contrast|is outside the captured image
         CO|StoreGroupScreenshotTestKt.storeInfoSaving|Contrast|is outside the captured image
         CO|StoreGroupScreenshotTestKt.storeInfoSlugTaken|Contrast|is outside the captured image
+        IL|ShopSetupScreenshotTestKt.setupAccountEmpty|Label|has no ContentDescription or Text
+        IL|ShopSetupScreenshotTestKt.setupAccountLight|Label|has no ContentDescription or Text
+        IL|ShopSetupScreenshotTestKt.setupAccountDark|Label|has no ContentDescription or Text
+        IL|ShopSetupScreenshotTestKt.setupAccountInvalidEmail|Label|has no ContentDescription or Text
+        IL|ShopSetupScreenshotTestKt.setupAccountSaving|Label|has no ContentDescription or Text
 """.trimIndent().lines().filter { it.isNotBlank() }.map { line ->
     val parts = line.split("|", limit = 4)
     val kind = KNOWN_KINDS.getValue(parts[0])
@@ -341,6 +309,15 @@ private val KNOWN_FINDINGS: List<KnownFinding> = """
 }
 fun auditAccessibility(rule: ComposeTestRule, preview: String): List<String> {
     val diagnostics = mutableListOf<String>()
+    // The caller may pass only a preview name, so derive the active locale here
+    // (the preview harness passes an explicit "[locale]" suffix and keeps it).
+    val previewLabel = if (LOCALE_SUFFIX.containsMatchIn(preview)) {
+        preview
+    } else {
+        val tag = ApplicationProvider.getApplicationContext<Context>()
+            .resources.configuration.locales[0].toLanguageTag()
+        "$preview [$tag]"
+    }
     val density = rule.density.density
     val minimumTouchPx = 48f * density
     var skippedDisabled = 0
@@ -362,8 +339,8 @@ fun auditAccessibility(rule: ComposeTestRule, preview: String): List<String> {
                         node.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty()
                     val texts = node.config.getOrNull(SemanticsProperties.Text).orEmpty()
                     val labelled = (descriptions + texts.map { it.text }).any { it.isNotBlank() }
-                    if (!labelled && !isInlineLink(node)) {
-                        diagnostics += "$preview Label: actionable node at ${node.boundsInRoot} " +
+                    if (!labelled) {
+                        diagnostics += "$previewLabel Label: actionable node at ${node.boundsInRoot} " +
                             "has no ContentDescription or Text"
                     }
                 }
@@ -371,19 +348,14 @@ fun auditAccessibility(rule: ComposeTestRule, preview: String): List<String> {
             node.children.forEach { visitMerged(it) }
         }
         visitMerged(mergedRoot)
-        val inlineLinkIds = actionable
-            .filter { isInlineLink(it) }
-            .map { it.id }
-            .toHashSet()
         for (node in actionable) {
-            if (node.id in inlineLinkIds) continue
             val touch = node.touchBoundsInRoot
             if (touch.width <= 0f || touch.height <= 0f) {
                 skippedEmptyTargets++
                 continue
             }
             if (touch.width < minimumTouchPx - 0.5f || touch.height < minimumTouchPx - 0.5f) {
-                diagnostics += "$preview Target: touch target " +
+                diagnostics += "$previewLabel Target: touch target " +
                     "${touch.width / density}x${touch.height / density}dp at $touch is smaller than 48dp"
             }
         }
@@ -391,7 +363,6 @@ fun auditAccessibility(rule: ComposeTestRule, preview: String): List<String> {
             for (second in first + 1 until actionable.size) {
                 val a = actionable[first]
                 val b = actionable[second]
-                if (a.id in inlineLinkIds || b.id in inlineLinkIds) continue
                 if (a.touchBoundsInRoot.width <= 0f || a.touchBoundsInRoot.height <= 0f ||
                     b.touchBoundsInRoot.width <= 0f || b.touchBoundsInRoot.height <= 0f
                 ) {
@@ -401,7 +372,7 @@ fun auditAccessibility(rule: ComposeTestRule, preview: String): List<String> {
                     !isAncestor(a, b) &&
                     !isAncestor(b, a)
                 ) {
-                    diagnostics += "$preview Target: ${a.touchBoundsInRoot} overlaps ${b.touchBoundsInRoot}"
+                    diagnostics += "$previewLabel Target: ${a.touchBoundsInRoot} overlaps ${b.touchBoundsInRoot}"
                 }
             }
         }
@@ -427,7 +398,7 @@ fun auditAccessibility(rule: ComposeTestRule, preview: String): List<String> {
                     val right = ceil(bounds.right).toInt().coerceAtMost(bitmap.width)
                     val bottom = ceil(bounds.bottom).toInt().coerceAtMost(bitmap.height)
                     if (right <= left || bottom <= top) {
-                        diagnostics += "$preview Contrast: text \"$content\" at $bounds " +
+                        diagnostics += "$previewLabel Contrast: text \"$content\" at $bounds " +
                             "is outside the captured image"
                     } else {
                         val ratio = try {
@@ -436,16 +407,16 @@ fun auditAccessibility(rule: ComposeTestRule, preview: String): List<String> {
                                 ?: throw IllegalStateException("ATF returned no contrast ratio")
                         } catch (error: Throwable) {
                             throw AssertionError(
-                                "$preview Contrast: failed to measure text \"$content\" at $bounds",
+                                "$previewLabel Contrast: failed to measure text \"$content\" at $bounds",
                                 error,
                             )
                         }
                         val threshold = if (isLargeText(node, density)) 3.0 else 4.5
                         if (ratio <= 1.0) {
-                            diagnostics += "$preview Contrast: text \"$content\" at $bounds " +
+                            diagnostics += "$previewLabel Contrast: text \"$content\" at $bounds " +
                                 "is not measurable (single-colour crop)"
                         } else if (ratio < threshold) {
-                            diagnostics += "$preview Contrast: text \"$content\" at $bounds measured " +
+                            diagnostics += "$previewLabel Contrast: text \"$content\" at $bounds measured " +
                                 "${formatRatio(ratio)}:1, below ${formatRatio(threshold)}:1"
                         }
                     }
@@ -456,7 +427,7 @@ fun auditAccessibility(rule: ComposeTestRule, preview: String): List<String> {
         visitUnmerged(unmergedNodes[index])
     }
     println(
-        "auditAccessibility[$preview] diagnostics=${diagnostics.size} " +
+        "auditAccessibility[$previewLabel] diagnostics=${diagnostics.size} " +
             "skippedDisabled=$skippedDisabled skippedEmptyTargets=$skippedEmptyTargets",
     )
     return diagnostics
@@ -477,29 +448,8 @@ private fun isDisabled(node: SemanticsNode): Boolean {
     }
     return false
 }
-private fun isInlineLink(node: SemanticsNode): Boolean {
-    val bounds = node.boundsInRoot
-    var parent = node.parent
-    while (parent != null) {
-        val texts = parent.config.getOrNull(SemanticsProperties.Text)
-        if (!texts.isNullOrEmpty()) {
-            val hasLink = texts.any { annotated ->
-                annotated.getLinkAnnotations(0, annotated.length).isNotEmpty()
-            }
-            if (hasLink) {
-                val ancestor = parent.boundsInRoot
-                val inside = bounds.left >= ancestor.left - 0.5f &&
-                    bounds.top >= ancestor.top - 0.5f &&
-                    bounds.right <= ancestor.right + 0.5f &&
-                    bounds.bottom <= ancestor.bottom + 0.5f
-                if (inside) return true
-            }
-        }
-        parent = parent.parent
-    }
-    return false
-}
 private fun formatRatio(value: Double): String = String.format(Locale.US, "%.2f", value)
+private val LOCALE_SUFFIX = Regex("""\[[^\]]+\]\s*$""")
 private fun isLargeText(node: SemanticsNode, density: Float): Boolean {
     val results = mutableListOf<TextLayoutResult>()
     node.config.getOrNull(SemanticsActions.GetTextLayoutResult)?.action?.invoke(results)

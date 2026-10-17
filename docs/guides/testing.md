@@ -116,7 +116,7 @@ The rules run as follows:
 
 | Rule | Tree | Check | Threshold |
 |------|------|-------|-----------|
-| 1 — `Label` | merged | every node with an `OnClick` action or `ToggleableState` exposes `ContentDescription` or `Text`; an inline text link (a range of an ancestor `AnnotatedString` carrying a `LinkAnnotation`) is named by its linked text | non-blank |
+| 1 — `Label` | merged | every node with an `OnClick` action or `ToggleableState` exposes `ContentDescription` or `Text` | non-blank |
 | 2 — `Target` | merged | Compose `touchBoundsInRoot` at least 48dp on both axes, and no overlap with another actionable node unless one is an ancestor | ≥ 48dp |
 | 3 — `Contrast` | unmerged | for every semantics root (`onAllNodes(isRoot())`, so dialog windows are audited too) crop each text node's `boundsInRoot` from that root's `captureToImage()` and measure it with ATF's `ContrastSwatch`, built directly from a `BitmapImage` over the captured bitmap and the node's bounds | ≥ 4.5:1 normal; ≥ 3:1 large (≥ 18sp, or ≥ 14sp at weight ≥ 700) |
 
@@ -128,9 +128,7 @@ skipped for `Label` and `Target`. The separately specified zero-size node
 exclusion is the only `Contrast` skip: a text node with non-zero size whose
 `boundsInRoot` is empty or whose crop does not intersect that root's captured
 image is an empty or out-of-image crop and fails the audit naming the preview,
-node text, and bounds, never a silent skip. Inline text links (WCAG 2.5.8) are
-exempt from the `Target` minimum because their target sits inside a sentence.
-Skipped nodes are counted in the per-preview `println` summary, not reported. Rule 2 uses Compose touch
+node text, and bounds, never a silent skip. Skipped nodes are counted in the per-preview `println` summary, not reported. Rule 2 uses Compose touch
 bounds, never drawn component dimensions. Rule 3 measures one text node at a
 time, never merged row pixels; the large-text decision comes from the node's
 `GetTextLayoutResult`, and an unspecified size counts as normal. Image-only nodes
@@ -146,8 +144,9 @@ violation cannot leave the unit-test task green. A finding that cannot be fixed
 without new reference PNGs, or that requires a phase-R redesign, is listed in
 `KNOWN_FINDINGS` in the test and in the blocked-findings table below with its
 preview, rule, finding, and planned minimal fix instead of weakening a rule or
-skipping a preview. `KNOWN_FINDINGS` prints a warning when a listed finding no
-longer occurs so a fixed entry can be removed.
+skipping a preview. A listed finding that no longer occurs also fails its case,
+so the list always matches what the audit finds and a stale entry cannot hide a
+later regression on the same node.
 
 The three isolated proofs in `AccessibilityAuditRulesAcceptanceTest` (an
 unlabelled `IconButton`, two adjacent 20dp clickables, and grey text on white
@@ -159,8 +158,8 @@ everything cannot satisfy them.
 changes pixels, while the exact affected reference PNG is not individually
 listed in `allowed_files`, are recorded in the `KNOWN_FINDINGS` list in
 `AccessibilityPreviewAuditTest.kt` and below. Every other diagnostic fails its
-preview case. The list prints a warning when an entry no longer occurs so a fixed
-item can be removed.
+preview case, and so does an entry that no longer occurs. Text inside a disabled
+control is not measured, because WCAG 1.4.3 exempts inactive components.
 
 | Preview | Rule | Node text / kind | Reason | Plan |
 |---|---|---|---|---|
@@ -176,29 +175,6 @@ item can be removed.
 | `ProductEditScreenshotTestKt.productEditStockConflict` | Contrast | `text "خليها ٩"` | Dialog window not captured under Robolectric | R1 — audit dialog window capture and colour tokens |
 | `AccountScreenshotTestKt.accountContentLight` | Contrast | `text "رقم فودافون كاش"` | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
 | `AccountScreenshotTestKt.accountLoadingLight` | Contrast | `text "رقم فودافون كاش"` | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
-| `AuthScreenshotTestKt.authOtpDark` | Contrast | `text "رقم الموبايل"` | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
-| `AuthScreenshotTestKt.authOtpExpired` | Contrast | `text "رقم الموبايل"` | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
-| `AuthScreenshotTestKt.authOtpLight` | Contrast | `text "رقم الموبايل"` | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
-| `AuthScreenshotTestKt.authOtpResendable` | Contrast | `text "رقم الموبايل"` | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
-| `AuthScreenshotTestKt.authOtpVerifying` | Contrast | `text "رقم الموبايل"` | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
-| `AuthScreenshotTestKt.authOtpWrongCodeDark` | Contrast | `text "رقم الموبايل"` | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
-| `AuthScreenshotTestKt.authOtpWrongCode` | Contrast | `text "رقم الموبايل"` | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
-| `AuthScreenshotTestKt.authPhoneSendingDark` | Contrast | `text "رقم الموبايل"` | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
-| `AuthScreenshotTestKt.authPhoneSending` | Contrast | `text "رقم الموبايل"` | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
-| `StoreGroupScreenshotTestKt.sellerProfileContentDark` | Contrast | `text "رقم الهاتف (معرف الحساب)"` | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
-| `StoreGroupScreenshotTestKt.sellerProfileContentLight` | Contrast | `text "رقم الهاتف (معرف الحساب)"` | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
-| `StoreGroupScreenshotTestKt.sellerProfilePhotoUploadFailed` | Contrast | `text "رقم الهاتف (معرف الحساب)"` | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
-| `StoreGroupScreenshotTestKt.sellerProfileSaving` | Contrast | `text "رقم الهاتف (معرف الحساب)"` | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
-| `StoreGroupScreenshotTestKt.sellerProfileVerificationError` | Contrast | `text "رقم الهاتف (معرف الحساب)"` | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
-| `OrderScreensScreenshotTestKt.newOrderContentDark` | Contrast | `text "−"` | Stepper glyph contrast below 3:1 | B5 — raise the stepper glyph token contrast |
-| `OrderScreensScreenshotTestKt.newOrderContentLight` | Contrast | `text "−"` | Stepper glyph contrast below 3:1 | B5 — raise the stepper glyph token contrast |
-| `OrderScreensScreenshotTestKt.newOrderFilled` | Contrast | `text "+"` | Stepper glyph contrast below 3:1 | B5 — raise the stepper glyph token contrast |
-| `OrderScreensScreenshotTestKt.newOrderPhoneInvalid` | Contrast | `text "−"` | Stepper glyph contrast below 3:1 | B5 — raise the stepper glyph token contrast |
-| `OrderScreensScreenshotTestKt.newOrderSaving` | Contrast | `text "−"` | Stepper glyph contrast below 3:1 | B5 — raise the stepper glyph token contrast |
-| `OrderScreensScreenshotTestKt.newOrderStockErrorDark` | Contrast | `text "+"` | Stepper glyph contrast below 3:1 | B5 — raise the stepper glyph token contrast |
-| `OrderScreensScreenshotTestKt.newOrderStockErrorDark` | Contrast | `text "−"` | Stepper glyph contrast below 3:1 | B5 — raise the stepper glyph token contrast |
-| `OrderScreensScreenshotTestKt.newOrderStockErrorLight` | Contrast | `text "+"` | Stepper glyph contrast below 3:1 | B5 — raise the stepper glyph token contrast |
-| `OrderScreensScreenshotTestKt.newOrderStockErrorLight` | Contrast | `text "−"` | Stepper glyph contrast below 3:1 | B5 — raise the stepper glyph token contrast |
 | `OrdersScreenshotTestKt.ordersBothGroupsDark` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
 | `OrdersScreenshotTestKt.ordersBothGroupsLight` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
 | `OrdersScreenshotTestKt.ordersContentDark` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
@@ -233,6 +209,11 @@ item can be removed.
 | `StoreGroupScreenshotTestKt.storeInfoIdentityLight` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
 | `StoreGroupScreenshotTestKt.storeInfoSaving` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
 | `StoreGroupScreenshotTestKt.storeInfoSlugTaken` | Contrast | `out of frame` | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
+| `ShopSetupScreenshotTestKt.setupAccountEmpty` | Label | `has no ContentDescription or Text` | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
+| `ShopSetupScreenshotTestKt.setupAccountLight` | Label | `has no ContentDescription or Text` | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
+| `ShopSetupScreenshotTestKt.setupAccountDark` | Label | `has no ContentDescription or Text` | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
+| `ShopSetupScreenshotTestKt.setupAccountInvalidEmail` | Label | `has no ContentDescription or Text` | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
+| `ShopSetupScreenshotTestKt.setupAccountSaving` | Label | `has no ContentDescription or Text` | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
 
 **Spike conclusion.** Compose accessibility checks (`enableAccessibilityChecks`,
 `tryPerformAccessibilityChecks`) and ATF's `AccessibilityHierarchyAndroid` do not
@@ -263,24 +244,33 @@ label has no existing string, the finding and the required string are reported
 because `src/main/res/**` is out of scope.
 
 **Semantics-only fixes (no pixel change).** `Label` and duplicate-semantics
-`Target` findings never need a reference PNG, so they are fixed in `src/main`
+`Target` findings normally need no reference PNG, so they are fixed in `src/main`
 and removed from `KNOWN_FINDINGS`; the list carries only genuinely pixel-changing
-or phase-R findings. The fixes landed in this change are:
+or phase-R findings. The lone exception is the inline `withLink` links, whose
+generated semantics nodes cannot carry a label without a redesign, so they are
+deferred to R3 as recorded in the table above. The fixes landed in this change are:
 
 | Screen source | Finding | Fix (existing string) |
 |---|---|---|
 | `core/ui/SearchField.kt` | `Label` on the search text field once a query is typed | field `contentDescription` = its `placeholder` (`products_search_hint`, `customers_search_hint`) |
 | `feature/products/ProductEditScreen.kt` | `Label` on the availability `Switch` with a sibling `Text`, and on the photo-picker box | row `toggleable(role = Role.Switch)`, `Switch(onCheckedChange = null)`; photo box `contentDescription` = `product_pick_photo` |
-| `feature/shopsetup/ShopSetupScreen.kt` | `Label` plus duplicate-bounds `Target` on the read-only birth-year field and its overlay click target | clickable moved to the field's parent with `contentDescription` = `setup_birth_year_open_description`; the duplicate overlay removed |
+| `feature/shopsetup/ShopSetupScreen.kt` | `Label` plus duplicate-bounds `Target` on the read-only birth-year field and its overlay click target | clickable full-size overlay sibling declared last in the `Box` with `contentDescription` = `setup_birth_year_open_description`, and the read-only field wrapped in `clearAndSetSemantics {}` so the control exposes one labelled actionable node while the overlay still receives every tap; the overlay carries the chosen year as its `stateDescription` |
 | `feature/auth/AuthOtpForm.kt` | `Label` on the transparent OTP `BasicTextField` | field `contentDescription` = `auth_otp_title` |
-| `feature/shopsetup/ShopSetupScreen.kt` (`OnboardingLegalText`) | `Label` and `Target` on the inline terms/privacy links Compose creates for `withLink` | audit treats a link whose ancestor `Text` carries a `LinkAnnotation` and whose bounds sit inside it as named by the linked text and exempt from the 48dp target rule (WCAG 2.5.8) |
 
 The out-of-frame table rows above are the empty/out-of-image text crops the
 harness cannot measure; they are not screen-accessibility findings. The audit
-still returns a diagnostic for each one so a silent skip is impossible, and the
-two inline-link proof cases in `AccessibilityPreviewAuditTest` assert that a
-`withLink` link produces no `Label`/`Target` diagnostic while an icon-only
-clickable beside it still fails `Label`.
+still returns a diagnostic for each one so a silent skip is impossible. Inline
+text links are audited like every other actionable node: Compose gives each
+`withLink` range its own clickable semantics node with no `Text` of its own, so
+the terms/privacy links in `OnboardingLegalText` are recorded in
+`KNOWN_FINDINGS` with plan R3 rather than exempted. They have no `Target`
+finding on their own merit: Compose widens a small clickable's touch area to
+the 48dp minimum, and `Target` reads that touch area. Measured by the supervisor
+on 2026-10-17: a one-word 14sp link draws 38.7 × 24dp and reports
+`touchBoundsInRoot` of 48 × 48dp. `AccessibilityAuditRulesAcceptanceTest` keeps
+the three isolated proofs (an
+unlabelled `IconButton`, two adjacent 20dp clickables, and grey text on white
+below 3:1) failing only for their intended rule.
 
 ### Lint (`lintStagingDebug`)
 

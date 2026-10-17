@@ -76,8 +76,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
@@ -333,19 +335,13 @@ private fun AccountInformationStep(
     )
     Spacer(Modifier.height(spacing.space4))
     val openYearLabel = stringResource(R.string.setup_birth_year_open_description)
-    // The clickable target is the field's own parent, so its semantics node is an
-    // ancestor of the read-only field's node. That labels the control without
-    // leaving a duplicate sibling click target with identical bounds.
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .semantics { contentDescription = openYearLabel }
-            .clickable(
-                onClickLabel = openYearLabel,
-                role = Role.Button,
-                onClick = { showYearDialog = true },
-            ),
-    ) {
+    // The read-only field and a full-size clickable sibling share one Box. The
+    // overlay is declared last, so it sits on top and receives every tap and
+    // opens the year dialog even though the field covers the same pixels. The
+    // field clears its own semantics so the control exposes a single labelled
+    // actionable node instead of a duplicate target; the overlay carries the
+    // chosen year as its state so a screen reader still hears it.
+    Box(modifier = Modifier.fillMaxWidth()) {
         OutlinedTextField(
             value = state.birthYear?.toString().orEmpty(),
             onValueChange = {},
@@ -358,7 +354,20 @@ private fun AccountInformationStep(
             singleLine = true,
             modifier = Modifier
                 .fillMaxWidth()
-                .semantics { contentDescription = openYearLabel },
+                .clearAndSetSemantics {},
+        )
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .semantics {
+                    contentDescription = openYearLabel
+                    state.birthYear?.let { stateDescription = it.toString() }
+                }
+                .clickable(
+                    onClickLabel = openYearLabel,
+                    role = Role.Button,
+                    onClick = { showYearDialog = true },
+                ),
         )
     }
     Spacer(Modifier.height(spacing.space4))
