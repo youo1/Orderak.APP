@@ -14,7 +14,7 @@ type Position = { top: number; left: number };
  * wired with `aria-describedby`, which would read the same name twice. It is
  * portalled so an ancestor's `overflow: hidden` cannot clip it.
  */
-export function Tooltip({ label, children }: { label: string; children: React.ReactNode }) {
+export function Tooltip({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<Position>({ top: 0, left: 0 });
   const anchor = useRef<HTMLSpanElement | null>(null);
@@ -70,7 +70,11 @@ export function Tooltip({ label, children }: { label: string; children: React.Re
 
   useLayoutEffect(() => {
     if (!open) return;
-    const control = anchor.current;
+    // Measure the control itself, not the positioning anchor. A caller may make
+    // the anchor absolute to keep it out of a grid/flex flow (the dialog close
+    // control does); the visible control is always the anchor's first child.
+    const anchorNode = anchor.current;
+    const control = (anchorNode?.firstElementChild as HTMLElement | null) ?? anchorNode;
     const tooltip = tip.current;
     if (!control || !tooltip) return;
     const controlRect = control.getBoundingClientRect();
@@ -97,7 +101,7 @@ export function Tooltip({ label, children }: { label: string; children: React.Re
     <>
       <span
         ref={anchor}
-        className="tooltip-anchor"
+        className={['tooltip-anchor', className].filter(Boolean).join(' ')}
         onMouseOver={event => {
           if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) return;
           clearHoverTimer();
