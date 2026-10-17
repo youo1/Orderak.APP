@@ -1,12 +1,28 @@
 /* eslint-disable react/only-export-components */
 import { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { EmptyState } from '@/shared/ui/empty-state';
+import { Tooltip } from '@/shared/ui/tooltip';
 
 type Row = Record<string, unknown>;
 
 const sensitive = /password|secret|token|cipher|raw_json|details_json|phone_hash|credential/i;
 
-export function DataTable({ rows, onSelect, preferred = [] }: { rows: Row[]; onSelect?: (row: Row) => void; preferred?: string[] }) {
+export function DataTable({
+  rows,
+  onSelect,
+  preferred = [],
+  recordLabel = 'records',
+  emptyBody = 'Records appear here when they are available.',
+}: {
+  rows: Row[];
+  onSelect?: (row: Row) => void;
+  preferred?: string[];
+  /** Plural resource wording, e.g. "stores". Used by both empty variants. */
+  recordLabel?: string;
+  /** How a record appears, for the "none yet" empty state. */
+  emptyBody?: string;
+}) {
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
   const columns = useMemo(() => {
@@ -23,14 +39,25 @@ export function DataTable({ rows, onSelect, preferred = [] }: { rows: Row[]; onS
   // it means the state cannot outlive what it indexes.
   const safePage = Math.min(page, pageCount - 1);
   const visible = filtered.slice(safePage * pageSize, (safePage + 1) * pageSize);
+  const filtering = query.length > 0;
+  const count = filtering
+    ? `${filtered.length.toLocaleString()} of ${rows.length.toLocaleString()} records`
+    : `${filtered.length.toLocaleString()} records`;
 
   return <div className="table-card">
-    <div className="table-tools"><label className="search-box"><Search size={16} /><span className="sr-only">Filter these results</span><input value={query} onChange={event => { setQuery(event.target.value); setPage(0); }} placeholder="Filter these results" /></label><span>{filtered.length.toLocaleString()} records</span></div>
+    <div className="table-tools"><label className="search-box"><Search size={16} /><span className="sr-only">Filter these results</span><input value={query} onChange={event => { setQuery(event.target.value); setPage(0); }} placeholder="Filter these results" /></label><span>{count}</span></div>
     <div className="table-scroll"><table><thead><tr>{columns.map(column => <th key={column}>{humanize(column)}</th>)}</tr></thead><tbody>
-      {!visible.length && <tr><td colSpan={Math.max(1, columns.length)}><div className="empty-state">No matching records</div></td></tr>}
+      {!visible.length && <tr><td colSpan={Math.max(1, columns.length)} className="empty-cell">
+        {rows.length === 0
+          ? <EmptyState variant="none-yet" title={`No ${recordLabel} yet`} body={emptyBody} />
+          : <EmptyState variant="no-match" records={recordLabel} query={query} total={rows.length} onClear={() => { setQuery(''); setPage(0); }} />}
+      </td></tr>}
       {visible.map((row, index) => <tr key={String(row.id ?? row.flag_key ?? row.capability_key ?? index)} onClick={() => onSelect?.(row)} className={onSelect ? 'clickable' : ''}>{columns.map(column => <td key={column}>{renderValue(column, row[column])}</td>)}</tr>)}
     </tbody></table></div>
-    <div className="pagination"><span>Page {safePage + 1} of {pageCount}</span><div><button aria-label="Previous page" disabled={!safePage} onClick={() => setPage(Math.max(0, safePage - 1))}><ChevronLeft size={16} /></button><button aria-label="Next page" disabled={safePage + 1 >= pageCount} onClick={() => setPage(safePage + 1)}><ChevronRight size={16} /></button></div></div>
+    <div className="pagination"><span>Page {safePage + 1} of {pageCount}</span><div>
+      <Tooltip label="Previous page"><button aria-label="Previous page" disabled={!safePage} onClick={() => setPage(Math.max(0, safePage - 1))}><ChevronLeft size={16} /></button></Tooltip>
+      <Tooltip label="Next page"><button aria-label="Next page" disabled={safePage + 1 >= pageCount} onClick={() => setPage(safePage + 1)}><ChevronRight size={16} /></button></Tooltip>
+    </div></div>
   </div>;
 }
 
