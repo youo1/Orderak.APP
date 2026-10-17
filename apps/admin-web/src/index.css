@@ -36,11 +36,17 @@
 }
 
 :root {
+  color-scheme: light dark;
   color: var(--orderak-ink);
   background: var(--orderak-canvas);
   font-family: var(--orderak-font-family);
   font-synthesis: none;
 }
+
+.orderak-dark { color-scheme: dark; }
+
+/* The admin has no theme toggle: the page follows the operating system. This
+   class pins a dark surface (the navigation rail) when one is needed. */
 
 /* Generated design-system editor. Preview tokens are never applied here; they
    are sent to the isolated iframe document. */
@@ -265,13 +271,53 @@ tr.clickable:hover td { background: var(--orderak-hover-surface); }
 .status.warning { color: var(--orderak-on-warning-container); background: var(--warning-soft); }
 .status.neutral { color: var(--muted); background: var(--md-sys-color-surface-container-high); }
 .pagination { min-height: 50px; display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: var(--orderak-type-label-medium-size); }
-.pagination button { width: 31px; height: 31px; display: inline-grid; margin-left: 5px; place-items: center; border: 1px solid var(--line); border-radius: var(--orderak-shape-small); background: var(--surface); cursor: pointer; }
+.pagination button { width: 31px; height: 31px; display: inline-grid; margin-left: 5px; place-items: center; border: 1px solid var(--line); border-radius: var(--orderak-shape-small); color: var(--muted); background: var(--surface); cursor: pointer; }
+.pagination button:disabled { opacity: .38; cursor: not-allowed; }
 /* Figures in a column must be tabular: Cairo's proportional lining figures
    shift width and make a money column read ragged. Value from the system
    (--orderak-numeric-tabular), not inlined. */
 td, .metric-card strong, .attention em, .snapshot dd, .pagination { font-variant-numeric: var(--orderak-numeric-tabular); }
 
-.empty-state { padding: 32px; color: var(--muted); text-align: center; }
+.empty-state { display: grid; justify-items: center; gap: 10px; padding: 44px 24px; color: var(--muted); text-align: center; }
+.empty-state-glyph { width: 48px; height: 48px; display: grid; place-items: center; border-radius: var(--orderak-shape-full); color: var(--muted); background: var(--md-sys-color-surface-container-high); }
+.empty-state-title { margin: 0; color: var(--ink); font-size: var(--orderak-type-title-medium-size); font-weight: var(--orderak-type-title-medium-weight); line-height: 1.35; }
+.empty-state-body { max-width: 420px; margin: 0; color: var(--muted); font-size: var(--orderak-type-body-small-size); line-height: 1.5; }
+.empty-state-clear { min-height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--orderak-shape-small); color: var(--ink); background: var(--surface); font-size: var(--orderak-type-label-medium-size); font-weight: var(--orderak-type-label-medium-weight); cursor: pointer; }
+.empty-state-clear:hover { background: var(--primary-soft); }
+.empty-cell { height: auto; max-width: none; padding: 0; overflow: visible; white-space: normal; }
+
+.checkbox-control { display: grid; gap: 6px; }
+.checkbox-label-row { position: relative; display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+.checkbox-input { position: absolute; top: 0; left: 0; width: 24px; height: 24px; margin: 0; padding: 0; border: 0; appearance: none; opacity: 0; cursor: pointer; }
+.checkbox-input:disabled { cursor: not-allowed; }
+.checkbox-input:focus-visible { outline: none; }
+.checkbox-box { width: 20px; height: 20px; display: grid; flex: 0 0 20px; place-items: center; border: 2px solid var(--md-sys-color-outline); border-radius: var(--orderak-shape-extra-small); color: transparent; background: var(--surface); }
+.checkbox-check { opacity: 0; }
+.checkbox-input:checked + .checkbox-box { color: var(--md-sys-color-on-primary); background: var(--md-sys-color-primary); border-color: var(--md-sys-color-primary); }
+.checkbox-input:checked + .checkbox-box .checkbox-check { opacity: 1; }
+.checkbox-input:focus-visible + .checkbox-box { outline: var(--orderak-focus-ring); outline-offset: var(--orderak-focus-ring-offset); }
+.checkbox-label { color: var(--ink); font-size: var(--orderak-type-body-medium-size); font-weight: var(--orderak-type-label-medium-weight); line-height: 1.35; }
+.checkbox-hint { margin-left: 30px; color: var(--muted); font-size: var(--orderak-type-body-small-size); line-height: 1.4; }
+.checkbox-input:disabled + .checkbox-box { border-color: color-mix(in srgb, var(--ink) 38%, transparent); background: var(--surface); }
+.checkbox-input:disabled:checked + .checkbox-box { border-color: color-mix(in srgb, var(--ink) 38%, transparent); background: color-mix(in srgb, var(--ink) 38%, transparent); }
+.checkbox-input:disabled:checked + .checkbox-box .checkbox-check { color: var(--surface); }
+.checkbox-control.is-disabled .checkbox-label { color: color-mix(in srgb, var(--ink) 38%, transparent); }
+.checkbox-control.is-disabled .checkbox-hint { color: color-mix(in srgb, var(--muted) 38%, transparent); }
+.checkbox-control.is-disabled .checkbox-label-row { cursor: not-allowed; }
+
+.tooltip-anchor { display: inline-flex; }
+.tooltip { position: fixed; z-index: 200; max-width: 260px; padding: 5px 8px; border-radius: var(--orderak-shape-extra-small); color: var(--md-sys-color-inverse-on-surface); background: var(--md-sys-color-inverse-surface); box-shadow: var(--orderak-shadow-raised); font-size: var(--orderak-type-label-medium-size); font-weight: var(--orderak-type-label-medium-weight); line-height: 1.35; pointer-events: none; }
+
+.toast-region { position: fixed; inset-block-end: 24px; inset-inline-end: 24px; z-index: 120; display: flex; flex-direction: column; gap: 8px; width: min(400px, calc(100vw - 32px)); pointer-events: none; }
+.toast { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 12px 14px; border-radius: var(--orderak-shape-small); color: var(--md-sys-color-inverse-on-surface); background: var(--md-sys-color-inverse-surface); box-shadow: var(--orderak-shadow-overlay); pointer-events: auto; animation: toast-in var(--orderak-motion-fast); }
+.toast-icon { flex: 0 0 auto; margin-top: 1px; color: var(--md-sys-color-inverse-primary); }
+.toast-content { min-width: 0; flex: 1; }
+.toast-message { margin: 0; font-size: var(--orderak-type-body-medium-size); line-height: 1.4; }
+.toast-detail { margin: 2px 0 0; color: var(--md-sys-color-inverse-on-surface); font-size: var(--orderak-type-body-small-size); line-height: 1.4; }
+.toast-dismiss { width: 28px; height: 28px; display: grid; flex: 0 0 28px; place-items: center; border: 0; border-radius: var(--orderak-shape-extra-small); color: color-mix(in srgb, var(--md-sys-color-inverse-on-surface) 75%, transparent); background: transparent; cursor: pointer; }
+.toast-dismiss:hover { background: color-mix(in srgb, var(--md-sys-color-inverse-on-surface) 12%, transparent); }
+@keyframes toast-in { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
 .section-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
 .section-heading h2 { margin: 0; text-transform: capitalize; }
 .section-heading span { padding: 3px 7px; border-radius: var(--orderak-shape-full); color: var(--muted); background: var(--md-sys-color-surface-container-high); font-size: var(--orderak-type-label-medium-size); font-weight: var(--orderak-type-label-medium-weight); }
@@ -331,11 +377,6 @@ td, .metric-card strong, .attention em, .snapshot dd, .pagination { font-variant
 .status-line strong { margin-right: 10px; color: var(--ink); }
 .dot { width: 7px; height: 7px; border-radius: var(--orderak-shape-full); background: var(--md-sys-color-outline); }
 .dot.on { background: var(--primary-tint); box-shadow: 0 0 0 3px var(--primary-soft); }
-.switch input { position: absolute; opacity: 0; }
-.switch span { width: 42px; height: 24px; display: block; padding: 3px; border-radius: var(--orderak-shape-full); background: var(--line); cursor: pointer; transition: var(--orderak-motion-drawer); }
-.switch span::after { content: ''; width: 18px; height: 18px; display: block; border-radius: var(--orderak-shape-full); background: var(--surface); transition: var(--orderak-motion-drawer); }
-.switch input:checked + span { background: var(--primary); }
-.switch input:checked + span::after { transform: translateX(18px); }
 .job-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
 .invite-panel { margin-bottom: 18px; }
 .one-time-secret { grid-template-columns: auto 1fr auto; align-items: center; margin-top: 16px; }
@@ -376,6 +417,5 @@ td, .metric-card strong, .attention em, .snapshot dd, .pagination { font-variant
   .auth-card { padding: 28px 22px; }
   .message { width: 92%; }
   .control-row { grid-template-columns: 42px 1fr; }
-  .control-row .switch, .control-row > .status { grid-column: 2; }
-  .one-time-secret { grid-template-columns: 1fr; }
+  .control-row > .status { grid-column: 2; }  .one-time-secret { grid-template-columns: 1fr; }
 }

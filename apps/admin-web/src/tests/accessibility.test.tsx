@@ -36,6 +36,10 @@ import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/alert';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/card';
+import { Checkbox } from '@/shared/ui/checkbox';
+import { EmptyState } from '@/shared/ui/empty-state';
+import { ToastProvider, useToast } from '@/shared/ui/toast';
+import { Tooltip } from '@/shared/ui/tooltip';
 import { askConfirm, ConfirmHost } from '@/shared/ui/confirm';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/dialog';
 import { Field } from '@/shared/ui/field';
@@ -83,6 +87,19 @@ const MODES: Mode[] = [
   { name: 'prefers-color-scheme: dark', dir: 'ltr', lang: 'en', colorScheme: 'dark' },
   { name: 'RTL Arabic', dir: 'rtl', lang: 'ar', colorScheme: 'light' },
 ];
+
+function ToastFixture() {
+  const { enqueue } = useToast();
+  return (
+    <button
+      type="button"
+      style={{ minWidth: 32, minHeight: 32 }}
+      onClick={() => enqueue({ message: 'Runtime configuration saved.', detail: 'Its result appears in the job list when it finishes.' })}
+    >
+      Show toast
+    </button>
+  );
+}
 
 type EmulationSession = { send: (method: string, params?: Record<string, unknown>) => Promise<unknown> };
 
@@ -317,6 +334,61 @@ describe('admin kit accessibility', () => {
         <Switch aria-label="Disabled switch" disabled />
       </main>
     ));
+  }, 120_000);
+
+  it('has no blocking axe findings for the checkbox states', async () => {
+    await checkEveryMode('checkbox states', () => (
+      <main>
+        <Checkbox checked={false} onCheckedChange={() => undefined} label="Unchecked option" />
+        <Checkbox checked onCheckedChange={() => undefined} label="Checked option" />
+        <Checkbox checked={false} onCheckedChange={() => undefined} disabled label="Disabled option" />
+        <Checkbox checked onCheckedChange={() => undefined} disabled label="Disabled checked option" />
+        <Checkbox
+          checked={false}
+          onCheckedChange={() => undefined}
+          label="Active administrator"
+          hint="Can sign in with their role. Turning this off ends their sessions."
+        />
+      </main>
+    ), {
+      prepare: async () => { document.querySelector<HTMLInputElement>('.checkbox-input')?.focus(); },
+      rendered: '.checkbox-box',
+    });
+  }, 120_000);
+
+  it('has no blocking axe findings for both empty-state variants', async () => {
+    await checkEveryMode('empty states', () => (
+      <main>
+        <EmptyState variant="none-yet" title="No bug reports yet" body="Bug reports appear here when a seller files one." />
+        <EmptyState variant="no-match" records="stores" query="acme corp" total={1284} onClear={() => undefined} />
+      </main>
+    ), { rendered: '.empty-state-title' });
+  }, 120_000);
+
+  it('has no blocking axe findings for an open tooltip', async () => {
+    await checkEveryMode('tooltip', () => (
+      <main>
+        <Tooltip label="Previous page">
+          <button type="button" aria-label="Previous page" data-tooltip-control style={{ minWidth: 32, minHeight: 32 }}>Previous</button>
+        </Tooltip>
+      </main>
+    ), {
+      prepare: async () => { document.querySelector<HTMLButtonElement>('[data-tooltip-control]')?.focus(); },
+      rendered: '[role="tooltip"]',
+    });
+  }, 120_000);
+
+  it('has no blocking axe findings for an announced toast', async () => {
+    await checkEveryMode('toast', () => (
+      <ToastProvider>
+        <ToastFixture />
+      </ToastProvider>
+    ), {
+      prepare: async () => {
+        Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(button => button.textContent === 'Show toast')?.click();
+      },
+      rendered: '.toast',
+    });
   }, 120_000);
 
   it('has no blocking axe findings for the tabs', async () => {
