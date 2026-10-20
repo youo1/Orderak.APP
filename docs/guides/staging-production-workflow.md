@@ -138,13 +138,16 @@ service-account keys, or Production API tokens into Staging.
 
 The repository currently uses these controls:
 
-- One protected branch, `main`: pull request required, required CI checks, no
+- Three protected branches, `develop`, `staging` and `main`: pull request
+  required, required CI checks (10 on `develop`, 13 on `staging` and `main`), no
   force push, no deletion. `feature/*`, `fix/*` and `hotfix/*` are deliberately
   unprotected — they are one person's working area until a pull request exists,
-  and force-pushing a rebase there is normal.
-- `main` additionally enforces its rules on administrators, so the repository
-  owner cannot push to it directly either, and requires conversation resolution
-  before merge.
+  and force-pushing a rebase there is normal. (This bullet said "one protected
+  branch, `main`" from the 2026-08-25 single-branch collapse until 2026-10-20;
+  measured that day.)
+- `staging` and `main` additionally enforce their rules on administrators, so
+  the repository owner cannot push to them directly either, and require
+  conversation resolution before merge. `develop` does neither.
 - Required approvals are zero on all three. On a single-maintainer repository an
   approval is a self-approval, which constrains nothing — the same reasoning the
   next section records for environment reviewers. The check suite is the gate
@@ -152,14 +155,18 @@ The repository currently uses these controls:
 - Separate `staging` and `production` GitHub Environments, both set to accept
   deployments from **protected branches only**
   (`deployment_branch_policy: {protected_branches: true}`). This is load-bearing,
-  not incidental: `staging-deploy.yml` runs on `main`, so removing `main`'s
-  protection does not merely relax a rule — it stops Staging deploying at all, at
-  the environment gate.
+  not incidental. `staging-deploy.yml` deploys on pushes to `staging`, the
+  hotfix and provenance recovery dispatch it against `main`, and
+  `production-deploy.yml` is dispatched from `main`. Removing either branch's
+  protection does not merely relax a rule — it stops those deploys at the
+  environment gate. The same rule is why an unprotected `hotfix/*` branch cannot
+  deploy to Staging at all.
 - Environment-scoped secrets and variables; workflows do not share credentials
   implicitly.
 - Separate concurrency groups so two deployments to the same environment do
   not overlap.
-- A manual Production workflow requiring both a tested `release_ref` and the
+- A manual Production workflow requiring both a `release_sha` — `main`'s current
+  tip as a full 40-character SHA, with Staging deployment provenance — and the
   exact confirmation text `DEPLOY_PRODUCTION`.
 
 **Production has a required-reviewer rule again. Corrected 2026-08-24.**
@@ -210,8 +217,9 @@ three environments present are `production`, `staging` and
 What does the real work is what always did — checks a machine performs on every
 dispatch, none of which need a second person to be available:
 the typed `DEPLOY_PRODUCTION` confirmation, the 40-character SHA matched against
-`origin/main`, the requirement that the SHA already have a successful
-`staging-deploy.yml` run, `require-deploy-owner`, `verify-deployment-map.mjs`,
+`origin/main`, the requirement that the SHA — or, for a promotion merge, its
+second parent — already have a successful Staging deployment record,
+`require-deploy-owner`, `verify-deployment-map.mjs`,
 the full test/lint/`--dry-run` pass, and the post-deploy smoke test. Alongside
 those sits credential custody: each deploy token is scoped to its environment, so
 a workflow that does not declare the environment cannot reach its resources.
