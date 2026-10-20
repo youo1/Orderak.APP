@@ -11,6 +11,7 @@ import { Field } from '@/shared/ui/field';
 import { Input } from '@/shared/ui/input';
 import { NativeSelect, Textarea } from '@/shared/ui/textarea';
 import { STEP_UP_UNAVAILABLE, useStepUp } from '@/shared/api/step-up';
+import { useToast } from '@/shared/ui/toast';
 import { useAuth } from '@/features/auth/auth-context';
 
 type Row = Record<string, unknown>;
@@ -44,6 +45,7 @@ type Health = {
 export function BillingVerificationsPage() {
   const auth = useAuth();
   const client = useQueryClient();
+  const { enqueue } = useToast();
   const [selected, setSelected] = useState<Row | null>(null);
   const [retry, setRetry] = useState({ reason: '', password: '', totp: '' });
   const [statusFilter, setStatusFilter] = useState('');
@@ -77,6 +79,7 @@ export function BillingVerificationsPage() {
       });
     },
     onSuccess: () => {
+      enqueue({ message: 'Billing verification retried.' });
       setSelected(null);
       setRetry({ reason: '', password: '', totp: '' });
       client.invalidateQueries({ queryKey: ['billing-verifications'] });

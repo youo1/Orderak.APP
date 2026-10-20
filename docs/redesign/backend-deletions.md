@@ -61,7 +61,7 @@ ALTER TABLE zz_retired_content_pages RENAME TO content_pages;
 The migration also writes a `retired_tables` row per table, so the follow-up that
 drops them has the date and the reason without reconstructing it from git history.
 **The drop is the next step, after a backup has been taken and the row counts
-recorded.** That is a second deliberate migration (061), not an oversight.
+recorded.** That is a later deliberate migration after a backup, not an oversight; it is not assigned a number here.
 
 ## Refused: `geo_city_names`, `geo_city_search`
 

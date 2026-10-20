@@ -171,6 +171,28 @@ android {
     }
     buildFeatures { compose = true; buildConfig = true }
 
+    // The accessibility preview audit resolves and renders every @PreviewTest
+    // declaration from the screenshot source set on the JVM, so those sources
+    // have to compile into the unit-test artifact. The screenshotTest source
+    // set itself is untouched; this only adds its directory to `test`. Both the
+    // Java and Kotlin source directories are named because AGP's built-in
+    // Kotlin compilation reads the latter, and the audit must be able to
+    // Class.forName each <File>ScreenshotTestKt facade at runtime.
+    sourceSets {
+        getByName("test") {
+            java.srcDir("src/screenshotTest/java")
+            kotlin.srcDir("src/screenshotTest/java")
+        }
+    }
+
+    testOptions {
+        unitTests {
+            // Robolectric needs the merged Android resources on the unit-test
+            // runtime classpath (strings, plurals, themes, fonts).
+            isIncludeAndroidResources = true
+        }
+    }
+
     // Room exports the schema here so a future migration can be written and
     // tested against the shipped one rather than against a description of it.
     ksp { arg("room.schemaLocation", "$projectDir/schemas") }
@@ -237,6 +259,14 @@ dependencies {
     testImplementation(libs.coroutines.test)
     testImplementation(libs.turbine)
     testImplementation(libs.sqlite.jdbc)
+    // The accessibility preview audit runs the real composables on the JVM.
+    testImplementation(libs.robolectric)
+    testImplementation(libs.accessibility.test.framework)
+    testImplementation(composeBom)
+    testImplementation(libs.compose.ui.test.junit4)
+    testImplementation(libs.androidx.test.ext.junit)
+    testImplementation(libs.screenshot.validation.api)
+    testImplementation(libs.compose.ui.tooling)
     androidTestImplementation(composeBom)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
@@ -274,6 +304,17 @@ dependencies {
  * render would still read the host.
  */
 tasks.withType<Test>().matching { it.name.contains("ScreenshotTest") }.configureEach {
+    systemProperty("user.timezone", "UTC")
+    systemProperty("user.language", "en")
+    systemProperty("user.country", "US")
+}
+
+/**
+ * The accessibility preview audit renders the same translated surfaces as the
+ * screenshot tests, so it is pinned the same way. The predicate excludes the
+ * ScreenshotTest tasks so those are not configured twice.
+ */
+tasks.withType<Test>().matching { !it.name.contains("ScreenshotTest") }.configureEach {
     systemProperty("user.timezone", "UTC")
     systemProperty("user.language", "en")
     systemProperty("user.country", "US")
