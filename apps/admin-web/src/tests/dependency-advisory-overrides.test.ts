@@ -208,10 +208,12 @@ describe('pnpm-lock.yaml: resolved versions land inside the overridden ranges', 
     }
   });
 
-  it('sharp keeps its pre-existing resolved versions with no override-forced upgrade', () => {
+  it('sharp keeps the versions its miniflare parents pin, with no override-forced upgrade', () => {
+    // 0.35.2 is the miniflare that @cloudflare/vitest-pool-workers pins exactly;
+    // 0.35.5 is the miniflare under wrangler 4.149.0. Both waivers stay while 0.35.2 does.
     const versions = collectVersions(lockfile, 'sharp');
     expect(versions.length).toBeGreaterThan(0);
-    expect(new Set(versions)).toEqual(new Set(['0.35.2', '0.35.4']));
+    expect(new Set(versions)).toEqual(new Set(['0.35.2', '0.35.5']));
   });
 
   it('braces still resolves to 3.0.3 (no fixed release exists to move to)', () => {
