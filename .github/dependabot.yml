@@ -88,6 +88,19 @@ updates:
       # Raise .nvmrc first, then this.
       - dependency-name: "@types/node"
         update-types: [version-update:semver-major]
+      # vitest 5 cannot run the backend suite: @cloudflare/vitest-pool-workers,
+      # which runs every Worker test, accepts only vitest ^4.1.0 in its latest
+      # release (0.23.0, checked 2026-10-20). PR #167 (vitest 5 in the
+      # dev-tooling group) failed test, lint-and-links and protected-auth-contract;
+      # PR #169 (@vitest/coverage-istanbul 5) passed only because nothing in CI
+      # runs coverage, and that plugin works with vitest 5 alone. The @vitest/*
+      # packages must match vitest's major, so they are held with it. Lift both
+      # rules when the pool's peerDependencies accept vitest 5, and move vitest,
+      # @vitest/* and the admin's browser provider in one change.
+      - dependency-name: vitest
+        update-types: [version-update:semver-major]
+      - dependency-name: "@vitest/*"
+        update-types: [version-update:semver-major]
 
   # Android / Compose / Kotlin toolchain.
   - package-ecosystem: gradle
