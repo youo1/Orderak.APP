@@ -137,7 +137,7 @@ jobs:
           --report junit,har
           --report-dir schemathesis-report
           --output-sanitize true
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: schemathesis-nightly-sanitized-${{ matrix.shard }}
@@ -148,7 +148,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: grafana/setup-k6-action@db07bd9765aac508ef18982e52ab937fe633a065 # v1.2.1
+      - uses: grafana/setup-k6-action@43b9fc21641a76002687994433dd586f56e791b1 # v1.2.2
       - name: Low nightly load
         if: ${{ !inputs.run_pre_release }}
         run: k6 run quality/performance/k6/api-load.js

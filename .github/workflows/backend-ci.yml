@@ -29,9 +29,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -58,6 +58,25 @@ jobs:
 
       - name: Run admin accessibility tests
         run: pnpm --dir apps/admin-web run test:a11y
+
+      # Added 2026-10-20. Like the Worker-types check below, these ran only
+      # inside staging-deploy.yml and production-deploy.yml, so a dependency
+      # bump that broke the admin passed every required pull-request check and
+      # failed at deploy time instead. That is what the minor-and-patch group
+      # (#184) did: its wrangler moved miniflare's sharp from 0.35.4 to 0.35.5,
+      # and Deploy Staging stopped on dependency-advisory-overrides.test.ts.
+      # The end-to-end suite reuses the Chromium installed above.
+      - name: Run admin unit tests
+        run: pnpm --dir apps/admin-web run test
+
+      - name: Run admin end-to-end tests
+        run: pnpm --dir apps/admin-web run test:e2e
+
+      - name: Lint admin
+        run: pnpm --dir apps/admin-web run lint
+
+      - name: Admin edge Worker types are current
+        run: pnpm --dir apps/admin-web run cf-types:check
 
       - name: Run backend tests
         working-directory: services/backend
@@ -139,9 +158,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
           cache: pnpm
