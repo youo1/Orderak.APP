@@ -151,14 +151,15 @@ overrides:
 # developer already supplied.
 #
 # It is ignored rather than overridden for the same reason as faker below, and
-# the reason was measured. wrangler 4.131.0 — already the resolved version for
-# both workspaces that declare it, and the newest in `^4.131.0` — depends on
-# miniflare 5.20260910.0-alpha, which pins sharp 0.35.4 and is clean. The one
-# remaining source is @cloudflare/vitest-pool-workers@0.22.0, which pins
+# the reason was measured. wrangler 4.149.0 — the resolved version for both
+# workspaces that declare it since 2026-10-20 — depends on miniflare
+# 5.20261006.1-alpha, which pins sharp 0.35.5 and is clean. The one remaining
+# source is @cloudflare/vitest-pool-workers@0.23.0, which pins
 # `wrangler: 4.124.0` and `miniflare: 5.20260815.0-alpha` exactly, not as
-# ranges. Overriding either hands it a version it never declared support for —
-# the trade the fast-uri upper bound exists to refuse. 0.22.0 is the latest
-# published release, so there is no in-range or out-of-range upgrade to take.
+# ranges, and that miniflare pins sharp 0.35.2. Overriding either hands it a
+# version it never declared support for — the trade the fast-uri upper bound
+# exists to refuse. 0.23.0 is the latest published release (checked
+# 2026-10-20), so there is no in-range or out-of-range upgrade to take.
 #
 # This entry goes when Cloudflare ships a vitest-pool-workers built on
 # miniflare 5.20260910.0-alpha or later. Re-check on the next audit failure.
@@ -173,11 +174,12 @@ auditConfig:
   #
   # GHSA-wq5f-xc86-pv6w (high) — sharp's bundled libvips decodes a crafted image
   # with an out-of-bounds write. It is dev-only through miniflare, which backs
-  # the wrangler dev server and the Workers vitest pool; no parent release ships
-  # sharp >=0.35.5 yet (latest miniflare still resolves 0.35.4), and sharp's
-  # native platform packages are not exercised by the tests. Waived, not
-  # overridden. Expires 2026-11-05: remove when a miniflare release ships
-  # sharp >=0.35.5.
+  # the wrangler dev server and the Workers vitest pool. Fixed in sharp 0.35.5,
+  # which wrangler 4.149.0's miniflare already resolves; the vulnerable 0.35.2
+  # is left only under the miniflare @cloudflare/vitest-pool-workers@0.23.0 pins
+  # exactly (see GHSA-rgj7-g3m4-5g8c above). sharp's native platform packages
+  # are not exercised by the tests. Waived, not overridden. Expires 2026-11-05:
+  # remove when a vitest-pool-workers release resolves sharp >=0.35.5.
   ignoreGhsas:
     - GHSA-qxc2-j82w-r537
     - GHSA-rgj7-g3m4-5g8c

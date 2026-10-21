@@ -419,7 +419,8 @@ the `on:` block of each file rather than assumed from the workflow name.
 
 **Runs on every PR, path-filtered:**
 
-- `backend-ci.yml`: Worker tests and architecture verification.
+- `backend-ci.yml`: Worker tests and architecture verification, plus the
+  admin's unit, end-to-end, accessibility, lint and edge-types checks.
 - `android-ci.yml`: staging assembly, unit tests, lint, and all build guards.
 - `auth-phase1-contract.yml`: auth/API guards plus focused Android and Worker
   behavioral tests.
