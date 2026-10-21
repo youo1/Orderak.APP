@@ -59,6 +59,25 @@ jobs:
       - name: Run admin accessibility tests
         run: pnpm --dir apps/admin-web run test:a11y
 
+      # Added 2026-10-20. Like the Worker-types check below, these ran only
+      # inside staging-deploy.yml and production-deploy.yml, so a dependency
+      # bump that broke the admin passed every required pull-request check and
+      # failed at deploy time instead. That is what the minor-and-patch group
+      # (#184) did: its wrangler moved miniflare's sharp from 0.35.4 to 0.35.5,
+      # and Deploy Staging stopped on dependency-advisory-overrides.test.ts.
+      # The end-to-end suite reuses the Chromium installed above.
+      - name: Run admin unit tests
+        run: pnpm --dir apps/admin-web run test
+
+      - name: Run admin end-to-end tests
+        run: pnpm --dir apps/admin-web run test:e2e
+
+      - name: Lint admin
+        run: pnpm --dir apps/admin-web run lint
+
+      - name: Admin edge Worker types are current
+        run: pnpm --dir apps/admin-web run cf-types:check
+
       - name: Run backend tests
         working-directory: services/backend
         run: pnpm test
