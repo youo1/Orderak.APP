@@ -25,7 +25,14 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # 30, not 15: the Chromium step installs system packages with --with-deps,
+    # and on 2026-10-22 the Azure apt mirror served them at 32 kB/s ("Fetched
+    # 24.2 MB in 12min 35s"), so that step alone took 730-805 s and the job was
+    # cancelled mid-tests on two pull requests in a row. A normal run takes 3-5
+    # minutes. --with-deps stays: the axe and Playwright checks need Chromium's
+    # real fonts and libraries. If this recurs, move the admin browser checks
+    # into their own job instead of raising this again.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
