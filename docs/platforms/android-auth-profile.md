@@ -11,7 +11,7 @@ applies_to: [production, staging]
 [`../contracts/authentication-security-invariants.md`](../contracts/authentication-security-invariants.md)
 
 The current Android runtime behavior is intentionally unchanged by the
-cross-platform-readiness migration.
+cross-platform-readiness and D-13 age-evidence migrations.
 
 - Firebase Phone Authentication remains the account-creation and recovery
   provider. Passkeys remain an additional returning-seller channel.
@@ -31,6 +31,16 @@ cross-platform-readiness migration.
 - The Worker verifies Firebase proof, legal evidence, device admission,
   restrictions, and session credentials exactly as documented in the versioned
   auth contract.
+- The migrated Worker onboarding account contract requires affirmative age
+  confirmation (`age_confirmed: true`) and records the exact canonical Arabic
+  statement `عمري ١٨ عامًا أو أكثر`, source `android_onboarding_v2`, a Worker
+  timestamp, and the accepted Terms version as confidential evidence on
+  `legal_acceptances`. Installed clients may still send `birth_year`; the Worker
+  accepts a valid legacy year only when `age_confirmed` is absent, records source
+  `android_onboarding_v2_legacy_birth_year` with NULL statement text, and does
+  not store the submitted year in `onboarding_sessions` or `seller_profiles`.
+  The current Android runtime source, strings, and UI are unchanged for now;
+  this profile does not require new Android strings or source.
 - Every Seller request uses explicit `/api/v1/*`; `ApiRoutes` rejects
   unversioned and v2 paths before network I/O. All response decoding crosses
   `NetworkJson` with `ignoreUnknownKeys=true`, while missing required or

@@ -98,7 +98,7 @@ describe("Auth and onboarding V2", () => {
 
 		const account = await route("/api/v1/onboarding/account", {
 			full_name: "Ayman Seller",
-			birth_year: 1988,
+			age_confirmed: true,
 			email: "owner@example.com",
 			terms_accepted: true,
 			app_version: "2.0.0",
@@ -123,7 +123,9 @@ describe("Auth and onboarding V2", () => {
 		const recentAuth = String(payload.recent_auth_token);
 
 		const foundation = await env.orderak_db.prepare(
-			`SELECT s.business_category,s.city_name,p.full_name,p.birth_year,p.email_private,l.source
+			`SELECT s.business_category,s.city_name,p.full_name,p.birth_year,p.email_private,l.source,
+			        l.age_confirmation_source,l.age_confirmation_statement_text,
+			        l.age_confirmation_terms_version,l.age_confirmation_confirmed_at
 			 FROM sellers s JOIN seller_profiles p ON p.seller_id=s.id
 			 JOIN legal_acceptances l ON l.seller_id=s.id WHERE s.phone=?`,
 		).bind(PHONE).first<Record<string, unknown>>();
@@ -131,10 +133,14 @@ describe("Auth and onboarding V2", () => {
 			business_category: "fashion",
 			city_name: "Cairo",
 			full_name: "Ayman Seller",
-			birth_year: 1988,
+			birth_year: null,
 			email_private: "owner@example.com",
 			source: "android_onboarding_v2",
+			age_confirmation_source: "android_onboarding_v2",
+			age_confirmation_statement_text: "عمري ١٨ عامًا أو أكثر",
 		});
+		expect(foundation?.age_confirmation_terms_version).toBeTruthy();
+		expect(foundation?.age_confirmation_confirmed_at).toBeTruthy();
 
 		const resendHeaders = {
 			"x-orderak-phone": PHONE,
@@ -217,30 +223,137 @@ describe("Auth and onboarding V2", () => {
 		expect(session?.status).toBe("phone_verified");
 	});
 
-	it("requires a private integer birth year within the UTC year range", async () => {
+	it("requires affirmative age confirmation or a valid legacy birth year", async () => {
 		const onboardingToken = await beginOnboarding();
 		const headers = { authorization: `Bearer ${onboardingToken}` };
-		for (const birthYear of [
-			undefined,
-			1899,
-			new Date().getUTCFullYear() + 1,
-			1990.5,
-			"1990",
+		for (const body of [
+			{ full_name: "Ayman Seller", terms_accepted: true, app_version: "2.0.0" },
+			{ full_name: "Ayman Seller", age_confirmed: false, terms_accepted: true },
+			{ full_name: "Ayman Seller", age_confirmed: "true", terms_accepted: true },
+			{ full_name: "Ayman Seller", birth_year: 1899, terms_accepted: true },
 		]) {
-			const body: Record<string, unknown> = {
-				full_name: "Ayman Seller",
-				terms_accepted: true,
-				app_version: "2.0.0",
-			};
-			if (birthYear !== undefined) body.birth_year = birthYear;
 			const response = await route("/api/v1/onboarding/account", body, headers);
 			expect(response.status).toBe(400);
-			expect(await response.json()).toMatchObject({ code: "invalid_birth_year" });
+			expect(await response.json()).toMatchObject({ code: "age_confirmation_required" });
 		}
 		const session = await env.orderak_db.prepare(
-			"SELECT status,birth_year FROM onboarding_sessions WHERE phone_e164=?",
-		).bind(PHONE).first<{ status: string; birth_year: number | null }>();
-		expect(session).toEqual({ status: "phone_verified", birth_year: null });
+			"SELECT status,birth_year,age_confirmation_source FROM onboarding_sessions WHERE phone_e164=?",
+		).bind(PHONE).first<{ status: string; birth_year: number | null; age_confirmation_source: string | null }>();
+		expect(session).toEqual({
+			status: "phone_verified",
+			birth_year: null,
+			age_confirmation_source: null,
+		});
+
+		// An installed client that sends only a valid birth year is still accepted,
+		// but the year is never persisted and the evidence statement stays NULL.
+		const legacy = await route("/api/v1/onboarding/account", {
+			full_name: "Legacy Seller",
+			birth_year: 1990,
+			terms_accepted: true,
+			app_version: "2.0.0",
+		}, headers);
+		expect(legacy.status).toBe(200);
+		const legacySession = await env.orderak_db.prepare(
+			"SELECT birth_year,age_confirmation_source FROM onboarding_sessions WHERE phone_e164=?",
+		).bind(PHONE).first<{ birth_year: number | null; age_confirmation_source: string | null }>();
+		expect(legacySession).toEqual({
+			birth_year: null,
+			age_confirmation_source: "android_onboarding_v2_legacy_birth_year",
+		});
+	});
+
+	it("creates a minimal store with optional category and city persisted as NULL", async () => {
+		const onboardingToken = await beginOnboarding();
+		await route("/api/v1/onboarding/account", {
+			full_name: "Minimal Seller",
+			age_confirmed: true,
+			terms_accepted: true,
+		}, { authorization: `Bearer ${onboardingToken}` });
+		const completed = await route("/api/v1/onboarding/complete", {
+			device_secret: DEVICE_SECRET,
+			store_name: "Owner Only Shop",
+			country_iso: "EG",
+		}, { authorization: `Bearer ${onboardingToken}` });
+		expect(completed.status).toBe(200);
+		const body = await completed.json<Record<string, unknown>>();
+		expect(body.store_url).toBeTruthy();
+		const row = await env.orderak_db.prepare(
+			`SELECT business_category,business_category_id,business_subcategory_id,
+			        city_geoname_id,city_catalog_id,city_catalog_version,city_name
+			 FROM sellers WHERE phone=?`,
+		).bind(PHONE).first<Record<string, unknown>>();
+		expect(row).toEqual({
+			business_category: null,
+			business_category_id: null,
+			business_subcategory_id: null,
+			city_geoname_id: null,
+			city_catalog_id: null,
+			city_catalog_version: null,
+			city_name: null,
+		});
+	});
+
+	it("validates category and city independently when only one is supplied", async () => {
+		const onboardingToken = await beginOnboarding();
+		await route("/api/v1/onboarding/account", {
+			full_name: "Partial Seller",
+			age_confirmed: true,
+			terms_accepted: true,
+		}, { authorization: `Bearer ${onboardingToken}` });
+
+		const badCity = await route("/api/v1/onboarding/complete", {
+			device_secret: DEVICE_SECRET,
+			store_name: "Partial Shop",
+			country_iso: "EG",
+			city_name: "A",
+		}, { authorization: `Bearer ${onboardingToken}` });
+		expect(badCity.status).toBe(400);
+		expect(await badCity.json()).toMatchObject({ code: "invalid_city" });
+
+		const badCategory = await route("/api/v1/onboarding/complete", {
+			device_secret: DEVICE_SECRET,
+			store_name: "Partial Shop",
+			country_iso: "EG",
+			business_category: "not_a_real_category",
+		}, { authorization: `Bearer ${onboardingToken}` });
+		expect(badCategory.status).toBe(400);
+		expect(await badCategory.json()).toMatchObject({ code: "invalid_business_category" });
+	});
+
+	it("records legacy birth-year evidence with a NULL statement and no stored year", async () => {
+		const onboardingToken = await beginOnboarding();
+		await route("/api/v1/onboarding/account", {
+			full_name: "Legacy Seller",
+			birth_year: 1988,
+			terms_accepted: true,
+			app_version: "2.0.0",
+		}, { authorization: `Bearer ${onboardingToken}` });
+		const completed = await route("/api/v1/onboarding/complete", {
+			device_secret: DEVICE_SECRET,
+			store_name: "Legacy Shop",
+			business_category: "fashion",
+			country_iso: "EG",
+			city_name: "Cairo",
+		}, { authorization: `Bearer ${onboardingToken}` });
+		expect(completed.status).toBe(200);
+
+		const evidence = await env.orderak_db.prepare(
+			`SELECT l.age_confirmation_source source,l.age_confirmation_statement_text statement_text,
+			        l.age_confirmation_terms_version terms_version,l.age_confirmation_confirmed_at confirmed_at,
+			        o.birth_year session_birth_year,p.birth_year profile_birth_year
+			 FROM sellers s JOIN legal_acceptances l ON l.seller_id=s.id
+			 JOIN onboarding_sessions o ON o.phone_e164=s.phone
+			 JOIN seller_profiles p ON p.seller_id=s.id WHERE s.phone=?`,
+		).bind(PHONE).first<Record<string, unknown>>();
+		expect(evidence).toMatchObject({
+			source: "android_onboarding_v2_legacy_birth_year",
+			statement_text: null,
+			session_birth_year: null,
+			profile_birth_year: null,
+		});
+		expect(evidence?.terms_version).toBeTruthy();
+		expect(evidence?.confirmed_at).toBeTruthy();
 	});
 
 	it("consumes a private-email verification link exactly once", async () => {

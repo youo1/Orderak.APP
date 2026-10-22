@@ -180,6 +180,68 @@ describe("PUT /api/v1/store", () => {
 		expect(invalid.status).toBe(400);
 		expect(await invalid.json()).toMatchObject({ code: "invalid_business_category" });
 	});
+
+	it("sets a validated city after setup and clears stale catalogue fields for a typed name", async () => {
+		const r = await registerStore({ country_iso: "EG" });
+		await env.orderak_db.prepare(
+			"UPDATE sellers SET city_catalog_id=?,city_catalog_version=?,city_name=? WHERE phone=?",
+		).bind(4242, "stale-version", "Old Catalogue City", r.phone).run();
+
+		const typed = await SELF.fetch(`${BASE}/api/v1/store`, {
+			method: "PUT",
+			headers: authHeaders(r),
+			body: JSON.stringify({ city_name: "  New   Village  " }),
+		});
+		expect(typed.status).toBe(200);
+		expect(await typed.json()).toMatchObject({
+			store: {
+				city_name: "New Village",
+				city_catalog_id: null,
+				city_catalog_version: null,
+			},
+		});
+
+		const tooShort = await SELF.fetch(`${BASE}/api/v1/store`, {
+			method: "PUT",
+			headers: authHeaders(r),
+			body: JSON.stringify({ city_name: "A" }),
+		});
+		expect(tooShort.status).toBe(400);
+		expect(await tooShort.json()).toMatchObject({ code: "invalid_city" });
+
+		const unknownCatalogue = await SELF.fetch(`${BASE}/api/v1/store`, {
+			method: "PUT",
+			headers: authHeaders(r),
+			body: JSON.stringify({ city_catalog_id: 999999999 }),
+		});
+		expect(unknownCatalogue.status).toBe(400);
+		expect(await unknownCatalogue.json()).toMatchObject({ code: "invalid_city" });
+	});
+
+	it("stores a legacy category key alone and leaves taxonomy IDs NULL", async () => {
+		const r = await registerStore();
+		const legacy = await SELF.fetch(`${BASE}/api/v1/store`, {
+			method: "PUT",
+			headers: authHeaders(r),
+			body: JSON.stringify({ business_category: "fashion" }),
+		});
+		expect(legacy.status).toBe(200);
+		expect(await legacy.json()).toMatchObject({
+			store: {
+				business_category: "fashion",
+				business_category_id: null,
+				business_subcategory_id: null,
+			},
+		});
+
+		const invalid = await SELF.fetch(`${BASE}/api/v1/store`, {
+			method: "PUT",
+			headers: authHeaders(r),
+			body: JSON.stringify({ business_category: "not_a_real_category" }),
+		});
+		expect(invalid.status).toBe(400);
+		expect(await invalid.json()).toMatchObject({ code: "invalid_business_category" });
+	});
 });
 
 describe("categories", () => {

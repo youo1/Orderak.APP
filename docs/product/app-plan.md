@@ -117,14 +117,16 @@ desktop.
   Passkey sign-in directly; account creation and recovery use Firebase Phone OTP
   (SMS), with OTP fallback shown only when applicable. Welcome includes the
   existing explicit العربية/English/Français language sheet.
-- **Account setup (step 1/2)** — full name, required private birth year,
-  optional private email, and versioned Terms/Privacy acceptance after phone
-  verification.
-- **Store setup (step 2/2)** — store name, read-only preview of the unchanged
-  canonical URL, one required global business-category dropdown, and
-  static-catalogue city search restricted by verified phone country with manual
-  fallback. Country, subcategory, and logo are not requested here; subcategory
-  and logo remain editable later in Store Information/Profile Settings.
+- **Account setup (step 1/2)** — full name, affirmative confirmation of the
+  canonical statement `عمري ١٨ عامًا أو أكثر`, optional private email, and
+  versioned Terms/Privacy acceptance after phone verification. No birth year is
+  collected.
+- **Store setup (step 2/2)** — store name and owner; a read-only preview of the
+  unchanged canonical URL is shown. Business category and city are optional at
+  setup and can be completed later through the onboarding checklist and Store
+  Information, with the same validation when supplied. Country, subcategory, and
+  logo are not requested here; subcategory and logo remain editable later in
+  Store Information/Profile Settings.
 - **Main shell** with tabs:
   - **Dashboard** — today / unpaid / to-ship counts + "share catalog" link.
   - **Orders** — list + order details, status updates.
@@ -251,21 +253,23 @@ branch from Dashboard.
   committed atomically, and obsolete background-session signals are discarded
   while Auth or Shop Setup owns the screen.
 - DataStore persists explicit registered/pre-registration state, onboarding
-  progress and draft fields (including private birth year), and the last
-  confirmed account status. A cached
+  progress and draft fields (name, email, store name, and any supplied
+  category/city), and the last confirmed account status. New onboarding does not
+  collect a birth year. A cached
   restricted status remains blocking until a successful active response;
   existing installations infer compatible defaults from their saved store
   identity and profile.
 - After OTP on a new phone, the backend verifies the Firebase ID token. Existing
   sellers restore their device session and may create a Passkey before the
-  dashboard; new sellers receive a short-lived onboarding token and accept the
-  displayed legal versions on account step 1. When Passkeys are enabled, the
+  dashboard; new sellers receive a short-lived onboarding token and, on account
+  step 1, accept the displayed legal versions and affirmatively confirm the
+  canonical 18+ statement. When Passkeys are enabled, the
   new seller sees the opt-in immediately after OTP; Android persists that
   choice, but does not open the system registration ceremony until the Worker
-  has completed store step 2. The Worker atomically creates the profile, store,
-  identity, organization, owner membership, route, consent, and device session
-  only after store step 2. An opted-in seller may then create the discoverable
-  credential. Starter and Professional sellers can add devices without
+  has completed the basic store step 2. The Worker atomically creates the
+  profile, store, identity, organization, owner membership, route, consent, and
+  device session only after the basic store step 2 completes. An opted-in seller
+  may then create the discoverable credential. Starter and Professional sellers can add devices without
   signing out an old phone. On Free, verified recovery replaces and logs out the
   previously authorized device, preserving single-device access after reinstall
   or phone replacement.
@@ -274,17 +278,20 @@ branch from Dashboard.
 
 ### Store setup city and taxonomy revision
 
-- Step 2 contains store name, a read-only `https://orderak.app/…` preview of the
-  existing canonical URL, one category dropdown, and a searchable city
-  dropdown. Subcategory selection is deferred to authenticated Store
-  Information settings, where choices are limited to the store's selected
-  category. Logo upload remains available after onboarding in Profile Settings.
-- The country is captured with the verified phone and is not asked again. The
-  Worker uses that country for static city search and rejects a selected
-  catalogue ID from another country.
-- City search supports Arabic, English, and French, loading/empty/error/retry
-  states, and manual entry. It requires no paid location API or key, and Android
-  requests no location permission.
+- Step 2 creates the named store with its owner from the store name and a
+  read-only `https://orderak.app/…` preview of the existing canonical URL.
+  Business category and city are optional at setup (D-05) and can be completed
+  later through the checklist and Store Information (logged-in
+  `PUT /api/v1/store`), with the same validation when supplied. Subcategory
+  selection remains available in authenticated Store Information settings, where
+  choices are limited to the store's selected category. Logo upload remains
+  available after onboarding in Profile Settings.
+- The country is captured with the verified phone and is not asked again. When a
+  city is supplied, the Worker uses that country for static city search and
+  rejects a selected catalogue ID from another country.
+- City search in the checklist and Store Information supports Arabic, English,
+  and French, loading/empty/error/retry states, and manual entry. It requires no
+  paid location API or key, and Android requests no location permission.
 - The versioned category catalog is global and independent of country/city.
   Low-confidence source categories are excluded from v1 and retained in the
   internal audit workbook.
@@ -317,9 +324,12 @@ branch from Dashboard.
 - Account email is optional, private, and verified by a non-blocking
   transactional link. It is used for invoices and account notices, but is not
   an account-recovery credential in this version.
-- Account step 1 requires a year of birth selected from the current UTC year
-  down to 1900. It is private profile data and never part of a Store DTO or
-  public storefront/contact surface.
+- Account step 1 requires affirmative confirmation of the canonical statement
+  `عمري ١٨ عامًا أو أكثر` (shown exactly and submitted as `age_confirmed: true`).
+  New onboarding does not collect or store a birth year. Existing stored
+  birth-year values are retained and are not deleted, rewritten, migrated, or
+  backfilled by this change, and they are never part of a Store DTO or public
+  storefront/contact surface.
 
 ## Pre-production identity and routing foundation
 
@@ -431,7 +441,8 @@ picker continues to work offline without waiting for a Play language split.
 - Product discounts remain hidden in the MVP editor because the backend and
   public catalog do not yet share an authoritative discount contract. This
   prevents a local-only discount from being advertised at a different price.
-- Shop-setup city suggestions are curated and offline. Android makes no direct
+- City suggestions in the onboarding checklist and Store Information are curated
+  and offline. Android makes no direct
   geocoding-provider request; adding live search requires a backend-owned
   provider contract, privacy review, caching, and rate limits.
 - Later: production Play Console products and pricing, authorized rollout,

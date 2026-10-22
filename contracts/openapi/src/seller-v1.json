@@ -11283,7 +11283,17 @@
                 "$ref": "#/components/schemas/OnboardingAccount"
               },
               "examples": {
-                "valid": {
+                "explicitAgeConfirmation": {
+                  "value": {
+                    "full_name": "Mariam Ali",
+                    "age_confirmed": true,
+                    "email": null,
+                    "terms_accepted": true,
+                    "app_version": "1.3.0"
+                  }
+                },
+                "legacyInstalledClient": {
+                  "summary": "Accepted for installed-client compatibility; birth_year is not persisted.",
                   "value": {
                     "full_name": "Mariam Ali",
                     "birth_year": 1995,
@@ -11509,6 +11519,14 @@
                 "$ref": "#/components/schemas/OnboardingComplete"
               },
               "examples": {
+                "minimal": {
+                  "summary": "Category and city are optional; the response still carries the canonical store link.",
+                  "value": {
+                    "device_secret": "device-secret-abc123",
+                    "store_name": "متجري",
+                    "country_iso": "EG"
+                  }
+                },
                 "valid": {
                   "value": {
                     "device_secret": "device-secret-abc123",
@@ -14629,6 +14647,14 @@
                 "$ref": "#/components/schemas/StoreUpdate"
               },
               "examples": {
+                "cityAndTaxonomy": {
+                  "summary": "Set category and city after setup; a legacy business_category key alone leaves the taxonomy IDs NULL.",
+                  "value": {
+                    "business_category_id": "fashion",
+                    "business_subcategory_id": "fashion_clothing",
+                    "city_catalog_id": 41505
+                  }
+                },
                 "valid": {
                   "value": {
                     "whatsapp": "+201000000000",
@@ -19516,11 +19542,24 @@
           "cover_url": {
             "type": "string"
           },
+          "business_category": {
+            "type": "string",
+            "description": "Legacy category key alone. Stores only business_category and clears business_category_id/business_subcategory_id; it is never mapped to a taxonomy ID. Invalid keys return 400 invalid_business_category."
+          },
           "business_category_id": {
-            "type": "string"
+            "type": "string",
+            "description": "Taxonomy category selection, optionally with business_subcategory_id. Stores the taxonomy IDs and category key. Invalid selections return 400 invalid_business_category."
           },
           "business_subcategory_id": {
             "type": "string"
+          },
+          "city_catalog_id": {
+            "type": "integer",
+            "description": "Existing city catalogue identifier, validated against the store country. Invalid or unknown IDs return 400 invalid_city."
+          },
+          "city_name": {
+            "type": "string",
+            "description": "Typed city name, normalized and subject to the same minimum length as setup. A typed name clears city_catalog_id and city_catalog_version so an unrelated catalogue reference is never carried forward. Invalid values return 400 invalid_city."
           }
         }
       },
@@ -19741,17 +19780,22 @@
         "type": "object",
         "required": [
           "full_name",
-          "birth_year",
           "terms_accepted",
           "app_version"
         ],
-        "description": "Step 1 of onboarding: the account details, recorded against the session opened by /auth/phone/complete.",
+        "description": "Step 1 of onboarding: the account details, recorded against the session opened by /auth/phone/complete. Age eligibility is affirmative: send age_confirmed=true. Installed clients that predate this contract send birth_year instead only when age_confirmed is absent; the Worker accepts a valid integer (1900 through the current UTC year) for compatibility but never stores the sent year in the onboarding session or seller profile. Missing, false, or non-boolean age_confirmed without a valid legacy birth_year is refused with 400 age_confirmation_required.",
         "properties": {
           "full_name": {
             "type": "string"
           },
+          "age_confirmed": {
+            "type": "boolean",
+            "description": "Must be true for a new client. Affirmative confirmation of the canonical statement عمري ١٨ عامًا أو أكثر; the Worker records the statement, source android_onboarding_v2, the accepted terms version, and a Worker timestamp in legal_acceptances."
+          },
           "birth_year": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Legacy installed-client compatibility only, and only when age_confirmed is absent. Not stored anywhere; the request is recorded with source android_onboarding_v2_legacy_birth_year and NULL statement text.",
+            "minimum": 1900
           },
           "email": {
             "type": [
@@ -19796,14 +19840,9 @@
         "type": "object",
         "required": [
           "device_secret",
-          "store_name",
-          "slug",
-          "business_category",
-          "business_category_id",
-          "country_iso",
-          "city_name"
+          "store_name"
         ],
-        "description": "Step 2 of onboarding: creates the store and the seller account from the session's saved details.",
+        "description": "Step 2 of onboarding: creates the store and the seller account from the session's saved details. Business category and city are optional (D-05); omit both to create a named store with an owner, then complete them later through the checklist and PUT /api/v1/store. A supplied value is still fully validated, and country validation is never optional.",
         "properties": {
           "device_secret": {
             "type": "string",
@@ -19816,10 +19855,12 @@
             "type": "string"
           },
           "business_category": {
-            "type": "string"
+            "type": "string",
+            "description": "Legacy category key alone. Validated against the existing key set; stores only business_category and leaves business_category_id and business_subcategory_id NULL. It is never mapped to a taxonomy ID."
           },
           "business_category_id": {
-            "type": "string"
+            "type": "string",
+            "description": "Taxonomy category selection. With an optional business_subcategory_id, stores the taxonomy IDs and category key. Invalid or incomplete selections return 400 invalid_business_category."
           },
           "business_subcategory_id": {
             "type": [
@@ -19840,10 +19881,12 @@
             "type": [
               "integer",
               "null"
-            ]
+            ],
+            "description": "Existing city catalogue identifier, validated against the store country. Omit both city_catalog_id and city_name to persist NULL city fields."
           },
           "city_name": {
-            "type": "string"
+            "type": "string",
+            "description": "Typed city name, normalized and subject to the same minimum length and invalid_city behavior as setup."
           }
         }
       },
