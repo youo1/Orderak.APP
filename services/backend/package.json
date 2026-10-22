@@ -37,7 +37,7 @@
     "@types/node": "^24.19.2",
     "@vitest/coverage-istanbul": "^4.1.11",
     "fontkit": "2.0.4",
-    "oxlint": "^1.87.0",
+    "oxlint": "^1.88.0",
     "oxlint-tsgolint": "^7.0.2003",
     "tsx": "4.23.15",
     "typescript": "~6.0.2",
