@@ -687,12 +687,20 @@ val verifyAuthPhase1Contract by tasks.registering {
         )
         requireContract(
             // D-13: the Worker now accepts affirmative age confirmation for new
-            // clients and a valid legacy birth year from installed clients. The
-            // installed Android source is intentionally unchanged for now, so no
-            // new Android source string is required here. Both shapes record
-            // evidence on legal_acceptances; a legacy request records a NULL
-            // statement because the installed client never displayed it.
-            "age_confirmed" in backendAuthV2 &&
+            // clients and a valid legacy birth year from installed clients. Both
+            // shapes record evidence on legal_acceptances; a legacy request
+            // records a NULL statement because the installed client never
+            // displayed it. Android must keep sending one of the two shapes:
+            // today the legacy birth year, after plan item R3 the confirmation.
+            // Dropping the birth year before the confirmation exists would make
+            // every setup fail with age_confirmation_required.
+            (
+                ("val age_confirmed: Boolean" in backendApi &&
+                    "age_confirmed = " in shopSetupViewModel) ||
+                    ("val birth_year: Int" in backendApi &&
+                        "birth_year = requireNotNull(current.birthYear)" in shopSetupViewModel)
+            ) &&
+                "age_confirmed" in backendAuthV2 &&
                 "AGE_CONFIRMATION_STATEMENT" in backendAuthV2 &&
                 "عمري ١٨ عامًا أو أكثر" in backendAuthV2 &&
                 "body.age_confirmed === true" in backendAuthV2 &&
@@ -723,7 +731,7 @@ val verifyAuthPhase1Contract by tasks.registering {
                     workspaceRoot.resolve(
                         "services/backend/migrations/062_age_confirmation_evidence.sql"
                     ).readText(),
-            "D-13 must accept and record explicit age confirmation and legacy birth-year compatibility without persisting a sent birth year."
+            "D-13 must accept and record explicit age confirmation and legacy birth-year compatibility without persisting a sent birth year, and Android must send one of the two shapes."
         )
 
         val shippedSource = mainRoot.walkTopDown()

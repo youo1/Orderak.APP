@@ -127,6 +127,11 @@ desktop.
   Information, with the same validation when supplied. Country, subcategory, and
   logo are not requested here; subcategory and logo remain editable later in
   Store Information/Profile Settings.
+- **Transition until plan item R3.** The two steps above describe the setup the
+  backend now accepts (R3a). The Android setup screens change in R3; until then
+  the installed app still asks for a birth year, a business category and a city,
+  and sends them. The Worker accepts that request as legacy age evidence, never
+  stores the birth year, and records NULL statement text for it.
 - **Main shell** with tabs:
   - **Dashboard** — today / unpaid / to-ship counts + "share catalog" link.
   - **Orders** — list + order details, status updates.
@@ -254,8 +259,9 @@ branch from Dashboard.
   while Auth or Shop Setup owns the screen.
 - DataStore persists explicit registered/pre-registration state, onboarding
   progress and draft fields (name, email, store name, and any supplied
-  category/city), and the last confirmed account status. New onboarding does not
-  collect a birth year. A cached
+  category/city), and the last confirmed account status. Until plan item R3
+  ships the new setup screen, the draft also holds the birth year the current
+  setup asks for; the Worker no longer stores it. A cached
   restricted status remains blocking until a successful active response;
   existing installations infer compatible defaults from their saved store
   identity and profile.

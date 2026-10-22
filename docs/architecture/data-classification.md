@@ -33,7 +33,7 @@ applies_to: [production, staging]
 | `sellers` | `id` (UUID) | L1 | Internal identifier; not exposed in URLs |
 | `seller_devices` | `secret_hash` | L2 | Hashed device credential |
 | `seller_devices` | `fcm_token` | L2 | Push notification token |
-| `seller_profiles` | `full_name`, `birth_year`, `email_private`, `email_verified_at` | L2 | Private account profile; birth year and private email are excluded from Store DTOs, public pages, email variables, telemetry, and public contact data. Existing `birth_year` values are retained and are not deleted, rewritten, migrated, or backfilled by the age-confirmation change; new onboarding no longer collects or stores a birth year |
+| `seller_profiles` | `full_name`, `birth_year`, `email_private`, `email_verified_at` | L2 | Private account profile; birth year and private email are excluded from Store DTOs, public pages, email variables, telemetry, and public contact data. Existing `birth_year` values are retained and are not deleted, rewritten, migrated, or backfilled by the age-confirmation change; the Worker no longer stores a newly sent birth year, although the current Android setup still collects and sends one until plan item R3 |
 | `sellers` | `business_category`, `city_geoname_id`, `city_name` | L0 | Public store classification and location |
 
 ### 2.1.1 Auth and onboarding implementation (v1 API)
@@ -48,7 +48,7 @@ applies_to: [production, staging]
 | `email_verification_tokens` | email, token hash, timestamps | L2 | Raw token is returned only in the transactional link |
 | `geo_cities`, `geo_city_names`, `geo_city_search` | all imported fields | L0 | Public GeoNames data; CC BY attribution required |
 | Android encrypted preferences | onboarding token, recent-auth token, device secret | L3 | Opaque bearer values; never in logs, URLs, screenshots, or backups |
-| Android DataStore | onboarding text draft (name, email, store name, and any supplied category/city) | L2 | Device-local resumable draft; new onboarding collects no birth year; logo is not collected during onboarding |
+| Android DataStore | onboarding text draft (name, email, store name, any supplied category/city and, until plan item R3 ships the new setup screen, the birth year) | L2 | Device-local resumable draft; the current Android setup still drafts and sends a birth year, which the Worker accepts only as legacy age evidence and never stores; logo is not collected during onboarding |
 
 ### 2.2 Order Data — L2 Confidential (Buyer PII)
 
