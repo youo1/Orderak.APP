@@ -60,14 +60,29 @@ throttling, and recovery behavior.
    the opaque token in encrypted preferences and keeps only a resumable draft
    in DataStore.
 4. **`POST /api/v1/onboarding/account`**: after OTP, the seller submits a 3–80
-   character name, a required private integer birth year from 1900 through the
-   current UTC year, optional private email, and affirmative acceptance of the
-   Terms/Privacy links shown above Next. The Worker snapshots the currently
-   published versions; no consent is recorded at OTP completion. Birth year is
-   excluded from Store DTOs, public pages, email variables, and telemetry.
-   Production schema support is supplied by the forward-only migration
-   `039_add_private_birth_year.sql`; schema nullability exists only for legacy
-   compatibility and does not relax request validation.
+   character name, affirmative age confirmation (`age_confirmed: true`), optional
+   private email, and affirmative acceptance of the Terms/Privacy links shown
+   above Next. The Worker snapshots the currently published versions; no consent
+   is recorded at OTP completion. For new onboarding the Worker records the exact
+   canonical Arabic statement `عمري ١٨ عامًا أو أكثر`, source
+   `android_onboarding_v2`, the accepted Terms version, and a Worker timestamp in
+   the nullable age-evidence columns on `legal_acceptances`, beside the general
+   legal acceptance. That evidence is confidential and excluded from Store DTOs,
+   public pages, email variables, and telemetry. Only a nullable
+   `age_confirmation_source` marker is added to `onboarding_sessions`; no
+   separate evidence table exists, and a newly sent birth year is never persisted
+   in `onboarding_sessions` or `seller_profiles`. A missing, `false`, or
+   non-boolean confirmation without a valid legacy year fails closed with
+   `400 age_confirmation_required`.
+   Installed-client compatibility is limited and explicit: when `age_confirmed`
+   is absent and `birth_year` is a JSON integer from 1900 through the current UTC
+   year, the Worker accepts the legacy request, records source
+   `android_onboarding_v2_legacy_birth_year`, the accepted Terms version, and a
+   Worker timestamp, and stores NULL statement text because that client never
+   displayed the statement; it still does not store the submitted year. Existing
+   birth-year columns, rows, and stored values—including the schema support from
+   `039_add_private_birth_year.sql`—are retained unchanged and are explicitly
+   not deleted, backfilled, or migrated by this D-13 change.
 5. **`POST /api/v1/onboarding/complete`**: requires the matching app-generated
    device secret and an idempotency key, then atomically creates the seller,
    private profile, store identity, organization, owner membership, primary

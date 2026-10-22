@@ -109,9 +109,9 @@ for returning sellers.
 | Method | Path | Authentication | Purpose |
 |---|---|---|---|
 | `POST` | `/api/v1/auth/phone/complete` | Fresh Firebase ID token + E.164 phone | Existing seller: issue the normal device session. New seller: issue a hash-only, rolling 30-minute onboarding token with a 24-hour absolute lifetime. |
-| `POST` | `/api/v1/onboarding/account` | `Authorization: Bearer <onboarding_token>` | Save full name, required private birth year, and private optional email; snapshot the published Terms and Privacy versions shown when the user presses Next. |
+| `POST` | `/api/v1/onboarding/account` | `Authorization: Bearer <onboarding_token>` | Save full name, affirmative age confirmation (`age_confirmed: true`), and private optional email; snapshot the published Terms and Privacy versions shown when the user presses Next. |
 | `GET` | `/api/v1/onboarding/slug/check?slug=…` | Onboarding token | Delayed availability check for the existing generated store slug. Android displays the resulting URL as read-only during onboarding. |
-| `POST` | `/api/v1/onboarding/complete` | Onboarding token + matching app-generated `device_secret` + `Idempotency-Key` | Atomically create the seller, profile, store identity, organization, owner membership, route, device session, and legal acceptance. |
+| `POST` | `/api/v1/onboarding/complete` | Onboarding token + matching app-generated `device_secret` + `Idempotency-Key` | Atomically create the seller, profile, store identity, organization, owner membership, route, device session, and legal acceptance. Country is required; business category and city are optional and can be set later through `PUT /api/v1/store`. |
 | `POST` | `/api/v1/auth/passkeys/registration/options` | Seller device headers + recent-auth token | Create discoverable registration options for RP ID `orderak.app`. |
 | `POST` | `/api/v1/auth/passkeys/registration/complete` | Seller device headers + recent-auth token | Verify and store the public-key credential. |
 | `POST` | `/api/v1/auth/passkeys/authentication/options` | None | Create discoverable authentication options. |
@@ -145,15 +145,17 @@ catalog pages. Public store contact email remains the separate `sellers.email`
 field.
 
 Phone completion accepts optional `phone_country_iso`; the Worker validates its
-calling code against the Firebase-verified E.164 number before saving it. New
-Android onboarding clients submit required `business_category_id`,
-`city_catalog_id` (when a catalogue suggestion was selected), and `city_name`.
-`business_subcategory_id` is optional for backward compatibility but is not
-collected during onboarding. Sellers select or update it later through
-authenticated Store Information settings. The legacy category/GeoNames fields
-remain accepted for installed older clients and rollback. Neither path changes
-store slug generation, eight-character `store_code`, `public_identifier`, or
-URL routing.
+calling code against the Firebase-verified E.164 number before saving it.
+Country validation remains required at `/api/v1/onboarding/complete`. Business
+category and city are optional at setup: new Android onboarding clients may
+submit `business_category_id`, optional `business_subcategory_id`,
+`city_catalog_id` (when a catalogue suggestion was selected), and `city_name`;
+each supplied field is validated, with city checked against the phone country,
+but omitting category and city does not block completion. The legacy category/GeoNames fields remain
+accepted for installed older clients and rollback. Sellers set or change either
+value later through authenticated `PUT /api/v1/store` (see Store Information
+below). Neither path changes store slug generation, eight-character
+`store_code`, `public_identifier`, or URL routing.
 
 `POST /api/v1/geo/cities/select` body:
 
@@ -174,6 +176,29 @@ seller records remain in `orderak-db`.
 ```json
 {
   "full_name": "Ayman Seller",
+  "age_confirmed": true,
+  "email": "owner@example.com",
+  "terms_accepted": true,
+  "app_version": "2.0.0"
+}
+```
+
+`age_confirmed` must be the JSON boolean `true` for the current flow. An explicit
+confirmation records the exact canonical Arabic statement
+`عمري ١٨ عامًا أو أكثر`, source `android_onboarding_v2`, the Worker timestamp,
+and the accepted Terms version in the nullable age-evidence columns on
+`legal_acceptances` (`age_confirmation_statement_text`,
+`age_confirmation_source`, `age_confirmation_confirmed_at`,
+`age_confirmation_terms_version`). A missing, `false`, or non-boolean
+confirmation without a valid legacy `birth_year` returns
+`400 {"error":"age_confirmation_required"}`.
+
+Installed-client compatibility accepts this legacy shape only when
+`age_confirmed` is absent:
+
+```json
+{
+  "full_name": "Ayman Seller",
   "birth_year": 1988,
   "email": "owner@example.com",
   "terms_accepted": true,
@@ -181,11 +206,19 @@ seller records remain in `orderak-db`.
 }
 ```
 
-`birth_year` is required and must be a JSON integer from `1900` through the
-current UTC year. Missing, string, fractional, pre-1900, and future values return
-`400 {"error":"invalid_birth_year"}`. It is stored only in the private
-onboarding/profile records and is excluded from Store DTOs, public pages,
-transactional email variables, telemetry, and public contact data.
+`birth_year` must then be a JSON integer from `1900` through the current UTC year.
+The Worker records source `android_onboarding_v2_legacy_birth_year`, the accepted
+Terms version, and a Worker timestamp, with NULL
+`age_confirmation_statement_text` because that legacy client never displayed the
+statement. The submitted year is not stored in `onboarding_sessions` or
+`seller_profiles`, and a present `age_confirmed` (including `false`) disables the
+legacy path. A draft already saved by the previous Worker with an account-saved
+status, a retained session birth year, and no source marker also completes as
+this legacy shape; its retained year is never copied to a new field. Existing
+birth-year columns and values are retained; this change does not delete,
+backfill, or migrate them. The age evidence is confidential and excluded from
+Store DTOs, public pages, transactional email variables, telemetry, and public
+contact data.
 
 ### Health Check
 
@@ -357,7 +390,7 @@ production URL returns the public 404.
 | Method | Path | Purpose |
 | ------ | ---- | ------- |
 | `GET`  | `/api/v1/store` | Read Store Information (editable fields + read-only identity block). |
-| `PUT`  | `/api/v1/store` | Update store_name (regenerates slug/public_identifier, keeps store_code+UUID), slug, description, whatsapp, email, website, address, instapay, vfcash, logo_url, cover_url, and a validated `business_category_id` + `business_subcategory_id` pair. The verified login phone is read-only. |
+| `PUT`  | `/api/v1/store` | Update store_name (regenerates slug/public_identifier, keeps store_code+UUID), slug, description, whatsapp, email, website, address, instapay, vfcash, logo_url, cover_url, optional `business_category_id` + `business_subcategory_id` or legacy `business_category`, and optional `city_catalog_id` or `city_name`. Omitted fields are unchanged. The verified login phone is read-only. |
 | `GET`  | `/api/v1/categories` | List the store's categories (`category_code`, name, slug, product_count). |
 | `POST` | `/api/v1/categories` | Create a category → returns immutable `category_code` (`c-XXXXXX`). |
 | `PUT`  | `/api/v1/categories/{category_code}` | Rename / reorder (code is immutable). |
@@ -368,6 +401,17 @@ production URL returns the public 404.
 | `DELETE` | `/api/v1/products/{product_code}` | Delete one product. Stock movements are kept. |
 | `PATCH` | `/api/v1/products/{product_code}/stock` | Adjust stock under compare-and-set; a stale revision answers `409 stale_stock`. |
 | `POST` | `/api/v1/media/upload` | Multipart image upload to R2 → `{ url }`. Served publicly at `GET /media/{key}`. |
+
+`PUT /api/v1/store` is the authenticated path for adding or changing business
+category and city after setup. A taxonomy selection (`business_category_id`,
+plus optional `business_subcategory_id`) is validated against the active
+taxonomy and persists its IDs and taxonomy version together with the derived
+category key. Sending a legacy `business_category` key alone persists only that
+key and clears any stored taxonomy IDs/version; it is never mapped to a taxonomy
+ID. A `city_catalog_id` is verified against the store's country catalogue and
+persists the catalogue ID, version, and display name; a typed `city_name`
+(minimum two characters after trimming) clears any stored catalogue ID/version
+so the row always describes one selection.
 
 Auth is via `x-orderak-phone` + `x-orderak-secret` headers. Public URLs and
 catalog operations use `public_identifier`, `category_code`, and

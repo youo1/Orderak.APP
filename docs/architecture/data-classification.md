@@ -33,14 +33,14 @@ applies_to: [production, staging]
 | `sellers` | `id` (UUID) | L1 | Internal identifier; not exposed in URLs |
 | `seller_devices` | `secret_hash` | L2 | Hashed device credential |
 | `seller_devices` | `fcm_token` | L2 | Push notification token |
-| `seller_profiles` | `full_name`, `birth_year`, `email_private`, `email_verified_at` | L2 | Private account profile; birth year and private email are excluded from Store DTOs, public pages, email variables, telemetry, and public contact data |
+| `seller_profiles` | `full_name`, `birth_year`, `email_private`, `email_verified_at` | L2 | Private account profile; birth year and private email are excluded from Store DTOs, public pages, email variables, telemetry, and public contact data. Existing `birth_year` values are retained and are not deleted, rewritten, migrated, or backfilled by the age-confirmation change; the Worker no longer stores a newly sent birth year, although the current Android setup still collects and sends one until plan item R3 |
 | `sellers` | `business_category`, `city_geoname_id`, `city_name` | L0 | Public store classification and location |
 
 ### 2.1.1 Auth and onboarding implementation (v1 API)
 
 | Table/location | Fields | Classification | Notes |
 |---|---|---|---|
-| `onboarding_sessions` | phone, Firebase UID, name, birth year, private email, legal versions | L2 | Resumable pre-account record; never exposed publicly |
+| `onboarding_sessions` | phone, Firebase UID, name, private email, legal versions, nullable `age_confirmation_source` | L2 | Resumable pre-account record; never exposed publicly. New onboarding stores no birth year; `age_confirmation_source` records only the age-confirmation path for the session and is nullable |
 | `onboarding_sessions` | `token_hash`, `device_secret_hash` | L2 | High-entropy hashes used only by backend auth handlers |
 | `passkey_credentials` | credential ID, public key, user ID, counter, AAGUID, transports, backup/device metadata | L2 | Public-key material is not biometric data, but credential identifiers remain confidential and must not be logged |
 | `webauthn_challenges` | challenge hash, ceremony, seller/user binding, timestamps | L2 | Raw challenge is returned once and never stored |
@@ -48,7 +48,7 @@ applies_to: [production, staging]
 | `email_verification_tokens` | email, token hash, timestamps | L2 | Raw token is returned only in the transactional link |
 | `geo_cities`, `geo_city_names`, `geo_city_search` | all imported fields | L0 | Public GeoNames data; CC BY attribution required |
 | Android encrypted preferences | onboarding token, recent-auth token, device secret | L3 | Opaque bearer values; never in logs, URLs, screenshots, or backups |
-| Android DataStore | onboarding text draft including birth year, category pair, and confirmed/manual city | L2 | Device-local resumable draft; logo is not collected during onboarding |
+| Android DataStore | onboarding text draft (name, email, store name, any supplied category/city and, until plan item R3 ships the new setup screen, the birth year) | L2 | Device-local resumable draft; the current Android setup still drafts and sends a birth year, which the Worker accepts only as legacy age evidence and never stores; logo is not collected during onboarding |
 
 ### 2.2 Order Data — L2 Confidential (Buyer PII)
 
@@ -64,6 +64,7 @@ applies_to: [production, staging]
 |---|---|---|---|
 | `legal_acceptances` | `phone_e164`, `seller_id` | L2 | Consent evidence with PII |
 | `legal_acceptances` | `terms_version`, `privacy_version`, `locale`, `marketing_consent` | L1 | Consent metadata |
+| `legal_acceptances` | `age_confirmation_statement_text`, `age_confirmation_source`, `age_confirmation_confirmed_at`, `age_confirmation_terms_version`, linked to the seller/session | L2 | Confidential age-confirmation consent evidence in nullable columns. The statement text is the canonical `عمري ١٨ عامًا أو أكثر` statement shown for an explicit confirmation; the source is `android_onboarding_v2` or, for a legacy request that supplied only a valid birth year, `android_onboarding_v2_legacy_birth_year`; the terms version is the accepted age/terms version; the timestamp is the Worker-recorded confirmation time. Legacy rows have NULL statement text because that client never showed it. Purpose: prove affirmative age confirmation and audit exactly which statement/version was accepted |
 | `deletion_requests` | `phone_e164`, `email` | L2 | De-identified on completion |
 
 ### 2.4 Admin — L3 Highly Sensitive

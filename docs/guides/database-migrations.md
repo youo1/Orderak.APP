@@ -106,6 +106,7 @@ trigger's final semicolon when replaying a fresh remote D1 database.
 - [059_stock_movements_product_code_not_null.sql](#059_stock_movements_product_code_not_nullsql)
 - [060_retire_dead_tables.sql](#060_retire_dead_tablessql)
 - [061_app_screens_design_url.sql](#061_app_screens_design_urlsql)
+- [062_age_confirmation_evidence.sql](#062_age_confirmation_evidencesql)
 
 ## 001_init.sql
 
@@ -708,3 +709,13 @@ trigger's final semicolon when replaying a fresh remote D1 database.
 - Renames `app_screens.figma_url` to `design_url` with `ALTER TABLE ... RENAME COLUMN`, so every stored value is preserved exactly. It does not add a compatibility column and does not alter any other workflow column.
 - The rollout marker answers the window honestly. `production-deploy.yml` applies migrations before deploying the Worker, so the previous release serves traffic against the new schema in between; that previous Worker names figma_url only in the admin screen create and update statements in `src/domains/admin/admin-project.ts`, so for the minutes between the migration and the deploy an operator's screen create or update fails, and works again after the deploy. No seller, storefront, or manifest-sync path names the column, and `SELECT *` readers only see the new key name, which no admin page reads.
 - Rollback is `ALTER TABLE app_screens RENAME COLUMN design_url TO figma_url;`, performed after the Worker is reverted so the code and the column name agree again. No value is lost by the rename or its inverse.
+
+## 062_age_confirmation_evidence.sql
+
+**Source:** `services/backend/migrations/062_age_confirmation_evidence.sql`
+
+### What it does
+
+- Adds four nullable age-evidence columns to `legal_acceptances` - statement text, source, confirmed-at timestamp, and terms version - beside the legal acceptance recorded in the same onboarding step. Existing rows keep their current meaning, and account erasure already covers this table.
+- An explicit confirmation records the canonical statement and source `android_onboarding_v2`. A legacy request from an installed client records source `android_onboarding_v2_legacy_birth_year` with a NULL statement, because that client never displayed the canonical statement. The accepted terms version and a Worker timestamp are recorded in both shapes.
+- Adds only a nullable source marker to `onboarding_sessions` so the account-step decision can reach completion without persisting the submitted year of birth. The migration is additive: it does not change city or category columns, does not drop or rewrite any column or value, and has no backfill. Rollback is a Worker revert; dropping the new columns afterward is optional and discards evidence.

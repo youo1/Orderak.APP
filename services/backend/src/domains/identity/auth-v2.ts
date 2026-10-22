@@ -46,6 +46,9 @@ const EMAIL_TOKEN_HOURS = 24;
 const PRODUCTION_RP_ID = "orderak.app";
 const RP_NAME = "Orderak";
 const CATEGORY_KEYS = new Set(["fashion", "electronics", "food", "beauty", "services", "other"]);
+const AGE_CONFIRMATION_STATEMENT = "عمري ١٨ عامًا أو أكثر";
+const AGE_SOURCE_EXPLICIT = "android_onboarding_v2";
+const AGE_SOURCE_LEGACY = "android_onboarding_v2_legacy_birth_year";
 
 interface OnboardingRow {
 	id: string;
@@ -63,6 +66,7 @@ interface OnboardingRow {
 	privacy_version: number | null;
 	terms_accepted_at: string | null;
 	app_version: string | null;
+	age_confirmation_source: string | null;
 	completed_seller_id: string | null;
 	idempotency_key: string | null;
 	city_catalog_id: number | null;
@@ -348,7 +352,17 @@ async function saveOnboardingAccount(request: Request, env: PublicWorkerEnv, url
 	const body = await readObject(request);
 	const fullName = string(body.full_name, 80).replace(/\s+/g, " ").trim();
 	const email = normalizeEmail(body.email);
-	const birthYear = validBirthYear(body.birth_year);
+	// Age eligibility is affirmative: an explicit confirmation is the new shape.
+	// Installed clients still send a birth year, and only an absent confirmation
+	// with a valid integer birth year keeps working without recording the year.
+	const ageConfirmationSupplied = Object.prototype.hasOwnProperty.call(body, "age_confirmed");
+	const ageConfirmed = body.age_confirmed === true;
+	const legacyBirthYear = ageConfirmationSupplied ? null : validBirthYear(body.birth_year);
+	const ageSource = ageConfirmed
+		? AGE_SOURCE_EXPLICIT
+		: legacyBirthYear != null
+			? AGE_SOURCE_LEGACY
+			: null;
 	if (fullName.length < 3) return jsonResponse({ error: "invalid_full_name" }, 400);
 	if (body.email != null && body.email !== "" && !email) {
 		return jsonResponse({ error: "invalid_email" }, 400);
@@ -356,7 +370,7 @@ async function saveOnboardingAccount(request: Request, env: PublicWorkerEnv, url
 	if (body.terms_accepted !== true) {
 		return jsonResponse({ error: "legal_acceptance_required" }, 400);
 	}
-	if (birthYear == null) return jsonResponse({ error: "invalid_birth_year" }, 400);
+	if (!ageSource) return jsonResponse({ error: "age_confirmation_required" }, 400);
 	if (email) {
 		const existing = await env.orderak_db.prepare(
 			"SELECT seller_id FROM seller_profiles WHERE lower(email_private)=lower(?)",
@@ -371,19 +385,20 @@ async function saveOnboardingAccount(request: Request, env: PublicWorkerEnv, url
 	if (!terms || !privacy) return jsonResponse({ error: "legal_not_configured" }, 503);
 
 	await env.orderak_db.prepare(
-		`UPDATE onboarding_sessions SET status='account_saved',full_name=?,birth_year=?,email_private=?,
+		`UPDATE onboarding_sessions SET status='account_saved',full_name=?,email_private=?,
 		 terms_version=?,privacy_version=?,terms_accepted_at=datetime('now'),app_version=?,
+		 age_confirmation_source=?,
 		 locale=?,expires_at=CASE
 		   WHEN datetime('now',?)<absolute_expires_at THEN datetime('now',?)
 		   ELSE absolute_expires_at END,updated_at=datetime('now')
 		 WHERE id=? AND status IN ('phone_verified','account_saved')`,
 	).bind(
 		fullName,
-		birthYear,
 		email,
 		Number(terms.version),
 		Number(privacy.version),
 		string(body.app_version, 40) || null,
+		ageSource,
 		locale,
 		`+${ONBOARDING_ROLLING_MINUTES} minutes`,
 		`+${ONBOARDING_ROLLING_MINUTES} minutes`,
@@ -421,11 +436,19 @@ async function completeOnboarding(
 			passkey_registration_available: featureEnabled(env, "PASSKEY_ENABLED"),
 		});
 	}
+	// A session that saved the account step on the previous Worker has no source
+	// marker, but its retained birth year identifies it as the legacy shape. It
+	// must still complete, with a NULL statement because that client never showed
+	// the canonical text. Its year is never copied to a profile or another column.
+	const ageConfirmationSource = session.age_confirmation_source
+		?? (session.status === "account_saved" && validBirthYear(session.birth_year) != null
+			? AGE_SOURCE_LEGACY
+			: null);
 	if (
 		session.status !== "account_saved"
 		|| !session.full_name
-		|| session.birth_year == null
 		|| !session.terms_accepted_at
+		|| !ageConfirmationSource
 	) {
 		return jsonResponse({ error: "account_step_required" }, 409);
 	}
@@ -433,13 +456,30 @@ async function completeOnboarding(
 	const storeName = string(body.store_name, 60).replace(/\s+/g, " ").trim();
 	const requestedCategoryId = string(body.business_category_id, 80);
 	const requestedSubcategoryId = string(body.business_subcategory_id, 80);
+	// A supplied legacy category must be a real key, not coerced away. Without
+	// this check a non-string value (for example 123) becomes "" and would be
+	// mistaken for an omitted optional category.
+	const legacyCategorySupplied = body.business_category != null;
+	if (legacyCategorySupplied && typeof body.business_category !== "string") {
+		return jsonResponse({ error: "invalid_business_category" }, 400);
+	}
 	const legacyCategory = string(body.business_category, 30);
 	const sessionCountryIso = normalizeCountryIso(session.phone_country_iso);
 	const requestCountryIso = normalizeCountryIso(body.country_iso);
 	const countryIso = sessionCountryIso !== "XX" ? sessionCountryIso : requestCountryIso;
 	const cityNameInput = string(body.city_name, 100).replace(/\s+/g, " ").trim();
+	const cityNameSupplied = body.city_name != null;
 	const cityGeonameId = positiveInteger(body.city_geoname_id);
 	const cityCatalogId = positiveInteger(body.city_catalog_id);
+	if (body.city_catalog_id != null && cityCatalogId == null) {
+		return jsonResponse({ error: "invalid_city" }, 400);
+	}
+	if (body.city_geoname_id != null && cityGeonameId == null) {
+		return jsonResponse({ error: "invalid_city" }, 400);
+	}
+	if (body.city_name != null && typeof body.city_name !== "string") {
+		return jsonResponse({ error: "invalid_city" }, 400);
+	}
 	if (storeName.length < 2) return jsonResponse({ error: "invalid_store_name" }, 400);
 	if (countryIso === "XX") return jsonResponse({ error: "invalid_country" }, 400);
 	if (
@@ -450,6 +490,7 @@ async function completeOnboarding(
 		return jsonResponse({ error: "country_mismatch" }, 400);
 	}
 
+	const hasTaxonomyInput = body.business_category_id != null || body.business_subcategory_id != null;
 	const taxonomy = requestedCategoryId
 		? requestedSubcategoryId
 			? await activeTaxonomySelection(env, requestedCategoryId, requestedSubcategoryId)
@@ -458,17 +499,21 @@ async function completeOnboarding(
 	if (requestedSubcategoryId && !requestedCategoryId) {
 		return jsonResponse({ error: "invalid_business_category" }, 400);
 	}
-	if (requestedCategoryId && !taxonomy) {
+	if ((requestedCategoryId || hasTaxonomyInput) && !taxonomy) {
 		return jsonResponse({ error: "invalid_business_category" }, 400);
 	}
-	if (!taxonomy && !CATEGORY_KEYS.has(legacyCategory)) {
+	if (!taxonomy && legacyCategorySupplied && !CATEGORY_KEYS.has(legacyCategory)) {
 		return jsonResponse({ error: "invalid_business_category" }, 400);
 	}
-	const category = taxonomy?.category_key ?? legacyCategory;
+	// Category and city are optional at setup (D-05): a name and owner are enough.
+	// A taxonomy selection stores its IDs and key; a legacy key alone stores only
+	// the key, and omission stores NULL.
+	const category = taxonomy?.category_key ?? (legacyCategory || null);
 
-	let cityName = cityNameInput;
+	let cityName: string | null = null;
 	let verifiedCityCatalogId: number | null = null;
 	let verifiedCityCatalogVersion: string | null = null;
+	let verifiedCityGeonameId: number | null = null;
 	if (cityCatalogId != null) {
 		const catalogCity = await env.orderak_geo.withSession("first-unconstrained").prepare(
 			`SELECT c.name,c.native_name,c.version
@@ -491,9 +536,16 @@ async function completeOnboarding(
 			"SELECT name FROM geo_cities WHERE geoname_id=? AND country_iso=?",
 		).bind(cityGeonameId, countryIso).first<{ name: string }>();
 		if (!city) return jsonResponse({ error: "invalid_city" }, 400);
+		verifiedCityGeonameId = cityGeonameId;
 		cityName = city.name;
+	} else if (cityNameSupplied) {
+		// City is optional, but a supplied name is never silently treated as
+		// omitted. An empty or whitespace-only value is invalid, exactly as the
+		// store update path treats it. Catalogue/GeoNames IDs take precedence.
+		if (!cityNameInput) return jsonResponse({ error: "invalid_city" }, 400);
+		cityName = cityNameInput;
 	}
-	if (cityName.length < 2) return jsonResponse({ error: "invalid_city" }, 400);
+	if (cityName != null && cityName.length < 2) return jsonResponse({ error: "invalid_city" }, 400);
 
 	const rawSlug = string(body.slug, 60);
 	const manualSlug = cleanSlug(rawSlug);
@@ -539,7 +591,7 @@ async function completeOnboarding(
 		countryIso,
 		publicIdentifier,
 		category,
-		cityGeonameId,
+		verifiedCityGeonameId,
 		cityName,
 		verifiedCityCatalogId,
 		verifiedCityCatalogVersion,
@@ -547,16 +599,21 @@ async function completeOnboarding(
 		taxonomy?.subcategory_id ?? null,
 		taxonomy?.version_id ?? null,
 	);
+	const ageStatement = ageConfirmationSource === AGE_SOURCE_EXPLICIT
+		? AGE_CONFIRMATION_STATEMENT
+		: null;
 	const statements: D1PreparedStatement[] = [
 		sellerInsert,
 		...foundation,
 		env.orderak_db.prepare(
-			`INSERT INTO seller_profiles(seller_id,full_name,birth_year,email_private) VALUES(?,?,?,?)`,
-		).bind(sellerId, session.full_name, session.birth_year, session.email_private),
+			`INSERT INTO seller_profiles(seller_id,full_name,birth_year,email_private) VALUES(?,?,NULL,?)`,
+		).bind(sellerId, session.full_name, session.email_private),
 		env.orderak_db.prepare(
 			`INSERT INTO legal_acceptances(
-			 id,seller_id,phone_e164,terms_version,privacy_version,locale,source,app_version,marketing_consent,accepted_at)
-			 VALUES(?,?,?,?,?,?, 'android_onboarding_v2', ?,0,?)`,
+			 id,seller_id,phone_e164,terms_version,privacy_version,locale,source,app_version,marketing_consent,accepted_at,
+			 age_confirmation_statement_text,age_confirmation_source,age_confirmation_confirmed_at,
+			 age_confirmation_terms_version)
+			 VALUES(?,?,?,?,?,?, 'android_onboarding_v2', ?,0,?,?,?,?,?)`,
 		).bind(
 			newUuid(),
 			sellerId,
@@ -566,6 +623,10 @@ async function completeOnboarding(
 			session.locale,
 			session.app_version,
 			session.terms_accepted_at,
+			ageStatement,
+			ageConfirmationSource,
+			session.terms_accepted_at,
+			session.terms_version,
 		),
 		env.orderak_db.prepare(
 			`UPDATE onboarding_sessions SET status='completed',completed_seller_id=?,idempotency_key=?,
@@ -636,7 +697,7 @@ async function completeOnboarding(
 		business_category_id: taxonomy?.category_id ?? null,
 		business_subcategory_id: taxonomy?.subcategory_id ?? null,
 		business_taxonomy_version: taxonomy?.version_id ?? null,
-		city_geoname_id: cityGeonameId,
+		city_geoname_id: verifiedCityGeonameId,
 		city_catalog_id: verifiedCityCatalogId,
 		city_catalog_version: verifiedCityCatalogVersion,
 		city_name: cityName,
