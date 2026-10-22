@@ -101,6 +101,21 @@ updates:
         update-types: [version-update:semver-major]
       - dependency-name: "@vitest/*"
         update-types: [version-update:semver-major]
+      # @simplewebauthn/server 14 changes the library that verifies passkeys.
+      # PR #205 failed test:types: AuthenticatorTransportFuture, imported in
+      # services/backend/src/domains/identity/auth-v2.ts, is gone and transports
+      # are typed string[]. Registration and verification already pin
+      # supportedAlgorithmIDs to [-7, -257] there, so v14's new default list
+      # (ML-DSA-44 first) does not apply, but its attestation and certificate
+      # checks changed and no test proves which credentials pass today.
+      # Changing backend credential verification needs the owner's explicit
+      # approval under the authentication contract. Lift this in a planned
+      # migration that keeps both [-7, -257] pins, types transports as string[],
+      # and adds registration fixtures proving -7 and -257 pass while -8 and
+      # ML-DSA fail. Do it soon: v14.0.2 fixes two moderate certificate-
+      # revocation issues. Passkeys stay off (PASSKEY_ENABLED) until then.
+      - dependency-name: "@simplewebauthn/server"
+        update-types: [version-update:semver-major]
 
   # Android / Compose / Kotlin toolchain.
   - package-ecosystem: gradle
