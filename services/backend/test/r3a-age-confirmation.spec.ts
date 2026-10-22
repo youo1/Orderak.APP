@@ -52,10 +52,18 @@ async function beginOnboarding(): Promise<string> {
 	return String(body.onboarding_token);
 }
 
+// Age evidence lives on legal_acceptances (nullable columns), not a separate
+// table: a new per-seller table would be left behind by account erasure,
+// which only knows about legal_acceptances (services/backend/src/domains/identity/deletion.ts
+// is out of scope for this task). Column names are prefixed with
+// age_confirmation_ because legal_acceptances already has bare `source`,
+// `terms_version` and `accepted_at` columns recording the general terms/privacy
+// acceptance event; the age evidence must not overload those.
 async function evidenceFor(phone: string) {
 	return env.orderak_db.prepare(
-		`SELECT a.source, a.statement_text, a.terms_version, a.confirmed_at
-		 FROM age_confirmation_evidence a JOIN sellers s ON s.id = a.seller_id
+		`SELECT a.age_confirmation_source source, a.age_confirmation_statement_text statement_text,
+		        a.age_confirmation_terms_version terms_version, a.age_confirmation_confirmed_at confirmed_at
+		 FROM legal_acceptances a JOIN sellers s ON s.id = a.seller_id
 		 WHERE s.phone = ?`,
 	).bind(phone).first<Record<string, unknown>>();
 }
@@ -183,15 +191,16 @@ describe("R3a — age confirmation replaces birth year (D-13)", () => {
 });
 
 describe("R3a — age-confirmation evidence migration is additive", () => {
-	it("adds the evidence table without touching birth-year columns or dropping anything", () => {
+	it("adds nullable age-evidence columns to legal_acceptances and a source marker to onboarding_sessions, without touching birth-year columns or dropping anything", () => {
 		const files = Object.values(MIGRATION_062);
 		expect(files).toHaveLength(1);
 		const sql = files[0];
-		expect(sql).toMatch(/CREATE TABLE\s+age_confirmation_evidence/i);
-		expect(sql.toLowerCase()).toContain("seller_id");
-		expect(sql.toLowerCase()).toContain("source");
-		expect(sql.toLowerCase()).toContain("statement_text");
-		expect(sql.toLowerCase()).toContain("terms_version");
+		expect(sql).not.toMatch(/CREATE TABLE\s+age_confirmation_evidence/i);
+		expect(sql).toMatch(/ALTER TABLE\s+legal_acceptances\s+ADD COLUMN\s+age_confirmation_statement_text/i);
+		expect(sql).toMatch(/ALTER TABLE\s+legal_acceptances\s+ADD COLUMN\s+age_confirmation_source/i);
+		expect(sql).toMatch(/ALTER TABLE\s+legal_acceptances\s+ADD COLUMN\s+age_confirmation_confirmed_at/i);
+		expect(sql).toMatch(/ALTER TABLE\s+legal_acceptances\s+ADD COLUMN\s+age_confirmation_terms_version/i);
+		expect(sql).toMatch(/ALTER TABLE\s+onboarding_sessions\s+ADD COLUMN\s+age_confirmation_source/i);
 		expect(sql).not.toMatch(/drop\s+column/i);
 		expect(sql).not.toMatch(/birth_year/i);
 	});
