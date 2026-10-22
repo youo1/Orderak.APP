@@ -8,8 +8,11 @@ import org.junit.Test
  * Locked regression: this task adds Banner, OfflineStrip, and Skeleton
  * strings to default, Arabic, English, and French resources. Whatever keys
  * land must keep complete key-and-resource-type parity across all four files
- * (docs/contracts/localization-invariants.md, invariant 1) both before and
- * after this task — it must not newly break on the unchanged tree, and the
+ * (docs/contracts/localization-invariants.md, invariant 1), excluding keys
+ * the default resource marks translatable="false" — invariant 1's own
+ * "non-translatable brand assets" carve-out (e.g. app_name, which today
+ * exists only in the default resource). Parity must hold both before and
+ * after this task: it must not newly break on the unchanged tree, and the
  * change must not break it either.
  *
  * Asserts only key names and resource tags (string / string-array / plurals),
@@ -23,19 +26,26 @@ class FeedbackKitStringParityAcceptanceTest {
 
     private data class ResourceKey(val tag: String, val name: String)
 
-    private val tagAndName = Regex("""<(string|string-array|plurals)\s+name="([^"]+)"""")
+    private val openTag = Regex("""<(string|string-array|plurals)\s+([^>]*)>""")
+    private val nameAttr = Regex("""name="([^"]+)"""")
+    private val notTranslatable = Regex("""translatable\s*=\s*"false"""")
 
     private fun keys(file: File): Set<ResourceKey> {
         assertTrue("Missing ${'$'}{file.path}; run from the app module", file.isFile)
-        return tagAndName.findAll(file.readText())
-            .map { ResourceKey(it.groupValues[1], it.groupValues[2]) }
+        return openTag.findAll(file.readText())
+            .mapNotNull { match ->
+                val attrs = match.groupValues[2]
+                if (notTranslatable.containsMatchIn(attrs)) return@mapNotNull null
+                val name = nameAttr.find(attrs)?.groupValues?.get(1) ?: return@mapNotNull null
+                ResourceKey(match.groupValues[1], name)
+            }
             .toSet()
     }
 
     @Test
-    fun theFourShippedLocalesKeepCompleteKeyAndResourceTypeParity() {
+    fun theFourShippedLocalesKeepCompleteKeyAndResourceTypeParityExcludingNonTranslatableAssets() {
         val base = keys(stringsFile("values"))
-        assertTrue("The default values/strings.xml declares no keys at all", base.isNotEmpty())
+        assertTrue("The default values/strings.xml declares no translatable keys at all", base.isNotEmpty())
         for (dir in resourceDirs) {
             val actual = keys(stringsFile(dir))
             val missing = base - actual

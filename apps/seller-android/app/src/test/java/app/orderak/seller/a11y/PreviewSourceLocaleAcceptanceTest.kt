@@ -1,18 +1,25 @@
 package app.orderak.seller.a11y
 
 import java.io.File
+import java.lang.reflect.Method
 import java.nio.file.Files
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 
 /**
- * Locked acceptance checks for the R1a preview-source parser.
+ * Locked acceptance checks for the R1a preview-source parser's explicit-root
+ * entry point.
  *
- * The parser must fail when a @PreviewTest declares no locale metadata,
- * instead of silently defaulting every unlabelled preview to Arabic, and it
- * must accept an injected source root so a fixture can prove that without
- * touching the real app sources (whose multipreview annotations always carry
- * explicit locales today, so the failure path is otherwise untestable).
+ * Reached through java.lang.reflect rather than a direct compile-time call:
+ * on today's tree `SourceDeclarations.parse()` takes no arguments and is
+ * private, so a direct `SourceDeclarations.parse(sourceRoot = ..., multipreviewRoot = ...)`
+ * call does not compile at all (Kotlin compiles every unit test in the module
+ * together, so that would break unrelated tests too). Reflection lets this
+ * file compile unchanged on both the old and the new tree and fail by
+ * assertion, not by compilation, until the overload exists. The method-name
+ * check tolerates Kotlin's `internal` name mangling (e.g. `parse$app_debug`)
+ * by matching on a `parse` prefix instead of an exact name.
  */
 class PreviewSourceLocaleAcceptanceTest {
 
@@ -24,8 +31,42 @@ class PreviewSourceLocaleAcceptanceTest {
         file.writeText(text)
     }
 
+    private fun sourceDeclarationsClass(): Class<*> =
+        Class.forName("app.orderak.seller.a11y.SourceDeclarations")
+
+    private fun singletonInstance(): Any {
+        val field = sourceDeclarationsClass().getDeclaredField("INSTANCE")
+        field.isAccessible = true
+        return field.get(null)
+    }
+
+    private fun findTwoFileArgParseMethod(): Method? =
+        sourceDeclarationsClass().declaredMethods.firstOrNull { method ->
+            method.name.startsWith("parse") &&
+                method.parameterCount == 2 &&
+                method.parameterTypes.all { it == File::class.java }
+        }
+
+    @Test
+    fun theParserExposesAnExplicitSourceRootAndMultipreviewRootEntryPoint() {
+        val method = findTwoFileArgParseMethod()
+        val declaredNames = sourceDeclarationsClass().declaredMethods.joinToString { it.toString() }
+        assertTrue(
+            "Expected SourceDeclarations to declare a parse(sourceRoot: File, multipreviewRoot: File) " +
+                "overload (or an internal-mangled equivalent starting with 'parse' and taking two File " +
+                "parameters); found among: $declaredNames",
+            method != null,
+        )
+    }
+
     @Test
     fun aPreviewTestDeclarationWithNoLocaleMetadataFailsParsingInsteadOfDefaultingToArabic() {
+        val method = findTwoFileArgParseMethod()
+        if (method == null) {
+            fail("No two-File-argument parse overload found on SourceDeclarations yet")
+            return
+        }
+        method.isAccessible = true
         val sourceRoot = tempDir()
         val multipreviewRoot = tempDir()
         write(
@@ -45,7 +86,7 @@ class PreviewSourceLocaleAcceptanceTest {
 
         var threw = false
         try {
-            SourceDeclarations.parse(sourceRoot = sourceRoot, multipreviewRoot = multipreviewRoot)
+            method.invoke(singletonInstance(), sourceRoot, multipreviewRoot)
         } catch (error: Throwable) {
             threw = true
         }
@@ -57,6 +98,12 @@ class PreviewSourceLocaleAcceptanceTest {
 
     @Test
     fun anInjectedSourceRootWithExplicitLocaleMetadataParsesWithoutTouchingRealAppSources() {
+        val method = findTwoFileArgParseMethod()
+        if (method == null) {
+            fail("No two-File-argument parse overload found on SourceDeclarations yet")
+            return
+        }
+        method.isAccessible = true
         val sourceRoot = tempDir()
         val multipreviewRoot = tempDir()
         write(
@@ -77,10 +124,16 @@ class PreviewSourceLocaleAcceptanceTest {
             """.trimIndent(),
         )
 
-        val declarations = SourceDeclarations.parse(sourceRoot = sourceRoot, multipreviewRoot = multipreviewRoot)
+        val result = method.invoke(singletonInstance(), sourceRoot, multipreviewRoot)
+        val declarations = result as? List<*> ?: emptyList<Any?>()
+        val found = declarations.any { declaration ->
+            declaration != null &&
+                declaration.javaClass.methods.firstOrNull { it.name == "getFunction" }
+                    ?.invoke(declaration) == "zzLocaleProbe"
+        }
         assertTrue(
             "An explicit-locale @PreviewTest in the injected source root must parse",
-            declarations.any { it.function == "zzLocaleProbe" },
+            found,
         )
     }
 }
