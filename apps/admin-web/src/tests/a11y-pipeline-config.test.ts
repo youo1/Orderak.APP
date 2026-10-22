@@ -9,7 +9,7 @@ describe('a11y pipeline wiring', () => {
   it('declares exactly the two approved a11y devDependencies at the pinned versions', () => {
     const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
     expect(pkg.devDependencies['axe-core']).toBe('4.14.0');
-    expect(pkg.devDependencies['@vitest/browser-playwright']).toBe('4.1.11');
+    expect(pkg.devDependencies['@vitest/browser-playwright']).toBe('4.1.12');
     expect(pkg.devDependencies['@axe-core/playwright']).toBeUndefined();
     expect(pkg.devDependencies['jest-axe']).toBeUndefined();
     expect(pkg.devDependencies['cypress-axe']).toBeUndefined();
