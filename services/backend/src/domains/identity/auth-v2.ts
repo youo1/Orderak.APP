@@ -448,6 +448,13 @@ async function completeOnboarding(
 	const storeName = string(body.store_name, 60).replace(/\s+/g, " ").trim();
 	const requestedCategoryId = string(body.business_category_id, 80);
 	const requestedSubcategoryId = string(body.business_subcategory_id, 80);
+	// A supplied legacy category must be a real key, not coerced away. Without
+	// this check a non-string value (for example 123) becomes "" and would be
+	// mistaken for an omitted optional category.
+	const legacyCategorySupplied = body.business_category != null;
+	if (legacyCategorySupplied && typeof body.business_category !== "string") {
+		return jsonResponse({ error: "invalid_business_category" }, 400);
+	}
 	const legacyCategory = string(body.business_category, 30);
 	const sessionCountryIso = normalizeCountryIso(session.phone_country_iso);
 	const requestCountryIso = normalizeCountryIso(body.country_iso);
@@ -486,7 +493,7 @@ async function completeOnboarding(
 	if ((requestedCategoryId || hasTaxonomyInput) && !taxonomy) {
 		return jsonResponse({ error: "invalid_business_category" }, 400);
 	}
-	if (legacyCategory && !taxonomy && !CATEGORY_KEYS.has(legacyCategory)) {
+	if (!taxonomy && legacyCategorySupplied && !CATEGORY_KEYS.has(legacyCategory)) {
 		return jsonResponse({ error: "invalid_business_category" }, 400);
 	}
 	// Category and city are optional at setup (D-05): a name and owner are enough.
