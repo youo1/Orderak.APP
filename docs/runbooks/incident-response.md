@@ -221,4 +221,4 @@ Every P0 and P1 incident must undergo a post-incident review covering:
 ## References
 
 - [Egypt Personal Data Protection Law No. 151/2020 — English translation](https://eg.andersen.com/wp-content/uploads/2026/02/Law-No.-151-of-2020.pdf)
-- [Egyptian PDPC DPO guidance](https://www.pdpc.gov.eg/assets/pdf-data/Guidelines/DPO.pdf)
+- [Egyptian PDPC DPO guidance — archived copy (snapshot: 2026-08-10)](https://web.archive.org/web/20260810094204/https://pdpc.gov.eg/assets/pdf-data/Guidelines/DPO.pdf); official source: `https://www.pdpc.gov.eg/assets/pdf-data/Guidelines/DPO.pdf` (unreachable since 2026-10-22)
