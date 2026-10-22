@@ -8,6 +8,10 @@ import { BASE, createSchema } from "./helpers";
 const PHONE = "+201001234567";
 const DEVICE_SECRET = "device-secret-with-enough-entropy";
 let testEnv: TestEnv;
+// The Firebase lookup stub echoes the phone number of the test that is
+// currently onboarding. Each added test uses its own E.164 number so the
+// per-phone rate-limit Durable Object is not exhausted for later tests.
+let firebasePhone = PHONE;
 
 function freshFirebaseToken(): string {
 	const payload = btoa(JSON.stringify({ auth_time: Math.floor(Date.now() / 1000) }))
@@ -55,10 +59,11 @@ async function route(
 	return response;
 }
 
-async function beginOnboarding(): Promise<string> {
+async function beginOnboarding(phone = PHONE): Promise<string> {
+	firebasePhone = phone;
 	const response = await route("/api/v1/auth/phone/complete", {
 		id_token: freshFirebaseToken(),
-		phone: PHONE,
+		phone,
 		device_secret: DEVICE_SECRET,
 	});
 	expect(response.status).toBe(200);
@@ -69,6 +74,7 @@ async function beginOnboarding(): Promise<string> {
 
 beforeEach(async () => {
 	await createSchema();
+	firebasePhone = PHONE;
 	testEnv = Object.create(env) as TestEnv;
 	testEnv.FIREBASE_WEB_API_KEY = "test-key";
 	testEnv.ONBOARDING_ENABLED = "true";
@@ -80,7 +86,7 @@ beforeEach(async () => {
 		if (!url.startsWith("https://identitytoolkit.googleapis.com/v1/accounts:lookup")) {
 			throw new Error(`unexpected_fetch:${url}`);
 		}
-		return Response.json({ users: [{ localId: "firebase-v2-user", phoneNumber: PHONE }] });
+		return Response.json({ users: [{ localId: "firebase-v2-user", phoneNumber: firebasePhone }] });
 	}));
 });
 
@@ -164,6 +170,10 @@ describe("Auth and onboarding V2", () => {
 		}, { authorization: `Bearer ${onboardingToken}` });
 		expect(replay.status).toBe(200);
 		expect(await replay.json()).toMatchObject({ ok: true, idempotent: true });
+		const evidenceCount = await env.orderak_db.prepare(
+			"SELECT COUNT(*) count FROM legal_acceptances WHERE phone_e164=?",
+		).bind(PHONE).first<{ count: number }>();
+		expect(Number(evidenceCount?.count)).toBe(1);
 	});
 
 	it("requires only a global category during onboarding and rejects invalid supplied pairs", async () => {
@@ -264,7 +274,8 @@ describe("Auth and onboarding V2", () => {
 	});
 
 	it("creates a minimal store with optional category and city persisted as NULL", async () => {
-		const onboardingToken = await beginOnboarding();
+		const phone = "+201001234571";
+		const onboardingToken = await beginOnboarding(phone);
 		await route("/api/v1/onboarding/account", {
 			full_name: "Minimal Seller",
 			age_confirmed: true,
@@ -282,7 +293,7 @@ describe("Auth and onboarding V2", () => {
 			`SELECT business_category,business_category_id,business_subcategory_id,
 			        city_geoname_id,city_catalog_id,city_catalog_version,city_name
 			 FROM sellers WHERE phone=?`,
-		).bind(PHONE).first<Record<string, unknown>>();
+		).bind(phone).first<Record<string, unknown>>();
 		expect(row).toEqual({
 			business_category: null,
 			business_category_id: null,
@@ -295,7 +306,8 @@ describe("Auth and onboarding V2", () => {
 	});
 
 	it("validates category and city independently when only one is supplied", async () => {
-		const onboardingToken = await beginOnboarding();
+		const phone = "+201001234572";
+		const onboardingToken = await beginOnboarding(phone);
 		await route("/api/v1/onboarding/account", {
 			full_name: "Partial Seller",
 			age_confirmed: true,
@@ -311,6 +323,19 @@ describe("Auth and onboarding V2", () => {
 		expect(badCity.status).toBe(400);
 		expect(await badCity.json()).toMatchObject({ code: "invalid_city" });
 
+		// A supplied empty or whitespace-only name is not the same as omitting
+		// the optional city: it must not be silently dropped.
+		for (const cityName of ["", "   "]) {
+			const blankCity = await route("/api/v1/onboarding/complete", {
+				device_secret: DEVICE_SECRET,
+				store_name: "Partial Shop",
+				country_iso: "EG",
+				city_name: cityName,
+			}, { authorization: `Bearer ${onboardingToken}` });
+			expect(blankCity.status).toBe(400);
+			expect(await blankCity.json()).toMatchObject({ code: "invalid_city" });
+		}
+
 		const badCategory = await route("/api/v1/onboarding/complete", {
 			device_secret: DEVICE_SECRET,
 			store_name: "Partial Shop",
@@ -322,7 +347,8 @@ describe("Auth and onboarding V2", () => {
 	});
 
 	it("records legacy birth-year evidence with a NULL statement and no stored year", async () => {
-		const onboardingToken = await beginOnboarding();
+		const phone = "+201001234573";
+		const onboardingToken = await beginOnboarding(phone);
 		await route("/api/v1/onboarding/account", {
 			full_name: "Legacy Seller",
 			birth_year: 1988,
@@ -345,11 +371,52 @@ describe("Auth and onboarding V2", () => {
 			 FROM sellers s JOIN legal_acceptances l ON l.seller_id=s.id
 			 JOIN onboarding_sessions o ON o.phone_e164=s.phone
 			 JOIN seller_profiles p ON p.seller_id=s.id WHERE s.phone=?`,
-		).bind(PHONE).first<Record<string, unknown>>();
+		).bind(phone).first<Record<string, unknown>>();
 		expect(evidence).toMatchObject({
 			source: "android_onboarding_v2_legacy_birth_year",
 			statement_text: null,
 			session_birth_year: null,
+			profile_birth_year: null,
+		});
+		expect(evidence?.terms_version).toBeTruthy();
+		expect(evidence?.confirmed_at).toBeTruthy();
+	});
+
+	it("completes a pre-deploy account_saved session as legacy with a NULL statement", async () => {
+		const phone = "+201001234574";
+		const onboardingToken = await beginOnboarding(phone);
+		await route("/api/v1/onboarding/account", {
+			full_name: "Pre-deploy Seller",
+			age_confirmed: true,
+			terms_accepted: true,
+			app_version: "3.0.0",
+		}, { authorization: `Bearer ${onboardingToken}` });
+		// The previous Worker saved the account step with the birth year on the
+		// session and no source marker. Deployment must not strand this draft.
+		await env.orderak_db.prepare(
+			`UPDATE onboarding_sessions SET age_confirmation_source=NULL,birth_year=1988
+			 WHERE phone_e164=?`,
+		).bind(phone).run();
+
+		const completed = await route("/api/v1/onboarding/complete", {
+			device_secret: DEVICE_SECRET,
+			store_name: "Pre-deploy Shop",
+			country_iso: "EG",
+		}, { authorization: `Bearer ${onboardingToken}` });
+		expect(completed.status).toBe(200);
+
+		const evidence = await env.orderak_db.prepare(
+			`SELECT l.age_confirmation_source source,l.age_confirmation_statement_text statement_text,
+			        l.age_confirmation_terms_version terms_version,l.age_confirmation_confirmed_at confirmed_at,
+			        o.birth_year session_birth_year,p.birth_year profile_birth_year
+			 FROM sellers s JOIN legal_acceptances l ON l.seller_id=s.id
+			 JOIN onboarding_sessions o ON o.phone_e164=s.phone
+			 JOIN seller_profiles p ON p.seller_id=s.id WHERE s.phone=?`,
+		).bind(phone).first<Record<string, unknown>>();
+		expect(evidence).toMatchObject({
+			source: "android_onboarding_v2_legacy_birth_year",
+			statement_text: null,
+			session_birth_year: 1988,
 			profile_birth_year: null,
 		});
 		expect(evidence?.terms_version).toBeTruthy();

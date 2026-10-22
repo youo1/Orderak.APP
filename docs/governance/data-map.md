@@ -139,8 +139,8 @@ applies_to: [internal]
 | Classification | Examples |
 |---|---|
 | **Restricted** | `phone`, `secret` (hashed), `admin_users.password_hash`, `admin_users.totp_secret`, `seller_devices.secret_hash`, `instapay`, `vfcash` |
-| **Confidential** | `buyer_phone`, `buyer_name`, seller `email`, `admin_users.email`, `payment_events.raw_json`, `support_messages.body`, `inbound_emails.*`, `legal_acceptances.age_confirmation_*` |
-| **Internal** | `admin_audit.*`, `error_logs.*`, `rate_limits.*`, `email_events.*`, `webhook_events`, `onboarding_sessions.age_confirmation_source` |
+| **Confidential** | `buyer_phone`, `buyer_name`, seller `email`, `admin_users.email`, `payment_events.raw_json`, `support_messages.body`, `inbound_emails.*`, `legal_acceptances.age_confirmation_*`, `onboarding_sessions.age_confirmation_source` |
+| **Internal** | `admin_audit.*`, `error_logs.*`, `rate_limits.*`, `email_events.*`, `webhook_events` |
 | **Public** | `store_name`, `slug`, `public_identifier`, `store_code`, product `name`/`description`/`price`/`image_url`, category `name`, `logo_url`, `cover_url` |
 
 ## 3. Data Flow Diagrams

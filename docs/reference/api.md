@@ -212,10 +212,13 @@ Terms version, and a Worker timestamp, with NULL
 `age_confirmation_statement_text` because that legacy client never displayed the
 statement. The submitted year is not stored in `onboarding_sessions` or
 `seller_profiles`, and a present `age_confirmed` (including `false`) disables the
-legacy path. Existing birth-year columns and values are retained; this change
-does not delete, backfill, or migrate them. The age evidence is confidential and
-excluded from Store DTOs, public pages, transactional email variables, telemetry,
-and public contact data.
+legacy path. A draft already saved by the previous Worker with an account-saved
+status, a retained session birth year, and no source marker also completes as
+this legacy shape; its retained year is never copied to a new field. Existing
+birth-year columns and values are retained; this change does not delete,
+backfill, or migrate them. The age evidence is confidential and excluded from
+Store DTOs, public pages, transactional email variables, telemetry, and public
+contact data.
 
 ### Health Check
 

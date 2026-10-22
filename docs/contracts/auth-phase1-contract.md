@@ -169,9 +169,12 @@ version 8 and is specified in guarantee 10.
     source `android_onboarding_v2_legacy_birth_year`, records the accepted Terms
     version and a Worker timestamp, and stores NULL statement text because that
     legacy client never displayed the statement. It still does not persist the
-    submitted year. Existing birth-year columns and stored values are retained
-    unchanged; this intentional D-13 contract migration neither deletes,
-    backfills, nor migrates them.
+    submitted year. A draft saved by the previous Worker with `status` of
+    `account_saved`, a retained session birth year, and a NULL source marker also
+    completes as the legacy shape with NULL statement text; the retained year is
+    neither copied nor persisted into a new field. Existing birth-year columns
+    and stored values are retained unchanged; this intentional D-13 contract
+    migration neither deletes, backfills, nor migrates them.
 23. After the Worker returns a valid new-seller onboarding token, Android enters
     Account step 1 directly. Explicit `PRE_REGISTRATION` state always routes to
     resumable setup and can never be treated as a completed Main session because
