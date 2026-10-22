@@ -823,7 +823,10 @@ async function handleStoreUpdate(request: Request, env: Env, url: URL, store: Ro
 		cityCatalogVersion = catalogCity.version;
 		cityName = catalogCity.name;
 	} else if (body.city_name != null) {
-		const typedCity = String(body.city_name).replace(/\s+/g, " ").trim().slice(0, 100);
+		// The typed name must be a string. Coercing a number or boolean would
+		// turn it into a plausible-looking city ("123", "true") and store it.
+		if (typeof body.city_name !== "string") return jsonResponse({ error: "invalid_city" }, 400);
+		const typedCity = body.city_name.replace(/\s+/g, " ").trim().slice(0, 100);
 		if (typedCity.length < 2) return jsonResponse({ error: "invalid_city" }, 400);
 		cityGeonameId = null;
 		cityCatalogId = null;

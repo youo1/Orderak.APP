@@ -461,6 +461,9 @@ async function completeOnboarding(
 	if (body.city_geoname_id != null && cityGeonameId == null) {
 		return jsonResponse({ error: "invalid_city" }, 400);
 	}
+	if (body.city_name != null && typeof body.city_name !== "string") {
+		return jsonResponse({ error: "invalid_city" }, 400);
+	}
 	if (storeName.length < 2) return jsonResponse({ error: "invalid_store_name" }, 400);
 	if (countryIso === "XX") return jsonResponse({ error: "invalid_country" }, 400);
 	if (
