@@ -1260,6 +1260,36 @@
               }
             }
           },
+          "400": {
+            "description": "Validation failure",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/validation_failed",
+                      "title": "Validation Failed",
+                      "status": 400,
+                      "code": "validation_failed",
+                      "detail": "One or more fields are invalid.",
+                      "request_id": "018f-example",
+                      "field_errors": {
+                        "field": "invalid"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
           "401": {
             "description": "Seller authentication required",
             "headers": {
@@ -1308,6 +1338,37 @@
                       "code": "account_restricted",
                       "detail": "The account is not active.",
                       "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              },
+              "Retry-After": {
+                "$ref": "./components/common.json#/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/rate_limited",
+                      "title": "Rate Limited",
+                      "status": 429,
+                      "code": "rate_limited",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example",
+                      "retryable": true
                     }
                   }
                 }
