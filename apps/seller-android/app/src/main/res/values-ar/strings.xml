@@ -541,4 +541,27 @@
     <string name="store_info_save_failed">مقدرناش نحفظ بيانات المتجر — مفيش حاجة اتغيرت</string>
     <string name="support_reply_failed">ردّك ماتبعتش — لسه موجود في الخانة</string>
     <string name="store_info_upload_failed">الصورة ماترفعتش — اختارها تاني، أو احفظ من غيرها</string>
+    <string name="banner_information_title">تنبيه</string>
+    <string name="banner_information_message">متجرك مفتوح ويستقبل الطلبات.</string>
+    <string name="banner_warning_title">اقتربت من الحد</string>
+    <string name="banner_warning_message">استهلكت معظم عدد المنتجات المتاح في باقتك.</string>
+    <string name="banner_warning_action">مراجعة المنتجات</string>
+    <string name="banner_error_title">تعذّر إتمام العملية</string>
+    <string name="banner_error_message">تعذّر حفظ هذا التغيير. لم يُفقد أي شيء — أعد المحاولة.</string>
+    <string name="banner_success_title">تم الحفظ</string>
+    <string name="banner_success_message">تظهر تغييراتك الآن في متجرك.</string>
+    <string name="banner_locked_by_plan_title">غير متاح في باقتك</string>
+    <string name="banner_locked_by_plan_message">هذه الميزة متاحة عند الترقية إلى باقة أعلى.</string>
+    <string name="banner_locked_by_plan_action">عرض الباقات</string>
+    <string name="banner_sync_in_progress_title">جارٍ المزامنة</string>
+    <string name="banner_sync_in_progress_message">تُرسل أحدث تغييراتك الآن.</string>
+    <string name="banner_sync_failed_title">تعذّرت المزامنة</string>
+    <string name="banner_sync_failed_message">تغييراتك محفوظة على هذا الهاتف فقط. أعد المحاولة لإرسالها.</string>
+    <string name="banner_sync_failed_retry">إعادة المحاولة</string>
+    <string name="banner_version_warning_title">يلزم التحديث</string>
+    <string name="banner_version_warning_message">لم يعد هذا الإصدار قادرًا على الوصول إلى متجرك. حدّث تطبيق Orderak للمتابعة.</string>
+    <string name="offline_strip_offline">أنت غير متصل</string>
+    <string name="offline_strip_last_update">آخر تحديث منذ %1$s دقائق</string>
+    <string name="offline_strip_reconnecting">جارٍ إعادة الاتصال…</string>
+    <string name="skeleton_loading">جارٍ التحميل</string>
 </resources>

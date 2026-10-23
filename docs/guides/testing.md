@@ -78,25 +78,110 @@ the Gradle test tasks pin `user.language=en`, `user.country=US`, and
 `user.timezone=UTC`, exactly like the screenshot tasks.
 
 The source is the authority. The audit parses `app/src/screenshotTest/java` with
-the anchored matcher `(?m)^\s*@PreviewTest\s*$` to decide which functions are
-states and which locales they render; it parses the multipreview annotations in
-`app/src/main/java/app/orderak/seller/core/ui` for their constituent locales.
+the anchored matcher `(?m)^\s*@PreviewTest\s*---
+status: current
+generated: false
+owner: backend
+applies_to: [production, staging]
+---
+# Testing Guide
+
+Orderak has independent backend and Android suites plus versioned authentication,
+localization, seller-API, and design-system build guards.
+
+## Backend tests
+
+### `pnpm test` (Vitest, Workers pool)
+
+Runs all backend unit and integration tests. Covers:
+
+- Identity helpers (slug generation, transliteration, store codes)
+- Store registration and device restore
+- Explicit Seller v1 routing plus 404/no-redirect checks for removed unversioned
+  and v2 routes
+- RFC 9457 Problem Details and response request-ID correlation
+- OpenAPI route/spec coverage, examples, public leakage, Prism, Schemathesis,
+  and k6 tiered checks
+- Category CRUD
+- Product sync and code generation
+- Order fetch with cursor
+- Chat endpoint (authenticated + rate-limited + plan quota)
+- Public store/category/product pages + SEO metadata
+- Legacy URL redirects
+- Billing (subscriptions, coupons, referrals, ads)
+- Admin authentication (login, 2FA, RBAC, password change)
+- Email templates (seeds, overrides, preview, test-send)
+- Webhook idempotency
+
+Run before every commit:
+
+```cmd
+cd services/backend
+pnpm test
+```
+
+### `npx tsc --noEmit` (TypeScript type-check)
+
+Catches type errors across the entire Worker codebase. No runtime — pure
+static analysis.
+
+```cmd
+cd services/backend
+npx tsc --noEmit
+```
+
+## Android tests
+
+### Unit tests (`testStagingDebugUnitTest`)
+
+JVM unit tests. No emulator needed. Covers:
+
+- Versioned seller route policy (`ApiRoutesTest`)
+- OTP timing/state, authentication-operation generation, and logout ordering
+- Data formatting helpers
+- ViewModel logic
+- The accessibility preview audit (`app.orderak.seller.a11y.AccessibilityPreviewAuditTest`)
+
+```cmd
+cd apps/seller-android
+gradlew.bat testStagingDebugUnitTest
+```
+
+### Accessibility preview audit (`AccessibilityPreviewAuditTest`)
+
+The audit compiles the screenshot preview declarations into the unit-test
+artifact (`app/src/screenshotTest/java` is added to the `test` source set) and
+renders every source `@PreviewTest` under Robolectric 4.17 with
+`GraphicsMode.NATIVE`, SDK 35, and the `ar-w411dp-h891dp-xxhdpi` qualifiers. It
+runs on a plain `Application` so Firebase/Hilt initialization never starts, and
+the Gradle test tasks pin `user.language=en`, `user.country=US`, and
+`user.timezone=UTC`, exactly like the screenshot tasks.
+
+ to decide which functions are
+states and which variants they render; it parses the multipreview annotations in
+`app/src/main/java/app/orderak/seller/core/ui` for their locale, `uiMode`, and
+`fontScale`. Both roots are explicit arguments to
+`SourceDeclarations.parse(sourceRoot, multipreviewRoot)`, so an isolated fixture
+can prove the parser without reading the real app sources. There is no locale
+fallback: a `@PreviewTest` with no locale metadata fails parsing.
 Compose runtime's public `getDeclaredComposableMethod` resolves each parsed state
 function; reflection never infers a `@Preview` or picks a neighbouring helper. A
 missing source directory, an unresolvable state, or an unresolvable multipreview
 locale fails loudly, and the runtime annotation count must equal the number of
-audited cases. The observed figure is **280 `@PreviewTest` annotations in 22
+audited cases. The observed figure is **293 `@PreviewTest` annotations in 23
 source files**, against the manager's approximate 320-state estimate (a
 discrepancy of ~40); the audit prints the measured values rather than hardcoding
 either number.
 
 One `@PreviewTest` declaration is one JUnit case, named for its compiled
-`<File>ScreenshotTestKt` facade and function. A declaration with several locale
-variants gets a single `setContent` call whose host reads a mutable locale
-variant, copies the current configuration and applies the parsed locale (so the
-SDK, size, and density qualifiers survive), and provides `LocalConfiguration`,
-`LocalContext`, `LocalResources`, and `LocalLayoutDirection` from the same
-locale context built with `createConfigurationContext`. `LocalResources` matters:
+`<File>ScreenshotTestKt` facade and function. A declaration with several
+variants gets a single `setContent` call whose host reads a mutable variant,
+copies the current configuration and applies the parsed locale, `uiMode`, and
+`fontScale` (so the SDK, size, and density qualifiers survive), and provides
+`LocalConfiguration`, `LocalDensity`, `LocalContext`, `LocalResources`, and
+`LocalLayoutDirection` from the same locale context built with
+`createConfigurationContext`. Each declared variant is audited in its own
+locale, mode, and scale, and every diagnostic names the preview and the locale. `LocalResources` matters:
 Compose UI reads `stringResource`/`pluralStringResource` from it, so without it
 every `en`/`fr` preview would audit Arabic strings while reported as `en`/`fr`.
 The host also re-provides `LocalActivityResultRegistryOwner` and
@@ -287,6 +372,22 @@ Enforces:
 ```cmd
 gradlew.bat lintStagingDebug
 ```
+
+### Shared feedback components (kit-pending)
+
+`Banner`, `OfflineStrip`, and `Skeleton` live in
+`app/src/main/java/app/orderak/seller/core/ui/FeedbackComponents.kt`. Their state
+vocabulary is `BannerState`, `OfflineStripState`, and `SkeletonVariant`; the
+locked `FeedbackComponentStatesAcceptanceTest` pins each enum. The 13
+`@PreviewTest` functions in
+`app/src/screenshotTest/java/app/orderak/seller/core/ui/FeedbackOverlayScreenshotTest.kt`
+carry `FeedbackPreviews`, which declares the eight Arabic/English,
+light/dark, 100%/200% variants. `tooling/ux/render-coverage.mjs` requires one
+reference per declared variant, so a missing variant fails the guard. The
+inventory marks all three components `kit-pending` with adopter `R2` in its own
+column; `tooling/repository/verify-design-system-components.mjs` allows a
+kit-pending row only when that adopter is named, and fails if the component gains
+a production caller while still pending.
 
 ### Screenshot validation (`validateStagingDebugScreenshotTest`)
 

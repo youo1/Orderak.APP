@@ -163,6 +163,21 @@ export const RENDERS = {
   orderListDark: { kind: "component", note: "OrderCard, dark" },
   orderListGreyscale: { kind: "component", note: "order status survives greyscale" },
 
+  // R1a-1: Banner, OfflineStrip and Skeleton are kit-pending (adopter R2).
+  bannerInformation: { kind: "component", state: "Information", note: "Banner information, in the eight-variant feedback matrix" },
+  bannerWarning: { kind: "component", state: "Warning", note: "Banner warning with an action" },
+  bannerError: { kind: "component", state: "Error", note: "Banner error" },
+  bannerSuccess: { kind: "component", state: "Success", note: "Banner success" },
+  bannerLockedByPlan: { kind: "component", state: "LockedByPlan", note: "Banner locked by plan with an action" },
+  bannerSyncInProgress: { kind: "component", state: "SyncInProgress", note: "Banner sync in progress" },
+  bannerSyncFailed: { kind: "component", state: "SyncFailed", note: "Banner sync failed with retry" },
+  bannerVersionWarning: { kind: "component", state: "VersionWarning", note: "Banner version warning, non-dismissible" },
+  offlineStripOffline: { kind: "component", state: "Offline", note: "Offline strip with the last update" },
+  offlineStripReconnecting: { kind: "component", state: "Reconnecting", note: "Offline strip reconnecting" },
+  skeletonListRows: { kind: "component", state: "ListRows", note: "Skeleton list rows, static" },
+  skeletonMetricTiles: { kind: "component", state: "MetricTiles", note: "Skeleton metric tiles, static" },
+  skeletonDetailBlock: { kind: "component", state: "DetailBlock", note: "Skeleton detail block, static" },
+
   componentGalleryLight: { kind: "component", note: "the shared component vocabulary, light" },
   componentGalleryDark: { kind: "component", note: "the shared component vocabulary, dark" },
   componentGalleryGreyscale: { kind: "component", note: "the vocabulary survives greyscale" },
@@ -516,7 +531,7 @@ export const FLOOR = 83;
  * @param contracts    the screen contracts
  * @param floor        minimum proven screen-states
  */
-export function checkRenders({ renders, discovered, hasReference, contracts, floor }) {
+export function checkRenders({ renders, discovered, hasReference, hasVariantReference, variants, contracts, floor }) {
   const problems = [];
   const provenStates = new Set();
   const provenOffline = new Set();
@@ -533,7 +548,17 @@ export function checkRenders({ renders, discovered, hasReference, contracts, flo
       problems.push(`RENDERS declares ${fn}, but no @PreviewTest by that name exists`);
       continue;
     }
-    if (!hasReference(dir, fn)) {
+    const declaredVariants = variants?.get(fn) ?? [];
+    if (declaredVariants.length > 0 && hasVariantReference) {
+      const missing = declaredVariants.filter((variant) => !hasVariantReference(dir, fn, variant));
+      if (missing.length > 0) {
+        problems.push(
+          `${fn}: no reference PNG for variant(s) ${missing.join(", ")} under ${dir} — ` +
+            "run :app:updateStagingDebugScreenshotTest",
+        );
+        continue;
+      }
+    } else if (!hasReference(dir, fn)) {
       problems.push(`${fn}: no reference PNG under ${dir} — run :app:updateStagingDebugScreenshotTest`);
       continue;
     }
@@ -559,10 +584,40 @@ export function checkRenders({ renders, discovered, hasReference, contracts, flo
   return { problems, provenStates, provenOffline };
 }
 
+/**
+ * Multipreview annotation name -> the preview names it declares.
+ *
+ * A @PreviewTest carrying one of these produces one reference per variant, so the
+ * render guard has to know every variant, not merely that the function exists.
+ */
+function discoverMultipreviews(root, { readdir, readFile }) {
+  const result = new Map();
+  if (!root) return result;
+  for (const file of readdir(root)) {
+    const lines = readFile(file).split(/\r?\n/);
+    for (let index = 0; index < lines.length; index++) {
+      const name = lines[index].match(/^\s*annotation class (\w+)/)?.[1];
+      if (!name) continue;
+      let start = index - 1;
+      while (start >= 0 && lines[start].trimStart().startsWith("@")) start--;
+      const names = [];
+      for (let line = start + 1; line < index; line++) {
+        const attrs = lines[line].match(/@Preview\s*\(([^)]*)\)/)?.[1] ?? "";
+        const previewName = attrs.match(/name\s*=\s*"([^"]+)"/)?.[1];
+        if (previewName) names.push(previewName);
+      }
+      if (names.length > 0) result.set(name, names);
+    }
+  }
+  return result;
+}
+
 /** Every @PreviewTest in a Kotlin source tree, mapped to its reference dir. */
-export function discoverPreviews(sourceRoot, { readdir, readFile, relative }) {
+export function discoverPreviews(sourceRoot, { readdir, readFile, relative, multipreviewRoot }) {
   const discovered = new Map();
+  const variants = new Map();
   const problems = [];
+  const multipreviews = discoverMultipreviews(multipreviewRoot, { readdir, readFile });
   for (const file of readdir(sourceRoot)) {
     const text = readFile(file);
     const pkg = text.match(/^package\s+([\w.]+)/m)?.[1];
@@ -572,11 +627,22 @@ export function discoverPreviews(sourceRoot, { readdir, readFile, relative }) {
     // Everything after an @PreviewTest up to its `fun name(`.
     for (const chunk of text.split("@PreviewTest").slice(1)) {
       const fn = chunk.match(/\bfun\s+(\w+)\s*\(/)?.[1];
-      if (fn) discovered.set(fn, dir);
-      else problems.push(`${relative(file)}: @PreviewTest with no following function`);
+      if (!fn) { problems.push(`${relative(file)}: @PreviewTest with no following function`); continue; }
+      discovered.set(fn, dir);
+      const head = chunk.slice(0, chunk.search(/\bfun\s+\w+\s*\(/));
+      const inline = [...head.matchAll(/@Preview\s*\(([^)]*)\)/g)]
+        .map((match) => match[1].match(/name\s*=\s*"([^"]+)"/)?.[1])
+        .filter(Boolean);
+      let declared = inline;
+      if (declared.length === 0) {
+        for (const match of head.matchAll(/@(\w+)/g)) {
+          if (multipreviews.has(match[1])) { declared = multipreviews.get(match[1]); break; }
+        }
+      }
+      if (declared.length > 0) variants.set(fn, declared);
     }
   }
-  return { discovered, problems };
+  return { discovered, variants, problems };
 }
 
 /* ---- wiring, only when run as a script ------------------------------- */
@@ -588,10 +654,12 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
       return e.isDirectory() ? kotlinFiles(p) : e.name.endsWith(".kt") ? [p] : [];
     });
 
-  const { discovered, problems: scanProblems } = discoverPreviews(SOURCE, {
+  const MULTIPREVIEW = path.join(ANDROID, "src/main/java/app/orderak/seller/core/ui");
+  const { discovered, variants, problems: scanProblems } = discoverPreviews(SOURCE, {
     readdir: kotlinFiles,
     readFile: f => fs.readFileSync(f, "utf8"),
     relative: f => path.relative(ROOT, f),
+    multipreviewRoot: MULTIPREVIEW,
   });
 
   const hasReference = (dir, fn) => REFERENCE_ROOTS.some(root => {
@@ -600,8 +668,22 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
       fs.readdirSync(full).some(f => f.startsWith(fn + "_") && f.endsWith(".png"));
   });
 
+  const hasVariantReference = (dir, fn, variant) => REFERENCE_ROOTS.some(root => {
+    const full = path.join(root, dir);
+    return fs.existsSync(full) &&
+      fs.readdirSync(full).some(f => f.startsWith(`${fn}_${variant}_`) && f.endsWith(".png"));
+  });
+
   const { problems, provenStates, provenOffline } =
-    checkRenders({ renders: RENDERS, discovered, hasReference, contracts: CONTRACTS, floor: FLOOR });
+    checkRenders({
+      renders: RENDERS,
+      discovered,
+      hasReference,
+      hasVariantReference,
+      variants,
+      contracts: CONTRACTS,
+      floor: FLOOR,
+    });
   problems.unshift(...scanProblems);
 
   const totalStates = CONTRACTS.reduce((a, c) => a + c.states.length, 0);

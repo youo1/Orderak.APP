@@ -84,6 +84,47 @@ test("passes on the real tree", () => {
 	assert.equal(result.status, 0, result.output);
 });
 
+test("fails on a kit-pending row with no R-item adopter", () => {
+	const root = sandbox();
+	const inventory = path.join(root, INVENTORY);
+	const lines = readFileSync(inventory, "utf8").split(/\r?\n/);
+	const header = lines.findIndex(
+		(line) => line.trim().startsWith("|") && cells(line).map((cell) => cell.trim()).includes("Adopter"),
+	);
+	assert.notEqual(header, -1, "the inventory header names an Adopter column");
+	const adopterIndex = cells(lines[header]).map((cell) => cell.trim()).indexOf("Adopter");
+	const row = findRow(lines, "Banner");
+	assert.notEqual(row, -1, "the inventory names the kit-pending Banner");
+	const rowCells = cells(lines[row]);
+	rowCells[adopterIndex] = " ";
+	lines[row] = `|${rowCells.join("|")}|`;
+	writeFileSync(inventory, lines.join("\n"));
+	const result = run(root);
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /Banner/);
+	assert.match(result.output, /kit-pending but has no R-item adopter/);
+});
+
+test("fails when a kit-pending component gains a production caller", () => {
+	const root = sandbox();
+	write(
+		root,
+		path.join("apps", "seller-android", "app", "src", "main", "java", "app", "orderak", "seller", "feature", "orders", "ZzBannerCaller.kt"),
+		[
+			"package app.orderak.seller.feature.orders",
+			"",
+			"import app.orderak.seller.core.ui.Banner",
+			"",
+			"fun zzBannerCaller() { Banner(state = null, title = \"x\", message = \"y\") }",
+			"",
+		].join("\n"),
+	);
+	const result = run(root);
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /Banner/);
+	assert.match(result.output, /kit-pending but has a production caller/);
+});
+
 test("fails on an unused Android composable, naming it and its file", () => {
 	const root = sandbox();
 	write(

@@ -513,4 +513,27 @@
     <string name="store_info_save_failed">Couldn\'t save your store — nothing was changed</string>
     <string name="support_reply_failed">Your reply wasn\'t sent — it is still in the box</string>
     <string name="store_info_upload_failed">The image didn\'t upload — pick it again, or save without it</string>
+    <string name="banner_information_title">Heads up</string>
+    <string name="banner_information_message">Your store is open and taking orders.</string>
+    <string name="banner_warning_title">Almost at your limit</string>
+    <string name="banner_warning_message">You have used most of this plan\'s product allowance.</string>
+    <string name="banner_warning_action">Review products</string>
+    <string name="banner_error_title">Something went wrong</string>
+    <string name="banner_error_message">We couldn\'t save that change. Nothing was lost — try again.</string>
+    <string name="banner_success_title">Saved</string>
+    <string name="banner_success_message">Your changes are visible on your store.</string>
+    <string name="banner_locked_by_plan_title">Not on your plan</string>
+    <string name="banner_locked_by_plan_message">This feature opens when you upgrade to a higher plan.</string>
+    <string name="banner_locked_by_plan_action">See plans</string>
+    <string name="banner_sync_in_progress_title">Syncing</string>
+    <string name="banner_sync_in_progress_message">Your latest changes are on their way.</string>
+    <string name="banner_sync_failed_title">Sync failed</string>
+    <string name="banner_sync_failed_message">Your changes are saved on this phone only. Try again to send them.</string>
+    <string name="banner_sync_failed_retry">Retry</string>
+    <string name="banner_version_warning_title">Update needed</string>
+    <string name="banner_version_warning_message">This version can no longer reach your store. Update Orderak to continue.</string>
+    <string name="offline_strip_offline">You\'re offline</string>
+    <string name="offline_strip_last_update">Last update %1$s min ago</string>
+    <string name="offline_strip_reconnecting">Reconnecting…</string>
+    <string name="skeleton_loading">Loading</string>
 </resources>
