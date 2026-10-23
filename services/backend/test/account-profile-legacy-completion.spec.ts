@@ -12,6 +12,25 @@ const MIGRATION_063 = import.meta.glob("../migrations/063_clear_stored_birth_yea
 	eager: true,
 }) as Record<string, string>;
 
+/**
+ * D1's exec() expects one statement per line and chokes on a comment-only or
+ * blank line with "SQL code did not contain a statement". The repository's
+ * migrations conventionally open with a multi-line header comment (see
+ * migration 062), so a migration file read straight off disk cannot be handed
+ * to exec() as-is. Strip comment-only and blank lines first, the way the
+ * repository's other migration-replay tests do, so this test exercises the
+ * migration's real statements instead of tripping over its header comment.
+ */
+function stripCommentsAndBlankLines(sql: string): string {
+	return sql
+		.split("\n")
+		.filter((line) => {
+			const trimmed = line.trim();
+			return trimmed.length > 0 && !trimmed.startsWith("--");
+		})
+		.join("\n");
+}
+
 const PHONE = "+201001239500";
 const DEVICE_SECRET = "device-secret-with-enough-entropy";
 let testEnv: TestEnv;
@@ -94,10 +113,10 @@ describe("Legacy account_saved completion survives the birth-year migration (D-1
 
 		const files = Object.values(MIGRATION_063);
 		expect(files).toHaveLength(1);
-		// Run the migration's own SQL against this exact row, rather than
-		// hand-simulating its effect, so the migration's predicate is what is
-		// actually under test.
-		await env.orderak_db.exec(files[0]);
+		// Run the migration's own SQL (its header comment stripped, as D1's
+		// exec() requires) against this exact row, rather than hand-simulating
+		// its effect, so the migration's predicate is what is actually under test.
+		await env.orderak_db.exec(stripCommentsAndBlankLines(files[0]));
 
 		const postMigration = await env.orderak_db.prepare(
 			"SELECT status,birth_year,age_confirmation_source FROM onboarding_sessions WHERE phone_e164=?",
