@@ -40,8 +40,11 @@ cross-platform-readiness and D-13 age-evidence migrations.
   `android_onboarding_v2_legacy_birth_year` with NULL statement text, and does
   not store the submitted year in `onboarding_sessions` or `seller_profiles`.
   A draft saved by the previous Worker with an account-saved status, a retained
-  session birth year, and no source marker still completes as that legacy shape
-  with NULL statement text; the retained year is never copied to a new field.
+  session birth year, and no source marker is marked by migration
+  `063_clear_stored_birth_years.sql` as `android_onboarding_v2_legacy_birth_year`
+  and then still completes as that legacy shape with NULL statement text. The
+  stored session year is cleared by the same migration; the column and the
+  consent evidence remain, and the year is never copied to a new field.
   The current Android runtime source, strings, and UI are unchanged for now;
   this profile does not require new Android strings or source.
 - Every Seller request uses explicit `/api/v1/*`; `ApiRoutes` rejects

@@ -16,6 +16,12 @@ const CLEANUP_RULES: CleanupRule[] = [
 	{ label: "recent_auth_proofs:expired1d", statement: "DELETE FROM recent_auth_proofs WHERE rowid IN (SELECT rowid FROM recent_auth_proofs WHERE expires_at < datetime('now','-1 day') LIMIT ?)" },
 	{ label: "admin_auth_challenges:expired1d", statement: "DELETE FROM admin_auth_challenges WHERE rowid IN (SELECT rowid FROM admin_auth_challenges WHERE expires_at < datetime('now','-1 day') OR consumed_at < datetime('now','-1 day') LIMIT ?)" },
 	{ label: "email_verification_tokens:expired30d", statement: "DELETE FROM email_verification_tokens WHERE rowid IN (SELECT rowid FROM email_verification_tokens WHERE expires_at < datetime('now','-30 days') OR used_at < datetime('now','-30 days') LIMIT ?)" },
+	// A pending email-change request holds the new address and a token hash for
+	// 24 hours. It is the same transient verification data as an
+	// email_verification_token, so it follows the same 30-day post-expiry/use
+	// window. Superseded requests are included: a newer request already
+	// replaced them, and their only remaining content is personal data.
+	{ label: "pending_email_changes:expired30d", statement: "DELETE FROM pending_email_changes WHERE rowid IN (SELECT rowid FROM pending_email_changes WHERE expires_at < datetime('now','-30 days') OR used_at < datetime('now','-30 days') OR superseded_at < datetime('now','-30 days') LIMIT ?)" },
 	// Consent records that never became an account.
 	//
 	// legal_acceptances is evidence for an account: retention-matrix.md §2 sets

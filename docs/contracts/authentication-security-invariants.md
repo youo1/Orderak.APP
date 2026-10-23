@@ -35,6 +35,9 @@ specific identity SDK. The current Android implementation profile remains in
    server-authoritative.
 6. Legal acceptance is affirmative, versioned, attributable, and recorded at
    the approved product step. Authentication success alone is not consent.
+   Age eligibility is affirmative consent evidence: D-13 option A clears all
+   stored birth-year values while retaining both columns and the evidence, and a
+   legacy year submitted by an installed client is never stored.
 7. Device secrets are random client credentials, stored only in protected local
    storage and hash-only at rest in D1. Device metadata cannot authenticate.
 8. Logout invalidates provider state before clearing business, entitlement, and

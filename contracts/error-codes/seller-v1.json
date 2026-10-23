@@ -494,6 +494,7 @@
 			"code": "not_found",
 			"sources": [
 				"services/backend/src/domains/customers/customers.ts",
+				"services/backend/src/domains/identity/auth-v2.ts",
 				"services/backend/src/domains/operations/seller-operations.ts",
 				"services/backend/src/domains/stores/api-store.ts",
 				"services/backend/src/entrypoints/admin-worker.ts",

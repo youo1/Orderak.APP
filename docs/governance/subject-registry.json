@@ -105,7 +105,7 @@
     },
     {
       "id": "identity-domain",
-      "description": "The seller account: how it is created, how it authenticates, how devices are authorized, and how it is deleted and retained. Security properties themselves belong to the auth contracts."
+      "description": "The seller account: how it is created, how it authenticates, how devices are authorized, and how it is deleted and retained. D-13 option A clears stored birth-year values while the columns and age evidence remain. Security properties themselves belong to the auth contracts."
     },
     {
       "id": "stores-domain",

@@ -79,10 +79,13 @@ throttling, and recovery behavior.
    year, the Worker accepts the legacy request, records source
    `android_onboarding_v2_legacy_birth_year`, the accepted Terms version, and a
    Worker timestamp, and stores NULL statement text because that client never
-   displayed the statement; it still does not store the submitted year. Existing
-   birth-year columns, rows, and stored values—including the schema support from
-   `039_add_private_birth_year.sql`—are retained unchanged and are explicitly
-   not deleted, backfilled, or migrated by this D-13 change.
+   displayed the statement; it still does not store the submitted year. D-13
+   option A clears all stored birth-year values in `onboarding_sessions` and
+   `seller_profiles` through `063_clear_stored_birth_years.sql`, after marking
+   eligible pre-migration `account_saved` sessions as the legacy source. The
+   birth-year columns and the schema support from
+   `039_add_private_birth_year.sql` remain, and the age-confirmation evidence is
+   retained rather than deleted.
 5. **`POST /api/v1/onboarding/complete`**: requires the matching app-generated
    device secret and an idempotency key, then atomically creates the seller,
    private profile, store identity, organization, owner membership, primary

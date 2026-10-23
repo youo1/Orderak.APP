@@ -172,6 +172,11 @@ export async function handleAuthV2Routes(
 			? resendEmailVerification(request, env, url, ctx)
 			: featureDisabled("onboarding_v2");
 	}
+	if (path === "/api/v1/account/profile" && (method === "GET" || method === "PATCH")) {
+		return method === "GET"
+			? getAccountProfile(request, env, url)
+			: updateAccountProfile(request, env, url, ctx);
+	}
 	return null;
 }
 
@@ -202,14 +207,50 @@ export async function handleEmailVerification(
 	const tokenHash = await sha256Hex(token);
 	// The trigger in migration 033 applies the verified timestamp to the
 	// matching private profile in the same atomic statement. RETURNING means a
-	// replay (including a concurrent replay) cannot report success.
+	// replay (including a concurrent replay) cannot report success. A link sent
+	// to an address the seller has since replaced through a profile email change
+	// verifies nothing, because the trigger matches the current address, so it
+	// must not be consumed or report success either.
 	const consumed = await env.orderak_db.prepare(
 		`UPDATE email_verification_tokens SET used_at=datetime('now')
 		 WHERE token_hash=? AND used_at IS NULL AND expires_at>datetime('now')
+		   AND EXISTS (
+		     SELECT 1 FROM seller_profiles p
+		     WHERE p.seller_id=email_verification_tokens.seller_id
+		       AND lower(p.email_private)=lower(email_verification_tokens.email)
+		   )
 		 RETURNING id`,
 	).bind(tokenHash).first<{ id: string }>();
-	if (!consumed) return verificationPage(false);
-	return verificationPage(true);
+	if (consumed) return verificationPage(true);
+	// A profile email-change link is a different kind of token with a different
+	// effect: it replaces the current address, so it must be the still-current,
+	// unexpired request and the address must still be free. The trigger in
+	// migration 064 performs the profile update in the same statement that
+	// consumes the token, and its predicate repeats the uniqueness check so a
+	// race cannot overwrite another seller's address. A conflict retires the
+	// pending request without touching the profile.
+	const changed = await env.orderak_db.prepare(
+		`UPDATE pending_email_changes SET used_at=datetime('now')
+		 WHERE token_hash=? AND used_at IS NULL AND superseded_at IS NULL
+		   AND expires_at>datetime('now')
+		   AND NOT EXISTS (
+		     SELECT 1 FROM seller_profiles p
+		     WHERE p.seller_id!=pending_email_changes.seller_id
+		       AND lower(p.email_private)=lower(pending_email_changes.email)
+		   )
+		 RETURNING seller_id`,
+	).bind(tokenHash).first<{ seller_id: string }>();
+	if (changed) return verificationPage(true);
+	await env.orderak_db.prepare(
+		`UPDATE pending_email_changes SET superseded_at=datetime('now')
+		 WHERE token_hash=? AND used_at IS NULL AND superseded_at IS NULL
+		   AND EXISTS (
+		     SELECT 1 FROM seller_profiles p
+		     WHERE p.seller_id!=pending_email_changes.seller_id
+		       AND lower(p.email_private)=lower(pending_email_changes.email)
+		   )`,
+	).bind(tokenHash).run();
+	return verificationPage(false);
 }
 
 /**
@@ -630,7 +671,7 @@ async function completeOnboarding(
 		),
 		env.orderak_db.prepare(
 			`UPDATE onboarding_sessions SET status='completed',completed_seller_id=?,idempotency_key=?,
-			 updated_at=datetime('now') WHERE id=? AND status='account_saved'`,
+			 birth_year=NULL,updated_at=datetime('now') WHERE id=? AND status='account_saved'`,
 		).bind(sellerId, idempotencyKey, session.id),
 	];
 	if (session.email_private && emailTokenHash) {
@@ -989,6 +1030,114 @@ async function resendEmailVerification(
 	).run();
 	await sendVerificationEmail(env, ctx, profile.email_private, profile.full_name, token, pickLocale(request, url));
 	return jsonResponse({ ok: true });
+}
+
+interface AccountProfileRow {
+	full_name: string;
+	email_private: string | null;
+	email_verified_at: string | null;
+	pending_email_private: string | null;
+}
+
+async function loadAccountProfile(env: PublicWorkerEnv, sellerId: string): Promise<AccountProfileRow | null> {
+	return env.orderak_db.prepare(
+		`SELECT p.full_name,p.email_private,p.email_verified_at,
+		   (SELECT e.email FROM pending_email_changes e
+		    WHERE e.seller_id=p.seller_id AND e.used_at IS NULL AND e.superseded_at IS NULL
+		      AND e.expires_at>datetime('now')
+		    ORDER BY e.created_at DESC, e.rowid DESC LIMIT 1) pending_email_private
+		 FROM seller_profiles p WHERE p.seller_id=?`,
+	).bind(sellerId).first<AccountProfileRow>();
+}
+
+function accountProfileResponse(profile: AccountProfileRow): Response {
+	return jsonResponse({
+		full_name: profile.full_name,
+		email_private: profile.email_private,
+		email_verified: profile.email_verified_at != null,
+		pending_email_private: profile.pending_email_private,
+	});
+}
+
+async function getAccountProfile(request: Request, env: PublicWorkerEnv, url: URL): Promise<Response> {
+	const auth = await requireSeller(request, env, url);
+	if (auth instanceof Response) return auth;
+	const profile = await loadAccountProfile(env, String(auth.seller.id));
+	if (!profile) return jsonResponse({ error: "not_found" }, 404);
+	return accountProfileResponse(profile);
+}
+
+async function updateAccountProfile(
+	request: Request,
+	env: PublicWorkerEnv,
+	url: URL,
+	ctx: ExecutionContext,
+): Promise<Response> {
+	const auth = await requireSeller(request, env, url);
+	if (auth instanceof Response) return auth;
+	const sellerId = String(auth.seller.id);
+	const body = await readObject(request);
+	const current = await env.orderak_db.prepare(
+		"SELECT full_name,email_private,email_verified_at FROM seller_profiles WHERE seller_id=?",
+	).bind(sellerId).first<{ full_name: string; email_private: string | null; email_verified_at: string | null }>();
+	if (!current) return jsonResponse({ error: "not_found" }, 404);
+
+	const fullNameSupplied = Object.prototype.hasOwnProperty.call(body, "full_name");
+	const emailSupplied = Object.prototype.hasOwnProperty.call(body, "email_private");
+	const fullName = fullNameSupplied ? string(body.full_name, 80).replace(/\s+/g, " ").trim() : null;
+	const email = emailSupplied ? normalizeEmail(body.email_private) : null;
+
+	// Validate every supplied field before any change is applied. The name rule
+	// is the onboarding rule, so the two surfaces cannot disagree about a name
+	// the account step already accepted.
+	if (fullNameSupplied && (fullName == null || fullName.length < 3)) {
+		return jsonResponse({ error: "invalid_full_name" }, 400);
+	}
+	if (emailSupplied && !email) return jsonResponse({ error: "invalid_email" }, 400);
+
+	const currentEmail = current.email_private?.toLowerCase() ?? null;
+	const changesEmail = emailSupplied && email !== currentEmail;
+	if (changesEmail) {
+		const recent = await requireRecentAuth(request, env, sellerId);
+		if (recent instanceof Response) return recent;
+		const conflict = await env.orderak_db.prepare(
+			"SELECT seller_id FROM seller_profiles WHERE lower(email_private)=lower(?) AND seller_id!=? LIMIT 1",
+		).bind(email, sellerId).first<{ seller_id: string }>();
+		if (conflict) return jsonResponse({ error: "email_in_use" }, 409);
+		const requestCount = await env.orderak_db.prepare(
+			`SELECT COUNT(*) count FROM pending_email_changes
+			 WHERE seller_id=? AND created_at>datetime('now','-1 hour')`,
+		).bind(sellerId).first<{ count: number }>();
+		if (Number(requestCount?.count ?? 0) >= 3) return jsonResponse({ error: "rate_limited" }, 429);
+	}
+
+	const statements: D1PreparedStatement[] = [];
+	if (fullNameSupplied) {
+		statements.push(env.orderak_db.prepare(
+			"UPDATE seller_profiles SET full_name=?,updated_at=datetime('now') WHERE seller_id=?",
+		).bind(fullName, sellerId));
+	}
+	let token: string | null = null;
+	if (changesEmail && email) {
+		token = randomToken();
+		const tokenHash = await sha256Hex(token);
+		statements.push(env.orderak_db.prepare(
+			`UPDATE pending_email_changes SET superseded_at=datetime('now')
+			 WHERE seller_id=? AND used_at IS NULL AND superseded_at IS NULL`,
+		).bind(sellerId));
+		statements.push(env.orderak_db.prepare(
+			`INSERT INTO pending_email_changes(id,seller_id,email,token_hash,expires_at)
+			 VALUES(?,?,?,?,datetime('now',?))`,
+		).bind(newUuid(), sellerId, email, tokenHash, `+${EMAIL_TOKEN_HOURS} hours`));
+	}
+	if (statements.length) await env.orderak_db.batch(statements);
+	if (token && email) {
+		await sendVerificationEmail(env, ctx, email, fullName ?? current.full_name, token, pickLocale(request, url));
+	}
+
+	const profile = await loadAccountProfile(env, sellerId);
+	if (!profile) return jsonResponse({ error: "not_found" }, 404);
+	return accountProfileResponse(profile);
 }
 
 async function requireSeller(

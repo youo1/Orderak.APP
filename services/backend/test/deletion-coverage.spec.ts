@@ -87,5 +87,6 @@ describe("account deletion foreign-key coverage", () => {
 		expect(deleted).toContain("support_tickets");
 		expect(deleted).toContain("support_messages");
 		expect(deleted).toContain("orders");
+		expect(deleted).toContain("pending_email_changes");
 	});
 });
