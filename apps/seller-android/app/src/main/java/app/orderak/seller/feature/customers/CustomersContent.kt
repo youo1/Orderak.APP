@@ -64,7 +64,10 @@ fun CustomersContent(
         // failure state, so it is the one that does carry an action: the read can
         // be run again, and before this it could not.
         ErrorState(
+            // The local read failed, not the service, so the title names what
+            // could not be read rather than the service's own cause.
             kind = ErrorStateKind.ServiceUnavailable,
+            title = stringResource(R.string.error_state_customers_load_title),
             message = stringResource(R.string.error_unknown),
             onRetry = onRetry,
             modifier = modifier,

@@ -500,22 +500,18 @@ fun EmptyState(
 /**
  * A failure that replaces a surface's content.
  *
- * Every error names the cause (the [title], which defaults to the failure
- * [kind] describes), the way out (the [message]) and, when the caller knows it,
- * what was kept: "what you typed is still here" belongs in the message too.
+ * Every error names the cause (the [title]), the way out (the [message]) and,
+ * when the caller knows it, what was kept: "what you typed is still here"
+ * belongs in the message too. A null [title] is the [kind]'s own cause; pass
+ * one whenever the cause is something else, because a wrong cause sends the
+ * seller after the wrong fix. For a backend code, [errorStateText] decides.
  */
 @Composable
 fun ErrorState(
     kind: ErrorStateKind,
     message: String,
     modifier: Modifier = Modifier,
-    title: String = stringResource(
-        if (kind == ErrorStateKind.NoConnection) {
-            R.string.error_state_no_connection_title
-        } else {
-            R.string.error_state_service_unavailable_title
-        },
-    ),
+    title: String? = null,
     onRetry: (() -> Unit)? = null,
 ) {
     val spacing = LocalOrderakSpacing.current
@@ -524,7 +520,13 @@ fun ErrorState(
         icon = if (kind == ErrorStateKind.NoConnection) Icons.Outlined.WifiOff else Icons.Outlined.ErrorOutline,
         circleColor = danger.container,
         iconColor = danger.onContainer,
-        title = title,
+        title = title ?: stringResource(
+            if (kind == ErrorStateKind.NoConnection) {
+                R.string.error_state_no_connection_title
+            } else {
+                R.string.error_state_service_unavailable_title
+            },
+        ),
         message = message,
         modifier = modifier,
         action = if (onRetry != null) {
@@ -559,10 +561,22 @@ fun GateNotice(
     onViewPlans: (() -> Unit)? = null,
 ) {
     val spacing = LocalOrderakSpacing.current
+    // At 200% a button beside the text squeezes the body to a few words per
+    // line, so it takes its own full-width row, as the Banner's action does.
+    val fontScale = maxOf(LocalDensity.current.fontScale, LocalConfiguration.current.fontScale)
+    val buttonBelow = fontScale >= 2f
     when (availability) {
         FeatureAvailability.Available -> Unit
         FeatureAvailability.LockedByPlan -> {
             val colors = SemanticRole.Commerce.colors()
+            val plansButton: @Composable (Modifier) -> Unit = { buttonModifier ->
+                OutlinedButton(
+                    onClick = onViewPlans ?: {},
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.onContainer),
+                    border = BorderStroke(1.dp, colors.onContainer),
+                    modifier = buttonModifier.heightIn(min = spacing.minimumTouchTarget),
+                ) { Text(stringResource(R.string.gate_upgrade_action)) }
+            }
             Surface(
                 modifier = modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.large,
@@ -570,35 +584,33 @@ fun GateNotice(
                 contentColor = colors.onContainer,
                 border = BorderStroke(1.dp, colors.containerOutline),
             ) {
-                Row(
+                Column(
                     modifier = Modifier.padding(spacing.space4),
-                    horizontalArrangement = Arrangement.spacedBy(spacing.space3),
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalArrangement = Arrangement.spacedBy(spacing.space3),
                 ) {
-                    SemanticRole.Commerce.icon?.let {
-                        Icon(imageVector = it, contentDescription = null, modifier = Modifier.size(spacing.iconMedium))
-                    }
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(spacing.space1),
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(spacing.space3),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(
-                            text = stringResource(R.string.gate_locked_by_plan_title),
-                            style = MaterialTheme.typography.titleSmall,
-                        )
-                        Text(
-                            text = stringResource(R.string.gate_locked_by_plan_body),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
+                        SemanticRole.Commerce.icon?.let {
+                            Icon(imageVector = it, contentDescription = null, modifier = Modifier.size(spacing.iconMedium))
+                        }
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(spacing.space1),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.gate_locked_by_plan_title),
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                            Text(
+                                text = stringResource(R.string.gate_locked_by_plan_body),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                        if (onViewPlans != null && !buttonBelow) plansButton(Modifier)
                     }
-                    if (onViewPlans != null) {
-                        OutlinedButton(
-                            onClick = onViewPlans,
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.onContainer),
-                            border = BorderStroke(1.dp, colors.onContainer),
-                            modifier = Modifier.heightIn(min = spacing.minimumTouchTarget),
-                        ) { Text(stringResource(R.string.gate_upgrade_action)) }
-                    }
+                    if (onViewPlans != null && buttonBelow) plansButton(Modifier.fillMaxWidth())
                 }
             }
         }

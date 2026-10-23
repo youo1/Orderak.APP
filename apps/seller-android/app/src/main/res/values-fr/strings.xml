@@ -554,6 +554,10 @@
     <string name="empty_state_filtered_action">Effacer le filtre</string>
     <string name="error_state_no_connection_title">Pas de connexion</string>
     <string name="error_state_orders_load_title">Impossible de charger vos commandes</string>
+    <string name="error_state_products_load_title">Impossible de charger vos produits</string>
+    <string name="error_state_customers_load_title">Impossible de charger vos clients</string>
+    <string name="error_state_request_failed_title">Impossible de terminer l’opération</string>
+    <string name="error_state_try_again_later">Réessayez dans un instant.</string>
     <string name="error_state_service_unavailable_title">Le service est indisponible pour le moment</string>
     <string name="error_state_service_unavailable_kept">Ce que vous avez saisi est conservé. Réessayez dans un instant.</string>
 </resources>

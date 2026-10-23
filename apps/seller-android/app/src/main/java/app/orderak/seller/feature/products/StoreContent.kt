@@ -113,9 +113,12 @@ fun StoreContent(
         // The retry is the point. The read that failed could not be re-run, so
         // this state was the end of the surface: the catalogue stayed empty for
         // the life of the process and the seller's only way out was to kill the
-        // app. `FullScreenError` accepted an `onRetry` from the start.
+        // app. The error state accepted an `onRetry` from the start.
         ErrorState(
+            // The local read failed, not the service, so the title names what
+            // could not be read rather than the service's own cause.
             kind = ErrorStateKind.ServiceUnavailable,
+            title = stringResource(R.string.error_state_products_load_title),
             message = stringResource(R.string.error_unknown),
             onRetry = onRetry,
             modifier = modifier,

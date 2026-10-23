@@ -84,6 +84,37 @@ fun backendErrorResource(code: String?): Int = when {
     else -> R.string.error_unknown
 }
 
+/** What an [ErrorState] draws for one failed request. A null [title] keeps the kind's own. */
+data class ErrorStateText(
+    val kind: ErrorStateKind,
+    @StringRes val title: Int?,
+    @StringRes val message: Int,
+)
+
+/**
+ * The [ErrorState] for a failed request's code.
+ *
+ * Only two causes have a kind of their own: the connection and the service.
+ * Everything else (a sign-in that lapsed, a plan limit, a field the server
+ * refused) is neither, so it gets the plain "could not complete" title and the
+ * code's own remedy. Titling those "the service is not available" told the
+ * seller something false and sent them to wait for a service that was fine.
+ *
+ * "Try again in a moment" is said only for a failure that passes. A feature
+ * that is switched off or not configured will not come back in a moment, so it
+ * takes the plain branch, with its own message and no promise of time.
+ */
+fun errorStateText(code: String?): ErrorStateText = when {
+    code == "network" -> ErrorStateText(ErrorStateKind.NoConnection, null, R.string.error_network)
+    code != null && (code in TRANSIENT_UNAVAILABLE || code.startsWith("http_5")) ->
+        ErrorStateText(ErrorStateKind.ServiceUnavailable, null, R.string.error_state_try_again_later)
+    else -> ErrorStateText(
+        ErrorStateKind.ServiceUnavailable,
+        R.string.error_state_request_failed_title,
+        backendErrorResource(code),
+    )
+}
+
 private val AUTH = setOf(
     "auth", "auth_stale", "recent_auth_required", "unauthorized",
     "onboarding_auth", "weak_device_secret",
@@ -118,6 +149,13 @@ private val UNAVAILABLE = setOf(
     "billing_lifecycle_disabled", "tenant_unavailable", "tenant_read_only",
     "tenant_write_fenced", "server", "city_catalog_unavailable", "taxonomy_unavailable",
     "email_not_configured", "payment_gateway_unavailable", "asset_links_not_configured",
+)
+
+/** The part of [UNAVAILABLE] that passes on its own: worth "try again in a moment". */
+private val TRANSIENT_UNAVAILABLE = setOf(
+    "server", "ai_temporarily_unavailable", "tenant_unavailable", "identity_not_ready",
+    "entitlements_not_ready", "city_catalog_unavailable", "taxonomy_unavailable",
+    "payment_gateway_unavailable",
 )
 
 /**

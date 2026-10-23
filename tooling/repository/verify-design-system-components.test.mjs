@@ -125,6 +125,39 @@ test("fails when a kit-pending component gains a production caller", () => {
 	assert.match(result.output, /kit-pending but has a production caller/);
 });
 
+for (const [label, before] of [
+	["a URL string", 'fun zzOpen() = open("https://orderak.app")'],
+	["a quote character literal", "fun zzTrim(text: String) = text.trim('\"')"],
+]) {
+	test(`still sees a real call after ${label} on an earlier line`, () => {
+		// Removing `//` comments before strings cut the URL in half, and a '"'
+		// literal opened a string that ran on: the call below was then read as
+		// text and missed. A kit-pending OfflineStrip that gains this caller
+		// must still fail the guard. The caller sits in core/ui itself, with no
+		// import, because an import line alone would already count as a call site.
+		const root = sandbox();
+		write(
+			root,
+			path.join(CORE_UI, "ZzLiteralThenCall.kt"),
+			[
+				"package app.orderak.seller.core.ui",
+				"",
+				before,
+				"",
+				"fun zzCaller() { OfflineStrip(state = null) }",
+				"",
+				// A later string literal is what closes the stray quote around the call.
+				'fun zzLabel() = "x"',
+				"",
+			].join("\n"),
+		);
+		const result = run(root);
+		assert.notEqual(result.status, 0, result.output);
+		assert.match(result.output, /OfflineStrip/);
+		assert.match(result.output, /kit-pending but has a production caller/);
+	});
+}
+
 test("does not count a same-named member or a string literal as a caller", () => {
 	// The ad manager has its own `Banner` member and placeholder text such as
 	// "AdMob Banner". Neither calls the kit's Banner, so neither may be listed.

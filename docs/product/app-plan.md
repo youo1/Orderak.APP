@@ -144,13 +144,20 @@ desktop.
   error, loading and gated states with one component each, from the seller
   component kit:
   - Notices are the Banner.
-  - Loading is a static skeleton shaped like the content it waits for, not a
-    spinner.
+  - Loading a whole surface is a static skeleton shaped like the content it
+    waits for, not a spinner. Three spinners remain where a screen draws its
+    own progress: splash, order details and categories. Their R items replace
+    them.
+  - The assistant keeps the conversation on screen while a question is
+    sending, with a progress bar above the box; it used to replace the chat.
   - An empty list says why and offers one next step. A filter or search that
     hides every row offers to clear it instead.
-  - An error names the cause (no connection, or the service) and the way out.
-    It never shows the seller a raw error code, which the operations pages did
-    before this change.
+  - An error names the cause and the way out. A lost connection and a service
+    failure each have their own; anything else (a sign-in that lapsed, a plan
+    limit) says the operation could not be completed and gives that code's
+    remedy, and a failed local read names what could not be read. It never shows
+    the seller a raw error code, which the operations pages did before this
+    change.
   - A feature locked by the plan offers an upgrade only while purchase is open.
     Before this change that offer was a chip that did nothing; it is now a
     button that opens the subscription page. While purchase is closed the

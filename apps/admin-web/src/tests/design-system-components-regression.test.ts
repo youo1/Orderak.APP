@@ -11,23 +11,27 @@ function read(file: string): string {
   return readFileSync(file, 'utf8');
 }
 
-describe('state-to-role mapping stays in SemanticChip.kt', () => {
-  it('keeps LockedByPlan on Commerce, NotBuilt on Neutral and Available drawing nothing', () => {
-    const chip = read(path.join(coreUi, 'SemanticChip.kt'));
-    expect(chip).toMatch(/fun FeatureAvailabilityChip\(/);
-    expect(chip).toMatch(/FeatureAvailability\.Available\s*->\s*Unit/);
-    expect(chip).toMatch(/FeatureAvailability\.LockedByPlan\s*->\s*SemanticChip\(\s*SemanticRole\.Commerce\s*,\s*upgradeLabel\s*,\s*modifier\s*\)/);
-    expect(chip).toMatch(/FeatureAvailability\.NotBuilt\s*->\s*SemanticChip\(\s*SemanticRole\.Neutral\s*,\s*unavailableLabel\s*,\s*modifier\s*\)/);
+// Since R1a-1b the gate's state-to-surface mapping lives in GateNotice.
+describe('the gate\'s state-to-surface mapping stays in GateNotice', () => {
+  const kit = read(path.join(coreUi, 'FeedbackComponents.kt'));
+  const notice = kit.slice(kit.indexOf('fun GateNotice('));
+
+  it('keeps Available drawing nothing, LockedByPlan on Commerce and NotBuilt on the neutral surface', () => {
+    expect(notice).toMatch(/FeatureAvailability\.Available\s*->\s*Unit/);
+    expect(notice).toContain('SemanticRole.Commerce.colors()');
+    expect(notice).toMatch(/FeatureAvailability\.NotBuilt\s*->\s*Surface\([\s\S]*?MaterialTheme\.colorScheme\.surfaceVariant/);
   });
 
-  it('keeps the gate notices\' own surfaces and copy', () => {
-    const gate = read(path.join(coreUi, 'FeatureGate.kt'));
-    expect(gate).toContain('SemanticRole.Commerce.colors()');
+  it('keeps the gate notices\' own copy', () => {
     for (const key of ['gate_locked_by_plan_title', 'gate_locked_by_plan_body', 'gate_not_built_title', 'gate_not_built_body']) {
-      expect(gate).toContain(`R.string.${key}`);
+      expect(notice).toContain(`R.string.${key}`);
     }
-    expect(gate).toMatch(/FeatureAvailability\.LockedByPlan\s*->\s*LockedByPlanNotice\(/);
-    expect(gate).toMatch(/FeatureAvailability\.NotBuilt\s*->\s*NotBuiltNotice\(/);
+  });
+
+  it('keeps FeatureGate drawing the feature when available and GateNotice otherwise', () => {
+    const gate = read(path.join(coreUi, 'FeatureGate.kt'));
+    expect(gate).toMatch(/FeatureAvailability\.Available\s*->\s*content\(\)/);
+    expect(gate).toMatch(/->\s*GateNotice\(/);
   });
 });
 

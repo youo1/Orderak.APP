@@ -555,6 +555,10 @@
     <string name="empty_state_filtered_action">Clear filter</string>
     <string name="error_state_no_connection_title">No connection</string>
     <string name="error_state_orders_load_title">Couldn’t load your orders</string>
+    <string name="error_state_products_load_title">Couldn’t load your products</string>
+    <string name="error_state_customers_load_title">Couldn’t load your customers</string>
+    <string name="error_state_request_failed_title">Couldn’t complete that</string>
+    <string name="error_state_try_again_later">Try again in a moment.</string>
     <string name="error_state_service_unavailable_title">The service isn’t available right now</string>
     <string name="error_state_service_unavailable_kept">What you typed is still here. Try again in a moment.</string>
 </resources>

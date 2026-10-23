@@ -30,6 +30,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -63,6 +64,7 @@ import app.orderak.seller.core.ui.Banner
 import app.orderak.seller.core.ui.BannerState
 import app.orderak.seller.core.ui.PlanUsageRow
 import app.orderak.seller.core.ui.PlanUsageRowItem
+import app.orderak.seller.core.ui.SkeletonVariant
 import app.orderak.seller.core.ui.planUsageRows
 import app.orderak.seller.core.locale.AppLocales
 import app.orderak.seller.core.text.formatCount
@@ -150,6 +152,7 @@ fun SubscriptionContent(
         // Loading until entitlements answer. There is nothing on this page that
         // can be said truthfully without them.
         busy = planName == null,
+        loading = SkeletonVariant.DetailBlock,
     ) {
         Text(
             // Not null here: the page is busy until it is.
@@ -333,10 +336,13 @@ fun AiAssistantContent(
 ) {
     val spacing = LocalOrderakSpacing.current
     val locale = LocalConfiguration.current.locales[0]
+    // `busy` is only ever true while a question is sending: nothing loads on
+    // entry. It is not passed to OperationPage, which would replace the whole
+    // conversation with a loading placeholder; the chat stays on screen with a
+    // progress bar above the box, and the send button waits.
     OperationPage(
         title = stringResource(R.string.ai_assistant_title),
         onBack = onBack,
-        busy = busy,
         error = error,
         onRetry = onRetry,
     ) {
@@ -375,7 +381,7 @@ fun AiAssistantContent(
             // The declared empty state, which this screen did not have: it drew
             // the disclosure and the quota over blank space. The input box stays
             // — a chat with nothing in it is waiting, not broken — so this is a
-            // line rather than a FullScreenEmpty.
+            // line rather than an EmptyState.
             Text(
                 stringResource(R.string.ai_empty_hint),
                 style = MaterialTheme.typography.bodyMedium,
@@ -403,6 +409,9 @@ fun AiAssistantContent(
                 }
             }
         }
+        if (busy) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
         OutlinedTextField(
             value = input,
             onValueChange = { onInputChange(it.take(2000)) },
@@ -414,7 +423,9 @@ fun AiAssistantContent(
             onClick = { onSend() },
             modifier = Modifier.fillMaxWidth(),
         ) { Text(stringResource(R.string.common_send)) }
-        TextButton(onClick = onReset) { Text(stringResource(R.string.ai_reset)) }
+        // Not while a question is sending: the reply would land in a cleared
+        // chat as an answer with no question before it.
+        TextButton(onClick = onReset, enabled = !busy) { Text(stringResource(R.string.ai_reset)) }
     }
 }
 
@@ -466,6 +477,7 @@ fun DeletionStatusContent(
         busy = busy || !loaded,
         error = error,
         onRetry = onRetry,
+        loading = SkeletonVariant.DetailBlock,
     ) {
         if (request == null) {
             Text(

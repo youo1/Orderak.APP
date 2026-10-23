@@ -300,10 +300,15 @@ gradlew.bat lintStagingDebug
 `GateNotice` live in
 `app/src/main/java/app/orderak/seller/core/ui/FeedbackComponents.kt`. Their state
 vocabulary is `BannerState`, `OfflineStripState`, `SkeletonVariant`,
-`EmptyStateKind`, `ErrorStateKind`, and `FeatureAvailability`;
-`FeedbackComponentStatesAcceptanceTest` pins each kit enum, and
-`FeedbackStateComponentsTest` checks the gate's three states, the empty and
-error actions, and the Standard Arabic shared strings by resource key. The 21
+`EmptyStateKind`, and `ErrorStateKind`, which
+`FeedbackComponentStatesAcceptanceTest` pins, plus `FeatureAvailability` for
+the gate. In `FeedbackStateComponentsTest.kt`, `GateNoticeStatesTest` checks
+the gate's three states, `EmptyAndErrorStateTest` the empty and error actions,
+and `FeedbackStandardArabicTest` the Standard Arabic shared strings by resource
+key. A backend code reaches `ErrorState` through `errorStateText` in
+`BackendErrors.kt` (pinned by `ErrorStateTextTest`), so only a lost connection
+or a failing service gets that cause as its title; a screen whose failure is
+local passes its own title. The 21
 `@PreviewTest` functions in
 `app/src/screenshotTest/java/app/orderak/seller/core/ui/FeedbackOverlayScreenshotTest.kt`
 carry `FeedbackPreviews`, which declares the eight Arabic/English,

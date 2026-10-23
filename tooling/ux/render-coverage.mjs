@@ -90,10 +90,6 @@ export const RENDERS = {
   // Each of these renders a shared component with a surface's copy in it. That
   // proves the component and the string; it does not prove the screen chooses
   // them, which is exactly the defect class this repo keeps producing.
-  // The only shared state component no screen render reaches: FullScreenError's
-  // two callers, PlansScreen and OperationsScreens, are not previewable yet.
-  stateError: { kind: "component", note: "FullScreenError carries a retry" },
-  stateErrorDark: { kind: "component", note: "FullScreenError, dark" },
 
   // ---- الطلبات ----
   ordersLoadingLight: { kind: "screen", contract: "orders", state: "loading", theme: "light" },

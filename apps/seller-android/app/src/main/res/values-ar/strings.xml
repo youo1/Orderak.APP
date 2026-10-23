@@ -580,6 +580,10 @@
     <string name="empty_state_filtered_action">مسح التصفية</string>
     <string name="error_state_no_connection_title">لا يوجد اتصال</string>
     <string name="error_state_orders_load_title">تعذّرت قراءة الطلبات</string>
+    <string name="error_state_products_load_title">تعذّرت قراءة المنتجات</string>
+    <string name="error_state_customers_load_title">تعذّرت قراءة العملاء</string>
+    <string name="error_state_request_failed_title">تعذّر إتمام العملية</string>
+    <string name="error_state_try_again_later">حاول مرة أخرى بعد قليل.</string>
     <string name="error_state_service_unavailable_title">الخدمة غير متاحة الآن</string>
     <string name="error_state_service_unavailable_kept">وما كتبته باقٍ هنا. حاول بعد قليل.</string>
 </resources>

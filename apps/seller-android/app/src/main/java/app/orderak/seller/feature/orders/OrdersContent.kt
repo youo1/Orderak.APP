@@ -83,10 +83,13 @@ fun OrdersContent(
             //
             // The retry is the point. This state used to be a dead end: the read
             // that failed could not be re-run, so the seller's only way out was
-            // to kill the app. `FullScreenError` had accepted an `onRetry` all
+            // to kill the app. The error state had accepted an `onRetry` all
             // along — nothing passed one.
             ErrorState(
+                // The local read failed, not the service, so the title names what
+                // could not be read rather than the service's own cause.
                 kind = ErrorStateKind.ServiceUnavailable,
+                title = stringResource(R.string.error_state_orders_load_title),
                 message = stringResource(R.string.error_unknown),
                 onRetry = onRetry,
             )

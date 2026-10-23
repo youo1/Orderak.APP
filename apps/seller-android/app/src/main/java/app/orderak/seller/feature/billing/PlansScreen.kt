@@ -37,7 +37,6 @@ import androidx.lifecycle.viewModelScope
 import app.orderak.seller.R
 import app.orderak.seller.core.ui.Banner
 import app.orderak.seller.core.ui.BannerState
-import app.orderak.seller.core.ui.backendErrorResource
 import app.orderak.seller.data.billing.EntitlementManager
 import app.orderak.seller.data.remote.BackendApi
 import app.orderak.seller.data.remote.PlanComparisonRowDto
@@ -50,7 +49,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 import app.orderak.seller.core.ui.ErrorState
-import app.orderak.seller.core.ui.ErrorStateKind
+import app.orderak.seller.core.ui.errorStateText
 import app.orderak.seller.core.ui.Skeleton
 import app.orderak.seller.core.ui.SkeletonVariant
 
@@ -149,11 +148,16 @@ fun PlansContent(
                 variant = SkeletonVariant.DetailBlock,
                 modifier = Modifier.padding(padding).padding(LocalOrderakSpacing.current.space4),
             )
-            state.error != null -> ErrorState(
-                kind = if (state.error == "network") ErrorStateKind.NoConnection else ErrorStateKind.ServiceUnavailable,
-                message = stringResource(backendErrorResource(state.error)),
-                onRetry = onRetry,
-            )
+            state.error != null -> {
+                val text = errorStateText(state.error)
+                ErrorState(
+                    kind = text.kind,
+                    title = text.title?.let { stringResource(it) },
+                    message = stringResource(text.message),
+                    modifier = Modifier.padding(padding),
+                    onRetry = onRetry,
+                )
+            }
             state.plans.isEmpty() -> Column(
                 Modifier.fillMaxSize().padding(padding).padding(spacing.space8),
                 verticalArrangement = Arrangement.Center,
