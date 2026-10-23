@@ -169,6 +169,37 @@ test("a component render still has to have pixels", () => {
   assert.match(problems[0], /no reference PNG/);
 });
 
+/* ---------------- multipreview variants ---------------- */
+
+test("a multipreview @PreviewTest needs one reference per declared variant", () => {
+  const variants = new Map([["component", ["AR light 100", "EN dark 200"]]]);
+  const { problems } = checkRenders({
+    renders: { component: { kind: "component", note: "x" } },
+    discovered: new Map([["component", "a/b/Kt"]]),
+    hasReference: () => true,
+    hasVariantReference: (_dir, _fn, variant) => variant !== "EN dark 200",
+    variants,
+    contracts: CONTRACTS,
+    floor: 0,
+  });
+  assert.equal(problems.length, 1);
+  assert.match(problems[0], /EN dark 200/);
+});
+
+test("discovery reads the preview names declared by a multipreview annotation", () => {
+  const { discovered, variants, problems } = discoverPreviews("root", {
+    readdir: (dir) => dir === "multi" ? ["multi/Preview.kt"] : ["root/S.kt"],
+    readFile: (file) => file === "multi/Preview.kt"
+      ? `package p\n@Preview(name = "AR light 100", locale = "ar")\n@Preview(name = "EN dark 200", locale = "en")\nannotation class Matrix\n`
+      : `package p\n@PreviewTest\n@Matrix\n@Composable\nfun matrix() {}\n`,
+    relative: f => f,
+    multipreviewRoot: "multi",
+  });
+  assert.deepEqual(problems, []);
+  assert.equal(discovered.get("matrix"), "p/SKt");
+  assert.deepEqual(variants.get("matrix"), ["AR light 100", "EN dark 200"]);
+});
+
 /* ---------------- discovery ---------------- */
 
 test("the reference directory is derived from package and file name", () => {
