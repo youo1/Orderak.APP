@@ -16,6 +16,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -108,8 +111,8 @@ private fun isolatedCount(value: Int, locale: Locale): String =
  * pushes the message past three lines; a side-by-side action would leave the
  * message a few words wide. The action row keeps the 48dp target.
  *
- * [BannerState.VersionWarning] is deliberately actionless and non-dismissible:
- * updating is the only way out, and hiding the warning would hide the cause.
+ * [BannerState.VersionWarning] is non-dismissible: it has no close control, so
+ * updating stays the only way out of the warning.
  */
 @Composable
 fun Banner(
@@ -126,11 +129,13 @@ fun Banner(
     val role = roleFor(state)
     val colors = role.colors()
     val glyph = role.icon
-    var titleLines by remember(title) { mutableIntStateOf(0) }
+    // Measure once in the side-by-side arrangement. Updating the counts after
+    // the action moves would change the text width, change the line count and
+    // flip the arrangement again, so the layout would never settle.
+    var titleLines by remember(title, fontScale) { mutableIntStateOf(0) }
     var messageLines by remember(message, fontScale) { mutableIntStateOf(0) }
     val stacked = fontScale >= 2f && titleLines + messageLines > 3
-    val hasAction = actionLabel != null && onAction != null &&
-        state != BannerState.VersionWarning
+    val hasAction = actionLabel != null && onAction != null
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
@@ -163,21 +168,23 @@ fun Banner(
                     Text(
                         text = title,
                         style = MaterialTheme.typography.titleSmall,
-                        onTextLayout = { titleLines = it.lineCount },
+                        onTextLayout = { if (titleLines == 0) titleLines = it.lineCount },
                     )
                     Text(
                         text = message,
                         style = MaterialTheme.typography.bodySmall,
-                        onTextLayout = { messageLines = it.lineCount },
+                        onTextLayout = { if (messageLines == 0) messageLines = it.lineCount },
                     )
-                    if (hasAction && !stacked) {
-                        TextButton(
-                            onClick = onAction!!,
-                            contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
-                            modifier = Modifier.heightIn(min = spacing.minimumTouchTarget),
-                        ) {
-                            Text(actionLabel!!, style = MaterialTheme.typography.labelLarge)
-                        }
+                }
+                if (hasAction && !stacked) {
+                    TextButton(
+                        onClick = onAction!!,
+                        contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
+                        modifier = Modifier
+                            .align(Alignment.CenterVertically)
+                            .heightIn(min = spacing.minimumTouchTarget),
+                    ) {
+                        Text(actionLabel!!, style = MaterialTheme.typography.labelLarge)
                     }
                 }
             }
@@ -209,19 +216,16 @@ fun OfflineStrip(
 ) {
     val spacing = LocalOrderakSpacing.current
     val locale = LocalConfiguration.current.locales[0]
-    val role = if (state == OfflineStripState.Offline) {
-        SemanticRole.Info
+    val glyph = if (state == OfflineStripState.Offline) {
+        Icons.Outlined.CloudOff
     } else {
-        SemanticRole.Warning
+        Icons.Outlined.Sync
     }
-    val colors = role.colors()
-    val glyph = role.icon
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
-        color = colors.container,
-        contentColor = colors.onContainer,
-        border = BorderStroke(1.dp, colors.containerOutline),
+        color = MaterialTheme.colorScheme.inverseSurface,
+        contentColor = MaterialTheme.colorScheme.inverseOnSurface,
     ) {
         Row(
             modifier = Modifier.padding(
@@ -231,13 +235,11 @@ fun OfflineStrip(
             horizontalArrangement = Arrangement.spacedBy(spacing.space2 + spacing.space1),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (glyph != null) {
-                Icon(
-                    imageVector = glyph,
-                    contentDescription = null,
-                    modifier = Modifier.size(spacing.iconMedium),
-                )
-            }
+            Icon(
+                imageVector = glyph,
+                contentDescription = null,
+                modifier = Modifier.size(spacing.iconMedium),
+            )
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(spacing.space1),
@@ -322,11 +324,11 @@ fun Skeleton(
                 modifier = Modifier.padding(spacing.space4),
                 horizontalArrangement = Arrangement.spacedBy(spacing.space3),
             ) {
-                repeat(2) {
+                repeat(3) {
                     Surface(
                         modifier = Modifier.weight(1f),
                         shape = MaterialTheme.shapes.medium,
-                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
                     ) {
                         Column(
                             modifier = Modifier.padding(spacing.space3),

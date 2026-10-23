@@ -537,6 +537,7 @@
     <string name="banner_sync_failed_retry">Réessayer</string>
     <string name="banner_version_warning_title">Mise à jour requise</string>
     <string name="banner_version_warning_message">Cette version ne peut plus accéder à votre boutique. Mettez Orderak à jour pour continuer.</string>
+    <string name="banner_version_warning_action">Mettre à jour</string>
     <string name="offline_strip_offline">Vous êtes hors ligne</string>
     <string name="offline_strip_last_update">Dernière mise à jour il y a %1$s min</string>
     <string name="offline_strip_reconnecting">Reconnexion…</string>

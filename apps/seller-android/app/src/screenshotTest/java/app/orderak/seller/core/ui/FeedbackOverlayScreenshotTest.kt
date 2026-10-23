@@ -140,6 +140,8 @@ fun bannerVersionWarning() {
             state = BannerState.VersionWarning,
             title = stringResource(R.string.banner_version_warning_title),
             message = stringResource(R.string.banner_version_warning_message),
+            actionLabel = stringResource(R.string.banner_version_warning_action),
+            onAction = {},
         )
     }
 }

@@ -532,6 +532,7 @@
     <string name="banner_sync_failed_retry">Retry</string>
     <string name="banner_version_warning_title">Update needed</string>
     <string name="banner_version_warning_message">This version can no longer reach your store. Update Orderak to continue.</string>
+    <string name="banner_version_warning_action">Update</string>
     <string name="offline_strip_offline">You\'re offline</string>
     <string name="offline_strip_last_update">Last update %1$s min ago</string>
     <string name="offline_strip_reconnecting">Reconnecting…</string>

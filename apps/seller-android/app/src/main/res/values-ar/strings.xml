@@ -560,6 +560,7 @@
     <string name="banner_sync_failed_retry">إعادة المحاولة</string>
     <string name="banner_version_warning_title">يلزم التحديث</string>
     <string name="banner_version_warning_message">لم يعد هذا الإصدار قادرًا على الوصول إلى متجرك. حدّث تطبيق Orderak للمتابعة.</string>
+    <string name="banner_version_warning_action">تحديث</string>
     <string name="offline_strip_offline">أنت غير متصل</string>
     <string name="offline_strip_last_update">آخر تحديث منذ %1$s دقائق</string>
     <string name="offline_strip_reconnecting">جارٍ إعادة الاتصال…</string>
