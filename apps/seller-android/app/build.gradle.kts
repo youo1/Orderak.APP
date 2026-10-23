@@ -510,7 +510,7 @@ val verifyAuthPhase1Contract by tasks.registering {
 
         requireContract(contract.exists(), "The protected contract document is missing.")
         requireContract(
-			"**Contract version:** 8" in contract.readText(),
+			"**Contract version:** 9" in contract.readText(),
             "The recognized Phase 1 contract version changed without a guard migration."
         )
         requireContract(

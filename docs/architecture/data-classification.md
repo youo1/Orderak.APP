@@ -33,19 +33,20 @@ applies_to: [production, staging]
 | `sellers` | `id` (UUID) | L1 | Internal identifier; not exposed in URLs |
 | `seller_devices` | `secret_hash` | L2 | Hashed device credential |
 | `seller_devices` | `fcm_token` | L2 | Push notification token |
-| `seller_profiles` | `full_name`, `birth_year`, `email_private`, `email_verified_at` | L2 | Private account profile; birth year and private email are excluded from Store DTOs, public pages, email variables, telemetry, and public contact data. Existing `birth_year` values are retained and are not deleted, rewritten, migrated, or backfilled by the age-confirmation change; the Worker no longer stores a newly sent birth year, although the current Android setup still collects and sends one until plan item R3 |
+| `seller_profiles` | `full_name`, `birth_year`, `email_private`, `email_verified_at` | L2 | Private account profile; birth year and private email are excluded from Store DTOs, public pages, email variables, telemetry, and public contact data. Migration `063_clear_stored_birth_years.sql` clears all stored `birth_year` values while keeping the column and the separate age-confirmation evidence; the Worker never stores a newly sent birth year, although the current Android setup still collects and sends one until plan item R3 |
 | `sellers` | `business_category`, `city_geoname_id`, `city_name` | L0 | Public store classification and location |
 
 ### 2.1.1 Auth and onboarding implementation (v1 API)
 
 | Table/location | Fields | Classification | Notes |
 |---|---|---|---|
-| `onboarding_sessions` | phone, Firebase UID, name, private email, legal versions, nullable `age_confirmation_source` | L2 | Resumable pre-account record; never exposed publicly. New onboarding stores no birth year; `age_confirmation_source` records only the age-confirmation path for the session and is nullable |
+| `onboarding_sessions` | phone, Firebase UID, name, private email, legal versions, nullable `age_confirmation_source` | L2 | Resumable pre-account record; never exposed publicly. New onboarding stores no birth year; migration `063_clear_stored_birth_years.sql` marks pre-migration `account_saved` legacy sessions with `android_onboarding_v2_legacy_birth_year` and clears all stored session birth years, while the column remains. `age_confirmation_source` records only the age-confirmation path for the session and is nullable |
 | `onboarding_sessions` | `token_hash`, `device_secret_hash` | L2 | High-entropy hashes used only by backend auth handlers |
 | `passkey_credentials` | credential ID, public key, user ID, counter, AAGUID, transports, backup/device metadata | L2 | Public-key material is not biometric data, but credential identifiers remain confidential and must not be logged |
 | `webauthn_challenges` | challenge hash, ceremony, seller/user binding, timestamps | L2 | Raw challenge is returned once and never stored |
 | `recent_auth_proofs` | token hash, seller, method, expiry | L2 | Ten-minute step-up evidence |
 | `email_verification_tokens` | email, token hash, timestamps | L2 | Raw token is returned only in the transactional link |
+| `pending_email_changes` | proposed email, token hash, timestamps, used/superseded markers | L2 | Transient private email-change verification data with a 24-hour validity; only the token hash is stored and the raw token appears only in the transactional link. Expired, used, and superseded rows are purged on the email-token retention schedule |
 | `geo_cities`, `geo_city_names`, `geo_city_search` | all imported fields | L0 | Public GeoNames data; CC BY attribution required |
 | Android encrypted preferences | onboarding token, recent-auth token, device secret | L3 | Opaque bearer values; never in logs, URLs, screenshots, or backups |
 | Android DataStore | onboarding text draft (name, email, store name, any supplied category/city and, until plan item R3 ships the new setup screen, the birth year) | L2 | Device-local resumable draft; the current Android setup still drafts and sends a birth year, which the Worker accepts only as legacy age evidence and never stores; logo is not collected during onboarding |

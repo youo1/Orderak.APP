@@ -316,7 +316,11 @@ for (const [relative, expectedServers] of Object.entries(serverExpectations)) {
 // rather than on a grep: the endpoint announced every call with the build that
 // made it, and seven days of Workers logs across production and staging showed
 // none. See ADR-012.
-if (operationCount !== 251) fail(`OpenAPI operation inventory changed: expected 251, found ${operationCount}.`);
+// Raised to 253 on 2026-10-23 for the two private-profile operations:
+// GET and PATCH /api/v1/account/profile. They expose the seller's own name and
+// optional private email without birth_year, and the email change is a pending
+// request confirmed through the existing /verify-email link.
+if (operationCount !== 253) fail(`OpenAPI operation inventory changed: expected 253, found ${operationCount}.`);
 const seller = JSON.parse(read("contracts/openapi/src/seller-v1.json"));
 for (const [route, pathItem] of Object.entries(seller.paths)) {
   for (const method of ["get", "post", "put", "patch", "delete"]) {

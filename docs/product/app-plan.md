@@ -332,10 +332,12 @@ branch from Dashboard.
   an account-recovery credential in this version.
 - Account step 1 requires affirmative confirmation of the canonical statement
   `عمري ١٨ عامًا أو أكثر` (shown exactly and submitted as `age_confirmed: true`).
-  New onboarding does not collect or store a birth year. Existing stored
-  birth-year values are retained and are not deleted, rewritten, migrated, or
-  backfilled by this change, and they are never part of a Store DTO or public
-  storefront/contact surface.
+  New onboarding does not collect or store a birth year. Migration
+  `063_clear_stored_birth_years.sql` clears all previously stored birth-year
+  values while keeping both columns and the separate age-confirmation evidence;
+  installed clients may still submit a legacy year as evidence, but it is never
+  stored. Birth year is never part of a Store DTO or public storefront/contact
+  surface.
 
 ## Pre-production identity and routing foundation
 
