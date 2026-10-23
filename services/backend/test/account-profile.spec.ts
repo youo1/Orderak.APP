@@ -370,6 +370,29 @@ describe("GET/PATCH /api/v1/account/profile", () => {
 			pending_email_private: null,
 		});
 	});
+
+	it("a verification link for an address the seller has since replaced reports failure, not success", async () => {
+		const seller = await onboardSeller("Replaced Address Seller", "replaced@example.com");
+		const sellerRow = await env.orderak_db.prepare("SELECT id FROM sellers WHERE phone=?")
+			.bind(seller.phone).first<{ id: string }>();
+		// An unused resend link for the original address, issued before the change.
+		const oldLink = "link-for-the-replaced-address";
+		await env.orderak_db.prepare(
+			`INSERT INTO email_verification_tokens(id,seller_id,email,token_hash,kind,expires_at)
+			 VALUES(?,?,?,?,'resend',datetime('now','+24 hours'))`,
+		).bind(crypto.randomUUID(), sellerRow!.id, "replaced@example.com", await sha256Hex(oldLink)).run();
+
+		await profile("PATCH", { email_private: "replacement@example.com" }, credsWithAuth(seller));
+		const confirmed = await verifyLink(generatedTokens[generatedTokens.length - 1]);
+		expect(confirmed.status).toBe(200);
+
+		// The trigger from migration 033 matches the current address, so this link
+		// can verify nothing; the page must not tell the seller it did.
+		const stale = await verifyLink(oldLink);
+		expect(stale.status).toBe(400);
+		const after = await profile("GET", null, creds(seller));
+		expect(await after.json()).toMatchObject({ email_private: "replacement@example.com", email_verified: true });
+	});
 });
 
 describe("Migration 063 clears stored birth years", () => {

@@ -207,10 +207,18 @@ export async function handleEmailVerification(
 	const tokenHash = await sha256Hex(token);
 	// The trigger in migration 033 applies the verified timestamp to the
 	// matching private profile in the same atomic statement. RETURNING means a
-	// replay (including a concurrent replay) cannot report success.
+	// replay (including a concurrent replay) cannot report success. A link sent
+	// to an address the seller has since replaced through a profile email change
+	// verifies nothing, because the trigger matches the current address, so it
+	// must not be consumed or report success either.
 	const consumed = await env.orderak_db.prepare(
 		`UPDATE email_verification_tokens SET used_at=datetime('now')
 		 WHERE token_hash=? AND used_at IS NULL AND expires_at>datetime('now')
+		   AND EXISTS (
+		     SELECT 1 FROM seller_profiles p
+		     WHERE p.seller_id=email_verification_tokens.seller_id
+		       AND lower(p.email_private)=lower(email_verification_tokens.email)
+		   )
 		 RETURNING id`,
 	).bind(tokenHash).first<{ id: string }>();
 	if (consumed) return verificationPage(true);

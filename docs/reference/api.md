@@ -1300,7 +1300,10 @@ token, rechecks case-insensitive uniqueness against other sellers, and updates
 the email and verified timestamp together. A newer request supersedes earlier
 links. Missing, expired, used, superseded, replayed, or conflicting links fail
 without changing profile data; a conflict acquired by another seller retires the
-pending request and shows the existing failure page.
+pending request and shows the existing failure page. A first-verification or
+resend link issued for an address the seller has since replaced also shows the
+failure page and is not consumed, because it can no longer verify the current
+address.
 
 ## `POST /api/v1/account/deletion-request`
 
