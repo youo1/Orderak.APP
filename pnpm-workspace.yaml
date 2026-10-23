@@ -169,6 +169,17 @@ overrides:
 #
 # This entry goes when Cloudflare ships a vitest-pool-workers built on
 # miniflare 5.20260910.0-alpha or later. Re-check on the next audit failure.
+#
+# GHSA-mrhx-c7xc-m3w5 (high, CVE-2023-54404), first failing the audit on
+# 2026-10-24 — zod can exhaust memory while validating oversized constrained
+# collections. Fixed in 4.6.6. The only vulnerable copy is 4.4.3, which
+# @cloudflare/vitest-pool-workers@0.23.0 (still the latest release, checked
+# 2026-10-24) pins exactly; it validates the test pool's own configuration, so
+# it runs in tests and never in a Worker. Every other zod in the tree resolves
+# to 4.6.7 and is clean. Overriding the exact pin hands the pool a version it
+# never declared, the trade the fast-uri bound refuses, so it is waived by id,
+# as sharp is. Expires 2026-11-05: remove when a vitest-pool-workers release
+# resolves zod >=4.6.6.
 auditConfig:
   # GHSA-vfj7-8cjw-p6xm (high, CVE-2026-93687) — braces' brace-pattern parser can
   # be driven into exponential backtracking by a crafted pattern, so a malicious
@@ -186,18 +197,6 @@ auditConfig:
   # exactly (see GHSA-rgj7-g3m4-5g8c above). sharp's native platform packages
   # are not exercised by the tests. Waived, not overridden. Expires 2026-11-05:
   # remove when a vitest-pool-workers release resolves sharp >=0.35.5.
-  #
-  # GHSA-mrhx-c7xc-m3w5 (high, CVE-2023-54404), first failing the audit on
-  # 2026-10-24 — zod can exhaust memory
-  # while validating oversized constrained collections. Fixed in 4.6.6. The
-  # only vulnerable copy is 4.4.3, which @cloudflare/vitest-pool-workers@0.23.0
-  # (still the latest release, checked 2026-10-24) pins exactly; it validates
-  # the test pool's own configuration, so it runs in tests and never in a
-  # Worker. Every other zod in the tree resolves to 4.6.7 and is clean.
-  # Overriding the exact pin hands the pool a version it never declared, the
-  # trade the fast-uri bound refuses, so it is waived by id, as sharp is above.
-  # Expires 2026-11-05: remove when a vitest-pool-workers release resolves zod
-  # >=4.6.6.
   ignoreGhsas:
     - GHSA-mrhx-c7xc-m3w5
     - GHSA-qxc2-j82w-r537
