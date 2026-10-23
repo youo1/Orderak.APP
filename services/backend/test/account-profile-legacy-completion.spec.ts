@@ -3,6 +3,15 @@ import { createExecutionContext, env } from "cloudflare:test";
 import { handleAuthV2Routes } from "../src/domains/identity/auth-v2";
 import { createSchema } from "./helpers";
 
+// Migration 063 does not exist on the unchanged tree, so this glob matches
+// nothing and the length assertion below fails cleanly before the change,
+// rather than refusing to compile.
+const MIGRATION_063 = import.meta.glob("../migrations/063_clear_stored_birth_years.sql", {
+	query: "?raw",
+	import: "default",
+	eager: true,
+}) as Record<string, string>;
+
 const PHONE = "+201001239500";
 const DEVICE_SECRET = "device-secret-with-enough-entropy";
 let testEnv: TestEnv;
@@ -50,7 +59,7 @@ afterEach(() => {
 });
 
 describe("Legacy account_saved completion survives the birth-year migration (D-13 option A)", () => {
-	it("completes a session the migration already stamped with the legacy source and a nulled birth year", async () => {
+	it("runs migration 063 itself against a pre-migration account_saved session, matches its predicate, and still completes the session as legacy", async () => {
 		const started = await route("/api/v1/auth/phone/complete", {
 			id_token: freshFirebaseToken(),
 			phone: PHONE,
@@ -68,13 +77,36 @@ describe("Legacy account_saved completion survives the birth-year migration (D-1
 		}, auth);
 		expect(account.status).toBe(200);
 
-		// Simulate what migration 063 must do to a pre-existing row: stamp the
-		// legacy source marker first, then null the stored year — exactly the
-		// order the migration is required to follow so this draft is never
-		// stranded mid-setup with account_step_required.
+		// saveOnboardingAccount() never writes onboarding_sessions.birth_year at
+		// all (only legal_acceptances.age_confirmation_source), so the column is
+		// still NULL here. Setting it directly, together with clearing the source
+		// marker the account step just set, recreates exactly the row a prior
+		// Worker (before source markers existed) would have left behind:
+		// account_saved, a retained birth year, no source.
 		await env.orderak_db.prepare(
-			`UPDATE onboarding_sessions SET age_confirmation_source='android_onboarding_v2_legacy_birth_year',birth_year=NULL WHERE phone_e164=?`,
+			`UPDATE onboarding_sessions SET age_confirmation_source=NULL,birth_year=1985 WHERE phone_e164=?`,
 		).bind(PHONE).run();
+
+		const preMigration = await env.orderak_db.prepare(
+			"SELECT status,birth_year,age_confirmation_source FROM onboarding_sessions WHERE phone_e164=?",
+		).bind(PHONE).first<{ status: string; birth_year: number | null; age_confirmation_source: string | null }>();
+		expect(preMigration).toEqual({ status: "account_saved", birth_year: 1985, age_confirmation_source: null });
+
+		const files = Object.values(MIGRATION_063);
+		expect(files).toHaveLength(1);
+		// Run the migration's own SQL against this exact row, rather than
+		// hand-simulating its effect, so the migration's predicate is what is
+		// actually under test.
+		await env.orderak_db.exec(files[0]);
+
+		const postMigration = await env.orderak_db.prepare(
+			"SELECT status,birth_year,age_confirmation_source FROM onboarding_sessions WHERE phone_e164=?",
+		).bind(PHONE).first<{ status: string; birth_year: number | null; age_confirmation_source: string | null }>();
+		expect(postMigration).toEqual({
+			status: "account_saved",
+			birth_year: null,
+			age_confirmation_source: "android_onboarding_v2_legacy_birth_year",
+		});
 
 		const completed = await route("/api/v1/onboarding/complete", {
 			device_secret: DEVICE_SECRET,

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createExecutionContext, env } from "cloudflare:test";
 import { handleAuthV2Routes, handleEmailVerification } from "../src/domains/identity/auth-v2";
+import { sha256Hex } from "../src/domains/identity/auth";
 import { createSchema } from "./helpers";
 
 // randomToken() is mocked to a deterministic, logged sequence so a test can
@@ -130,7 +131,12 @@ beforeEach(async () => {
 		if (!url.startsWith("https://identitytoolkit.googleapis.com/v1/accounts:lookup")) {
 			throw new Error(`unexpected_fetch:${url}`);
 		}
-		return Response.json({ users: [{ localId: "firebase-v2-user", phoneNumber: firebasePhone }] });
+		// Each onboarding seller gets its own Firebase UID, derived from its own
+		// phone. idx_auth_identity_provider_subject (migration 032) is unique on
+		// (provider, provider_subject); a shared localId across sellers would
+		// make every multi-seller case in this file fail on that constraint
+		// before it ever reached an email assertion.
+		return Response.json({ users: [{ localId: `firebase-uid-${firebasePhone}`, phoneNumber: firebasePhone }] });
 	}));
 });
 
@@ -328,6 +334,39 @@ describe("GET/PATCH /api/v1/account/profile", () => {
 			full_name: "Validate Seller",
 			email_private: "validate@example.com",
 			email_verified: false,
+			pending_email_private: null,
+		});
+	});
+
+	it("an expired email-change link fails and leaves the profile unchanged", async () => {
+		const seller = await onboardSeller("Expired Link Seller", "expired-current@example.com");
+		const sellerRow = await env.orderak_db.prepare("SELECT id FROM sellers WHERE phone=?")
+			.bind(seller.phone).first<{ id: string }>();
+		const rawToken = "expired-pending-email-token";
+		await env.orderak_db.prepare(
+			`INSERT INTO pending_email_changes(id,seller_id,email,token_hash,created_at,expires_at,used_at,superseded_at)
+			 VALUES(?,?,?,?,datetime('now','-2 days'),datetime('now','-1 day'),NULL,NULL)`,
+		).bind(crypto.randomUUID(), sellerRow!.id, "expired-new@example.com", await sha256Hex(rawToken)).run();
+
+		const result = await verifyLink(rawToken);
+		expect(result.status).toBe(400);
+
+		const unchanged = await profile("GET", null, creds(seller));
+		expect(await unchanged.json()).toMatchObject({
+			email_private: "expired-current@example.com",
+			pending_email_private: null,
+		});
+	});
+
+	it("an unknown email-change link fails and leaves the profile unchanged", async () => {
+		const seller = await onboardSeller("Unknown Link Seller", "unknown-link@example.com");
+
+		const result = await verifyLink("this-token-was-never-issued-by-anything");
+		expect(result.status).toBe(400);
+
+		const unchanged = await profile("GET", null, creds(seller));
+		expect(await unchanged.json()).toMatchObject({
+			email_private: "unknown-link@example.com",
 			pending_email_private: null,
 		});
 	});
