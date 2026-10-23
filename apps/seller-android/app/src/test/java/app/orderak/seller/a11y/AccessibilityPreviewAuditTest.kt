@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.node.LayoutNode
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.semantics.SemanticsActions
@@ -46,6 +47,7 @@ import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withLink
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -94,11 +96,13 @@ class AccessibilityPreviewAuditTest(private val caseName: String) {
         val facadeClass = Class.forName(declaration.qualifiedFacade, false, javaClass.classLoader)
         val composable = facadeClass.getDeclaredComposableMethod(function)
         val application = ApplicationProvider.getApplicationContext<Context>()
-        val variantState = mutableStateOf(declaration.locales.first())
+        val variantState = mutableStateOf(declaration.variants.first())
         rule.setContent {
-            val localeTag = variantState.value
+            val variant = variantState.value
             val configuration = Configuration(application.resources.configuration).apply {
-                setLocale(localeFromTag(localeTag))
+                setLocale(localeFromTag(variant.locale))
+                uiMode = variant.uiMode
+                fontScale = variant.fontScale
             }
             val localeContext = application.createConfigurationContext(configuration)
             val layoutDirection =
@@ -115,6 +119,10 @@ class AccessibilityPreviewAuditTest(private val caseName: String) {
             }
             CompositionLocalProvider(
                 LocalConfiguration provides configuration,
+                LocalDensity provides Density(
+                    density = application.resources.displayMetrics.density,
+                    fontScale = variant.fontScale,
+                ),
                 LocalContext provides localeContext,
                 LocalResources provides localeContext.resources,
                 LocalLayoutDirection provides layoutDirection,
@@ -126,11 +134,23 @@ class AccessibilityPreviewAuditTest(private val caseName: String) {
         }
         val textsByLocale = linkedMapOf<String, Set<String>>()
         val allDiagnostics = mutableListOf<String>()
-        for (localeTag in declaration.locales) {
-            variantState.value = localeTag
+        for (variant in declaration.variants) {
+            variantState.value = variant
             rule.waitForIdle()
-            textsByLocale[localeTag] = collectTexts(rule)
-            val diagnostics = auditAccessibility(rule, "${declaration.id} [$localeTag]")
+            val mode = if (
+                (variant.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+                Configuration.UI_MODE_NIGHT_YES
+            ) {
+                "dark"
+            } else {
+                "light"
+            }
+            val scale = (variant.fontScale * 100).toInt()
+            val label = "${variant.locale} $mode $scale"
+            if (variant.locale !in textsByLocale) {
+                textsByLocale[variant.locale] = collectTexts(rule)
+            }
+            val diagnostics = auditAccessibility(rule, "${declaration.id} [$label]")
             for (diagnostic in diagnostics) {
                 assertTrue("Diagnostic must name the preview: $diagnostic", declaration.id in diagnostic)
                 assertTrue("Diagnostic must name a rule: $diagnostic", RULES.any { it in diagnostic })
@@ -163,7 +183,7 @@ class AccessibilityPreviewAuditTest(private val caseName: String) {
         )
         val english = textsByLocale["en"]
         val arabic = textsByLocale["ar"]
-        if (english != null && arabic != null) {
+        if (english != null && arabic != null && (english.isNotEmpty() || arabic.isNotEmpty())) {
             assertTrue(
                 "The locale host did not switch en/ar strings for ${declaration.id}",
                 english != arabic,
@@ -550,31 +570,45 @@ private fun localeFromTag(tag: String): Locale {
         else -> Locale.forLanguageTag(normalized)
     }
 }
+internal data class PreviewVariant(
+    val locale: String,
+    val uiMode: Int = Configuration.UI_MODE_NIGHT_NO,
+    val fontScale: Float = 1f,
+)
 internal data class SourceDeclaration(
     val file: File,
     val packageName: String,
     val facade: String,
     val function: String,
-    val locales: List<String>,
+    val variants: List<PreviewVariant>,
 ) {
     val id: String get() = "$facade.$function"
     val qualifiedFacade: String get() = if (packageName.isEmpty()) facade else "$packageName.$facade"
+    val locales: List<String> get() = variants.map { it.locale }.distinct()
 }
 internal object SourceDeclarations {
     private val annotationRegex = Regex("""(?m)^\s*@PreviewTest\s*$""")
     private val functionRegex = Regex("""\bfun\s+(\w+)\s*\(""")
     private val packageRegex = Regex("""(?m)^package\s+([\w.]+)""")
+    private val previewRegex = Regex("""@Preview\s*\(([^)]*)\)""", RegexOption.DOT_MATCHES_ALL)
     private val localeRegex = Regex("""locale\s*=\s*"([^"]+)"""")
-    private val multiAnnotationRegex = Regex("""@(\w+)\s*$""", RegexOption.MULTILINE)
-    private val sourceRoot = File("src/screenshotTest/java")
-    val all: List<SourceDeclaration> by lazy { parse() }
+    private val uiModeRegex = Regex("""uiMode\s*=\s*(?:Configuration\.)?UI_MODE_NIGHT_(YES|NO)""")
+    private val fontScaleRegex = Regex("""fontScale\s*=\s*([\d.]+)f?""")
+    private val annotationNameRegex = Regex("""@(\w+)""")
+    private val annotationClassRegex = Regex("""^\s*annotation class (\w+)""")
+    private val defaultSourceRoot = File("src/screenshotTest/java")
+    private val defaultMultipreviewRoot = File("src/main/java/app/orderak/seller/core/ui")
+    val all: List<SourceDeclaration> by lazy {
+        parse(defaultSourceRoot, defaultMultipreviewRoot)
+    }
     private val byId: Map<String, SourceDeclaration> by lazy { all.associateBy { it.id } }
     fun byId(id: String): SourceDeclaration? = byId[id]
-    private fun parse(): List<SourceDeclaration> {
+
+    fun parse(sourceRoot: File, multipreviewRoot: File): List<SourceDeclaration> {
         check(sourceRoot.isDirectory) {
             "Missing ${sourceRoot.absolutePath}; unit tests must run from the app module"
         }
-        val multipreviews = parseMultipreviews()
+        val multipreviews = parseMultipreviews(multipreviewRoot)
         val declarations = mutableListOf<SourceDeclaration>()
         sourceRoot.walkTopDown()
             .filter { it.isFile && it.extension == "kt" }
@@ -590,40 +624,62 @@ internal object SourceDeclarations {
                     val function = functionRegex.find(text, match.range.last)
                         ?.groupValues?.get(1)
                         ?: error("No function after @PreviewTest in ${file.path}")
-            val inline = localeRegex.findAll(block).map { it.groupValues[1] }.toList()
-            val resolved = if (inline.isNotEmpty()) {
-                inline
-            } else {
-                multiAnnotationRegex.findAll(block)
-                    .map { it.groupValues[1] }
-                    .filter { it != "Composable" && it != "PreviewTest" }
-                    .flatMap { annotation ->
-                        multipreviews[annotation] ?: error(
-                            "Unresolved multipreview @$annotation in ${file.path} for $function",
-                        )
+                    val inline = variantsIn(block, file.path, function)
+                    val resolved = if (inline.isNotEmpty()) {
+                        inline
+                    } else {
+                        annotationNameRegex.findAll(block)
+                            .map { it.groupValues[1] }
+                            .filter { it != "Composable" && it != "PreviewTest" && it != "Preview" }
+                            .flatMap { annotation ->
+                                multipreviews[annotation] ?: error(
+                                    "Unresolved multipreview @$annotation in ${file.path} for $function",
+                                )
+                            }
+                            .toList()
                     }
-                    .toList()
-            }
-            val locales = resolved.ifEmpty { listOf("ar") }
-            declarations += SourceDeclaration(file, packageName, facade, function, locales)
+                    check(resolved.isNotEmpty()) {
+                        "Missing explicit locale metadata for @PreviewTest $function in ${file.path}"
+                    }
+                    declarations += SourceDeclaration(file, packageName, facade, function, resolved)
                 }
             }
         return declarations
     }
-    private fun parseMultipreviews(): Map<String, List<String>> {
-        val root = File("src/main/java/app/orderak/seller/core/ui")
+
+    private fun variantsIn(block: String, path: String, function: String): List<PreviewVariant> =
+        previewRegex.findAll(block).map { match ->
+            val attributes = match.groupValues[1]
+            val locale = localeRegex.find(attributes)?.groupValues?.get(1)
+                ?: error("Missing explicit locale for @PreviewTest $function in $path")
+            val dark = uiModeRegex.find(attributes)?.groupValues?.get(1) == "YES"
+            val fontScale = fontScaleRegex.find(attributes)?.groupValues?.get(1)?.toFloat() ?: 1f
+            PreviewVariant(
+                locale = locale,
+                uiMode = if (dark) {
+                    Configuration.UI_MODE_NIGHT_YES
+                } else {
+                    Configuration.UI_MODE_NIGHT_NO
+                },
+                fontScale = fontScale,
+            )
+        }.toList()
+
+    private fun parseMultipreviews(root: File): Map<String, List<PreviewVariant>> {
         check(root.isDirectory) { "Missing multipreview source root ${root.absolutePath}" }
-        val result = mutableMapOf<String, List<String>>()
+        val result = mutableMapOf<String, List<PreviewVariant>>()
         root.walkTopDown()
             .filter { it.isFile && it.extension == "kt" }
             .forEach { file ->
-                val text = file.readText()
-                val matches = Regex("""annotation class (\w+)""").findAll(text).toList()
-                for ((index, match) in matches.withIndex()) {
-                    val start = if (index == 0) 0 else matches[index - 1].range.last + 1
-                    val block = text.substring(start, match.range.first)
-                    val locales = localeRegex.findAll(block).map { it.groupValues[1] }.toList()
-                    if (locales.isNotEmpty()) result[match.groupValues[1]] = locales
+                val lines = file.readText().lines()
+                for (index in lines.indices) {
+                    val name = annotationClassRegex.find(lines[index])?.groupValues?.get(1)
+                        ?: continue
+                    var start = index - 1
+                    while (start >= 0 && lines[start].trimStart().startsWith("@")) start--
+                    val block = lines.subList(start + 1, index).joinToString("\n")
+                    val variants = variantsIn(block, file.path, name)
+                    if (variants.isNotEmpty()) result[name] = variants
                 }
             }
         return result

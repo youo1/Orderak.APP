@@ -60,16 +60,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import app.orderak.seller.R
-import app.orderak.seller.core.ui.NoticeBanner
 import app.orderak.seller.core.ui.PlanUsageRow
 import app.orderak.seller.core.ui.PlanUsageRowItem
 import app.orderak.seller.core.ui.planUsageRows
 import app.orderak.seller.core.ui.SemanticRole
 import app.orderak.seller.core.locale.AppLocales
 import app.orderak.seller.core.text.formatCount
-import app.orderak.seller.core.ui.FullScreenEmpty
-import app.orderak.seller.core.ui.FullScreenError
-import app.orderak.seller.core.ui.FullScreenLoading
 import app.orderak.seller.core.ui.backendErrorResource
 import app.orderak.seller.data.billing.EntitlementManager
 import app.orderak.seller.data.billing.BillingManager
@@ -99,6 +95,8 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.intOrNull
 import javax.inject.Inject
 import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
+import app.orderak.seller.core.ui.EmptyState
+import app.orderak.seller.core.ui.EmptyStateKind
 
 @Composable
 fun AnnouncementsScreen(onBack: () -> Unit, vm: OperationsViewModel = hiltViewModel()) {
@@ -136,7 +134,7 @@ fun AnnouncementsContent(
         onRetry = onRetry,
         isEmpty = items?.isEmpty() == true,
         empty = {
-            FullScreenEmpty(message = stringResource(R.string.common_empty))
+            EmptyState(kind = EmptyStateKind.Empty, title = stringResource(R.string.common_empty))
         },
     ) {
         items.orEmpty().forEach { a ->
@@ -285,7 +283,7 @@ fun CatalogLanguagesContent(
             }
         }
         if (items?.isEmpty() == true) {
-            FullScreenEmpty(message = stringResource(R.string.common_empty))
+            EmptyState(kind = EmptyStateKind.Empty, title = stringResource(R.string.common_empty))
         }
         items.orEmpty().forEach { item ->
             Card(onClick = { onEdit(item) }, modifier = Modifier.fillMaxWidth()) {

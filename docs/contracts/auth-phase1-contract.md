@@ -8,7 +8,7 @@ authoritative_for: [auth-contract]
 ---
 # Versioned Seller Authentication Contract
 
-**Contract version:** 8
+**Contract version:** 9
 **Owner approval required:** Ayman Mohamed Abdellatif  
 **Protected since:** 13 July 2026
 
@@ -22,6 +22,15 @@ logout. Guarantee 10 now requires the device credential to be retired at the
 server and removed from the handset, where version 7 required neither. Provider,
 OTP state, timeouts, consent, verification, throttling and recovery behavior are
 unchanged.
+
+**Approved evolution:** 23 October 2026 — version 9 is the deliberate D-13
+option A migration. All stored birth-year values in `onboarding_sessions` and
+`seller_profiles` are cleared by migration `063_clear_stored_birth_years.sql`,
+after it marks eligible pre-migration `account_saved` sessions with
+`android_onboarding_v2_legacy_birth_year`. Both birth-year columns, the legacy
+age-evidence path, and the consent evidence remain. Provider, OTP state,
+timeouts, consent semantics, verification, throttling outside the new profile
+email-change limit, and recovery behavior are unchanged.
 
 The reason for the change: the client never called `POST /api/v1/auth/logout`.
 The route existed and revoked both the device credential and any outstanding
@@ -147,11 +156,38 @@ version 8 and is specified in guarantee 10.
     Autofill may populate all six digits, but only an explicit Verify action may
     submit them. Change number or Back clears the active phone-bound OTP
     session. Firebase instant verification remains allowed to complete directly.
-22. New-seller account step 1 requires a private `birth_year` integer from 1900
-    through the current UTC year. Android collects only a year through a
-    year-only dialog and caches it in the non-authoritative draft. The Worker
-    validates and persists it in `onboarding_sessions` and `seller_profiles`;
-    Store DTOs, public pages, emails, and telemetry must never expose it.
+22. New-seller account step 1 requires affirmative age confirmation, not a
+    birth year. The request must carry `age_confirmed: true`, and the flow
+    records the exact canonical Arabic statement `عمري ١٨ عامًا أو أكثر`, the
+    source `android_onboarding_v2`, the Worker confirmation timestamp, and the
+    accepted Terms version in the nullable age-evidence columns on
+    `legal_acceptances` (`age_confirmation_statement_text`,
+    `age_confirmation_source`, `age_confirmation_confirmed_at`,
+    `age_confirmation_terms_version`). That evidence lives beside the general
+    legal acceptance in the same table; `onboarding_sessions` carries only a
+    nullable `age_confirmation_source` marker and no separate evidence table is
+    introduced. A missing, `false`, or non-boolean `age_confirmed` without a
+    valid legacy birth year fails closed with HTTP `400` and stable code
+    `age_confirmation_required`. The new flow must never collect, store, or
+    persist a sent `birth_year` in `onboarding_sessions` or `seller_profiles`.
+    The age evidence is confidential consent evidence and, like any birth-year
+    value, must never appear in Store DTOs, public pages, emails, telemetry, or
+    public contact data. Installed-client compatibility is explicit and
+    narrow: when `age_confirmed` is absent and `birth_year` is a JSON integer
+    from 1900 through the current UTC year, the Worker accepts the request with
+    source `android_onboarding_v2_legacy_birth_year`, records the accepted Terms
+    version and a Worker timestamp, and stores NULL statement text because that
+    legacy client never displayed the statement. It still does not persist the
+    submitted year. A draft saved by the previous Worker with `status` of
+    `account_saved`, a birth year still stored on the session, and a NULL source
+    marker is marked by migration `063_clear_stored_birth_years.sql` as
+    `android_onboarding_v2_legacy_birth_year` and also completes as the legacy
+    shape with NULL statement text. That migration then clears every stored
+    birth-year value in `onboarding_sessions` and `seller_profiles`; both columns
+    and the separate age-confirmation evidence are retained, and the cleared
+    year is neither copied nor persisted into a new field. This intentional D-13
+    option A contract migration does not drop either column, rewrite migrations
+    033, 039 or 062, or delete the consent evidence.
 23. After the Worker returns a valid new-seller onboarding token, Android enters
     Account step 1 directly. Explicit `PRE_REGISTRATION` state always routes to
     resumable setup and can never be treated as a completed Main session because
@@ -269,9 +305,11 @@ required year-only birth-year field. Migration `033` had already been recorded
 in the production migration ledger without the birth-year columns, despite the
 earlier pre-release assumption. Migration `039_add_private_birth_year.sql`
 therefore supplies the forward-only production repair; `033` remains aligned
-with its applied historical shape. The seller-profile column is nullable only
-for legacy compatibility, while every new V6 onboarding request and insert
-still requires a validated year. Firebase provider, OTP generation and security
+with its applied historical shape. The seller-profile column is nullable and is
+retained while migration `063_clear_stored_birth_years.sql` clears its stored
+values; the D-13 age-confirmation migration in item 22 supersedes that field for
+new onboarding, which neither collects nor persists a birth year. Firebase
+provider, OTP generation and security
 timeouts, exact-phone verification, numeric device recovery, Passkey ceremony
 guarantees, legacy endpoints, and rollback behavior remain unchanged.
 

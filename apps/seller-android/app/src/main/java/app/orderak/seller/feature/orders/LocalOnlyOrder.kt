@@ -4,7 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import app.orderak.seller.R
-import app.orderak.seller.core.ui.NoticeBanner
+import app.orderak.seller.core.ui.Banner
+import app.orderak.seller.core.ui.BannerState
 import app.orderak.seller.core.ui.SemanticChip
 import app.orderak.seller.core.ui.SemanticRole
 import app.orderak.seller.core.ui.backendErrorResource
@@ -86,16 +87,16 @@ fun LocalOnlyOrderBanner(
     onDiscard: (() -> Unit)? = null,
 ) {
     if (refusalCode == null) {
-        NoticeBanner(
-            role = SemanticRole.Warning,
+        Banner(
+            state = BannerState.Warning,
             title = stringResource(R.string.order_local_only_title),
             message = stringResource(R.string.order_local_only_message),
             modifier = modifier,
         )
         return
     }
-    NoticeBanner(
-        role = SemanticRole.Danger,
+    Banner(
+        state = BannerState.Error,
         title = stringResource(R.string.order_refused_title),
         message = stringResource(
             R.string.order_refused_message,

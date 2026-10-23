@@ -510,7 +510,7 @@ val verifyAuthPhase1Contract by tasks.registering {
 
         requireContract(contract.exists(), "The protected contract document is missing.")
         requireContract(
-			"**Contract version:** 8" in contract.readText(),
+			"**Contract version:** 9" in contract.readText(),
             "The recognized Phase 1 contract version changed without a guard migration."
         )
         requireContract(
@@ -686,14 +686,52 @@ val verifyAuthPhase1Contract by tasks.registering {
             "Passkey cancellation must return to Welcome; only unavailable or failed states expose OTP fallback."
         )
         requireContract(
-            "val birth_year: Int" in backendApi &&
-                "birth_year = requireNotNull(current.birthYear)" in shopSetupViewModel &&
+            // D-13: the Worker now accepts affirmative age confirmation for new
+            // clients and a valid legacy birth year from installed clients. Both
+            // shapes record evidence on legal_acceptances; a legacy request
+            // records a NULL statement because the installed client never
+            // displayed it. Android must keep sending one of the two shapes:
+            // today the legacy birth year, after plan item R3 the confirmation.
+            // Dropping the birth year before the confirmation exists would make
+            // every setup fail with age_confirmation_required.
+            (
+                ("val age_confirmed: Boolean" in backendApi &&
+                    "age_confirmed = " in shopSetupViewModel) ||
+                    ("val birth_year: Int" in backendApi &&
+                        "birth_year = requireNotNull(current.birthYear)" in shopSetupViewModel)
+            ) &&
+                "age_confirmed" in backendAuthV2 &&
+                "AGE_CONFIRMATION_STATEMENT" in backendAuthV2 &&
+                "عمري ١٨ عامًا أو أكثر" in backendAuthV2 &&
+                "body.age_confirmed === true" in backendAuthV2 &&
+                "\"android_onboarding_v2_legacy_birth_year\"" in backendAuthV2 &&
                 "validBirthYear(body.birth_year)" in backendAuthV2 &&
-                "CREATE TABLE seller_profiles" in authV2Migration &&
-                "ALTER TABLE onboarding_sessions" in birthYearMigration &&
-                "ALTER TABLE seller_profiles" in birthYearMigration &&
-                "ADD COLUMN birth_year INTEGER" in birthYearMigration,
-            "V6 must validate and persist the private required birth year."
+                "age_confirmation_required" in backendAuthV2 &&
+                "age_confirmation_statement_text" in backendAuthV2 &&
+                "age_confirmation_source" in backendAuthV2 &&
+                "age_confirmation_confirmed_at" in backendAuthV2 &&
+                "age_confirmation_terms_version" in backendAuthV2 &&
+                "ALTER TABLE legal_acceptances ADD COLUMN age_confirmation_statement_text" in
+                    workspaceRoot.resolve(
+                        "services/backend/migrations/062_age_confirmation_evidence.sql"
+                    ).readText() &&
+                "ALTER TABLE legal_acceptances ADD COLUMN age_confirmation_source" in
+                    workspaceRoot.resolve(
+                        "services/backend/migrations/062_age_confirmation_evidence.sql"
+                    ).readText() &&
+                "ALTER TABLE legal_acceptances ADD COLUMN age_confirmation_confirmed_at" in
+                    workspaceRoot.resolve(
+                        "services/backend/migrations/062_age_confirmation_evidence.sql"
+                    ).readText() &&
+                "ALTER TABLE legal_acceptances ADD COLUMN age_confirmation_terms_version" in
+                    workspaceRoot.resolve(
+                        "services/backend/migrations/062_age_confirmation_evidence.sql"
+                    ).readText() &&
+                "ALTER TABLE onboarding_sessions ADD COLUMN age_confirmation_source" in
+                    workspaceRoot.resolve(
+                        "services/backend/migrations/062_age_confirmation_evidence.sql"
+                    ).readText(),
+            "D-13 must accept and record explicit age confirmation and legacy birth-year compatibility without persisting a sent birth year, and Android must send one of the two shapes."
         )
 
         val shippedSource = mainRoot.walkTopDown()

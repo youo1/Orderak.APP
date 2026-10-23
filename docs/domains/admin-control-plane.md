@@ -8,8 +8,8 @@ authoritative_for: [admin-control-plane-domain]
 ---
 # Admin control plane
 
-The internal operations surface: **176 of the backend's 246 API operations**,
-72% of the whole API, served by a different Worker from the seller API and
+The internal operations surface: **176 of the backend's 253 API operations**,
+70% of the whole API, served by a different Worker from the seller API and
 protected by a different identity system.
 
 This is the largest single area of the backend. This page is a map of it, not

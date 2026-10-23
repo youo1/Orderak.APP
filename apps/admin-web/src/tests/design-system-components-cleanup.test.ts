@@ -62,15 +62,17 @@ describe('B3 Android cleanup', () => {
     expect(importers).toEqual([]);
   });
 
-  it('draws both gate badges through FeatureAvailabilityChip with today\'s labels', () => {
-    const code = withoutComments(read(path.join(coreUi, 'FeatureGate.kt')));
-    expect(count(code, 'FeatureAvailabilityChip(')).toBe(2);
-    expect(code).not.toMatch(/\bSemanticChip\s*\(/);
-    expect(code).toMatch(/FeatureAvailabilityChip\(\s*(?:availability\s*=\s*)?FeatureAvailability\.LockedByPlan\b/);
-    expect(code).toMatch(/FeatureAvailabilityChip\(\s*(?:availability\s*=\s*)?FeatureAvailability\.NotBuilt\b/);
-    expect(count(code, 'stringResource(R.string.gate_upgrade_action)')).toBe(2);
-    expect(count(code, 'stringResource(R.string.gate_not_built_badge)')).toBe(2);
-    expect(code).toContain('if (onUpgrade != null)');
+  // R1a-1b folded FeatureAvailabilityChip and both notices into GateNotice, so
+  // the gate's drawing lives in one place and the not-built badge is gone.
+  it('draws the gate\'s locked states through GateNotice, with the upgrade only while purchase is open', () => {
+    const gate = withoutComments(read(path.join(coreUi, 'FeatureGate.kt')));
+    expect(gate).not.toMatch(/\bFeatureAvailabilityChip\b/);
+    expect(gate).not.toMatch(/\bSemanticChip\s*\(/);
+    expect(gate).toMatch(/GateNotice\(\s*availability\s*=\s*availability\b[^)]*onViewPlans\s*=\s*onUpgrade/);
+    const kit = withoutComments(read(path.join(coreUi, 'FeedbackComponents.kt')));
+    expect(count(kit, 'stringResource(R.string.gate_upgrade_action)')).toBe(1);
+    expect(kit).not.toContain('gate_not_built_badge');
+    expect(kit).toContain('onViewPlans != null');
   });
 });
 
@@ -122,13 +124,13 @@ describe('B3 component inventory', () => {
 
   it('carries one row per key, including private composables, same-file overloads, the colors utility and alias exports', () => {
     const inventory = read(inventoryPath);
-    const chip = rowsNaming(inventory, ['FeatureAvailabilityChip']);
-    expect(chip).toHaveLength(1);
-    expect(chip[0]).toContain('SemanticChip.kt');
-    expect(chip[0]).toContain('FeatureGate.kt');
+    const gateNotice = rowsNaming(inventory, ['GateNotice']);
+    expect(gateNotice).toHaveLength(1);
+    expect(gateNotice[0]).toContain('FeedbackComponents.kt');
+    expect(gateNotice[0]).toContain('FeatureGate.kt');
     expect(rowsNaming(inventory, ['FeatureGate'])).toHaveLength(1);
-    expect(rowsNaming(inventory, ['LockedByPlanNotice'])).toHaveLength(1);
-    expect(rowsNaming(inventory, ['NotBuiltNotice'])).toHaveLength(1);
+    // A private composable keeps its own row: CenteredState is shared by EmptyState and ErrorState.
+    expect(rowsNaming(inventory, ['CenteredState'])).toHaveLength(1);
     const colors = rowsNaming(inventory, ['colors', 'SemanticRole.colors']);
     expect(colors).toHaveLength(1);
     expect(colors[0]).toContain('SemanticRole.kt');
@@ -142,7 +144,12 @@ describe('B3 component inventory', () => {
 
   it('lists no deleted component and links to no source file', () => {
     const inventory = read(inventoryPath);
-    for (const gone of ['OsmMapView', 'SearchableAutocompleteField', 'CardFooter', 'DialogTrigger', 'DialogClose']) {
+    for (const gone of [
+      'OsmMapView', 'SearchableAutocompleteField', 'CardFooter', 'DialogTrigger', 'DialogClose',
+      // Absorbed into the feedback kit by R1a-1b.
+      'FeatureAvailabilityChip', 'LockedByPlanNotice', 'NotBuiltNotice', 'NoticeBanner', 'SyncStatusBanner',
+      'FullScreenEmpty', 'FullScreenError', 'FullScreenLoading',
+    ]) {
       expect(rowsNaming(inventory, [gone]), gone).toHaveLength(0);
     }
     expect(inventory).not.toContain('OsmMapView.kt');

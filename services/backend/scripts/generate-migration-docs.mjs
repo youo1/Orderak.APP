@@ -302,6 +302,21 @@ const descriptions = {
     "The rollout marker answers the window honestly. `production-deploy.yml` applies migrations before deploying the Worker, so the previous release serves traffic against the new schema in between; that previous Worker names figma_url only in the admin screen create and update statements in `src/domains/admin/admin-project.ts`, so for the minutes between the migration and the deploy an operator's screen create or update fails, and works again after the deploy. No seller, storefront, or manifest-sync path names the column, and `SELECT *` readers only see the new key name, which no admin page reads.",
     "Rollback is `ALTER TABLE app_screens RENAME COLUMN design_url TO figma_url;`, performed after the Worker is reverted so the code and the column name agree again. No value is lost by the rename or its inverse.",
   ],
+  "062_age_confirmation_evidence.sql": [
+    "Adds four nullable age-evidence columns to `legal_acceptances` - statement text, source, confirmed-at timestamp, and terms version - beside the legal acceptance recorded in the same onboarding step. Existing rows keep their current meaning, and account erasure already covers this table.",
+    "An explicit confirmation records the canonical statement and source `android_onboarding_v2`. A legacy request from an installed client records source `android_onboarding_v2_legacy_birth_year` with a NULL statement, because that client never displayed the canonical statement. The accepted terms version and a Worker timestamp are recorded in both shapes.",
+    "Adds only a nullable source marker to `onboarding_sessions` so the account-step decision can reach completion without persisting the submitted year of birth. The migration is additive: it does not change city or category columns, does not drop or rewrite any column or value, and has no backfill. Rollback is a Worker revert; dropping the new columns afterward is optional and discards evidence.",
+  ],
+  "063_clear_stored_birth_years.sql": [
+    "Implements D-13 option A: it marks pre-migration `account_saved` sessions that still carry a birth year and have no source marker as `android_onboarding_v2_legacy_birth_year`, then clears every stored `seller_profiles.birth_year` and `onboarding_sessions.birth_year` value.",
+    "Marking happens first so the legacy completion path can still recognize those drafts after the year is gone. Both columns and migrations 033, 039 and 062 remain in place; only the stored values are cleared. Installed clients may still submit a legacy year as age evidence, but it is not stored.",
+    "Rollback cannot reconstruct the cleared years; restore them from a verified D1 backup taken before the migration if one exists.",
+  ],
+  "064_pending_email_changes.sql": [
+    "Adds `pending_email_changes`, the transient request behind a private-profile email change. It stores the proposed address, a sha256 token hash (never the raw token), timestamps, and used/superseded markers. The address and hash are transient verification data with a 24-hour validity.",
+    "A new request supersedes every outstanding request for the seller before insertion. On confirmation the trigger consumes only the still-current, unexpired request and updates the profile email and verified timestamp in the same statement, rechecking case-insensitive uniqueness against other sellers so a conflict leaves the profile unchanged.",
+    "The table is additive and separate from both `email_verification_tokens` and the birth-year clearing migration; it does not widen the token kind constraint or change initial-verification and resend behavior. Used, expired and superseded rows are purged by the existing retention cleanup on the same cadence and window as email-verification tokens, and account erasure deletes them with the seller.",
+  ],
 };
 
 function anchor(name) {

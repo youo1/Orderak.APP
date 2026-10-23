@@ -35,11 +35,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import app.orderak.seller.R
-import app.orderak.seller.core.ui.FullScreenError
-import app.orderak.seller.core.ui.FullScreenLoading
-import app.orderak.seller.core.ui.NoticeBanner
-import app.orderak.seller.core.ui.SemanticRole
-import app.orderak.seller.core.ui.backendErrorResource
+import app.orderak.seller.core.ui.Banner
+import app.orderak.seller.core.ui.BannerState
 import app.orderak.seller.data.billing.EntitlementManager
 import app.orderak.seller.data.remote.BackendApi
 import app.orderak.seller.data.remote.PlanComparisonRowDto
@@ -51,6 +48,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
+import app.orderak.seller.core.ui.ErrorState
+import app.orderak.seller.core.ui.errorStateText
+import app.orderak.seller.core.ui.Skeleton
+import app.orderak.seller.core.ui.SkeletonVariant
 
 data class PlansUiState(
     val loading: Boolean = true,
@@ -143,11 +144,20 @@ fun PlansContent(
         },
     ) { padding ->
         when {
-            state.loading -> FullScreenLoading()
-            state.error != null -> FullScreenError(
-                message = stringResource(backendErrorResource(state.error)),
-                onRetry = onRetry,
+            state.loading -> Skeleton(
+                variant = SkeletonVariant.DetailBlock,
+                modifier = Modifier.padding(padding).padding(LocalOrderakSpacing.current.space4),
             )
+            state.error != null -> {
+                val text = errorStateText(state.error)
+                ErrorState(
+                    kind = text.kind,
+                    title = text.title?.let { stringResource(it) },
+                    message = stringResource(text.message),
+                    modifier = Modifier.padding(padding),
+                    onRetry = onRetry,
+                )
+            }
             state.plans.isEmpty() -> Column(
                 Modifier.fillMaxSize().padding(padding).padding(spacing.space8),
                 verticalArrangement = Arrangement.Center,
@@ -184,8 +194,8 @@ private fun PlanComparison(state: PlansUiState, padding: PaddingValues) {
             // the Info glyph and drew it in the neutral tone: one meaning with
             // two roles, in no container at all.
             if (!state.purchaseOpen) {
-                NoticeBanner(
-                    role = SemanticRole.Commerce,
+                Banner(
+                    state = BannerState.LockedByPlan,
                     title = stringResource(R.string.plans_purchase_closed),
                     message = stringResource(R.string.plans_purchase_closed_body),
                 )

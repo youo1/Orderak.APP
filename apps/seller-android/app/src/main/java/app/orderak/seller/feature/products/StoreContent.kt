@@ -42,10 +42,8 @@ import app.orderak.seller.R
 import app.orderak.seller.core.money.formatAmountLabel
 import app.orderak.seller.core.text.SearchText
 import app.orderak.seller.core.text.formatCount
-import app.orderak.seller.core.ui.FullScreenEmpty
-import app.orderak.seller.core.ui.FullScreenError
-import app.orderak.seller.core.ui.FullScreenLoading
-import app.orderak.seller.core.ui.NoticeBanner
+import app.orderak.seller.core.ui.Banner
+import app.orderak.seller.core.ui.BannerState
 import app.orderak.seller.core.ui.PlanUsageRow
 import app.orderak.seller.core.ui.PlanUsageRowItem
 import app.orderak.seller.core.ui.SearchField
@@ -56,6 +54,12 @@ import app.orderak.seller.data.billing.FeatureKeys
 import app.orderak.seller.data.db.ProductEntity
 import coil3.compose.AsyncImage
 import java.io.File
+import app.orderak.seller.core.ui.ErrorState
+import app.orderak.seller.core.ui.ErrorStateKind
+import app.orderak.seller.core.ui.EmptyState
+import app.orderak.seller.core.ui.EmptyStateKind
+import app.orderak.seller.core.ui.Skeleton
+import app.orderak.seller.core.ui.SkeletonVariant
 
 /**
  * المتجر, as a function of its state.
@@ -109,8 +113,12 @@ fun StoreContent(
         // The retry is the point. The read that failed could not be re-run, so
         // this state was the end of the surface: the catalogue stayed empty for
         // the life of the process and the seller's only way out was to kill the
-        // app. `FullScreenError` accepted an `onRetry` from the start.
-        FullScreenError(
+        // app. The error state accepted an `onRetry` from the start.
+        ErrorState(
+            // The local read failed, not the service, so the title names what
+            // could not be read rather than the service's own cause.
+            kind = ErrorStateKind.ServiceUnavailable,
+            title = stringResource(R.string.error_state_products_load_title),
             message = stringResource(R.string.error_unknown),
             onRetry = onRetry,
             modifier = modifier,
@@ -121,7 +129,7 @@ fun StoreContent(
         // The state this screen declared and never had. The catalogue seeded as
         // an empty list, so a seller with products met the "add your first
         // product" screen on every cold start until Room answered.
-        FullScreenLoading(modifier)
+        Skeleton(SkeletonVariant.ListRows, modifier.padding(LocalOrderakSpacing.current.space4))
         return
     }
     // Filtered in memory over what Room already holds, so search works with the
@@ -144,8 +152,9 @@ fun StoreContent(
             // empty SEARCH are the same test. They were shown
             // «مفيش منتج مطابق لـ «»» and a "clear search" button, for a search they
             // had not typed, on the first screen of their first session.
-            FullScreenEmpty(
-                message = stringResource(R.string.products_empty),
+            EmptyState(
+                kind = EmptyStateKind.Empty,
+                title = stringResource(R.string.products_empty),
                 icon = Icons.Outlined.Inbox,
             )
         } else {
@@ -155,8 +164,8 @@ fun StoreContent(
                 // limit. Warning rather than Danger: nothing is lost, and the
                 // products are still here.
                 if (state.stuckCount > 0) {
-                    NoticeBanner(
-                        role = SemanticRole.Warning,
+                    Banner(
+                        state = BannerState.Warning,
                         title = stringResource(R.string.products_stuck_title),
                         // The count picks the plural form; the digits it prints are a
                         // separate question, and Arabic answers the two differently.
@@ -218,8 +227,9 @@ fun StoreContent(
                     // sentence for both would read as "your products are gone", so
                     // this names the query and offers the way back to the full list.
                     if (visible.isEmpty()) {
-                        FullScreenEmpty(
-                            message = stringResource(R.string.products_search_empty, query),
+                        EmptyState(
+                            kind = EmptyStateKind.FilteredToNothing,
+                            title = stringResource(R.string.products_search_empty, query),
                             actionLabel = stringResource(R.string.search_clear_action),
                             onAction = { onQueryChange("") },
                         )
