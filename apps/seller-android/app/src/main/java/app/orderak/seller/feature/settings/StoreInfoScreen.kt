@@ -53,9 +53,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import java.util.Locale
 import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
-import app.orderak.seller.core.ui.FullScreenLoading
-import app.orderak.seller.core.ui.NoticeBanner
-import app.orderak.seller.core.ui.SemanticRole
+import app.orderak.seller.core.ui.Banner
+import app.orderak.seller.core.ui.BannerState
 import app.orderak.seller.core.ui.backendErrorResource
 import app.orderak.seller.R
 import app.orderak.seller.data.remote.BusinessSubcategoryDto
@@ -79,6 +78,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
+import app.orderak.seller.core.ui.Skeleton
+import app.orderak.seller.core.ui.SkeletonVariant
 
 @HiltViewModel
 class StoreInfoViewModel @Inject constructor(
@@ -462,7 +463,7 @@ fun StoreInfoContent(
         // is composed once, with the values already in hand.
         val spacing = LocalOrderakSpacing.current
         if (store == null) {
-            FullScreenLoading(Modifier.padding(padding))
+            Skeleton(SkeletonVariant.DetailBlock, Modifier.padding(padding).padding(LocalOrderakSpacing.current.space4))
             return@Scaffold
         }
         Column(
@@ -599,8 +600,8 @@ fun StoreInfoContent(
             if (uploadFailed) {
                 // Beside the two buttons that caused it, not at the bottom of the
                 // form: the remedy is to pick again, and that control is here.
-                NoticeBanner(
-                    role = SemanticRole.Danger,
+                Banner(
+                    state = BannerState.Error,
                     title = stringResource(R.string.store_info_upload_failed),
                     message = stringResource(R.string.error_unknown),
                 )
@@ -611,8 +612,8 @@ fun StoreInfoContent(
                 // Above the button, not below it: this is the answer to the press
                 // that is about to be repeated, and on a form this long the button
                 // is at the bottom of the scroll.
-                NoticeBanner(
-                    role = SemanticRole.Danger,
+                Banner(
+                    state = BannerState.Error,
                     title = stringResource(R.string.store_info_save_failed),
                     message = stringResource(backendErrorResource(saveError)),
                 )

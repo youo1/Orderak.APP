@@ -57,25 +57,19 @@ private fun ComponentGallery() {
                 SemanticChip(SemanticRole.Neutral, "قريباً")
             }
 
-            Text("Feature availability", style = MaterialTheme.typography.titleSmall)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                FeatureAvailabilityChip(FeatureAvailability.LockedByPlan, "ترقية", "قريباً")
-                FeatureAvailabilityChip(FeatureAvailability.NotBuilt, "ترقية", "قريباً")
-            }
-
             Text("Usage meters", style = MaterialTheme.typography.titleSmall)
             UsageMeter(label = "المنتجات", used = 14, limit = 20)
             UsageMeter(label = "طلبات الشهر", used = 43, limit = 50)
             UsageMeter(label = "الأجهزة", used = 1, limit = 1)
 
             Text("Notices", style = MaterialTheme.typography.titleSmall)
-            NoticeBanner(
-                role = SemanticRole.Warning,
+            Banner(
+                state = BannerState.Warning,
                 title = "شغّال من غير إنترنت",
                 message = "بتشوف آخر بيانات متزامنة. أي تعديل هيتبعت أول ما الشبكة ترجع.",
             )
-            NoticeBanner(
-                role = SemanticRole.Commerce,
+            Banner(
+                state = BannerState.LockedByPlan,
                 title = "الترقية لسه مش متاحة",
                 message = "الخطط المدفوعة مقفولة على مستوى المنصة دلوقتي.",
             )

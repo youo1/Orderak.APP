@@ -59,16 +59,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import app.orderak.seller.R
-import app.orderak.seller.core.ui.NoticeBanner
+import app.orderak.seller.core.ui.Banner
+import app.orderak.seller.core.ui.BannerState
 import app.orderak.seller.core.ui.PlanUsageRow
 import app.orderak.seller.core.ui.PlanUsageRowItem
 import app.orderak.seller.core.ui.planUsageRows
-import app.orderak.seller.core.ui.SemanticRole
 import app.orderak.seller.core.locale.AppLocales
 import app.orderak.seller.core.text.formatCount
-import app.orderak.seller.core.ui.FullScreenEmpty
-import app.orderak.seller.core.ui.FullScreenError
-import app.orderak.seller.core.ui.FullScreenLoading
 import app.orderak.seller.core.ui.backendErrorResource
 import app.orderak.seller.data.billing.EntitlementManager
 import app.orderak.seller.data.billing.FeatureKeys
@@ -100,6 +97,8 @@ import kotlinx.serialization.json.intOrNull
 import javax.inject.Inject
 import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 import app.orderak.seller.core.ui.theme.LocalOrderakLayout
+import app.orderak.seller.core.ui.EmptyState
+import app.orderak.seller.core.ui.EmptyStateKind
 
 @Composable
 fun DevicesScreen(
@@ -331,7 +330,7 @@ fun DevicesContent(
         onRetry = if (error == "recent_auth_required") onReauthenticate else onRetry,
         isEmpty = items?.isEmpty() == true && passkeys?.isEmpty() == true,
         empty = {
-            FullScreenEmpty(message = stringResource(R.string.common_empty))
+            EmptyState(kind = EmptyStateKind.Empty, title = stringResource(R.string.common_empty))
         },
     ) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
@@ -415,8 +414,8 @@ fun DevicesContent(
                 // because revoking a device is the other way out and it is drawn
                 // right below this.
                 Spacer(Modifier.height(spacing.space2))
-                NoticeBanner(
-                    role = SemanticRole.Commerce,
+                Banner(
+                    state = BannerState.LockedByPlan,
                     // The paywall's own words for this key, not a second sentence
                     // saying the same thing.
                     title = stringResource(R.string.paywall_limit_devices),

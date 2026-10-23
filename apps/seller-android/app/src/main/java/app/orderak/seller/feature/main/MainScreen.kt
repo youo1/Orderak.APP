@@ -61,13 +61,12 @@ import app.orderak.seller.feature.orders.OrdersFilter
 import app.orderak.seller.feature.today.TodayCounter
 import app.orderak.seller.feature.today.TodayScreen
 import app.orderak.seller.feature.today.TodayUiState
-import app.orderak.seller.core.ui.NoticeBanner
+import app.orderak.seller.core.ui.Banner
+import app.orderak.seller.core.ui.BannerState
 import app.orderak.seller.core.ui.PlanUsageRowItem
 import app.orderak.seller.core.ui.planUsageRows
-import app.orderak.seller.core.ui.SemanticRole
 import app.orderak.seller.feature.settings.SettingsScreen
 import app.orderak.seller.core.ads.LocalAdManager
-import app.orderak.seller.core.ui.SyncStatusBanner
 import app.orderak.seller.feature.customers.CustomersScreen
 import app.orderak.seller.feature.orders.OrdersScreen
 import app.orderak.seller.feature.products.ProductsScreen
@@ -427,7 +426,13 @@ private fun DashboardTab(
                     PlanStatusBanners(entitlementState, versionMode, versionPolicy)
                     AnnouncementsDashboardIndicator(onOpenAnnouncements)
                     if (syncStatus == "running" || syncStatus == "pending" || syncStatus == "failed") {
-                        SyncStatusBanner(syncStatus, onRetrySync)
+                        val failed = syncStatus == "failed"
+                        Banner(
+                            state = if (failed) BannerState.SyncFailed else BannerState.SyncInProgress,
+                            title = stringResource(if (failed) R.string.sync_failed else R.string.sync_pending),
+                            actionLabel = if (failed) stringResource(R.string.common_retry) else null,
+                            onAction = if (failed) onRetrySync else null,
+                        )
                     }
                 }
             },
@@ -454,8 +459,8 @@ private fun PlanStatusBanners(state: EntitlementSyncState, versionMode: VersionU
             // Was a hand-rolled surface on secondaryContainer — the orange this
             // system reserves for nothing in particular. The shared banner makes
             // offline read the same here as on every other surface.
-            NoticeBanner(
-                role = SemanticRole.Info,
+            Banner(
+                state = BannerState.Information,
                 title = stringResource(R.string.plan_using_offline_settings),
                 message = stringResource(R.string.plan_using_offline_settings_body),
             )
@@ -530,8 +535,8 @@ private fun PlanNotice(text: String, dismissible: Boolean, onDismiss: () -> Unit
     // that needs attention, or settings that have gone stale, is a warning — and
     // the shared banner brings the glyph that survives greyscale.
     Row(verticalAlignment = Alignment.CenterVertically) {
-        NoticeBanner(
-            role = SemanticRole.Warning,
+        Banner(
+            state = BannerState.Warning,
             title = stringResource(R.string.plan_notice_title),
             message = text,
             modifier = Modifier.weight(1f),

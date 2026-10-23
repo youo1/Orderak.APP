@@ -36,7 +36,8 @@ import com.android.tools.screenshot.PreviewTest
 fun stateError() {
     OrderakTheme(darkTheme = false) {
         Surface {
-            FullScreenError(
+            ErrorState(
+                kind = ErrorStateKind.ServiceUnavailable,
                 message = stringResource(R.string.sync_failed),
                 onRetry = {},
             )
@@ -50,7 +51,8 @@ fun stateError() {
 fun stateErrorDark() {
     OrderakTheme(darkTheme = true) {
         Surface {
-            FullScreenError(
+            ErrorState(
+                kind = ErrorStateKind.ServiceUnavailable,
                 message = stringResource(R.string.sync_failed),
                 onRetry = {},
             )

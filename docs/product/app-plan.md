@@ -140,6 +140,22 @@ desktop.
 - **Settings** — payout info, plan/subscription recovery, language, store and
   category management, support, announcements, translation review, devices,
   deletion status, gated AI, and logout.
+- **Shared states (plan item R1a-1b).** Every screen draws its notices, empty,
+  error, loading and gated states with one component each, from the seller
+  component kit:
+  - Notices are the Banner.
+  - Loading is a static skeleton shaped like the content it waits for, not a
+    spinner.
+  - An empty list says why and offers one next step. A filter or search that
+    hides every row offers to clear it instead.
+  - An error names the cause (no connection, or the service) and the way out.
+    It never shows the seller a raw error code, which the operations pages did
+    before this change.
+  - A feature locked by the plan offers an upgrade only while purchase is open.
+    Before this change that offer was a chip that did nothing; it is now a
+    button that opens the subscription page. While purchase is closed the
+    notice has nothing to press. A feature that is not built has no chip and
+    no button.
 
 ## App Screen Tree & Screen Sequences
 

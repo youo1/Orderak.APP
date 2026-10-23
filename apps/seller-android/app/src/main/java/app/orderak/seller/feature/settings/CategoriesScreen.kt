@@ -50,8 +50,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import app.orderak.seller.R
 import app.orderak.seller.core.text.formatCount
-import app.orderak.seller.core.ui.NoticeBanner
-import app.orderak.seller.core.ui.SemanticRole
+import app.orderak.seller.core.ui.Banner
+import app.orderak.seller.core.ui.BannerState
 import app.orderak.seller.data.billing.EntitlementManager
 import app.orderak.seller.data.billing.FeatureKeys
 import app.orderak.seller.data.db.CategoryEntity
@@ -320,8 +320,8 @@ fun CategoriesContent(
                 // A limit is not a fault. It reads as a notice, keeps the existing
                 // categories on screen, and offers an upgrade only when one can
                 // actually be bought.
-                LIMIT_REACHED -> NoticeBanner(
-                    role = SemanticRole.Commerce,
+                LIMIT_REACHED -> Banner(
+                    state = BannerState.LockedByPlan,
                     title = stringResource(R.string.categories_limit_title),
                     message = if (purchaseOpen) {
                         stringResource(R.string.categories_limit_body)
@@ -335,8 +335,8 @@ fun CategoriesContent(
                     actionLabel = stringResource(R.string.paywall_view_plans),
                     onAction = onLimitReached,
                 )
-                else -> NoticeBanner(
-                    role = SemanticRole.Danger,
+                else -> Banner(
+                    state = BannerState.Error,
                     title = stringResource(R.string.categories_error),
                     message = stringResource(R.string.categories_error_body),
                 )

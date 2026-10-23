@@ -80,25 +80,3 @@ enum class FeatureAvailability {
      */
     NotBuilt,
 }
-
-/**
- * The badge for a feature entry point, or nothing when the feature is available.
- *
- * Every gated row in the app draws its badge through this, so the three states
- * cannot drift apart between screens.
- */
-@Composable
-fun FeatureAvailabilityChip(
-    availability: FeatureAvailability,
-    upgradeLabel: String,
-    unavailableLabel: String,
-    modifier: Modifier = Modifier,
-) {
-    when (availability) {
-        FeatureAvailability.Available -> Unit
-        FeatureAvailability.LockedByPlan ->
-            SemanticChip(SemanticRole.Commerce, upgradeLabel, modifier)
-        FeatureAvailability.NotBuilt ->
-            SemanticChip(SemanticRole.Neutral, unavailableLabel, modifier)
-    }
-}

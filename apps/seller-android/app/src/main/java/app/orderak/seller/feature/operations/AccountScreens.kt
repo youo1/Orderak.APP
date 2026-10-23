@@ -59,17 +59,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import app.orderak.seller.R
-import app.orderak.seller.core.ui.NoticeBanner
+import app.orderak.seller.core.ui.Banner
+import app.orderak.seller.core.ui.BannerState
 import app.orderak.seller.core.ui.PlanUsageRow
 import app.orderak.seller.core.ui.PlanUsageRowItem
 import app.orderak.seller.core.ui.planUsageRows
-import app.orderak.seller.core.ui.SemanticRole
 import app.orderak.seller.core.locale.AppLocales
 import app.orderak.seller.core.text.formatCount
 import app.orderak.seller.core.text.formatCountOfLimit
-import app.orderak.seller.core.ui.FullScreenEmpty
-import app.orderak.seller.core.ui.FullScreenError
-import app.orderak.seller.core.ui.FullScreenLoading
 import app.orderak.seller.core.ui.backendErrorResource
 import app.orderak.seller.data.billing.EntitlementManager
 import app.orderak.seller.data.billing.FeatureKeys
@@ -175,8 +172,8 @@ fun SubscriptionContent(
             is BillingState.VerificationPending, BillingState.Verifying ->
                 Text(stringResource(R.string.subscription_verification_pending))
             is BillingState.Error ->
-                NoticeBanner(
-                    role = SemanticRole.Danger,
+                Banner(
+                    state = BannerState.Error,
                     title = stringResource(R.string.subscription_verification_error),
                     message = stringResource(R.string.subscription_verification_error_body),
                 )
@@ -210,8 +207,8 @@ fun SubscriptionContent(
         // gate. The *banner* is gated now, and it is the same decision every other
         // buying affordance in the app reads (I-5).
         if (!purchaseOpen) {
-            NoticeBanner(
-                role = SemanticRole.Commerce,
+            Banner(
+                state = BannerState.LockedByPlan,
                 title = stringResource(R.string.subscription_purchase_closed_title),
                 message = stringResource(R.string.subscription_purchase_closed_body),
                 // The banner said purchasing was closed and offered nothing,

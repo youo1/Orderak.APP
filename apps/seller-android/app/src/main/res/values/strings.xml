@@ -413,7 +413,6 @@
     <string name="gate_upgrade_action">Upgrade</string>
     <string name="gate_not_built_title">Not available yet</string>
     <string name="gate_not_built_body">This feature is not ready. No plan change unlocks it.</string>
-    <string name="gate_not_built_badge">Coming soon</string>
     <string name="nav_account">Account</string>
     <string name="products_limit_body_purchase_closed">You have reached %1$s products. Paid plans are not open for purchase yet — your existing products are unaffected.</string>
     <string name="product_stock_out">Out of stock</string>
@@ -541,7 +540,21 @@
     <string name="banner_version_warning_message">This version can no longer reach your store. Update Orderak to continue.</string>
     <string name="banner_version_warning_action">Update</string>
     <string name="offline_strip_offline">You\'re offline</string>
-    <string name="offline_strip_last_update">Last update %1$s min ago</string>
+    <plurals name="offline_strip_last_update">
+        <item quantity="one">Last update %1$s min ago</item>
+        <item quantity="other">Last update %1$s min ago</item>
+    </plurals>
     <string name="offline_strip_reconnecting">Reconnecting…</string>
     <string name="skeleton_loading">Loading</string>
+    <string name="error_state_no_connection_message">Check your connection, then try again.</string>
+    <string name="empty_state_empty_title">No orders yet</string>
+    <string name="empty_state_empty_message">Share your store link to get your first order.</string>
+    <string name="empty_state_empty_action">Share link</string>
+    <string name="empty_state_filtered_title">No matching orders</string>
+    <string name="empty_state_filtered_message">Try changing the filter.</string>
+    <string name="empty_state_filtered_action">Clear filter</string>
+    <string name="error_state_no_connection_title">No connection</string>
+    <string name="error_state_orders_load_title">Couldn’t load your orders</string>
+    <string name="error_state_service_unavailable_title">The service isn’t available right now</string>
+    <string name="error_state_service_unavailable_kept">What you typed is still here. Try again in a moment.</string>
 </resources>

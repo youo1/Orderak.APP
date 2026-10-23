@@ -235,14 +235,23 @@ function isPreviewOnlyKotlin(text) {
 	return scanComposableDeclarations(text).every((declaration) => declaration.preview);
 }
 
-/** Caller files for a declaration: files whose own net occurrences are positive. */
+/**
+ * Caller files for a declaration: files with a production call site.
+ *
+ * A whole-word count was enough while every name was unique. Once the kit's
+ * `Banner` gained callers (R1a-1b), it also matched the ad manager's unrelated
+ * `Banner` member and the word inside string literals ("AdMob Banner"), and
+ * listed three ad files as callers of a composable they never call. So callers
+ * use the same strict call sites as the kit-pending check. `SemanticRole.colors`
+ * keeps its own counting, which includes its declaration, so that is subtracted.
+ */
 function androidCallerFiles(declaration, declarations, texts) {
 	const files = [];
 	for (const { relative: file, text } of texts) {
-		const declarationsInFile = declarations.filter(
-			(entry) => entry.name === declaration.name && entry.relative === file,
-		).length;
-		if (countOccurrences(text, declaration.name) - declarationsInFile > 0) files.push(file);
+		const declarationsInFile = declaration.name === "SemanticRole.colors"
+			? declarations.filter((entry) => entry.name === declaration.name && entry.relative === file).length
+			: 0;
+		if (androidProductionOccurrences(text, declaration.name) - declarationsInFile > 0) files.push(file);
 	}
 	return files;
 }
