@@ -388,14 +388,37 @@ describe("Migration 063 clears stored birth years", () => {
 		expect(files).toHaveLength(1);
 		const sql = files[0];
 		expect(sql).not.toMatch(/drop\s+column/i);
-		const markIndex = sql.search(
-			/UPDATE\s+onboarding_sessions[\s\S]*?age_confirmation_source\s*=\s*'android_onboarding_v2_legacy_birth_year'/i,
+
+		// Checked at statement level, not by character offset: the marking
+		// statement ("UPDATE onboarding_sessions SET age_confirmation_source=…")
+		// and the onboarding_sessions birth_year-clearing statement both start
+		// with the literal "UPDATE onboarding_sessions", so a single sql.search()
+		// per regex can only ever report the position of whichever one occurs
+		// first, making a naive character-offset comparison between them
+		// unsatisfiable for any migration that does both. Splitting on `;` (the
+		// migration has no semicolons inside strings) and comparing statement
+		// indices instead avoids that ambiguity.
+		const statements = sql.split(";");
+		const markStatementIndex = statements.findIndex((statement) =>
+			/UPDATE\s+onboarding_sessions/i.test(statement) &&
+			/status\s*=\s*'account_saved'/i.test(statement) &&
+			/age_confirmation_source\s*=\s*'android_onboarding_v2_legacy_birth_year'/i.test(statement),
 		);
-		const nullProfileIndex = sql.search(/UPDATE\s+seller_profiles[\s\S]*?SET[\s\S]*?birth_year\s*=\s*NULL/i);
-		const nullSessionIndex = sql.search(/UPDATE\s+onboarding_sessions[\s\S]*?SET[\s\S]*?birth_year\s*=\s*NULL/i);
-		expect(markIndex).toBeGreaterThanOrEqual(0);
-		expect(nullProfileIndex).toBeGreaterThan(markIndex);
-		expect(nullSessionIndex).toBeGreaterThan(markIndex);
+		const nullSessionStatementIndex = statements.findIndex((statement) =>
+			/UPDATE\s+onboarding_sessions/i.test(statement) &&
+			/SET[\s\S]*?birth_year\s*=\s*NULL/i.test(statement) &&
+			!/age_confirmation_source\s*=\s*'android_onboarding_v2_legacy_birth_year'/i.test(statement),
+		);
+		const nullProfileStatementIndex = statements.findIndex((statement) =>
+			/UPDATE\s+seller_profiles/i.test(statement) &&
+			/SET[\s\S]*?birth_year\s*=\s*NULL/i.test(statement),
+		);
+
+		expect(markStatementIndex).toBeGreaterThanOrEqual(0);
+		expect(nullSessionStatementIndex).toBeGreaterThanOrEqual(0);
+		expect(nullProfileStatementIndex).toBeGreaterThanOrEqual(0);
+		expect(nullSessionStatementIndex).toBeGreaterThan(markStatementIndex);
+		expect(nullProfileStatementIndex).toBeGreaterThan(markStatementIndex);
 	});
 });
 
