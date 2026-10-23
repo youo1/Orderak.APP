@@ -52,3 +52,17 @@ CVE-2026-93687 exp:2026-11-05
 # release resolves sharp >=0.35.5. The expiry (2026-11-05) makes the check fail
 # again on that date, so it is re-checked rather than forgotten.
 GHSA-wq5f-xc86-pv6w exp:2026-11-05
+
+# CVE-2023-54404 (GHSA-mrhx-c7xc-m3w5, high) — zod can exhaust memory while
+# validating oversized constrained collections. Fixed in 4.6.6. The only
+# vulnerable copy is 4.4.3, which @cloudflare/vitest-pool-workers@0.23.0, its
+# latest release, pins exactly; it validates the test pool's own configuration
+# and never reaches a Worker. Every other zod in the tree resolves to 4.6.7. The
+# same waiver is in pnpm-workspace.yaml's ignoreGhsas, for the same reason as
+# sharp above: an override would hand the pool a version it never declared.
+#
+# Reason: test-pool only, pinned exactly by the pool's latest release.
+# Removal condition: Remove this entry when a @cloudflare/vitest-pool-workers
+# release resolves zod >=4.6.6. The expiry (2026-11-05) makes the check fail
+# again on that date, so it is re-checked rather than forgotten.
+CVE-2023-54404 exp:2026-11-05
