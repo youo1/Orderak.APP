@@ -416,7 +416,7 @@ describe("Auth and onboarding V2", () => {
 		expect(evidence).toMatchObject({
 			source: "android_onboarding_v2_legacy_birth_year",
 			statement_text: null,
-			session_birth_year: 1988,
+			session_birth_year: null,
 			profile_birth_year: null,
 		});
 		expect(evidence?.terms_version).toBeTruthy();

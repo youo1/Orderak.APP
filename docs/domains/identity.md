@@ -79,6 +79,7 @@ multi-member modelling actually happens; see
 | `onboarding_sessions` | Resumable onboarding drafts with an absolute expiry. |
 | `phone_change_challenges` | In-flight phone-number changes. |
 | `email_verification_tokens` | Single-use verification links for the optional private email. |
+| `pending_email_changes` | Single-use, 24-hour links that confirm a private-profile email change. Only the token hash is stored; a newer request supersedes earlier ones. |
 | `deletion_requests` | Account-deletion intake and fulfillment state. |
 | `legal_acceptances` | Which policy version a seller accepted, and when. |
 | `identity_migration_issues` | Records identities the v2 backfill could not resolve. |
@@ -152,7 +153,7 @@ blocked for the same reason.
 
 ## Retention
 
-`domains/identity/retention.ts` runs a daily cleanup over **17 rules**. Some
+`domains/identity/retention.ts` runs a daily cleanup over **29 rules**. Some
 delete rows; some only null out an IP column while keeping the record, which is
 the right shape for audit data that must survive its personal data.
 
@@ -164,7 +165,10 @@ transaction.
 
 Representative periods: `error_logs` 30 days, `webhook_events` 90 days,
 `admin_audit` IP nulled at 30 days and the row deleted at 2 years,
-`webauthn_challenges` and `recent_auth_proofs` 1 day past expiry.
+`webauthn_challenges` and `recent_auth_proofs` 1 day past expiry, and
+`email_verification_tokens` / `pending_email_changes` 30 days past expiry, use,
+or supersession. Both token tables use the same 24-hour functional validity and
+cleanup cadence.
 
 The rule list in code is the implementation. The **legal** retention position is
 the [retention matrix](../governance/retention-matrix.md), and the two must

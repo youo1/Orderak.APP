@@ -8,7 +8,7 @@ authoritative_for: [auth-contract]
 ---
 # Versioned Seller Authentication Contract
 
-**Contract version:** 8
+**Contract version:** 9
 **Owner approval required:** Ayman Mohamed Abdellatif  
 **Protected since:** 13 July 2026
 
@@ -22,6 +22,15 @@ logout. Guarantee 10 now requires the device credential to be retired at the
 server and removed from the handset, where version 7 required neither. Provider,
 OTP state, timeouts, consent, verification, throttling and recovery behavior are
 unchanged.
+
+**Approved evolution:** 23 October 2026 — version 9 is the deliberate D-13
+option A migration. All stored birth-year values in `onboarding_sessions` and
+`seller_profiles` are cleared by migration `063_clear_stored_birth_years.sql`,
+after it marks eligible pre-migration `account_saved` sessions with
+`android_onboarding_v2_legacy_birth_year`. Both birth-year columns, the legacy
+age-evidence path, and the consent evidence remain. Provider, OTP state,
+timeouts, consent semantics, verification, throttling outside the new profile
+email-change limit, and recovery behavior are unchanged.
 
 The reason for the change: the client never called `POST /api/v1/auth/logout`.
 The route existed and revoked both the device credential and any outstanding
@@ -170,11 +179,15 @@ version 8 and is specified in guarantee 10.
     version and a Worker timestamp, and stores NULL statement text because that
     legacy client never displayed the statement. It still does not persist the
     submitted year. A draft saved by the previous Worker with `status` of
-    `account_saved`, a retained session birth year, and a NULL source marker also
-    completes as the legacy shape with NULL statement text; the retained year is
-    neither copied nor persisted into a new field. Existing birth-year columns
-    and stored values are retained unchanged; this intentional D-13 contract
-    migration neither deletes, backfills, nor migrates them.
+    `account_saved`, a birth year still stored on the session, and a NULL source
+    marker is marked by migration `063_clear_stored_birth_years.sql` as
+    `android_onboarding_v2_legacy_birth_year` and also completes as the legacy
+    shape with NULL statement text. That migration then clears every stored
+    birth-year value in `onboarding_sessions` and `seller_profiles`; both columns
+    and the separate age-confirmation evidence are retained, and the cleared
+    year is neither copied nor persisted into a new field. This intentional D-13
+    option A contract migration does not drop either column, rewrite migrations
+    033, 039 or 062, or delete the consent evidence.
 23. After the Worker returns a valid new-seller onboarding token, Android enters
     Account step 1 directly. Explicit `PRE_REGISTRATION` state always routes to
     resumable setup and can never be treated as a completed Main session because
@@ -293,9 +306,10 @@ in the production migration ledger without the birth-year columns, despite the
 earlier pre-release assumption. Migration `039_add_private_birth_year.sql`
 therefore supplies the forward-only production repair; `033` remains aligned
 with its applied historical shape. The seller-profile column is nullable and is
-retained for existing rows; the D-13 age-confirmation migration in item 22
-supersedes that field for new onboarding, which neither collects nor persists a
-birth year. Firebase provider, OTP generation and security
+retained while migration `063_clear_stored_birth_years.sql` clears its stored
+values; the D-13 age-confirmation migration in item 22 supersedes that field for
+new onboarding, which neither collects nor persists a birth year. Firebase
+provider, OTP generation and security
 timeouts, exact-phone verification, numeric device recovery, Passkey ceremony
 guarantees, legacy endpoints, and rollback behavior remain unchanged.
 
