@@ -413,7 +413,6 @@
     <string name="gate_upgrade_action">Mise à niveau</string>
     <string name="gate_not_built_title">Pas encore disponible</string>
     <string name="gate_not_built_body">Cette fonctionnalité n\'est pas prête. Aucun changement de forfait ne la débloque.</string>
-    <string name="gate_not_built_badge">Bientôt</string>
     <string name="nav_account">Mon compte</string>
     <string name="products_limit_body_purchase_closed">Vous avez atteint %1$s produits. Les forfaits payants ne sont pas encore en vente — vos produits actuels sont intacts.</string>
     <string name="product_stock_out">Rupture de stock</string>
@@ -539,7 +538,26 @@
     <string name="banner_version_warning_message">Cette version ne peut plus accéder à votre boutique. Mettez Orderak à jour pour continuer.</string>
     <string name="banner_version_warning_action">Mettre à jour</string>
     <string name="offline_strip_offline">Vous êtes hors ligne</string>
-    <string name="offline_strip_last_update">Dernière mise à jour il y a %1$s min</string>
+    <plurals name="offline_strip_last_update">
+        <item quantity="one">Dernière mise à jour il y a %1$s min</item>
+        <item quantity="many">Dernière mise à jour il y a %1$s min</item>
+        <item quantity="other">Dernière mise à jour il y a %1$s min</item>
+    </plurals>
     <string name="offline_strip_reconnecting">Reconnexion…</string>
     <string name="skeleton_loading">Chargement</string>
+    <string name="error_state_no_connection_message">Vérifiez votre connexion, puis réessayez.</string>
+    <string name="empty_state_empty_title">Aucune commande pour l’instant</string>
+    <string name="empty_state_empty_message">Partagez le lien de votre boutique pour recevoir votre première commande.</string>
+    <string name="empty_state_empty_action">Partager le lien</string>
+    <string name="empty_state_filtered_title">Aucune commande correspondante</string>
+    <string name="empty_state_filtered_message">Essayez de modifier le filtre.</string>
+    <string name="empty_state_filtered_action">Effacer le filtre</string>
+    <string name="error_state_no_connection_title">Pas de connexion</string>
+    <string name="error_state_orders_load_title">Impossible de charger vos commandes</string>
+    <string name="error_state_products_load_title">Impossible de charger vos produits</string>
+    <string name="error_state_customers_load_title">Impossible de charger vos clients</string>
+    <string name="error_state_request_failed_title">Impossible de terminer l’opération</string>
+    <string name="error_state_try_again_later">Réessayez dans un instant.</string>
+    <string name="error_state_service_unavailable_title">Le service est indisponible pour le moment</string>
+    <string name="error_state_service_unavailable_kept">Ce que vous avez saisi est conservé. Réessayez dans un instant.</string>
 </resources>

@@ -42,9 +42,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import app.orderak.seller.R
-import app.orderak.seller.core.ui.FullScreenLoading
-import app.orderak.seller.core.ui.NoticeBanner
-import app.orderak.seller.core.ui.SemanticRole
+import app.orderak.seller.core.ui.Banner
+import app.orderak.seller.core.ui.BannerState
 import app.orderak.seller.data.remote.BackendApi
 import app.orderak.seller.data.session.SessionStore
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -58,6 +57,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
+import app.orderak.seller.core.ui.Skeleton
+import app.orderak.seller.core.ui.SkeletonVariant
 
 @HiltViewModel
 class SellerProfileViewModel @Inject constructor(
@@ -344,7 +345,7 @@ fun SellerProfileContent(
         // so drawing the form before it lands shows a blank phone number and
         // then swaps it in.
         if (!loaded) {
-            FullScreenLoading(Modifier.padding(padding))
+            Skeleton(SkeletonVariant.DetailBlock, Modifier.padding(padding).padding(LocalOrderakSpacing.current.space4))
             return@Scaffold
         }
         Column(
@@ -445,8 +446,8 @@ fun SellerProfileContent(
                         // Beside the control that caused it, not at the bottom of
                         // the form: the remedy is to pick again, and that button
                         // is here.
-                        NoticeBanner(
-                            role = SemanticRole.Danger,
+                        Banner(
+                            state = BannerState.Error,
                             title = stringResource(R.string.seller_profile_photo_failed),
                             message = stringResource(R.string.error_unknown),
                             modifier = Modifier.padding(top = spacing.space3),

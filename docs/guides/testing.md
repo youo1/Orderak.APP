@@ -294,21 +294,35 @@ Enforces:
 gradlew.bat lintStagingDebug
 ```
 
-### Shared feedback components (kit-pending)
+### Shared feedback components
 
-`Banner`, `OfflineStrip`, and `Skeleton` live in
+`Banner`, `OfflineStrip`, `Skeleton`, `EmptyState`, `ErrorState`, and
+`GateNotice` live in
 `app/src/main/java/app/orderak/seller/core/ui/FeedbackComponents.kt`. Their state
-vocabulary is `BannerState`, `OfflineStripState`, and `SkeletonVariant`; the
-locked `FeedbackComponentStatesAcceptanceTest` pins each enum. The 13
+vocabulary is `BannerState`, `OfflineStripState`, `SkeletonVariant`,
+`EmptyStateKind`, and `ErrorStateKind`, which
+`FeedbackComponentStatesAcceptanceTest` pins, plus `FeatureAvailability` for
+the gate. In `FeedbackStateComponentsTest.kt`, `GateNoticeStatesTest` checks
+the gate's three states, `EmptyAndErrorStateTest` the empty and error actions,
+and `FeedbackStandardArabicTest` the Standard Arabic shared strings by resource
+key. A backend code reaches `ErrorState` through `errorStateText` in
+`BackendErrors.kt` (pinned by `ErrorStateTextTest`), so only a lost connection
+or a failing service gets that cause as its title; a screen whose failure is
+local passes its own title. The 21
 `@PreviewTest` functions in
 `app/src/screenshotTest/java/app/orderak/seller/core/ui/FeedbackOverlayScreenshotTest.kt`
 carry `FeedbackPreviews`, which declares the eight Arabic/English,
 light/dark, 100%/200% variants. `tooling/ux/render-coverage.mjs` requires one
-reference per declared variant, so a missing variant fails the guard. The
-inventory marks all three components `kit-pending` with adopter `R2` in its own
-column; `tooling/repository/verify-design-system-components.mjs` allows a
-kit-pending row only when that adopter is named, and fails if the component gains
-a production caller while still pending.
+reference per declared variant, so a missing variant fails the guard.
+
+Every screen draws its banners, empty, error, loading and gate states through
+these components; the older `NoticeBanner`, `SyncStatusBanner`,
+`FullScreenEmpty`, `FullScreenError`, `FullScreenLoading`, `LockedByPlanNotice`,
+`NotBuiltNotice`, and `FeatureAvailabilityChip` are gone. `OfflineStrip` is the
+one component still marked `kit-pending`, with adopter `R2` in its own column;
+`tooling/repository/verify-design-system-components.mjs` allows a kit-pending
+row only when that adopter is named, and fails if the component gains a
+production caller while still pending.
 
 ### Screenshot validation (`validateStagingDebugScreenshotTest`)
 

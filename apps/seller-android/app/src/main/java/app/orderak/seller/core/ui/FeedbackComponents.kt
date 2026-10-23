@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -18,9 +19,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.FilterAlt
+import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material.icons.outlined.WifiOff
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -34,11 +42,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -89,6 +101,22 @@ enum class SkeletonVariant {
     DetailBlock,
 }
 
+/**
+ * The two situations the approved EmptyState design keeps apart. Nothing here
+ * yet and nothing matching a filter have different fixes, so they never share
+ * a sentence or an action.
+ */
+enum class EmptyStateKind {
+    Empty,
+    FilteredToNothing,
+}
+
+/** The two failures the approved ErrorState design draws. */
+enum class ErrorStateKind {
+    NoConnection,
+    ServiceUnavailable,
+}
+
 private fun roleFor(state: BannerState): SemanticRole = when (state) {
     BannerState.Information -> SemanticRole.Info
     BannerState.Warning -> SemanticRole.Warning
@@ -105,7 +133,8 @@ private fun isolatedCount(value: Int, locale: Locale): String =
     "\u2066${formatCount(value, locale)}\u2069"
 
 /**
- * Inline feedback with a role icon, a title, a message and an optional action.
+ * Inline feedback with a role icon, a title, an optional message and an
+ * optional action.
  *
  * The action moves below the message, on its own full-width row, when 200% text
  * pushes the message past three lines; a side-by-side action would leave the
@@ -118,7 +147,7 @@ private fun isolatedCount(value: Int, locale: Locale): String =
 fun Banner(
     state: BannerState,
     title: String,
-    message: String,
+    message: String? = null,
     modifier: Modifier = Modifier,
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
@@ -128,16 +157,24 @@ fun Banner(
     val fontScale = maxOf(LocalDensity.current.fontScale, configuration.fontScale)
     val role = roleFor(state)
     val colors = role.colors()
-    val glyph = role.icon
-    // Measure once in the side-by-side arrangement. Updating the counts after
-    // the action moves would change the text width, change the line count and
-    // flip the arrangement again, so the layout would never settle.
-    var titleLines by remember(title, fontScale) { mutableIntStateOf(0) }
-    var messageLines by remember(message, fontScale) { mutableIntStateOf(0) }
+    // Sync in progress shares the information colours but not their glyph: the
+    // approved design draws the sync arrows, so the state still reads without
+    // colour and is not mistaken for a plain notice.
+    val glyph = if (state == BannerState.SyncInProgress) Icons.Outlined.Sync else role.icon
+    // Measure once per width in the side-by-side arrangement. Updating the
+    // counts after the action moves would change the text width, change the line
+    // count and flip the arrangement again, so the layout would never settle. A
+    // new width (rotation, split screen) starts a fresh measurement, because a
+    // message that fit a wide row can need far more lines on a narrow one.
+    var width by remember { mutableIntStateOf(0) }
+    var titleLines by remember(title, fontScale, width) { mutableIntStateOf(0) }
+    var messageLines by remember(message, fontScale, width) { mutableIntStateOf(0) }
     val stacked = fontScale >= 2f && titleLines + messageLines > 3
     val hasAction = actionLabel != null && onAction != null
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .onSizeChanged { width = it.width },
         shape = MaterialTheme.shapes.large,
         color = colors.container,
         contentColor = colors.onContainer,
@@ -170,11 +207,13 @@ fun Banner(
                         style = MaterialTheme.typography.titleSmall,
                         onTextLayout = { if (titleLines == 0) titleLines = it.lineCount },
                     )
-                    Text(
-                        text = message,
-                        style = MaterialTheme.typography.bodySmall,
-                        onTextLayout = { if (messageLines == 0) messageLines = it.lineCount },
-                    )
+                    if (message != null) {
+                        Text(
+                            text = message,
+                            style = MaterialTheme.typography.bodySmall,
+                            onTextLayout = { if (messageLines == 0) messageLines = it.lineCount },
+                        )
+                    }
                 }
                 if (hasAction && !stacked) {
                     TextButton(
@@ -255,9 +294,13 @@ fun OfflineStrip(
                     style = MaterialTheme.typography.titleSmall,
                 )
                 if (state == OfflineStripState.Offline && lastUpdateMinutes != null) {
+                    // Count-aware: Arabic takes a different noun form for 1, 2,
+                    // 3–10 and 11 or more, so one fixed «دقائق» was wrong for most
+                    // counts.
                     Text(
-                        text = stringResource(
-                            R.string.offline_strip_last_update,
+                        text = pluralStringResource(
+                            R.plurals.offline_strip_last_update,
+                            lastUpdateMinutes,
                             isolatedCount(lastUpdateMinutes, locale),
                         ),
                         style = MaterialTheme.typography.bodySmall,
@@ -299,7 +342,8 @@ fun Skeleton(
                 modifier = Modifier.padding(spacing.space4),
                 verticalArrangement = Arrangement.spacedBy(spacing.space3),
             ) {
-                repeat(4) {
+                // Three rows, as the approved design draws them.
+                repeat(3) {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(spacing.space3),
                         verticalAlignment = Alignment.CenterVertically,
@@ -350,6 +394,244 @@ fun Skeleton(
                 Spacer(Modifier.height(spacing.space1))
                 Box(Modifier.skeletonBlock(spacing.space12, spacing.space3, placeholder, MaterialTheme.shapes.small))
                 Box(Modifier.skeletonBlock(spacing.space16 + spacing.space8, spacing.space2, placeholder, MaterialTheme.shapes.small))
+            }
+        }
+    }
+}
+
+/**
+ * The centred layout EmptyState and ErrorState share: a glyph in a circle, a
+ * title, an optional message and one optional button.
+ */
+@Composable
+private fun CenteredState(
+    icon: ImageVector,
+    circleColor: Color,
+    iconColor: Color,
+    title: String,
+    message: String?,
+    modifier: Modifier,
+    action: (@Composable () -> Unit)?,
+) {
+    val spacing = LocalOrderakSpacing.current
+    Box(
+        modifier = modifier.fillMaxSize().padding(spacing.space8),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(spacing.space2),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(spacing.space16)
+                    .clip(CircleShape)
+                    .background(circleColor),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = iconColor,
+                    modifier = Modifier.size(spacing.iconMedium),
+                )
+            }
+            Spacer(Modifier.height(spacing.space2))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            if (message != null) {
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (action != null) {
+                Spacer(Modifier.height(spacing.space2))
+                action()
+            }
+        }
+    }
+}
+
+/**
+ * A surface with nothing to show, saying why and offering one next step.
+ *
+ * [EmptyStateKind.FilteredToNothing] is for a filter or search that hides
+ * every row: its action clears the filter, never sells something, because the
+ * seller's data is still there.
+ */
+@Composable
+fun EmptyState(
+    kind: EmptyStateKind,
+    title: String,
+    modifier: Modifier = Modifier,
+    message: String? = null,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
+    icon: ImageVector = if (kind == EmptyStateKind.Empty) Icons.Outlined.Inbox else Icons.Outlined.FilterAlt,
+) {
+    val spacing = LocalOrderakSpacing.current
+    CenteredState(
+        icon = icon,
+        circleColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        iconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        title = title,
+        message = message,
+        modifier = modifier,
+        action = if (actionLabel != null && onAction != null) {
+            {
+                Button(
+                    onClick = onAction,
+                    modifier = Modifier.heightIn(min = spacing.minimumTouchTarget),
+                ) { Text(actionLabel) }
+            }
+        } else {
+            null
+        },
+    )
+}
+
+/**
+ * A failure that replaces a surface's content.
+ *
+ * Every error names the cause (the [title]), the way out (the [message]) and,
+ * when the caller knows it, what was kept: "what you typed is still here"
+ * belongs in the message too. A null [title] is the [kind]'s own cause; pass
+ * one whenever the cause is something else, because a wrong cause sends the
+ * seller after the wrong fix. For a backend code, [errorStateText] decides.
+ */
+@Composable
+fun ErrorState(
+    kind: ErrorStateKind,
+    message: String,
+    modifier: Modifier = Modifier,
+    title: String? = null,
+    onRetry: (() -> Unit)? = null,
+) {
+    val spacing = LocalOrderakSpacing.current
+    val danger = SemanticRole.Danger.colors()
+    CenteredState(
+        icon = if (kind == ErrorStateKind.NoConnection) Icons.Outlined.WifiOff else Icons.Outlined.ErrorOutline,
+        circleColor = danger.container,
+        iconColor = danger.onContainer,
+        title = title ?: stringResource(
+            if (kind == ErrorStateKind.NoConnection) {
+                R.string.error_state_no_connection_title
+            } else {
+                R.string.error_state_service_unavailable_title
+            },
+        ),
+        message = message,
+        modifier = modifier,
+        action = if (onRetry != null) {
+            {
+                OutlinedButton(
+                    onClick = onRetry,
+                    modifier = Modifier.heightIn(min = spacing.minimumTouchTarget),
+                ) { Text(stringResource(R.string.common_retry)) }
+            }
+        } else {
+            null
+        },
+    )
+}
+
+/**
+ * What a gated feature draws instead of itself.
+ *
+ * - [FeatureAvailability.LockedByPlan] with [onViewPlans]: the feature exists
+ *   behind a higher plan and purchase is open, so the notice offers the plans.
+ * - [FeatureAvailability.LockedByPlan] without it: purchase is closed, so the
+ *   notice states the lock and offers nothing to press.
+ * - [FeatureAvailability.NotBuilt]: no chip and no button. No plan change opens
+ *   it, and a path that leads nowhere must not look like a path.
+ * - [FeatureAvailability.Available]: nothing. The caller draws the feature
+ *   itself, without a wrapper; [FeatureGate] does exactly that.
+ */
+@Composable
+fun GateNotice(
+    availability: FeatureAvailability,
+    modifier: Modifier = Modifier,
+    onViewPlans: (() -> Unit)? = null,
+) {
+    val spacing = LocalOrderakSpacing.current
+    // At 200% a button beside the text squeezes the body to a few words per
+    // line, so it takes its own full-width row, as the Banner's action does.
+    val fontScale = maxOf(LocalDensity.current.fontScale, LocalConfiguration.current.fontScale)
+    val buttonBelow = fontScale >= 2f
+    when (availability) {
+        FeatureAvailability.Available -> Unit
+        FeatureAvailability.LockedByPlan -> {
+            val colors = SemanticRole.Commerce.colors()
+            val plansButton: @Composable (Modifier) -> Unit = { buttonModifier ->
+                OutlinedButton(
+                    onClick = onViewPlans ?: {},
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.onContainer),
+                    border = BorderStroke(1.dp, colors.onContainer),
+                    modifier = buttonModifier.heightIn(min = spacing.minimumTouchTarget),
+                ) { Text(stringResource(R.string.gate_upgrade_action)) }
+            }
+            Surface(
+                modifier = modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.large,
+                color = colors.container,
+                contentColor = colors.onContainer,
+                border = BorderStroke(1.dp, colors.containerOutline),
+            ) {
+                Column(
+                    modifier = Modifier.padding(spacing.space4),
+                    verticalArrangement = Arrangement.spacedBy(spacing.space3),
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(spacing.space3),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        SemanticRole.Commerce.icon?.let {
+                            Icon(imageVector = it, contentDescription = null, modifier = Modifier.size(spacing.iconMedium))
+                        }
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(spacing.space1),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.gate_locked_by_plan_title),
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                            Text(
+                                text = stringResource(R.string.gate_locked_by_plan_body),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                        if (onViewPlans != null && !buttonBelow) plansButton(Modifier)
+                    }
+                    if (onViewPlans != null && buttonBelow) plansButton(Modifier.fillMaxWidth())
+                }
+            }
+        }
+        FeatureAvailability.NotBuilt -> Surface(
+            modifier = modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        ) {
+            Column(
+                modifier = Modifier.padding(spacing.space4),
+                verticalArrangement = Arrangement.spacedBy(spacing.space1),
+            ) {
+                Text(
+                    text = stringResource(R.string.gate_not_built_title),
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    text = stringResource(R.string.gate_not_built_body),
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
         }
     }

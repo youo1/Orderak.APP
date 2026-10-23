@@ -93,15 +93,15 @@ test("fails on a kit-pending row with no R-item adopter", () => {
 	);
 	assert.notEqual(header, -1, "the inventory header names an Adopter column");
 	const adopterIndex = cells(lines[header]).map((cell) => cell.trim()).indexOf("Adopter");
-	const row = findRow(lines, "Banner");
-	assert.notEqual(row, -1, "the inventory names the kit-pending Banner");
+	const row = findRow(lines, "OfflineStrip");
+	assert.notEqual(row, -1, "the inventory names the kit-pending OfflineStrip");
 	const rowCells = cells(lines[row]);
 	rowCells[adopterIndex] = " ";
 	lines[row] = `|${rowCells.join("|")}|`;
 	writeFileSync(inventory, lines.join("\n"));
 	const result = run(root);
 	assert.notEqual(result.status, 0, result.output);
-	assert.match(result.output, /Banner/);
+	assert.match(result.output, /OfflineStrip/);
 	assert.match(result.output, /kit-pending but has no R-item adopter/);
 });
 
@@ -109,20 +109,75 @@ test("fails when a kit-pending component gains a production caller", () => {
 	const root = sandbox();
 	write(
 		root,
-		path.join("apps", "seller-android", "app", "src", "main", "java", "app", "orderak", "seller", "feature", "orders", "ZzBannerCaller.kt"),
+		path.join("apps", "seller-android", "app", "src", "main", "java", "app", "orderak", "seller", "feature", "orders", "ZzOfflineStripCaller.kt"),
 		[
 			"package app.orderak.seller.feature.orders",
 			"",
-			"import app.orderak.seller.core.ui.Banner",
+			"import app.orderak.seller.core.ui.OfflineStrip",
 			"",
-			"fun zzBannerCaller() { Banner(state = null, title = \"x\", message = \"y\") }",
+			"fun zzOfflineStripCaller() { OfflineStrip(state = null) }",
 			"",
 		].join("\n"),
 	);
 	const result = run(root);
 	assert.notEqual(result.status, 0, result.output);
-	assert.match(result.output, /Banner/);
+	assert.match(result.output, /OfflineStrip/);
 	assert.match(result.output, /kit-pending but has a production caller/);
+});
+
+for (const [label, before] of [
+	["a URL string", 'fun zzOpen() = open("https://orderak.app")'],
+	["a quote character literal", "fun zzTrim(text: String) = text.trim('\"')"],
+]) {
+	test(`still sees a real call after ${label} on an earlier line`, () => {
+		// Removing `//` comments before strings cut the URL in half, and a '"'
+		// literal opened a string that ran on: the call below was then read as
+		// text and missed. A kit-pending OfflineStrip that gains this caller
+		// must still fail the guard. The caller sits in core/ui itself, with no
+		// import, because an import line alone would already count as a call site.
+		const root = sandbox();
+		write(
+			root,
+			path.join(CORE_UI, "ZzLiteralThenCall.kt"),
+			[
+				"package app.orderak.seller.core.ui",
+				"",
+				before,
+				"",
+				"fun zzCaller() { OfflineStrip(state = null) }",
+				"",
+				// A later string literal is what closes the stray quote around the call.
+				'fun zzLabel() = "x"',
+				"",
+			].join("\n"),
+		);
+		const result = run(root);
+		assert.notEqual(result.status, 0, result.output);
+		assert.match(result.output, /OfflineStrip/);
+		assert.match(result.output, /kit-pending but has a production caller/);
+	});
+}
+
+test("does not count a same-named member or a string literal as a caller", () => {
+	// The ad manager has its own `Banner` member and placeholder text such as
+	// "AdMob Banner". Neither calls the kit's Banner, so neither may be listed.
+	const root = sandbox();
+	write(
+		root,
+		path.join("apps", "seller-android", "app", "src", "main", "java", "app", "orderak", "seller", "feature", "orders", "ZzSameName.kt"),
+		[
+			"package app.orderak.seller.feature.orders",
+			"",
+			"class ZzAds { fun Banner() {} }",
+			"",
+			"fun zzLabel() = \"AdMob Banner\"",
+			"",
+			"fun zzUse(ads: ZzAds) { ads.Banner() }",
+			"",
+		].join("\n"),
+	);
+	const result = run(root);
+	assert.equal(result.status, 0, result.output);
 });
 
 test("fails on an unused Android composable, naming it and its file", () => {
@@ -209,12 +264,12 @@ test("fails when an inventory row is removed, naming the component, file and inv
 	const root = sandbox();
 	const inventory = path.join(root, INVENTORY);
 	const lines = readFileSync(inventory, "utf8").split(/\r?\n/);
-	const row = findRow(lines, "FeatureAvailabilityChip");
-	assert.notEqual(row, -1, "the inventory names FeatureAvailabilityChip");
+	const row = findRow(lines, "SemanticChip");
+	assert.notEqual(row, -1, "the inventory names SemanticChip");
 	writeFileSync(inventory, lines.filter((_, index) => index !== row).join("\n"));
 	const result = run(root);
 	assert.notEqual(result.status, 0, result.output);
-	assert.match(result.output, /FeatureAvailabilityChip/);
+	assert.match(result.output, /SemanticChip/);
 	assert.match(result.output, /SemanticChip\.kt/);
 	assert.match(result.output, /design-system-components\.md/);
 });
@@ -223,8 +278,8 @@ test("fails when an inventory source path has the right basename but the wrong d
 	const root = sandbox();
 	const inventory = path.join(root, INVENTORY);
 	const lines = readFileSync(inventory, "utf8").split(/\r?\n/);
-	const row = findRow(lines, "FeatureAvailabilityChip");
-	assert.notEqual(row, -1, "the inventory names FeatureAvailabilityChip");
+	const row = findRow(lines, "SemanticChip");
+	assert.notEqual(row, -1, "the inventory names SemanticChip");
 	const correct = "apps/seller-android/app/src/main/java/app/orderak/seller/core/ui/SemanticChip.kt";
 	const wrong = "apps/seller-android/app/src/main/java/app/orderak/seller/core/ui/theme/SemanticChip.kt";
 	assert.ok(lines[row].includes(correct), lines[row]);
@@ -232,7 +287,7 @@ test("fails when an inventory source path has the right basename but the wrong d
 	writeFileSync(inventory, lines.join("\n"));
 	const result = run(root);
 	assert.notEqual(result.status, 0, result.output);
-	assert.match(result.output, /FeatureAvailabilityChip/);
+	assert.match(result.output, /SemanticChip/);
 	assert.ok(result.output.includes(correct), result.output);
 	assert.ok(result.output.includes(wrong), result.output);
 });
@@ -265,17 +320,17 @@ test("fails when an inventory Callers cell omits a caller file the guard compute
 	const header = lines.findIndex((line) => line.trim().startsWith("|") && cells(line).map((cell) => cell.trim()).includes("Callers"));
 	assert.notEqual(header, -1, "the inventory header names a Callers column");
 	const callersIndex = cells(lines[header]).map((cell) => cell.trim()).indexOf("Callers");
-	const row = findRow(lines, "SyncStatusBanner");
-	assert.notEqual(row, -1, "the inventory names SyncStatusBanner");
+	const row = findRow(lines, "GateNotice");
+	assert.notEqual(row, -1, "the inventory names GateNotice");
 	const rowCells = cells(lines[row]);
-	assert.match(rowCells[callersIndex], /MainScreen\.kt/);
+	assert.match(rowCells[callersIndex], /FeatureGate\.kt/);
 	rowCells[callersIndex] = " ";
 	lines[row] = `|${rowCells.join("|")}|`;
 	writeFileSync(inventory, lines.join("\n"));
 	const result = run(root);
 	assert.notEqual(result.status, 0, result.output);
-	assert.match(result.output, /SyncStatusBanner/);
-	assert.match(result.output, /MainScreen\.kt/);
+	assert.match(result.output, /GateNotice/);
+	assert.match(result.output, /FeatureGate\.kt/);
 	assert.match(result.output, /design-system-components\.md/);
 });
 

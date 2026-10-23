@@ -30,6 +30,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -59,17 +60,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import app.orderak.seller.R
-import app.orderak.seller.core.ui.NoticeBanner
+import app.orderak.seller.core.ui.Banner
+import app.orderak.seller.core.ui.BannerState
 import app.orderak.seller.core.ui.PlanUsageRow
 import app.orderak.seller.core.ui.PlanUsageRowItem
+import app.orderak.seller.core.ui.SkeletonVariant
 import app.orderak.seller.core.ui.planUsageRows
-import app.orderak.seller.core.ui.SemanticRole
 import app.orderak.seller.core.locale.AppLocales
 import app.orderak.seller.core.text.formatCount
 import app.orderak.seller.core.text.formatCountOfLimit
-import app.orderak.seller.core.ui.FullScreenEmpty
-import app.orderak.seller.core.ui.FullScreenError
-import app.orderak.seller.core.ui.FullScreenLoading
 import app.orderak.seller.core.ui.backendErrorResource
 import app.orderak.seller.data.billing.EntitlementManager
 import app.orderak.seller.data.billing.FeatureKeys
@@ -153,6 +152,7 @@ fun SubscriptionContent(
         // Loading until entitlements answer. There is nothing on this page that
         // can be said truthfully without them.
         busy = planName == null,
+        loading = SkeletonVariant.DetailBlock,
     ) {
         Text(
             // Not null here: the page is busy until it is.
@@ -175,8 +175,8 @@ fun SubscriptionContent(
             is BillingState.VerificationPending, BillingState.Verifying ->
                 Text(stringResource(R.string.subscription_verification_pending))
             is BillingState.Error ->
-                NoticeBanner(
-                    role = SemanticRole.Danger,
+                Banner(
+                    state = BannerState.Error,
                     title = stringResource(R.string.subscription_verification_error),
                     message = stringResource(R.string.subscription_verification_error_body),
                 )
@@ -210,8 +210,8 @@ fun SubscriptionContent(
         // gate. The *banner* is gated now, and it is the same decision every other
         // buying affordance in the app reads (I-5).
         if (!purchaseOpen) {
-            NoticeBanner(
-                role = SemanticRole.Commerce,
+            Banner(
+                state = BannerState.LockedByPlan,
                 title = stringResource(R.string.subscription_purchase_closed_title),
                 message = stringResource(R.string.subscription_purchase_closed_body),
                 // The banner said purchasing was closed and offered nothing,
@@ -336,10 +336,13 @@ fun AiAssistantContent(
 ) {
     val spacing = LocalOrderakSpacing.current
     val locale = LocalConfiguration.current.locales[0]
+    // `busy` is only ever true while a question is sending: nothing loads on
+    // entry. It is not passed to OperationPage, which would replace the whole
+    // conversation with a loading placeholder; the chat stays on screen with a
+    // progress bar above the box, and the send button waits.
     OperationPage(
         title = stringResource(R.string.ai_assistant_title),
         onBack = onBack,
-        busy = busy,
         error = error,
         onRetry = onRetry,
     ) {
@@ -378,7 +381,7 @@ fun AiAssistantContent(
             // The declared empty state, which this screen did not have: it drew
             // the disclosure and the quota over blank space. The input box stays
             // — a chat with nothing in it is waiting, not broken — so this is a
-            // line rather than a FullScreenEmpty.
+            // line rather than an EmptyState.
             Text(
                 stringResource(R.string.ai_empty_hint),
                 style = MaterialTheme.typography.bodyMedium,
@@ -406,6 +409,9 @@ fun AiAssistantContent(
                 }
             }
         }
+        if (busy) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
         OutlinedTextField(
             value = input,
             onValueChange = { onInputChange(it.take(2000)) },
@@ -417,7 +423,9 @@ fun AiAssistantContent(
             onClick = { onSend() },
             modifier = Modifier.fillMaxWidth(),
         ) { Text(stringResource(R.string.common_send)) }
-        TextButton(onClick = onReset) { Text(stringResource(R.string.ai_reset)) }
+        // Not while a question is sending: the reply would land in a cleared
+        // chat as an answer with no question before it.
+        TextButton(onClick = onReset, enabled = !busy) { Text(stringResource(R.string.ai_reset)) }
     }
 }
 
@@ -469,6 +477,7 @@ fun DeletionStatusContent(
         busy = busy || !loaded,
         error = error,
         onRetry = onRetry,
+        loading = SkeletonVariant.DetailBlock,
     ) {
         if (request == null) {
             Text(

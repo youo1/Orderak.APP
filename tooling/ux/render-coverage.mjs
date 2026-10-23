@@ -90,10 +90,6 @@ export const RENDERS = {
   // Each of these renders a shared component with a surface's copy in it. That
   // proves the component and the string; it does not prove the screen chooses
   // them, which is exactly the defect class this repo keeps producing.
-  // The only shared state component no screen render reaches: FullScreenError's
-  // two callers, PlansScreen and OperationsScreens, are not previewable yet.
-  stateError: { kind: "component", note: "FullScreenError carries a retry" },
-  stateErrorDark: { kind: "component", note: "FullScreenError, dark" },
 
   // ---- الطلبات ----
   ordersLoadingLight: { kind: "screen", contract: "orders", state: "loading", theme: "light" },
@@ -163,7 +159,8 @@ export const RENDERS = {
   orderListDark: { kind: "component", note: "OrderCard, dark" },
   orderListGreyscale: { kind: "component", note: "order status survives greyscale" },
 
-  // R1a-1: Banner, OfflineStrip and Skeleton are kit-pending (adopter R2).
+  // R1a-1 built Banner, OfflineStrip and Skeleton; R1a-1b gave Banner and
+  // Skeleton their callers. OfflineStrip stays kit-pending (adopter R2).
   bannerInformation: { kind: "component", state: "Information", note: "Banner information, in the eight-variant feedback matrix" },
   bannerWarning: { kind: "component", state: "Warning", note: "Banner warning with an action" },
   bannerError: { kind: "component", state: "Error", note: "Banner error" },
@@ -177,6 +174,16 @@ export const RENDERS = {
   skeletonListRows: { kind: "component", state: "ListRows", note: "Skeleton list rows, static" },
   skeletonMetricTiles: { kind: "component", state: "MetricTiles", note: "Skeleton metric tiles, static" },
   skeletonDetailBlock: { kind: "component", state: "DetailBlock", note: "Skeleton detail block, static" },
+
+  // R1a-1b: EmptyState, ErrorState and GateNotice, in the same eight-variant matrix.
+  emptyStateEmpty: { kind: "component", state: "Empty", note: "EmptyState with one next step" },
+  emptyStateFilteredToNothing: { kind: "component", state: "FilteredToNothing", note: "EmptyState for a filter that hides every row, with clear filter" },
+  errorStateNoConnection: { kind: "component", state: "NoConnection", note: "ErrorState no connection, with retry" },
+  errorStateServiceUnavailable: { kind: "component", state: "ServiceUnavailable", note: "ErrorState service unavailable, naming what was kept" },
+  gateNoticeAvailable: { kind: "component", state: "Available", note: "FeatureGate available: the feature itself, no notice" },
+  gateNoticeLockedByPlan: { kind: "component", state: "LockedByPlan", note: "GateNotice locked by plan, plans offered while purchase is open" },
+  gateNoticeLockedByPlanPurchaseClosed: { kind: "component", state: "LockedByPlanPurchaseClosed", note: "GateNotice locked by plan, nothing to press while purchase is closed" },
+  gateNoticeNotBuilt: { kind: "component", state: "NotBuilt", note: "GateNotice not built: no chip, no button" },
 
   componentGalleryLight: { kind: "component", note: "the shared component vocabulary, light" },
   componentGalleryDark: { kind: "component", note: "the shared component vocabulary, dark" },

@@ -63,7 +63,6 @@ import app.orderak.seller.data.db.OrderWithItems
 import app.orderak.seller.core.money.formatAmountLabel
 import app.orderak.seller.core.text.formatCount
 import app.orderak.seller.core.ui.FeatureGate
-import app.orderak.seller.core.ui.FullScreenEmpty
 import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 import app.orderak.seller.data.billing.FeatureKeys.OCR_RECEIPT_ASSISTANCE
 import app.orderak.seller.data.db.PaymentEntity
@@ -71,6 +70,8 @@ import app.orderak.seller.domain.OrderStatus
 import app.orderak.seller.domain.PayMethod
 import java.text.SimpleDateFormat
 import java.util.Date
+import app.orderak.seller.core.ui.EmptyState
+import app.orderak.seller.core.ui.EmptyStateKind
 
 /** S6 — order details + status stepper + S6a payment-proof verification. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -221,7 +222,7 @@ fun OrderDetailsContent(
             },
         ) { padding ->
             Box(Modifier.fillMaxSize().padding(padding)) {
-                FullScreenEmpty(message = stringResource(R.string.order_details_missing_body))
+                EmptyState(kind = EmptyStateKind.Empty, title = stringResource(R.string.order_details_missing_body))
             }
         }
         return

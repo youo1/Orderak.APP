@@ -41,7 +41,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.orderak.seller.R
 import app.orderak.seller.core.text.formatCount
-import app.orderak.seller.core.ui.NoticeBanner
+import app.orderak.seller.core.ui.Banner
+import app.orderak.seller.core.ui.BannerState
 import app.orderak.seller.core.ui.SemanticRole
 import app.orderak.seller.core.ui.colors
 import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
@@ -136,8 +137,8 @@ fun TodayScreen(
         // action that fixes it rather than leaving the seller to find one.
         state.planError?.let { message ->
             item {
-                NoticeBanner(
-                    role = SemanticRole.Danger,
+                Banner(
+                    state = BannerState.Error,
                     title = stringResource(R.string.sync_failed),
                     message = message,
                     actionLabel = stringResource(R.string.common_retry),

@@ -1,8 +1,5 @@
 package app.orderak.seller.core.ui
 
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.material3.TextButton
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -138,65 +135,6 @@ fun UsageMeter(
                     .clip(MaterialTheme.shapes.extraSmall)
                     .background(fill),
             )
-        }
-    }
-}
-
-/**
- * An inline notice: an icon, a title and a line of explanation.
- *
- * Sits above content rather than replacing it. That matters most for the offline
- * case — a seller working on an intermittent connection still needs the last
- * synced orders on screen, so losing the network must not blank the surface.
- */
-@Composable
-fun NoticeBanner(
-    role: SemanticRole,
-    title: String,
-    message: String,
-    modifier: Modifier = Modifier,
-    /**
-     * An optional way out of the state the banner describes.
-     *
-     * Both must be supplied or neither: a label with nothing behind it, or an
-     * action with nothing naming it, are each worse than no button.
-     */
-    actionLabel: String? = null,
-    onAction: (() -> Unit)? = null,
-) {
-    val spacing = LocalOrderakSpacing.current
-    val colors = role.colors()
-    val glyph = role.icon
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        color = colors.container,
-        contentColor = colors.onContainer,
-        border = BorderStroke(1.dp, colors.containerOutline),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = spacing.space3 + spacing.space1, vertical = spacing.space3),
-            horizontalArrangement = Arrangement.spacedBy(spacing.space2 + spacing.space1),
-        ) {
-            if (glyph != null) {
-                Icon(
-                    imageVector = glyph,
-                    contentDescription = null,
-                    modifier = Modifier.size(spacing.iconMedium),
-                )
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(spacing.space1)) {
-                Text(text = title, style = MaterialTheme.typography.labelLarge)
-                Text(text = message, style = MaterialTheme.typography.bodySmall)
-                if (actionLabel != null && onAction != null) {
-                    TextButton(
-                        onClick = onAction,
-                        contentPadding = PaddingValues(horizontal = 0.dp, vertical = spacing.space1),
-                    ) {
-                        Text(actionLabel, style = MaterialTheme.typography.labelLarge)
-                    }
-                }
-            }
         }
     }
 }

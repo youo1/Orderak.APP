@@ -276,7 +276,7 @@
     <string name="plan_paid3">المدفوعة 3</string>
     <string name="sync_pending">اتحفظ على الجهاز ومستني المزامنة.</string>
     <string name="sync_failed">ماقدرناش نزامن آخر التغييرات.</string>
-    <string name="common_retry">حاول تاني</string>
+    <string name="common_retry">إعادة المحاولة</string>
     <string name="order_cancel_confirm">تلغي الأوردر وترجّع كمياته للمخزون؟</string>
     <string name="product_delete_confirm">تحذف المنتج؟ مش هينفع ترجّعه بعد كده.</string>
     <string name="product_stock_conflict_title">المخزون اتغيّر</string>
@@ -428,12 +428,11 @@
     <string name="setup_city_no_results">لم نجد مدينة مطابقة. يمكنك استخدام الإدخال اليدوي أدناه.</string>
     <string name="setup_city_use_manual">استخدم «%1$s» كما كتبته</string>
     <string name="setup_city_data_attribution">بيانات المدن: Countries States Cities Database (ODbL)</string>
-    <string name="gate_locked_by_plan_title">مش متضمّنة في خطتك</string>
+    <string name="gate_locked_by_plan_title">متاح في خطة أعلى</string>
     <string name="gate_locked_by_plan_body">بياناتك الحالية زي ما هي بالظبط. الخاصية دي بس هي غير المتاحة.</string>
     <string name="gate_upgrade_action">ترقية</string>
     <string name="gate_not_built_title">لسه مش متاحة</string>
     <string name="gate_not_built_body">الخاصية دي مش جاهزة. مفيش تغيير خطة بيفتحها.</string>
-    <string name="gate_not_built_badge">قريباً</string>
     <string name="nav_account">حسابي</string>
     <string name="products_limit_body_purchase_closed">وصلت لـ %1$s منتج. الخطط المدفوعة لسه مفتحتش للشراء — منتجاتك الحالية زي ما هي.</string>
     <string name="product_stock_out">نفد المخزون</string>
@@ -562,7 +561,29 @@
     <string name="banner_version_warning_message">لم يعد هذا الإصدار قادرًا على الوصول إلى متجرك. حدّث تطبيق Orderak للمتابعة.</string>
     <string name="banner_version_warning_action">تحديث</string>
     <string name="offline_strip_offline">أنت غير متصل</string>
-    <string name="offline_strip_last_update">آخر تحديث منذ %1$s دقائق</string>
+    <plurals name="offline_strip_last_update">
+        <item quantity="zero">آخر تحديث منذ لحظات</item>
+        <item quantity="one">آخر تحديث منذ دقيقة</item>
+        <item quantity="two">آخر تحديث منذ دقيقتين</item>
+        <item quantity="few">آخر تحديث منذ %1$s دقائق</item>
+        <item quantity="many">آخر تحديث منذ %1$s دقيقة</item>
+        <item quantity="other">آخر تحديث منذ %1$s دقيقة</item>
+    </plurals>
     <string name="offline_strip_reconnecting">جارٍ إعادة الاتصال…</string>
     <string name="skeleton_loading">جارٍ التحميل</string>
+    <string name="error_state_no_connection_message">تحقق من الاتصال، ثم حاول مرة أخرى.</string>
+    <string name="empty_state_empty_title">لا توجد طلبات بعد</string>
+    <string name="empty_state_empty_message">شارك رابط متجرك ليصلك أول طلب.</string>
+    <string name="empty_state_empty_action">مشاركة الرابط</string>
+    <string name="empty_state_filtered_title">لا توجد طلبات مطابقة</string>
+    <string name="empty_state_filtered_message">جرّب تغيير التصفية.</string>
+    <string name="empty_state_filtered_action">مسح التصفية</string>
+    <string name="error_state_no_connection_title">لا يوجد اتصال</string>
+    <string name="error_state_orders_load_title">تعذّرت قراءة الطلبات</string>
+    <string name="error_state_products_load_title">تعذّرت قراءة المنتجات</string>
+    <string name="error_state_customers_load_title">تعذّرت قراءة العملاء</string>
+    <string name="error_state_request_failed_title">تعذّر إتمام العملية</string>
+    <string name="error_state_try_again_later">حاول مرة أخرى بعد قليل.</string>
+    <string name="error_state_service_unavailable_title">الخدمة غير متاحة الآن</string>
+    <string name="error_state_service_unavailable_kept">وما كتبته باقٍ هنا. حاول بعد قليل.</string>
 </resources>

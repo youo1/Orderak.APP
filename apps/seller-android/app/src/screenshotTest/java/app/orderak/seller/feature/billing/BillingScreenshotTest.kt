@@ -134,13 +134,13 @@ fun plansUnavailable() = plans(PlansUiState(loading = false, plans = emptyList()
 @PreviewTest
 @Preview(name = "Plans error light", locale = "ar")
 @Composable
-fun plansErrorLight() = plans(PlansUiState(loading = false, error = "network_unavailable"))
+fun plansErrorLight() = plans(PlansUiState(loading = false, error = "network"))
 
 @PreviewTest
 @Preview(name = "Plans error dark", locale = "ar")
 @Composable
 fun plansErrorDark() =
-    plans(PlansUiState(loading = false, error = "network_unavailable"), dark = true)
+    plans(PlansUiState(loading = false, error = "network"), dark = true)
 
 // ================= paywall =================
 

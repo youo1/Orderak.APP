@@ -1,24 +1,8 @@
 package app.orderak.seller.core.ui
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
-import app.orderak.seller.R
-import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 import app.orderak.seller.data.billing.FeatureAvailabilityResolver
 
 /**
@@ -62,6 +46,9 @@ fun FeatureGate(
  * screen that took one could not be rendered in any of its gate states — which
  * is how a three-state rule ends up with nobody having looked at two of them.
  * The overload above keeps the logging and the lookup; this one is the drawing.
+ *
+ * The locked states are drawn by [GateNotice]. Pass [onUpgrade] only while
+ * purchase is open: it is what puts the plans button on the locked notice.
  */
 @Composable
 fun FeatureGate(
@@ -72,99 +59,8 @@ fun FeatureGate(
 ) {
     when (availability) {
         FeatureAvailability.Available -> content()
-        FeatureAvailability.LockedByPlan -> LockedByPlanNotice(modifier, onUpgrade)
-        FeatureAvailability.NotBuilt -> NotBuiltNotice(modifier)
-    }
-}
-
-/**
- * Built, but this plan does not include it. The only branch that may offer an
- * upgrade, and only because the feature genuinely exists behind one.
- */
-@Composable
-private fun LockedByPlanNotice(
-    modifier: Modifier = Modifier,
-    onUpgrade: (() -> Unit)? = null,
-) {
-    val spacing = LocalOrderakSpacing.current
-    val colors = SemanticRole.Commerce.colors()
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        color = colors.container,
-        contentColor = colors.onContainer,
-        border = BorderStroke(1.dp, colors.containerOutline),
-    ) {
-        Row(
-            modifier = Modifier.padding(spacing.space4),
-            horizontalArrangement = Arrangement.spacedBy(spacing.space3),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            SemanticRole.Commerce.icon?.let {
-                Icon(imageVector = it, contentDescription = null, modifier = Modifier.size(spacing.iconMedium))
-            }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(spacing.space1),
-            ) {
-                Text(
-                    text = stringResource(R.string.gate_locked_by_plan_title),
-                    style = MaterialTheme.typography.labelLarge,
-                )
-                Text(
-                    text = stringResource(R.string.gate_locked_by_plan_body),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            if (onUpgrade != null) {
-                FeatureAvailabilityChip(
-                    availability = FeatureAvailability.LockedByPlan,
-                    upgradeLabel = stringResource(R.string.gate_upgrade_action),
-                    unavailableLabel = stringResource(R.string.gate_not_built_badge),
-                )
-            }
-        }
-    }
-}
-
-/**
- * Not reachable, and no plan change makes it reachable.
- *
- * Deliberately quiet and deliberately actionless: a seller who taps here should
- * find nothing to tap, because there is nothing that would help.
- */
-@Composable
-private fun NotBuiltNotice(modifier: Modifier = Modifier) {
-    val spacing = LocalOrderakSpacing.current
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    ) {
-        Row(
-            modifier = Modifier.padding(spacing.space4),
-            horizontalArrangement = Arrangement.spacedBy(spacing.space3),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(spacing.space1),
-            ) {
-                Text(
-                    text = stringResource(R.string.gate_not_built_title),
-                    style = MaterialTheme.typography.labelLarge,
-                )
-                Text(
-                    text = stringResource(R.string.gate_not_built_body),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            FeatureAvailabilityChip(
-                availability = FeatureAvailability.NotBuilt,
-                upgradeLabel = stringResource(R.string.gate_upgrade_action),
-                unavailableLabel = stringResource(R.string.gate_not_built_badge),
-            )
-        }
+        FeatureAvailability.LockedByPlan,
+        FeatureAvailability.NotBuilt,
+        -> GateNotice(availability = availability, modifier = modifier, onViewPlans = onUpgrade)
     }
 }

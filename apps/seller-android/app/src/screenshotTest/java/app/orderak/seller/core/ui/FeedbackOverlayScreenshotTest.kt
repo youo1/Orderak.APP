@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -183,4 +185,102 @@ fun skeletonMetricTiles() {
 @Composable
 fun skeletonDetailBlock() {
     FeedbackPreview { Skeleton(variant = SkeletonVariant.DetailBlock) }
+}
+
+@PreviewTest
+@FeedbackPreviews
+@Composable
+fun emptyStateEmpty() {
+    FeedbackPreview {
+        EmptyState(
+            kind = EmptyStateKind.Empty,
+            title = stringResource(R.string.empty_state_empty_title),
+            message = stringResource(R.string.empty_state_empty_message),
+            actionLabel = stringResource(R.string.empty_state_empty_action),
+            onAction = {},
+        )
+    }
+}
+
+@PreviewTest
+@FeedbackPreviews
+@Composable
+fun emptyStateFilteredToNothing() {
+    FeedbackPreview {
+        EmptyState(
+            kind = EmptyStateKind.FilteredToNothing,
+            title = stringResource(R.string.empty_state_filtered_title),
+            message = stringResource(R.string.empty_state_filtered_message),
+            actionLabel = stringResource(R.string.empty_state_filtered_action),
+            onAction = {},
+        )
+    }
+}
+
+@PreviewTest
+@FeedbackPreviews
+@Composable
+fun errorStateNoConnection() {
+    FeedbackPreview {
+        ErrorState(
+            kind = ErrorStateKind.NoConnection,
+            title = stringResource(R.string.error_state_orders_load_title),
+            message = stringResource(R.string.error_state_no_connection_message),
+            onRetry = {},
+        )
+    }
+}
+
+@PreviewTest
+@FeedbackPreviews
+@Composable
+fun errorStateServiceUnavailable() {
+    FeedbackPreview {
+        ErrorState(
+            kind = ErrorStateKind.ServiceUnavailable,
+            message = stringResource(R.string.error_state_service_unavailable_kept),
+            onRetry = {},
+        )
+    }
+}
+
+/** Available: the gate draws the feature itself, with no notice around it. */
+@PreviewTest
+@FeedbackPreviews
+@Composable
+fun gateNoticeAvailable() {
+    FeedbackPreview {
+        FeatureGate(availability = FeatureAvailability.Available, onUpgrade = {}) {
+            Button(onClick = {}, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.payment_verify))
+            }
+        }
+    }
+}
+
+@PreviewTest
+@FeedbackPreviews
+@Composable
+fun gateNoticeLockedByPlan() {
+    FeedbackPreview {
+        GateNotice(availability = FeatureAvailability.LockedByPlan, onViewPlans = {})
+    }
+}
+
+@PreviewTest
+@FeedbackPreviews
+@Composable
+fun gateNoticeLockedByPlanPurchaseClosed() {
+    FeedbackPreview {
+        GateNotice(availability = FeatureAvailability.LockedByPlan)
+    }
+}
+
+@PreviewTest
+@FeedbackPreviews
+@Composable
+fun gateNoticeNotBuilt() {
+    FeedbackPreview {
+        GateNotice(availability = FeatureAvailability.NotBuilt)
+    }
 }

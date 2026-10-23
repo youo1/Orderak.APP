@@ -62,12 +62,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import app.orderak.seller.core.ui.FullScreenLoading
 import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 import app.orderak.seller.R
 import app.orderak.seller.core.text.formatCount
 import coil3.compose.AsyncImage
 import java.io.File
+import app.orderak.seller.core.ui.Skeleton
+import app.orderak.seller.core.ui.SkeletonVariant
 
 /** S9 — photo-first product form (camera capture arrives with CameraX; photo picker now). */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -173,7 +174,7 @@ fun ProductEditContent(
         // answered, so anything the seller typed in between was overwritten by
         // the product they had opened to edit.
         if (!state.loaded) {
-            FullScreenLoading(Modifier.padding(padding))
+            Skeleton(SkeletonVariant.DetailBlock, Modifier.padding(padding).padding(LocalOrderakSpacing.current.space4))
             return@Scaffold
         }
         Column(

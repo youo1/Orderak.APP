@@ -55,4 +55,20 @@ class FeedbackComponentStatesAcceptanceTest {
             enumEntryNames("app.orderak.seller.core.ui.SkeletonVariant"),
         )
     }
+
+    @Test
+    fun emptyStateKindDeclaresExactlyTheTwoApprovedStates() {
+        assertEquals(
+            listOf("Empty", "FilteredToNothing"),
+            enumEntryNames("app.orderak.seller.core.ui.EmptyStateKind"),
+        )
+    }
+
+    @Test
+    fun errorStateKindDeclaresExactlyTheTwoApprovedStates() {
+        assertEquals(
+            listOf("NoConnection", "ServiceUnavailable"),
+            enumEntryNames("app.orderak.seller.core.ui.ErrorStateKind"),
+        )
+    }
 }

@@ -82,6 +82,60 @@ function withoutComments(source) {
 		.join("\n");
 }
 
+/**
+ * Kotlin source with comments removed and every string and character literal
+ * emptied, in one pass.
+ *
+ * Two separate passes got each other wrong: removing `//` comments first cut
+ * `"https://orderak.app"` in half and left an open quote, and a `'"'` character
+ * literal opened a string that ran on. Either way the text after it, a real
+ * call included, was read as a string and never counted. One left-to-right scan
+ * knows which of the four it is inside. Newlines are kept. A string template's
+ * `${...}` is emptied with its string, which is acceptable: a composable is not
+ * called from inside one.
+ */
+function withoutCommentsAndLiterals(source) {
+	let out = "";
+	let i = 0;
+	const keepNewlines = (text) => text.replace(/[^\n]/g, "");
+	while (i < source.length) {
+		const two = source.slice(i, i + 2);
+		if (two === "/*") {
+			// Kotlin block comments nest.
+			let depth = 1;
+			let j = i + 2;
+			while (j < source.length && depth > 0) {
+				if (source.startsWith("/*", j)) { depth++; j += 2; }
+				else if (source.startsWith("*/", j)) { depth--; j += 2; }
+				else j++;
+			}
+			out += keepNewlines(source.slice(i, j));
+			i = j;
+		} else if (two === "//") {
+			const end = source.indexOf("\n", i);
+			i = end === -1 ? source.length : end;
+		} else if (source.startsWith('"""', i)) {
+			let j = source.indexOf('"""', i + 3);
+			j = j === -1 ? source.length : j + 3;
+			while (source[j] === '"') j++; // a raw string may end in extra quotes
+			out += `""${keepNewlines(source.slice(i, j))}`;
+			i = j;
+		} else if (source[i] === '"' || source[i] === "'") {
+			const quote = source[i];
+			let j = i + 1;
+			while (j < source.length && source[j] !== quote && source[j] !== "\n") {
+				j += source[j] === "\\" ? 2 : 1;
+			}
+			out += quote + quote;
+			i = Math.min(j + 1, source.length);
+		} else {
+			out += source[i];
+			i++;
+		}
+	}
+	return out;
+}
+
 function isWordChar(char) {
 	return char !== undefined && /\w/.test(char);
 }
@@ -136,14 +190,15 @@ function countOccurrences(text, name) {
 
 /**
  * A production call site: the name as a standalone call, not a member access on
- * something else, not a declaration, and not text inside a string literal.
+ * something else and not a declaration. The text arrives from
+ * `withoutCommentsAndLiterals`, so nothing inside a comment or a string counts.
  *
  * The Android tree already had an unrelated `Banner` member on the ad manager;
  * a kit-pending composable must not inherit that as a caller.
  */
 function androidProductionOccurrences(text, name) {
 	if (name === "SemanticRole.colors") return countOccurrences(text, name);
-	const code = text.replace(/"(?:\\.|[^"\\])*"/g, '""');
+	const code = text;
 	let count = 0;
 	for (let at = code.indexOf(name); at !== -1; at = code.indexOf(name, at + name.length)) {
 		if (isWordChar(code[at - 1]) || isWordChar(code[at + name.length])) continue;
@@ -235,14 +290,23 @@ function isPreviewOnlyKotlin(text) {
 	return scanComposableDeclarations(text).every((declaration) => declaration.preview);
 }
 
-/** Caller files for a declaration: files whose own net occurrences are positive. */
+/**
+ * Caller files for a declaration: files with a production call site.
+ *
+ * A whole-word count was enough while every name was unique. Once the kit's
+ * `Banner` gained callers (R1a-1b), it also matched the ad manager's unrelated
+ * `Banner` member and the word inside string literals ("AdMob Banner"), and
+ * listed three ad files as callers of a composable they never call. So callers
+ * use the same strict call sites as the kit-pending check. `SemanticRole.colors`
+ * keeps its own counting, which includes its declaration, so that is subtracted.
+ */
 function androidCallerFiles(declaration, declarations, texts) {
 	const files = [];
 	for (const { relative: file, text } of texts) {
-		const declarationsInFile = declarations.filter(
-			(entry) => entry.name === declaration.name && entry.relative === file,
-		).length;
-		if (countOccurrences(text, declaration.name) - declarationsInFile > 0) files.push(file);
+		const declarationsInFile = declaration.name === "SemanticRole.colors"
+			? declarations.filter((entry) => entry.name === declaration.name && entry.relative === file).length
+			: 0;
+		if (androidProductionOccurrences(text, declaration.name) - declarationsInFile > 0) files.push(file);
 	}
 	return files;
 }
@@ -259,7 +323,7 @@ function androidCallerCount(declaration, declarations, texts) {
 	return total - declarationsOfName;
 }
 
-/** Strict call sites, used only for a kit-pending component's caller check. */
+/** Strict call sites for a kit-pending component; the same rule `androidCallerFiles` uses. */
 function androidKitCallerFiles(declaration, texts) {
 	return texts
 		.filter(({ text }) => androidProductionOccurrences(text, declaration.name) > 0)
@@ -385,7 +449,7 @@ const hasRItemAdopter = (entry) => /^R\d+\b/i.test((entry?.adopter ?? "").trim()
 
 const declarations = androidDeclarations();
 const androidTexts = collectFiles(ANDROID_MAIN, (name) => name.endsWith(".kt"))
-	.map((file) => ({ relative: relative(file), text: withoutComments(readFileSync(file, "utf8")) }))
+	.map((file) => ({ relative: relative(file), text: withoutCommentsAndLiterals(readFileSync(file, "utf8")) }))
 	.filter((entry) => !isPreviewOnlyKotlin(entry.text));
 
 const androidKeys = [];
