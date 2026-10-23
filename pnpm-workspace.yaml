@@ -56,14 +56,20 @@ overrides:
   # Reaches the tree only as @stoplight/prism-cli > @stoplight/prism-http >
   # ajv > fast-uri (and the ajv-formats variant of the same path), so it runs
   # in schema validation inside the OpenAPI mock and never in a Worker. One
-  # copy was resolved, 3.1.5; the advisory is fixed in 3.1.6 and this pins past
-  # it to 3.1.7 to avoid re-triaging the same alert on the next audit.
+  # copy was resolved, 3.1.5; the advisory is fixed in 3.1.6 and this pinned
+  # past it to 3.1.7 to avoid re-triaging the same alert on the next audit.
+  #
+  # GHSA-hrr3-gc8f-f4qj (moderate, CVE-2026-86472), first failing the audit on
+  # 2026-10-24 — inconsistent host
+  # case normalisation through percent-encoded octets, the same path and the
+  # same exposure. Fixed in 3.1.8, so the floor moved there; still a patch
+  # inside the 3.1 line ajv already resolves.
   #
   # The upper bound is load-bearing. ajv 8.20.0 declares `fast-uri: ^3.0.1`, and
-  # an open-ended ">=3.1.7" resolves to 4.x, overriding ajv past the range it
+  # an open-ended ">=3.1.8" resolves to 4.x, overriding ajv past the range it
   # says it supports -- an audit-green tree whose URI resolution is untested
   # against its consumer. Keep this inside major 3 until ajv widens its range.
-  fast-uri@<3.1.6: ">=3.1.7 <4"
+  fast-uri@<3.1.8: ">=3.1.8 <4"
   # GHSA-x5fp-wj9c-mxmx (moderate) — the array limit can be bypassed by comma
   # parsing inside a bracket key, so a crafted query string allocates past the
   # cap the limit exists to impose. Plus GHSA-4mjr-xmp4-gh2g (moderate), denial
@@ -180,7 +186,20 @@ auditConfig:
   # exactly (see GHSA-rgj7-g3m4-5g8c above). sharp's native platform packages
   # are not exercised by the tests. Waived, not overridden. Expires 2026-11-05:
   # remove when a vitest-pool-workers release resolves sharp >=0.35.5.
+  #
+  # GHSA-mrhx-c7xc-m3w5 (high, CVE-2023-54404), first failing the audit on
+  # 2026-10-24 — zod can exhaust memory
+  # while validating oversized constrained collections. Fixed in 4.6.6. The
+  # only vulnerable copy is 4.4.3, which @cloudflare/vitest-pool-workers@0.23.0
+  # (still the latest release, checked 2026-10-24) pins exactly; it validates
+  # the test pool's own configuration, so it runs in tests and never in a
+  # Worker. Every other zod in the tree resolves to 4.6.7 and is clean.
+  # Overriding the exact pin hands the pool a version it never declared, the
+  # trade the fast-uri bound refuses, so it is waived by id, as sharp is above.
+  # Expires 2026-11-05: remove when a vitest-pool-workers release resolves zod
+  # >=4.6.6.
   ignoreGhsas:
+    - GHSA-mrhx-c7xc-m3w5
     - GHSA-qxc2-j82w-r537
     - GHSA-rgj7-g3m4-5g8c
     - GHSA-vfj7-8cjw-p6xm
