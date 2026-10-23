@@ -134,6 +134,27 @@ function countOccurrences(text, name) {
 	return wholeWordCount(text, name);
 }
 
+/**
+ * A production call site: the name as a standalone call, not a member access on
+ * something else, not a declaration, and not text inside a string literal.
+ *
+ * The Android tree already had an unrelated `Banner` member on the ad manager;
+ * a kit-pending composable must not inherit that as a caller.
+ */
+function androidProductionOccurrences(text, name) {
+	if (name === "SemanticRole.colors") return countOccurrences(text, name);
+	const code = text.replace(/"(?:\\.|[^"\\])*"/g, '""');
+	let count = 0;
+	for (let at = code.indexOf(name); at !== -1; at = code.indexOf(name, at + name.length)) {
+		if (isWordChar(code[at - 1]) || isWordChar(code[at + name.length])) continue;
+		const before = code.slice(0, at).trimEnd();
+		if (/\bfun$/.test(before)) continue;
+		if (before.endsWith(".") && !/(?:^|[^A-Za-z0-9_])(?:[a-z_]\w*\.){2,}$/.test(before)) continue;
+		count++;
+	}
+	return count;
+}
+
 // ---- Android ---------------------------------------------------------------
 
 /** Strip a run of leading annotations (`@Composable private fun` -> `private fun`). */
@@ -238,6 +259,13 @@ function androidCallerCount(declaration, declarations, texts) {
 	return total - declarationsOfName;
 }
 
+/** Strict call sites, used only for a kit-pending component's caller check. */
+function androidKitCallerFiles(declaration, texts) {
+	return texts
+		.filter(({ text }) => androidProductionOccurrences(text, declaration.name) > 0)
+		.map(({ relative }) => relative);
+}
+
 // ---- Admin -----------------------------------------------------------------
 
 function isTestFile(relativePath) {
@@ -322,6 +350,8 @@ function readInventory() {
 	const nameIndex = header.indexOf("Component");
 	const fileIndex = header.indexOf("Source file");
 	const callersIndex = header.indexOf("Callers");
+	const statusIndex = header.indexOf("Status");
+	const adopterIndex = header.indexOf("Adopter");
 	const entries = [];
 	for (let i = headerIndex + 1; i < lines.length; i++) {
 		const line = lines[i];
@@ -333,12 +363,25 @@ function readInventory() {
 		const file = cells[fileIndex].replace(/`/g, "").trim().replace(/\\/g, "/");
 		if (!name || !file) continue;
 		const callers = callersIndex >= 0 && cells.length > callersIndex ? cells[callersIndex] : "";
-		entries.push({ name, file, callers });
+		const status = statusIndex >= 0 && cells.length > statusIndex ? cells[statusIndex] : "";
+		const adopter = adopterIndex >= 0 && cells.length > adopterIndex ? cells[adopterIndex] : "";
+		entries.push({ name, file, callers, status, adopter });
 	}
 	return { entries, hasCallers: callersIndex >= 0 };
 }
 
 // ---- Checks ----------------------------------------------------------------
+
+const inventory = readInventory();
+const inventoryRows = new Map();
+if (inventory !== null) {
+	for (const entry of inventory.entries) {
+		inventoryRows.set(`${entry.name}@@${entry.file}`, entry);
+	}
+}
+const isKitPending = (entry) =>
+	(entry?.status ?? "").trim().toLowerCase().replace(/\s+/g, "-") === "kit-pending";
+const hasRItemAdopter = (entry) => /^R\d+\b/i.test((entry?.adopter ?? "").trim());
 
 const declarations = androidDeclarations();
 const androidTexts = collectFiles(ANDROID_MAIN, (name) => name.endsWith(".kt"))
@@ -347,12 +390,18 @@ const androidTexts = collectFiles(ANDROID_MAIN, (name) => name.endsWith(".kt"))
 
 const androidKeys = [];
 const androidCallers = new Map();
+const androidKitCallers = new Map();
 for (const declaration of declarations) {
 	const key = `${declaration.name}@@${declaration.relative}`;
 	if (!androidCallers.has(key)) {
 		androidCallers.set(key, androidCallerFiles(declaration, declarations, androidTexts));
 	}
-	if (androidCallerCount(declaration, declarations, androidTexts) <= 0) {
+	const entry = inventoryRows.get(key);
+	const pending = isKitPending(entry) && hasRItemAdopter(entry);
+	if (pending) {
+		androidKitCallers.set(key, androidKitCallerFiles(declaration, androidTexts));
+	}
+	if (!pending && androidCallerCount(declaration, declarations, androidTexts) <= 0) {
 		problems.push(
 			`Android composable ${declaration.name} (${declaration.relative}) has no caller ` +
 				`in apps/seller-android/app/src/main outside its declaration.`,
@@ -373,8 +422,27 @@ for (const component of adminEntries) {
 }
 const adminKeys = adminEntries.map((component) => `${component.name}@@${component.relative}`);
 
-const inventory = readInventory();
-const treeCallers = new Map([...androidCallers, ...adminCallers]);
+const effectiveAndroidCallers = new Map(androidCallers);
+for (const [key, callers] of androidKitCallers) effectiveAndroidCallers.set(key, callers);
+const treeCallers = new Map([...effectiveAndroidCallers, ...adminCallers]);
+if (inventory !== null) {
+	for (const entry of inventory.entries) {
+		if (!isKitPending(entry)) continue;
+		const key = `${entry.name}@@${entry.file}`;
+		if (!hasRItemAdopter(entry)) {
+			problems.push(
+				`${INVENTORY_LABEL} row ${entry.name} (${entry.file}) is kit-pending but has no ` +
+					"R-item adopter; name the adopter in the Adopter column.",
+			);
+		}
+		if ((androidKitCallers.get(key) ?? []).length > 0) {
+			problems.push(
+				`${INVENTORY_LABEL} row ${entry.name} (${entry.file}) is kit-pending but has a ` +
+					"production caller; promote its status or remove the caller.",
+			);
+		}
+	}
+}
 if (inventory === null) {
 	problems.push(
 		`${INVENTORY_LABEL} is missing or has no inventory table with "Component" and "Source file" columns.`,
