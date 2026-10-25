@@ -184,11 +184,14 @@ interaction.
    seller receives a normal device session. A new seller receives a hash-only
    onboarding session whose rolling lifetime is 30 minutes and absolute
    lifetime is 24 hours.
-4. Account step 1 stores the private name, required birth year, optional email,
-   and snapshots the published Terms/Privacy versions. Store step 2 atomically
+4. Account step 1 stores the private name, optional email, and snapshots the
+   published Terms/Privacy versions. It requires affirmative age confirmation,
+   not a birth year. Store step 2 atomically
    and idempotently creates the seller, store identity, organization,
-   membership, route, legal evidence, and device session. Birth year remains in
-   the private profile and never enters Store/public DTOs. Android's DataStore
+   membership, route, legal evidence, and device session. The private profile
+   contains no birth year: migration `063_clear_stored_birth_years.sql` clears
+   stored values while keeping the column, and the age-confirmation evidence
+   remains. Birth year never enters Store/public DTOs. Android's DataStore
    is only a resumable draft; D1 is the account/onboarding authority.
 5. For ongoing requests, Android sends `x-orderak-phone` and `x-orderak-secret`
    (per-device credential) headers on every request. It also sends an opaque

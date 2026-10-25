@@ -1206,6 +1206,485 @@
         }
       }
     },
+    "/api/v1/account/profile": {
+      "get": {
+        "operationId": "get_v1_account_profile",
+        "tags": [
+          "seller"
+        ],
+        "summary": "GET /api/v1/account/profile",
+        "description": "Returns the authenticated seller's private account profile. The response is exactly full_name, email_private, email_verified, and pending_email_private; birth_year is never selected or returned. pending_email_private is the latest unexpired, unused email-change request.",
+        "x-owner": "Seller Experience",
+        "x-data-classification": "L2",
+        "x-rate-limit": "seller-authenticated-default",
+        "x-stability": "draft",
+        "security": [
+          {
+            "sellerDevice": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "./components/common.json#/parameters/RequestId"
+          },
+          {
+            "$ref": "./components/common.json#/parameters/ClientPlatform"
+          },
+          {
+            "$ref": "./components/common.json#/parameters/AppVersion"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The private account profile",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountProfile"
+                },
+                "examples": {
+                  "profile": {
+                    "value": {
+                      "full_name": "Ayman Seller",
+                      "email_private": "owner@example.com",
+                      "email_verified": true,
+                      "pending_email_private": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failure",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/validation_failed",
+                      "title": "Validation Failed",
+                      "status": 400,
+                      "code": "validation_failed",
+                      "detail": "One or more fields are invalid.",
+                      "request_id": "018f-example",
+                      "field_errors": {
+                        "field": "invalid"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Seller authentication required",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/auth",
+                      "title": "Auth",
+                      "status": 401,
+                      "code": "auth",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/account_restricted",
+                      "title": "Account Restricted",
+                      "status": 403,
+                      "code": "account_restricted",
+                      "detail": "The account is not active.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              },
+              "Retry-After": {
+                "$ref": "./components/common.json#/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/rate_limited",
+                      "title": "Rate Limited",
+                      "status": 429,
+                      "code": "rate_limited",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example",
+                      "retryable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Retryable dependency failure",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/temporarily_unavailable",
+                      "title": "Temporarily Unavailable",
+                      "status": 503,
+                      "code": "temporarily_unavailable",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example",
+                      "retryable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "patch_v1_account_profile",
+        "tags": [
+          "seller"
+        ],
+        "summary": "PATCH /api/v1/account/profile",
+        "description": "Updates the authenticated seller's private profile. full_name applies immediately and needs no recent authentication. A supplied email_private is validated and, when it differs case-insensitively from the current address, requires the X-Orderak-Recent-Auth proof, must be unique among other sellers, and is limited to three profile email-change requests per seller per rolling hour. The current email does not change until the verification link is opened; the response reports it as pending_email_private. Omitting email_private leaves the current address unchanged. The response is exactly full_name, email_private, email_verified, and pending_email_private; birth_year is never accepted or returned.",
+        "x-owner": "Seller Experience",
+        "x-data-classification": "L2",
+        "x-rate-limit": "seller-authenticated-default",
+        "x-stability": "draft",
+        "security": [
+          {
+            "sellerDevice": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "./components/common.json#/parameters/RequestId"
+          },
+          {
+            "$ref": "./components/common.json#/parameters/ClientPlatform"
+          },
+          {
+            "$ref": "./components/common.json#/parameters/AppVersion"
+          },
+          {
+            "name": "X-Orderak-Recent-Auth",
+            "in": "header",
+            "required": false,
+            "description": "Recent step-up proof from OTP or Passkey. Required only when email_private actually changes.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAccountProfileRequest"
+              },
+              "examples": {
+                "name": {
+                  "value": {
+                    "full_name": "Ayman Seller"
+                  }
+                },
+                "email_change": {
+                  "value": {
+                    "email_private": "new@example.com"
+                  }
+                },
+                "name_and_email": {
+                  "value": {
+                    "full_name": "Ayman Seller",
+                    "email_private": "new@example.com"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated private account profile",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountProfile"
+                },
+                "examples": {
+                  "pending_email": {
+                    "value": {
+                      "full_name": "Ayman Seller",
+                      "email_private": "owner@example.com",
+                      "email_verified": true,
+                      "pending_email_private": "new@example.com"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid full name or email",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "invalid_full_name": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/invalid_full_name",
+                      "title": "Invalid Full Name",
+                      "status": 400,
+                      "code": "invalid_full_name",
+                      "detail": "Invalid Full Name",
+                      "request_id": "018f-example"
+                    }
+                  },
+                  "invalid_email": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/invalid_email",
+                      "title": "Invalid Email",
+                      "status": 400,
+                      "code": "invalid_email",
+                      "detail": "Invalid Email",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Seller authentication or recent authentication required",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "auth": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/auth",
+                      "title": "Auth",
+                      "status": 401,
+                      "code": "auth",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example"
+                    }
+                  },
+                  "recent_auth_required": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/recent_auth_required",
+                      "title": "Recent Auth Required",
+                      "status": 401,
+                      "code": "recent_auth_required",
+                      "detail": "Recent Auth Required",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/account_restricted",
+                      "title": "Account Restricted",
+                      "status": 403,
+                      "code": "account_restricted",
+                      "detail": "The account is not active.",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The requested email address is already in use by another seller",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "email_in_use": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/email_in_use",
+                      "title": "Email In Use",
+                      "status": 409,
+                      "code": "email_in_use",
+                      "detail": "Email In Use",
+                      "request_id": "018f-example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Profile email-change requests exceeded three per rolling hour",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              },
+              "Retry-After": {
+                "$ref": "./components/common.json#/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "rate_limited": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/rate_limited",
+                      "title": "Rate Limited",
+                      "status": 429,
+                      "code": "rate_limited",
+                      "detail": "Rate Limited",
+                      "request_id": "018f-example",
+                      "retryable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Retryable dependency failure",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "./components/common.json#/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./components/common.json#/schemas/Problem"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "https://developers.orderak.app/problems/temporarily_unavailable",
+                      "title": "Temporarily Unavailable",
+                      "status": 503,
+                      "code": "temporarily_unavailable",
+                      "detail": "The request could not be completed.",
+                      "request_id": "018f-example",
+                      "retryable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/account/status": {
       "get": {
         "operationId": "get_v1_account_status",
@@ -11283,7 +11762,17 @@
                 "$ref": "#/components/schemas/OnboardingAccount"
               },
               "examples": {
-                "valid": {
+                "explicitAgeConfirmation": {
+                  "value": {
+                    "full_name": "Mariam Ali",
+                    "age_confirmed": true,
+                    "email": null,
+                    "terms_accepted": true,
+                    "app_version": "1.3.0"
+                  }
+                },
+                "legacyInstalledClient": {
+                  "summary": "Accepted for installed-client compatibility; birth_year is not persisted.",
                   "value": {
                     "full_name": "Mariam Ali",
                     "birth_year": 1995,
@@ -11509,6 +11998,14 @@
                 "$ref": "#/components/schemas/OnboardingComplete"
               },
               "examples": {
+                "minimal": {
+                  "summary": "Category and city are optional; the response still carries the canonical store link.",
+                  "value": {
+                    "device_secret": "device-secret-abc123",
+                    "store_name": "متجري",
+                    "country_iso": "EG"
+                  }
+                },
                 "valid": {
                   "value": {
                     "device_secret": "device-secret-abc123",
@@ -14629,6 +15126,14 @@
                 "$ref": "#/components/schemas/StoreUpdate"
               },
               "examples": {
+                "cityAndTaxonomy": {
+                  "summary": "Set category and city after setup; a legacy business_category key alone leaves the taxonomy IDs NULL.",
+                  "value": {
+                    "business_category_id": "fashion",
+                    "business_subcategory_id": "fashion_clothing",
+                    "city_catalog_id": 41505
+                  }
+                },
                 "valid": {
                   "value": {
                     "whatsapp": "+201000000000",
@@ -18614,6 +19119,63 @@
   },
   "components": {
     "schemas": {
+      "AccountProfile": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "The seller's private account profile. birth_year is deliberately absent: the profile API never selects, accepts, or returns it.",
+        "properties": {
+          "full_name": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 80
+          },
+          "email_private": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "email"
+          },
+          "email_verified": {
+            "type": "boolean",
+            "description": "Whether the current email_private address is verified."
+          },
+          "pending_email_private": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "email",
+            "description": "The latest unexpired, unused pending email-change address, or null."
+          }
+        },
+        "required": [
+          "full_name",
+          "email_private",
+          "email_verified",
+          "pending_email_private"
+        ]
+      },
+      "UpdateAccountProfileRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "minProperties": 1,
+        "properties": {
+          "full_name": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 80,
+            "description": "Trimmed and validated with the onboarding full-name rule."
+          },
+          "email_private": {
+            "type": "string",
+            "format": "email",
+            "minLength": 1,
+            "maxLength": 254,
+            "description": "A new private address. It does not replace the current address until its verification link is opened. Omitting this field leaves the current address unchanged; an empty or malformed value is invalid."
+          }
+        }
+      },
       "Order": {
         "type": "object",
         "properties": {
@@ -19516,11 +20078,24 @@
           "cover_url": {
             "type": "string"
           },
+          "business_category": {
+            "type": "string",
+            "description": "Legacy category key alone. Stores only business_category and clears business_category_id/business_subcategory_id; it is never mapped to a taxonomy ID. Invalid keys return 400 invalid_business_category."
+          },
           "business_category_id": {
-            "type": "string"
+            "type": "string",
+            "description": "Taxonomy category selection, optionally with business_subcategory_id. Stores the taxonomy IDs and category key. Invalid selections return 400 invalid_business_category."
           },
           "business_subcategory_id": {
             "type": "string"
+          },
+          "city_catalog_id": {
+            "type": "integer",
+            "description": "Existing city catalogue identifier, validated against the store country. Invalid or unknown IDs return 400 invalid_city."
+          },
+          "city_name": {
+            "type": "string",
+            "description": "Typed city name, normalized and subject to the same minimum length as setup. A typed name clears city_catalog_id and city_catalog_version so an unrelated catalogue reference is never carried forward. Invalid values return 400 invalid_city."
           }
         }
       },
@@ -19741,17 +20316,22 @@
         "type": "object",
         "required": [
           "full_name",
-          "birth_year",
           "terms_accepted",
           "app_version"
         ],
-        "description": "Step 1 of onboarding: the account details, recorded against the session opened by /auth/phone/complete.",
+        "description": "Step 1 of onboarding: the account details, recorded against the session opened by /auth/phone/complete. Age eligibility is affirmative: send age_confirmed=true. Installed clients that predate this contract send birth_year instead only when age_confirmed is absent; the Worker accepts a valid integer (1900 through the current UTC year) for compatibility but never stores the sent year in the onboarding session or seller profile. Missing, false, or non-boolean age_confirmed without a valid legacy birth_year is refused with 400 age_confirmation_required.",
         "properties": {
           "full_name": {
             "type": "string"
           },
+          "age_confirmed": {
+            "type": "boolean",
+            "description": "Must be true for a new client. Affirmative confirmation of the canonical statement عمري ١٨ عامًا أو أكثر; the Worker records the statement, source android_onboarding_v2, the accepted terms version, and a Worker timestamp in legal_acceptances."
+          },
           "birth_year": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Legacy installed-client compatibility only, and only when age_confirmed is absent. Not stored anywhere; the request is recorded with source android_onboarding_v2_legacy_birth_year and NULL statement text.",
+            "minimum": 1900
           },
           "email": {
             "type": [
@@ -19796,14 +20376,9 @@
         "type": "object",
         "required": [
           "device_secret",
-          "store_name",
-          "slug",
-          "business_category",
-          "business_category_id",
-          "country_iso",
-          "city_name"
+          "store_name"
         ],
-        "description": "Step 2 of onboarding: creates the store and the seller account from the session's saved details.",
+        "description": "Step 2 of onboarding: creates the store and the seller account from the session's saved details. Business category and city are optional (D-05); omit both to create a named store with an owner, then complete them later through the checklist and PUT /api/v1/store. A supplied value is still fully validated, and country validation is never optional.",
         "properties": {
           "device_secret": {
             "type": "string",
@@ -19816,10 +20391,12 @@
             "type": "string"
           },
           "business_category": {
-            "type": "string"
+            "type": "string",
+            "description": "Legacy category key alone. Validated against the existing key set; stores only business_category and leaves business_category_id and business_subcategory_id NULL. It is never mapped to a taxonomy ID."
           },
           "business_category_id": {
-            "type": "string"
+            "type": "string",
+            "description": "Taxonomy category selection. With an optional business_subcategory_id, stores the taxonomy IDs and category key. Invalid or incomplete selections return 400 invalid_business_category."
           },
           "business_subcategory_id": {
             "type": [
@@ -19840,10 +20417,12 @@
             "type": [
               "integer",
               "null"
-            ]
+            ],
+            "description": "Existing city catalogue identifier, validated against the store country. Omit both city_catalog_id and city_name to persist NULL city fields."
           },
           "city_name": {
-            "type": "string"
+            "type": "string",
+            "description": "Typed city name, normalized and subject to the same minimum length and invalid_city behavior as setup."
           }
         }
       },

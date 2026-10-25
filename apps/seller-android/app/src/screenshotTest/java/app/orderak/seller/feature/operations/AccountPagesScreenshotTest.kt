@@ -107,12 +107,12 @@ fun ticketClosed() = ticket(messages = THREAD, ticket = TICKET.copy(status = "cl
 @PreviewTest
 @Preview(name = "Ticket error light", locale = "ar")
 @Composable
-fun ticketErrorLight() = ticket(messages = emptyList(), error = "network_unavailable")
+fun ticketErrorLight() = ticket(messages = emptyList(), error = "network")
 
 @PreviewTest
 @Preview(name = "Ticket error dark", locale = "ar")
 @Composable
-fun ticketErrorDark() = ticket(messages = emptyList(), error = "network_unavailable", dark = true)
+fun ticketErrorDark() = ticket(messages = emptyList(), error = "network", dark = true)
 
 // ================= deletion status =================
 
@@ -175,12 +175,12 @@ fun deletionPending() = deletion(
 @PreviewTest
 @Preview(name = "Deletion error light", locale = "ar")
 @Composable
-fun deletionErrorLight() = deletion(request = null, error = "network_unavailable")
+fun deletionErrorLight() = deletion(request = null, error = "network")
 
 @PreviewTest
 @Preview(name = "Deletion error dark", locale = "ar")
 @Composable
-fun deletionErrorDark() = deletion(request = null, error = "network_unavailable", dark = true)
+fun deletionErrorDark() = deletion(request = null, error = "network", dark = true)
 
 // ================= subscription =================
 
@@ -353,7 +353,7 @@ fun devicesRecentAuthRequired() =
 @Preview(name = "Devices error dark", locale = "ar")
 @Composable
 fun devicesErrorDark() =
-    devices(items = emptyList(), passkeys = emptyList(), error = "network_unavailable", dark = true)
+    devices(items = emptyList(), passkeys = emptyList(), error = "network", dark = true)
 
 /**
  * The plan's device allowance, drawn under the devices it counts.
@@ -470,13 +470,13 @@ fun assistantSending() = assistant(messages = listOf(true to "كام أوردر 
 @PreviewTest
 @Preview(name = "Assistant error light", locale = "ar")
 @Composable
-fun assistantErrorLight() = assistant(messages = emptyList(), error = "network_unavailable")
+fun assistantErrorLight() = assistant(messages = emptyList(), error = "network")
 
 @PreviewTest
 @Preview(name = "Assistant error dark", locale = "ar")
 @Composable
 fun assistantErrorDark() =
-    assistant(messages = emptyList(), error = "network_unavailable", dark = true)
+    assistant(messages = emptyList(), error = "network", dark = true)
 
 /**
  * The quota line, which no existing render reaches: every preview above passes

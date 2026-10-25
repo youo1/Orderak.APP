@@ -9,12 +9,15 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import app.orderak.seller.R
 import app.orderak.seller.core.text.SearchText
-import app.orderak.seller.core.ui.FullScreenEmpty
-import app.orderak.seller.core.ui.FullScreenError
-import app.orderak.seller.core.ui.FullScreenLoading
 import app.orderak.seller.core.ui.SearchField
 import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 import app.orderak.seller.data.db.CustomerSummary
+import app.orderak.seller.core.ui.ErrorState
+import app.orderak.seller.core.ui.ErrorStateKind
+import app.orderak.seller.core.ui.EmptyState
+import app.orderak.seller.core.ui.EmptyStateKind
+import app.orderak.seller.core.ui.Skeleton
+import app.orderak.seller.core.ui.SkeletonVariant
 
 /**
  * العملاء, as a function of its state.
@@ -60,7 +63,11 @@ fun CustomersContent(
         // read that actually threw, rather than one still in flight. This is the
         // failure state, so it is the one that does carry an action: the read can
         // be run again, and before this it could not.
-        FullScreenError(
+        ErrorState(
+            // The local read failed, not the service, so the title names what
+            // could not be read rather than the service's own cause.
+            kind = ErrorStateKind.ServiceUnavailable,
+            title = stringResource(R.string.error_state_customers_load_title),
             message = stringResource(R.string.error_unknown),
             onRetry = onRetry,
             modifier = modifier,
@@ -68,11 +75,11 @@ fun CustomersContent(
         return
     }
     if (list == null) {
-        FullScreenLoading(modifier)
+        Skeleton(SkeletonVariant.ListRows, modifier.padding(LocalOrderakSpacing.current.space4))
         return
     }
     if (list.isEmpty()) {
-        FullScreenEmpty(message = stringResource(R.string.customers_empty), modifier = modifier)
+        EmptyState(kind = EmptyStateKind.Empty, title = stringResource(R.string.customers_empty), modifier = modifier)
         return
     }
 
@@ -95,8 +102,9 @@ fun CustomersContent(
         // saying so with the same sentence would read as "your customers are
         // gone". It names the query and offers the way back.
         if (visible.isEmpty()) {
-            FullScreenEmpty(
-                message = stringResource(R.string.customers_search_empty, query),
+            EmptyState(
+                kind = EmptyStateKind.FilteredToNothing,
+                title = stringResource(R.string.customers_search_empty, query),
                 actionLabel = stringResource(R.string.search_clear_action),
                 onAction = { onQueryChange("") },
             )

@@ -30,12 +30,15 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.orderak.seller.R
 import app.orderak.seller.core.text.formatCount
-import app.orderak.seller.core.ui.FullScreenEmpty
-import app.orderak.seller.core.ui.FullScreenError
-import app.orderak.seller.core.ui.FullScreenLoading
 import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 import app.orderak.seller.data.db.OrderEntity
 import app.orderak.seller.domain.OrderStatus
+import app.orderak.seller.core.ui.ErrorState
+import app.orderak.seller.core.ui.ErrorStateKind
+import app.orderak.seller.core.ui.EmptyState
+import app.orderak.seller.core.ui.EmptyStateKind
+import app.orderak.seller.core.ui.Skeleton
+import app.orderak.seller.core.ui.SkeletonVariant
 
 /**
  * الطلبات, as a function of its state.
@@ -80,9 +83,13 @@ fun OrdersContent(
             //
             // The retry is the point. This state used to be a dead end: the read
             // that failed could not be re-run, so the seller's only way out was
-            // to kill the app. `FullScreenError` had accepted an `onRetry` all
+            // to kill the app. The error state had accepted an `onRetry` all
             // along — nothing passed one.
-            FullScreenError(
+            ErrorState(
+                // The local read failed, not the service, so the title names what
+                // could not be read rather than the service's own cause.
+                kind = ErrorStateKind.ServiceUnavailable,
+                title = stringResource(R.string.error_state_orders_load_title),
                 message = stringResource(R.string.error_unknown),
                 onRetry = onRetry,
             )
@@ -90,13 +97,14 @@ fun OrdersContent(
             // The state this screen declared and never had. An empty list stood
             // in for "not read yet", so the empty state — whose action is
             // "record an order" — greeted a seller who already had some.
-            FullScreenLoading()
+            Skeleton(SkeletonVariant.ListRows, Modifier.padding(LocalOrderakSpacing.current.space4))
         } else if (list.isEmpty() && filter == OrdersFilter.All) {
             // The shared empty state, and it carries an action. "Nothing here"
             // without a next step is a dead end, and a seller on day one meets
             // this screen before any other.
-            FullScreenEmpty(
-                message = stringResource(R.string.orders_empty),
+            EmptyState(
+                kind = EmptyStateKind.Empty,
+                title = stringResource(R.string.orders_empty),
                 actionLabel = stringResource(R.string.order_new_title),
                 onAction = onNew,
             )
@@ -150,8 +158,9 @@ fun OrdersContent(
                     // Filtered to nothing is a different situation from having no
                     // orders at all: the fix is to clear the filter, not to sell
                     // something.
-                    FullScreenEmpty(
-                        message = stringResource(R.string.orders_empty_filtered),
+                    EmptyState(
+                        kind = EmptyStateKind.FilteredToNothing,
+                        title = stringResource(R.string.orders_empty_filtered),
                         actionLabel = stringResource(R.string.orders_all),
                         onAction = { onFilter(OrdersFilter.All) },
                     )

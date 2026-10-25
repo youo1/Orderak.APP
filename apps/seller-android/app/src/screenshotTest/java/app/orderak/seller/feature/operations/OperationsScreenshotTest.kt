@@ -134,12 +134,12 @@ fun supportEmptyDark() = support(tickets = emptyList(), dark = true)
 @PreviewTest
 @Preview(name = "Support error light", locale = "ar")
 @Composable
-fun supportErrorLight() = support(tickets = emptyList(), error = "network_unavailable")
+fun supportErrorLight() = support(tickets = emptyList(), error = "network")
 
 @PreviewTest
 @Preview(name = "Support error dark", locale = "ar")
 @Composable
-fun supportErrorDark() = support(tickets = emptyList(), error = "network_unavailable", dark = true)
+fun supportErrorDark() = support(tickets = emptyList(), error = "network", dark = true)
 
 // ================= announcements =================
 
@@ -204,13 +204,13 @@ fun announcementsEmptyDark() = announcements(items = emptyList(), dark = true)
 @PreviewTest
 @Preview(name = "Announcements error light", locale = "ar")
 @Composable
-fun announcementsErrorLight() = announcements(items = emptyList(), error = "network_unavailable")
+fun announcementsErrorLight() = announcements(items = emptyList(), error = "network")
 
 @PreviewTest
 @Preview(name = "Announcements error dark", locale = "ar")
 @Composable
 fun announcementsErrorDark() =
-    announcements(items = emptyList(), error = "network_unavailable", dark = true)
+    announcements(items = emptyList(), error = "network", dark = true)
 
 // ================= catalog languages =================
 
@@ -279,10 +279,10 @@ fun catalogLanguagesEmptyDark() = catalogLanguages(items = emptyList(), dark = t
 @Preview(name = "Catalog languages error light", locale = "ar")
 @Composable
 fun catalogLanguagesErrorLight() =
-    catalogLanguages(items = emptyList(), error = "network_unavailable")
+    catalogLanguages(items = emptyList(), error = "network")
 
 @PreviewTest
 @Preview(name = "Catalog languages error dark", locale = "ar")
 @Composable
 fun catalogLanguagesErrorDark() =
-    catalogLanguages(items = emptyList(), error = "network_unavailable", dark = true)
+    catalogLanguages(items = emptyList(), error = "network", dark = true)

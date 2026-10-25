@@ -375,6 +375,7 @@ async function fulfillDeletion(env: Env, req: DeletionRequest): Promise<void> {
 		stmts.push(env.orderak_db.prepare("DELETE FROM webauthn_challenges WHERE seller_id = ?").bind(sId));
 		stmts.push(env.orderak_db.prepare("DELETE FROM recent_auth_proofs WHERE seller_id = ?").bind(sId));
 		stmts.push(env.orderak_db.prepare("DELETE FROM email_verification_tokens WHERE seller_id = ?").bind(sId));
+		stmts.push(env.orderak_db.prepare("DELETE FROM pending_email_changes WHERE seller_id = ?").bind(sId));
 		stmts.push(env.orderak_db.prepare("DELETE FROM seller_profiles WHERE seller_id = ?").bind(sId));
 		stmts.push(env.orderak_db.prepare("DELETE FROM seller_auth_identities WHERE seller_id = ?").bind(sId));
 		stmts.push(

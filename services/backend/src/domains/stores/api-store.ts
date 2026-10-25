@@ -53,6 +53,12 @@ import {
 
 type Row = Record<string, unknown>;
 const FRESH_FIREBASE_PROOF_SECONDS = 5 * 60;
+const CATEGORY_KEYS = new Set(["fashion", "electronics", "food", "beauty", "services", "other"]);
+
+function positiveInteger(value: unknown): number | null {
+	const number = Number(value);
+	return Number.isSafeInteger(number) && number > 0 ? number : null;
+}
 
 async function allowPreAuthAttempt(
 	env: Env,
@@ -747,28 +753,85 @@ async function handleStoreUpdate(request: Request, env: Env, url: URL, store: Ro
 	if (body.business_category_id != null || body.business_subcategory_id != null) {
 		const requestedCategoryId = String(body.business_category_id ?? "").trim().slice(0, 80);
 		const requestedSubcategoryId = String(body.business_subcategory_id ?? "").trim().slice(0, 80);
-		if (!requestedCategoryId || !requestedSubcategoryId) {
+		if (!requestedCategoryId) {
 			return jsonResponse({ error: "invalid_business_category" }, 400);
 		}
-		const taxonomy = await env.orderak_db.prepare(
-			`SELECT c.id category_id,c.key category_key,s.id subcategory_id,c.version_id
-			 FROM business_categories c
-			 JOIN business_subcategories s
-			   ON s.category_id=c.id AND s.version_id=c.version_id
-			 JOIN business_taxonomy_versions v
-			   ON v.id=c.version_id AND v.status='active'
-			 WHERE c.id=? AND s.id=? AND c.active=1 AND s.active=1 LIMIT 1`,
-		).bind(requestedCategoryId, requestedSubcategoryId).first<{
-			category_id: string;
-			category_key: string;
-			subcategory_id: string;
-			version_id: number;
-		}>();
+		const taxonomy = requestedSubcategoryId
+			? await env.orderak_db.prepare(
+				`SELECT c.id category_id,c.key category_key,s.id subcategory_id,c.version_id
+				 FROM business_categories c
+				 JOIN business_subcategories s
+				   ON s.category_id=c.id AND s.version_id=c.version_id
+				 JOIN business_taxonomy_versions v
+				   ON v.id=c.version_id AND v.status='active'
+				 WHERE c.id=? AND s.id=? AND c.active=1 AND s.active=1 LIMIT 1`,
+			).bind(requestedCategoryId, requestedSubcategoryId).first<{
+				category_id: string;
+				category_key: string;
+				subcategory_id: string | null;
+				version_id: number;
+			}>()
+			: await env.orderak_db.prepare(
+				`SELECT c.id category_id,c.key category_key,c.version_id
+				 FROM business_categories c
+				 JOIN business_taxonomy_versions v ON v.id=c.version_id AND v.status='active'
+				 WHERE c.id=? AND c.active=1 LIMIT 1`,
+			).bind(requestedCategoryId).first<{
+				category_id: string;
+				category_key: string;
+				version_id: number;
+			}>();
 		if (!taxonomy) return jsonResponse({ error: "invalid_business_category" }, 400);
 		businessCategory = taxonomy.category_key;
 		businessCategoryId = taxonomy.category_id;
-		businessSubcategoryId = taxonomy.subcategory_id;
+		businessSubcategoryId = "subcategory_id" in taxonomy ? (taxonomy.subcategory_id as string | null) : null;
 		businessTaxonomyVersion = taxonomy.version_id;
+	} else if (body.business_category != null) {
+		// A legacy key alone stores only the key. It is never mapped to a
+		// taxonomy ID, and any previously stored taxonomy IDs are cleared so the
+		// row cannot describe two different selections.
+		const legacyCategory = String(body.business_category).trim().slice(0, 30);
+		if (!CATEGORY_KEYS.has(legacyCategory)) {
+			return jsonResponse({ error: "invalid_business_category" }, 400);
+		}
+		businessCategory = legacyCategory;
+		businessCategoryId = null;
+		businessSubcategoryId = null;
+		businessTaxonomyVersion = null;
+	}
+
+	// City uses the same country binding, catalogue lookup, normalization and
+	// minimum length as setup. A typed name clears any stale catalogue ID/version
+	// so the stored fields always describe one selection.
+	let cityGeonameId = store.city_geoname_id ?? null;
+	let cityCatalogId = store.city_catalog_id ?? null;
+	let cityCatalogVersion = store.city_catalog_version ?? null;
+	let cityName = store.city_name ?? null;
+	if (body.city_catalog_id != null) {
+		const requestedCityId = positiveInteger(body.city_catalog_id);
+		if (requestedCityId == null) return jsonResponse({ error: "invalid_city" }, 400);
+		const countryCode = normalizeCountryIso(String(store.country_code ?? "EG"));
+		const catalogCity = await (env as PublicWorkerEnv).orderak_geo.withSession("first-unconstrained").prepare(
+			`SELECT c.name,c.version
+			 FROM city_catalog c
+			 JOIN city_catalog_versions v ON v.version=c.version AND v.active=1
+			 WHERE c.source_city_id=? AND c.country_iso=? LIMIT 1`,
+		).bind(requestedCityId, countryCode).first<{ name: string; version: string }>();
+		if (!catalogCity) return jsonResponse({ error: "invalid_city" }, 400);
+		cityGeonameId = null;
+		cityCatalogId = requestedCityId;
+		cityCatalogVersion = catalogCity.version;
+		cityName = catalogCity.name;
+	} else if (body.city_name != null) {
+		// The typed name must be a string. Coercing a number or boolean would
+		// turn it into a plausible-looking city ("123", "true") and store it.
+		if (typeof body.city_name !== "string") return jsonResponse({ error: "invalid_city" }, 400);
+		const typedCity = body.city_name.replace(/\s+/g, " ").trim().slice(0, 100);
+		if (typedCity.length < 2) return jsonResponse({ error: "invalid_city" }, 400);
+		cityGeonameId = null;
+		cityCatalogId = null;
+		cityCatalogVersion = null;
+		cityName = typedCity;
 	}
 
 	await env.orderak_db
@@ -778,6 +841,8 @@ async function handleStoreUpdate(request: Request, env: Env, url: URL, store: Ro
 			   instapay = ?, vfcash = ?, logo_url = ?, cover_url = ?,
 			   business_category = ?, business_category_id = ?,
 			   business_subcategory_id = ?, business_taxonomy_version = ?,
+			   city_geoname_id = ?, city_catalog_id = ?, city_catalog_version = ?,
+			   city_name = ?,
 			   updated_at = datetime('now')
 			 WHERE id = ?`,
 		)
@@ -799,6 +864,10 @@ async function handleStoreUpdate(request: Request, env: Env, url: URL, store: Ro
 			businessCategoryId,
 			businessSubcategoryId,
 			businessTaxonomyVersion,
+			cityGeonameId,
+			cityCatalogId,
+			cityCatalogVersion,
+			cityName,
 			storeId,
 		)
 		.run();
