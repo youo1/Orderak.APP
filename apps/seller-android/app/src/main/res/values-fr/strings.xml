@@ -602,4 +602,25 @@
     <string name="field_preview_price_error">Saisissez un prix</string>
     <string name="field_preview_currency">EGP</string>
     <string name="field_preview_otp_error">Le code est incorrect</string>
+    <string name="stepper_decrease">Diminuer la quantité</string>
+    <string name="stepper_increase">Augmenter la quantité</string>
+    <string name="choice_preview_city_label">Ville</string>
+    <string name="choice_preview_city_value">Tanta</string>
+    <string name="choice_preview_city_error">Choisissez une ville</string>
+    <string name="choice_preview_switch_label">Afficher dans la boutique</string>
+    <string name="choice_preview_switch_helper">Les clients peuvent le voir et le commander</string>
+    <string name="choice_preview_cash">Espèces</string>
+    <string name="choice_preview_instapay">InstaPay</string>
+    <string name="choice_preview_wallet">Portefeuille électronique</string>
+    <string name="choice_preview_age_label">Je confirme avoir 18 ans ou plus</string>
+    <string name="choice_preview_age_error">Confirmez pour continuer</string>
+    <string name="choice_preview_filter_all">Toutes</string>
+    <string name="choice_preview_filter_new">Nouvelles</string>
+    <string name="choice_preview_filter_unpaid">Impayées</string>
+    <string name="choice_preview_filter_ready">Prêtes à expédier</string>
+    <string name="choice_preview_filter_more">Plus</string>
+    <string name="choice_preview_image_label">Photo du produit</string>
+    <string name="choice_preview_image_add">Ajouter une photo</string>
+    <string name="choice_preview_image_uploading">Envoi en cours…</string>
+    <string name="choice_preview_image_failed">L’envoi a échoué</string>
 </resources>

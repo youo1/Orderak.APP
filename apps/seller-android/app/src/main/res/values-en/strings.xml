@@ -596,4 +596,25 @@
     <string name="field_preview_price_error">Enter a price</string>
     <string name="field_preview_currency">EGP</string>
     <string name="field_preview_otp_error">The code is not correct</string>
+    <string name="stepper_decrease">Decrease quantity</string>
+    <string name="stepper_increase">Increase quantity</string>
+    <string name="choice_preview_city_label">City</string>
+    <string name="choice_preview_city_value">Tanta</string>
+    <string name="choice_preview_city_error">Choose a city</string>
+    <string name="choice_preview_switch_label">Show in the store</string>
+    <string name="choice_preview_switch_helper">Customers can see it and order it</string>
+    <string name="choice_preview_cash">Cash</string>
+    <string name="choice_preview_instapay">InstaPay</string>
+    <string name="choice_preview_wallet">E-wallet</string>
+    <string name="choice_preview_age_label">I confirm I am 18 or older</string>
+    <string name="choice_preview_age_error">Confirm to continue</string>
+    <string name="choice_preview_filter_all">All</string>
+    <string name="choice_preview_filter_new">New</string>
+    <string name="choice_preview_filter_unpaid">Unpaid</string>
+    <string name="choice_preview_filter_ready">Ready to ship</string>
+    <string name="choice_preview_filter_more">More</string>
+    <string name="choice_preview_image_label">Product photo</string>
+    <string name="choice_preview_image_add">Add a photo</string>
+    <string name="choice_preview_image_uploading">Uploading…</string>
+    <string name="choice_preview_image_failed">The upload failed</string>
 </resources>

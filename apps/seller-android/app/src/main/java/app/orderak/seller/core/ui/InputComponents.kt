@@ -62,7 +62,7 @@ private const val MoneyMaxLength = 12
 const val OtpCodeLength = 6
 
 /** A count in the locale's own digits, isolated from the paragraph direction. */
-private fun isolated(text: String): String = "\u2066$text\u2069"
+internal fun isolated(text: String): String = "\u2066$text\u2069"
 
 /**
  * The text a field draws under itself: the error if there is one, otherwise the

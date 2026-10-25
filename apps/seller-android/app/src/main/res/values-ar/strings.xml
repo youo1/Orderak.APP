@@ -628,4 +628,25 @@
     <string name="field_preview_price_error">أدخل السعر</string>
     <string name="field_preview_currency">ج.م</string>
     <string name="field_preview_otp_error">الرمز غير صحيح</string>
+    <string name="stepper_decrease">إنقاص الكمية</string>
+    <string name="stepper_increase">زيادة الكمية</string>
+    <string name="choice_preview_city_label">المدينة</string>
+    <string name="choice_preview_city_value">طنطا</string>
+    <string name="choice_preview_city_error">اختر المدينة</string>
+    <string name="choice_preview_switch_label">إظهار في المتجر</string>
+    <string name="choice_preview_switch_helper">يستطيع العملاء رؤيته وطلبه</string>
+    <string name="choice_preview_cash">نقدًا</string>
+    <string name="choice_preview_instapay">إنستاباي</string>
+    <string name="choice_preview_wallet">محفظة إلكترونية</string>
+    <string name="choice_preview_age_label">أؤكد أن عمري 18 عامًا أو أكثر</string>
+    <string name="choice_preview_age_error">أكّد للمتابعة</string>
+    <string name="choice_preview_filter_all">الكل</string>
+    <string name="choice_preview_filter_new">جديدة</string>
+    <string name="choice_preview_filter_unpaid">غير مدفوعة</string>
+    <string name="choice_preview_filter_ready">جاهزة للشحن</string>
+    <string name="choice_preview_filter_more">المزيد</string>
+    <string name="choice_preview_image_label">صورة المنتج</string>
+    <string name="choice_preview_image_add">إضافة صورة</string>
+    <string name="choice_preview_image_uploading">جارٍ الرفع…</string>
+    <string name="choice_preview_image_failed">تعذّر رفع الصورة</string>
 </resources>

@@ -344,6 +344,23 @@ carry `FeedbackPreviews`.
   drawn in the locale's digits, the phone row left to right with a 48dp country
   button, and six code cells in left-to-right order that take only digits.
 
+### Shared choice components
+
+`Stepper`, `SelectField`, `SwitchRow`, `SegmentedChoice`, `CheckboxRow`,
+`FilterChipRow` and `ImagePickerTile` live in
+`app/src/main/java/app/orderak/seller/core/ui/ChoiceComponents.kt`, all
+`kit-pending` with the adopter named in their row. `ImagePickerState` is the one
+state enum, pinned by `ChoiceKitStatesAcceptanceTest`, which also fails when an
+`imagePickerTile` preview is not named for an entry. The seventeen
+`@PreviewTest` functions in
+`app/src/screenshotTest/java/app/orderak/seller/core/ui/ChoiceFieldScreenshotTest.kt`
+carry `FeedbackPreviews`. `ChoiceFieldBehaviourTest` runs them in Arabic: the
+stepper stops at its bounds, disables the button there and draws Arabic-Indic
+digits with 48dp buttons; the select field is one target named by label and
+value; the switch, checkbox, segmented choice and chips respond to a tap; the
+image tile offers retry only after a failure and is not tappable while
+uploading.
+
 ### Shared overlay components
 
 `BottomSheet`, `PickerSheet` and `ConfirmSheet` live in
