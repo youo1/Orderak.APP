@@ -45,6 +45,7 @@ import { handleGeoRoutes } from "../domains/catalog/geo";
 import { handleBusinessTaxonomyRoutes } from "../domains/catalog/business-taxonomy";
 import { pickLocale } from "../platform/localization/i18n";
 import { withSentry } from "@sentry/cloudflare";
+import { sentryOptions } from "../platform/observability/sentry";
 import { recordLatency, flushLatencySamples } from "../platform/observability/measurement";
 import { DEFAULT_CURRENCY } from "../platform/money/money";
 import { Hono } from "hono";
@@ -479,13 +480,8 @@ app.onError(async (error, c) => {
 	return jsonResponse({ error: "server" }, 500);
 });
 
-export default withSentry<PublicWorkerEnv, QueuedEmailMessage>(
-	// SENTRY_DSN is a Wrangler secret — set via `npx wrangler secret put SENTRY_DSN`.
-	// When missing, Sentry is a no-op.
-	(env) => {
-		const dsn = (env as unknown as Record<string, unknown>).SENTRY_DSN as string | undefined;
-		return dsn ? { dsn, tracesSampleRate: 0.1 } : {};
-	},
+export default withSentry(
+	sentryOptions,
 	{
 	async fetch(request, env, ctx): Promise<Response> {
 		const bounded = await enforceRequestBodyLimit(request, {

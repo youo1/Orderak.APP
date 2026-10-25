@@ -145,13 +145,26 @@ guard against phone number spoofing.
 
 ## Rollback
 
-- Redeploy the previous Worker version if a code regression broke Firebase
-  integration:
+- If a code regression broke Firebase integration, roll the public Worker
+  (`orderak-worker`, which holds `FIREBASE_WEB_API_KEY`) back to the last good
+  release, then revert the change on `main`. Both steps, and why Production
+  cannot simply redeploy an older SHA, are in
+  [Rollback and forward fixes](../guides/staging-production-workflow.md#rollback-and-forward-fixes).
+  The rollback needs the owner's Cloudflare credentials:
 
-```cmd
-npx wrangler versions list
-npx wrangler rollback <previous-version-id>
+```powershell
+cd services/backend
+npx wrangler deployments list --env=""
+npx wrangler rollback <version-id> --env="" --message "<incident: reason>"
 ```
+
+- Pass the version ID deployed at the time of the last good `production/*`
+  tag. Do not take the previous entry, and never omit the ID. A
+  `wrangler secret put` — including the `FIREBASE_WEB_API_KEY` fixes above —
+  is a deployment of its own (`Source: Secret Change`), and rolling back past
+  one restores the old key with the old code. Without an ID, `wrangler rollback`
+  picks the version uploaded before the latest one, whatever that was. On
+  Staging, use `--env staging` in place of `--env=""`.
 
 - The isolated `accounts:lookup` verification call is stateless, but the full
   registration/session flows can write seller, device, legal-acceptance, and

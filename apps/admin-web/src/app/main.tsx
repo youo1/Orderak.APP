@@ -7,6 +7,7 @@ import { BrowserRouter } from 'react-router-dom'
 import '../index.css'
 import App from './App.tsx'
 import { RefineRoot } from './RefineRoot.tsx'
+import { ADMIN_SENTRY_OPTIONS } from './sentry-options'
 
 // Sentry: error monitoring with sourcemap support.
 // Set the DSN via VITE_SENTRY_DSN env var (e.g. in .env.production).
@@ -27,10 +28,11 @@ import { RefineRoot } from './RefineRoot.tsx'
 // traces carry stack frames and request metadata, which is what an operator
 // actually needs to debug the panel. So the ingest origin is allowlisted for
 // those, and replay stays off.
+//
+// What else leaves for Sentry is decided in sentry-options.ts.
 Sentry.init({
+  ...ADMIN_SENTRY_OPTIONS,
   dsn: import.meta.env.VITE_SENTRY_DSN,
-  integrations: [Sentry.browserTracingIntegration()],
-  tracesSampleRate: 0.1,
 });
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false } } })

@@ -42,14 +42,14 @@
     "tsx": "4.23.15",
     "typescript": "~6.0.2",
     "vitest": "^4.1.12",
-    "wrangler": "^4.151.0"
+    "wrangler": "^4.151.1"
   },
   "dependencies": {
     "@hono/zod-openapi": "^1.6.3",
     "@material/material-color-utilities": "0.3.0",
     "@orderak/contracts-typescript": "workspace:*",
-    "@sentry/cloudflare": "^10.71.0",
-    "@simplewebauthn/server": "^13.3.2",
+    "@sentry/cloudflare": "^11.8.0",
+    "@simplewebauthn/server": "^13.3.3",
     "hono": "^4.13.13",
     "jose": "^6.2.12",
     "libphonenumber-js": "^1.13.15",
