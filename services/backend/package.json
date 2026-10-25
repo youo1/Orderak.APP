@@ -48,7 +48,7 @@
     "@hono/zod-openapi": "^1.6.3",
     "@material/material-color-utilities": "0.3.0",
     "@orderak/contracts-typescript": "workspace:*",
-    "@sentry/cloudflare": "^10.71.0",
+    "@sentry/cloudflare": "^11.8.0",
     "@simplewebauthn/server": "^13.3.3",
     "hono": "^4.13.13",
     "jose": "^6.2.12",
