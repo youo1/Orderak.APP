@@ -35,8 +35,8 @@ import androidx.navigation.toRoute
 import app.orderak.seller.R
 import app.orderak.seller.core.text.formatCount
 import app.orderak.seller.app.navigation.PaywallRoute
-import app.orderak.seller.core.ui.NoticeBanner
-import app.orderak.seller.core.ui.SemanticRole
+import app.orderak.seller.core.ui.Banner
+import app.orderak.seller.core.ui.BannerState
 import app.orderak.seller.data.billing.EntitlementManager
 import app.orderak.seller.data.remote.BackendApi
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -210,8 +210,8 @@ fun PaywallContent(
             // anything monetary — the role, and the component, the subscription
             // page and the limit banners already say this same fact in.
             if (!state.purchaseOpen) {
-                NoticeBanner(
-                    role = SemanticRole.Commerce,
+                Banner(
+                    state = BannerState.LockedByPlan,
                     title = stringResource(R.string.paywall_purchase_closed),
                     message = stringResource(R.string.paywall_purchase_closed_body),
                 )

@@ -39,14 +39,30 @@ CVE-2026-93687 exp:2026-11-05
 
 # GHSA-wq5f-xc86-pv6w (high) — sharp's bundled libvips decodes a crafted image
 # with an out-of-bounds write. Exposure is dev-only through miniflare (the
-# wrangler dev server and @cloudflare/vitest-pool-workers); no parent release
-# ships sharp >=0.35.5 yet, and sharp's native platform packages are not
+# wrangler dev server and @cloudflare/vitest-pool-workers). The fix, sharp
+# 0.35.5, is what wrangler 4.149.0's miniflare resolves; the vulnerable 0.35.2
+# remains only under the miniflare that @cloudflare/vitest-pool-workers@0.23.0,
+# its latest release, pins exactly. sharp's native platform packages are not
 # exercised by the tests. This advisory has no CVE id, so Trivy is silenced by
 # GHSA id.
 #
-# Reason: dev-only through miniflare, with no parent release shipping
-# sharp >=0.35.5 yet.
-# Removal condition: Remove this entry when a miniflare release ships
-# sharp >=0.35.5. The expiry (2026-11-05) makes the check fail again on that
-# date, so it is re-checked rather than forgotten.
+# Reason: dev-only through miniflare; the one parent still on a vulnerable sharp
+# is the Workers test pool, and its latest release pins it.
+# Removal condition: Remove this entry when a @cloudflare/vitest-pool-workers
+# release resolves sharp >=0.35.5. The expiry (2026-11-05) makes the check fail
+# again on that date, so it is re-checked rather than forgotten.
 GHSA-wq5f-xc86-pv6w exp:2026-11-05
+
+# CVE-2023-54404 (GHSA-mrhx-c7xc-m3w5, high) — zod can exhaust memory while
+# validating oversized constrained collections. Fixed in 4.6.6. The only
+# vulnerable copy is 4.4.3, which @cloudflare/vitest-pool-workers@0.23.0, its
+# latest release, pins exactly; it validates the test pool's own configuration
+# and never reaches a Worker. Every other zod in the tree resolves to 4.6.7. The
+# same waiver is in pnpm-workspace.yaml's ignoreGhsas, for the same reason as
+# sharp above: an override would hand the pool a version it never declared.
+#
+# Reason: test-pool only, pinned exactly by the pool's latest release.
+# Removal condition: Remove this entry when a @cloudflare/vitest-pool-workers
+# release resolves zod >=4.6.6. The expiry (2026-11-05) makes the check fail
+# again on that date, so it is re-checked rather than forgotten.
+CVE-2023-54404 exp:2026-11-05

@@ -79,24 +79,30 @@ the Gradle test tasks pin `user.language=en`, `user.country=US`, and
 
 The source is the authority. The audit parses `app/src/screenshotTest/java` with
 the anchored matcher `(?m)^\s*@PreviewTest\s*$` to decide which functions are
-states and which locales they render; it parses the multipreview annotations in
-`app/src/main/java/app/orderak/seller/core/ui` for their constituent locales.
+states and which variants they render; it parses the multipreview annotations in
+`app/src/main/java/app/orderak/seller/core/ui` for their locale, `uiMode`, and
+`fontScale`. Both roots are explicit arguments to
+`SourceDeclarations.parse(sourceRoot, multipreviewRoot)`, so an isolated fixture
+can prove the parser without reading the real app sources. There is no locale
+fallback: a `@PreviewTest` with no locale metadata fails parsing.
 Compose runtime's public `getDeclaredComposableMethod` resolves each parsed state
 function; reflection never infers a `@Preview` or picks a neighbouring helper. A
 missing source directory, an unresolvable state, or an unresolvable multipreview
 locale fails loudly, and the runtime annotation count must equal the number of
-audited cases. The observed figure is **280 `@PreviewTest` annotations in 22
+audited cases. The observed figure is **293 `@PreviewTest` annotations in 23
 source files**, against the manager's approximate 320-state estimate (a
 discrepancy of ~40); the audit prints the measured values rather than hardcoding
 either number.
 
 One `@PreviewTest` declaration is one JUnit case, named for its compiled
-`<File>ScreenshotTestKt` facade and function. A declaration with several locale
-variants gets a single `setContent` call whose host reads a mutable locale
-variant, copies the current configuration and applies the parsed locale (so the
-SDK, size, and density qualifiers survive), and provides `LocalConfiguration`,
-`LocalContext`, `LocalResources`, and `LocalLayoutDirection` from the same
-locale context built with `createConfigurationContext`. `LocalResources` matters:
+`<File>ScreenshotTestKt` facade and function. A declaration with several
+variants gets a single `setContent` call whose host reads a mutable variant,
+copies the current configuration and applies the parsed locale, `uiMode`, and
+`fontScale` (so the SDK, size, and density qualifiers survive), and provides
+`LocalConfiguration`, `LocalDensity`, `LocalContext`, `LocalResources`, and
+`LocalLayoutDirection` from the same locale context built with
+`createConfigurationContext`. Each declared variant is audited in its own
+locale, mode, and scale, and every diagnostic names the preview and the locale. `LocalResources` matters:
 Compose UI reads `stringResource`/`pluralStringResource` from it, so without it
 every `en`/`fr` preview would audit Arabic strings while reported as `en`/`fr`.
 The host also re-provides `LocalActivityResultRegistryOwner` and
@@ -288,6 +294,36 @@ Enforces:
 gradlew.bat lintStagingDebug
 ```
 
+### Shared feedback components
+
+`Banner`, `OfflineStrip`, `Skeleton`, `EmptyState`, `ErrorState`, and
+`GateNotice` live in
+`app/src/main/java/app/orderak/seller/core/ui/FeedbackComponents.kt`. Their state
+vocabulary is `BannerState`, `OfflineStripState`, `SkeletonVariant`,
+`EmptyStateKind`, and `ErrorStateKind`, which
+`FeedbackComponentStatesAcceptanceTest` pins, plus `FeatureAvailability` for
+the gate. In `FeedbackStateComponentsTest.kt`, `GateNoticeStatesTest` checks
+the gate's three states, `EmptyAndErrorStateTest` the empty and error actions,
+and `FeedbackStandardArabicTest` the Standard Arabic shared strings by resource
+key. A backend code reaches `ErrorState` through `errorStateText` in
+`BackendErrors.kt` (pinned by `ErrorStateTextTest`), so only a lost connection
+or a failing service gets that cause as its title; a screen whose failure is
+local passes its own title. The 21
+`@PreviewTest` functions in
+`app/src/screenshotTest/java/app/orderak/seller/core/ui/FeedbackOverlayScreenshotTest.kt`
+carry `FeedbackPreviews`, which declares the eight Arabic/English,
+light/dark, 100%/200% variants. `tooling/ux/render-coverage.mjs` requires one
+reference per declared variant, so a missing variant fails the guard.
+
+Every screen draws its banners, empty, error, loading and gate states through
+these components; the older `NoticeBanner`, `SyncStatusBanner`,
+`FullScreenEmpty`, `FullScreenError`, `FullScreenLoading`, `LockedByPlanNotice`,
+`NotBuiltNotice`, and `FeatureAvailabilityChip` are gone. `OfflineStrip` is the
+one component still marked `kit-pending`, with adopter `R2` in its own column;
+`tooling/repository/verify-design-system-components.mjs` allows a kit-pending
+row only when that adopter is named, and fails if the component gains a
+production caller while still pending.
+
 ### Screenshot validation (`validateStagingDebugScreenshotTest`)
 
 Compose Preview Screenshot Testing. Compares rendered screenshots against
@@ -419,7 +455,8 @@ the `on:` block of each file rather than assumed from the workflow name.
 
 **Runs on every PR, path-filtered:**
 
-- `backend-ci.yml`: Worker tests and architecture verification.
+- `backend-ci.yml`: Worker tests and architecture verification, plus the
+  admin's unit, end-to-end, accessibility, lint and edge-types checks.
 - `android-ci.yml`: staging assembly, unit tests, lint, and all build guards.
 - `auth-phase1-contract.yml`: auth/API guards plus focused Android and Worker
   behavioral tests.

@@ -9,7 +9,7 @@ CI rejects any base/head combination that is not a declared route.
 - [ ] `feature/*` `fix/*` `chore/*` `docs/*` into **`develop`** — squash
 - [ ] `develop` into **`staging`** — merge commit (squash is not offered)
 - [ ] `staging` into **`main`** — merge commit (squash is not offered)
-- [ ] `hotfix/*` into **`main`** — merge commit, after dispatching `Deploy Staging` against the hotfix branch
+- [ ] `hotfix/*` into **`main`** — merge commit, then dispatch `Deploy Staging` against `main` before `Deploy Production` (Staging refuses unprotected `hotfix/*` branches)
 - [ ] `main` into **`staging`** / **`develop`** — mandatory hotfix back-merge
 
 ## Type of change

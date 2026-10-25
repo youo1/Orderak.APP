@@ -59,17 +59,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import app.orderak.seller.R
-import app.orderak.seller.core.ui.NoticeBanner
 import app.orderak.seller.core.ui.PlanUsageRow
 import app.orderak.seller.core.ui.PlanUsageRowItem
 import app.orderak.seller.core.ui.planUsageRows
 import app.orderak.seller.core.ui.SemanticRole
 import app.orderak.seller.core.locale.AppLocales
 import app.orderak.seller.core.text.formatCount
-import app.orderak.seller.core.ui.FullScreenEmpty
-import app.orderak.seller.core.ui.FullScreenError
-import app.orderak.seller.core.ui.FullScreenLoading
-import app.orderak.seller.core.ui.backendErrorResource
 import app.orderak.seller.data.billing.EntitlementManager
 import app.orderak.seller.data.billing.BillingManager
 import app.orderak.seller.data.billing.BillingState
@@ -98,6 +93,10 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.intOrNull
 import javax.inject.Inject
 import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
+import app.orderak.seller.core.ui.ErrorState
+import app.orderak.seller.core.ui.errorStateText
+import app.orderak.seller.core.ui.Skeleton
+import app.orderak.seller.core.ui.SkeletonVariant
 
 internal data class Credentials(val phone: String, val secret: String)
 
@@ -319,10 +318,13 @@ internal fun OperationPage(
      */
     onBack: (() -> Unit)?,
     busy: Boolean = false,
+    /** The API's error code (`result.error`), never a sentence: it is resolved here. */
     error: String? = null,
     onRetry: (() -> Unit)? = null,
     empty: @Composable (() -> Unit)? = null,
     isEmpty: Boolean = false,
+    /** The shape of the content this page waits for: rows for a list, a block for a detail page. */
+    loading: SkeletonVariant = SkeletonVariant.ListRows,
     content: @Composable () -> Unit,
 ) {
     val spacing = LocalOrderakSpacing.current
@@ -349,13 +351,18 @@ internal fun OperationPage(
                 .padding(padding),
         ) {
             when {
-                busy -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    FullScreenLoading()
+                busy -> Skeleton(loading, Modifier.padding(spacing.space4))
+                // `error` used to be drawn as-is, so a seller read the code itself,
+                // such as "auth" or "network".
+                error != null -> {
+                    val text = errorStateText(error)
+                    ErrorState(
+                        kind = text.kind,
+                        title = text.title?.let { stringResource(it) },
+                        message = stringResource(text.message),
+                        onRetry = onRetry,
+                    )
                 }
-                error != null -> FullScreenError(
-                    message = error,
-                    onRetry = onRetry,
-                )
                 isEmpty && empty != null -> {
                     empty()
                 }

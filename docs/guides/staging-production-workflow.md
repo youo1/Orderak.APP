@@ -354,8 +354,10 @@ Google Play.
 4. Confirm required secrets and variables exist in the `production` GitHub
    Environment.
 5. Review pending Production migrations and operational impact.
-6. Choose a monitored deployment window and ensure a known-good SHA is
-   available for application rollback.
+6. Choose a monitored deployment window, and note the `production/*` tag of the
+   release currently live: its time identifies the Worker versions an emergency
+   rollback would return to. Production cannot redeploy an older SHA — see
+   [Rollback and forward fixes](#rollback-and-forward-fixes).
 
 ### GitHub Actions procedure
 
@@ -403,20 +405,35 @@ main -> hotfix/<short-description> -> main -> back-merge to staging AND develop
 1. `git switch main && git pull --ff-only && git switch -c hotfix/<short-description>`
 2. Fix it, test locally, push, and open a pull request targeting `main`. The same
    thirteen checks apply: a hotfix skips the queue, not the gates.
-3. **Give it Staging provenance before merging.** Dispatch `Deploy Staging` with
-   the workflow ref set to the hotfix branch. That both puts the fix on a real
-   environment and creates the deployment record Production will look for.
-4. Merge with **Create a merge commit**, so the hotfix commit becomes the merge's
-   second parent and carries that record. The squash button is not offered on
-   `main`, by ruleset.
+3. Merge with **Create a merge commit**. The squash button is not offered on
+   `main`, by ruleset. Nothing deploys: `main` has no push trigger.
+4. **Give the merge Staging provenance.** Dispatch `Deploy Staging` with the
+   workflow ref set to `main`, and wait for it to succeed. That puts the fix on a
+   real environment and records a Staging deployment for `main`'s new tip — the
+   first thing Production's provenance check looks for.
 5. Dispatch `Deploy Production` with `main`'s new tip.
 6. **Back-merge `main` into `staging`, then into `develop`.** Not optional — see
-   below.
+   below. Until the back-merge reaches `staging`, Staging runs `main`'s code
+   against Staging's own, possibly newer, schema. If the back-merge does not
+   start `Deploy Staging` by itself (it only does when it touches a path in the
+   push trigger), dispatch it against `staging`.
 
-If you skip step 3, Production refuses the release because no Staging deployment
+**Staging cannot deploy the hotfix branch itself. Corrected 2026-10-20.** This
+list used to dispatch `Deploy Staging` from `hotfix/<name>` before merging, so
+that the record would sit on the merge's second parent. The `staging`
+environment accepts deployments from protected branches only, and `hotfix/*` is
+deliberately unprotected. Measured 2026-10-20: the protected branches are
+`develop`, `staging` and `main`, and no Staging deployment has ever been recorded
+from a `hotfix/*` ref. A dispatch from the hotfix branch would therefore stop at
+the environment gate before deploying or recording anything. Dispatching against
+`main` after the merge is the route that works, and it is the one the workflow's
+own error message names. It has run for real: on 2026-09-23 release `e5aef03`
+was refused at 19:16 UTC, `Deploy Staging` ran against `main` at 19:25, and
+Production succeeded at 19:31.
+
+If you skip step 4, Production refuses the release because no Staging deployment
 record exists for the SHA or its second parent. That is the gate working.
-Recover by dispatching `Deploy Staging` against `main`, then dispatch Production
-again.
+Recover by doing step 4, then dispatch Production again with the same SHA.
 
 ### The back-merge is mandatory
 
@@ -593,13 +610,20 @@ control and belongs with the production cutover, not here.
 
 ### Rehearsed, not assumed
 
-The rollback path below was exercised end to end on Staging on 2026-08-11,
+Redeploying an older commit was exercised end to end on Staging on 2026-08-11,
 before anything depended on it:
 
 1. Deployed an older commit (`4ea5f98`, four commits behind `main`) to
    Staging via `workflow_dispatch` — both `validate` and `deploy` green.
 2. Rolled forward to `main` the same way — both green, `/health` and the
    admin app back to `200`.
+
+That rehearsal covered Staging only. Production refuses any SHA but `main`'s
+tip, so neither Production path in
+[Rollback and forward fixes](#rollback-and-forward-fixes) is what was rehearsed
+here. The dispatch from a temporary branch that it relied on, and the tag the
+first point below recommends, would both be refused today by the `staging`
+environment's protected-branches rule.
 
 Two things that surfaced only by doing it, worth knowing before a real
 incident:
@@ -619,15 +643,171 @@ incident:
 
 ## Rollback and forward fixes
 
-For an application-code regression, run `Deploy Production` again with the last
-known-good Production SHA and the same explicit confirmation. This redeploys
-the older application code.
+**`Deploy Production` cannot roll back. Corrected 2026-10-20.** This section
+used to say: run `Deploy Production` again with the last known-good Production
+SHA. The workflow refuses that. Its step "Verify the release is the current main
+revision" fails any `release_sha` that is not `origin/main`'s tip, and a
+known-good release is by definition an older one. Passing the Staging-provenance
+check first does not help; the older SHA still is not `main`.
 
-A code rollback does **not** reverse D1 migrations. Database migrations are
-forward-only unless a reviewed recovery procedure explicitly says otherwise.
+There are two ways back from a Production code regression, and an incident
+normally uses both. The emergency path stops the damage in seconds. The pipeline
+path makes the fix permanent and brings `main` back in line with what is running.
+The emergency path is never finished without the pipeline path.
+
+### Emergency: roll the Workers back in Cloudflare
+
+Cloudflare keeps each Worker's recent versions, and `wrangler rollback` makes an
+earlier one the live deployment immediately. It goes around GitHub entirely and
+runs none of the release gates. That is why it is fast, and why it is only a
+bridge.
+
+`Deploy Production` deploys three Workers, each with its own command, and each
+is rolled back on its own:
+
+| Worker | Serves | Configuration |
+| --- | --- | --- |
+| `orderak-worker` | `api.orderak.app`, `orderak.app`, `www.orderak.app` | `services/backend/wrangler.jsonc` |
+| `orderak-admin-worker` | The Admin API. It has no route of its own and is reached through the Admin Edge Worker's `ADMIN_WORKER` service binding | `services/backend/wrangler.admin.jsonc` |
+| `orderak-admin-edge` | `admin.orderak.app`, including the Admin static assets | `apps/admin-web/wrangler.edge.jsonc` |
+
+Roll back only the Workers the regression is in. If the regression spans the
+Admin Edge Worker and the Admin Worker, roll both back to the same release, so
+the two sides of the service binding still agree.
+
+**This needs the owner's Cloudflare credentials.** No workflow runs a rollback,
+and the deploy tokens are GitHub environment secrets that cannot be read back
+out. Use the `orderak-rollback-breakglass` token (Workers Scripts `Edit` only,
+kept offline; see the [token inventory](../governance/cloudflare-token-inventory.md)),
+set as `CLOUDFLARE_API_TOKEN` for that shell only. The owner's own
+`npx wrangler login` also works.
+
+1. **Find the version to return to.** From the repository root, list each
+   Worker's ten most recent deployments, newest last. These commands are
+   read-only:
+
+   ```powershell
+   cd services/backend
+   npx wrangler deployments list --env=""
+   npx wrangler deployments list --config wrangler.admin.jsonc --env=""
+   cd ../../apps/admin-web
+   npx wrangler deployments list --config wrangler.edge.jsonc --env=""
+   ```
+
+   For each Worker, pick the deployment made at the time of the last good
+   release's `production/*` tag. The tag is written right after the smoke test,
+   so the minutes match. For example, release `production/2026-10-20T1838Z`
+   deployed the three Workers at 18:37:56, 18:38:04 and 18:38:17 UTC.
+
+   Do not just take the second-newest entry, and never omit the version ID.
+   Each `wrangler secret put` creates a deployment of its own, listed as
+   `Source: Secret Change`, so the previous entry is not always the previous
+   release. For example, `orderak-worker` has a secret deployment from
+   2026-09-25 between two releases. Without an ID, `wrangler rollback` picks
+   the version uploaded before the latest one, whatever that was.
+
+2. **Roll back**, from the same directories, with the version IDs from step 1:
+
+   ```powershell
+   cd services/backend
+   npx wrangler rollback <version-id> --env="" --message "<incident: reason>"
+   npx wrangler rollback <version-id> --config wrangler.admin.jsonc --env="" --message "<incident: reason>"
+   cd ../../apps/admin-web
+   npx wrangler rollback <version-id> --config wrangler.edge.jsonc --env="" --message "<incident: reason>"
+   ```
+
+   Because `--message` is given, wrangler does not ask for confirmation. The
+   chosen version takes 100% of traffic as soon as the command returns.
+
+3. **Verify** as for a release: `https://api.orderak.app/health`,
+   `https://admin.orderak.app`, and the Worker errors that triggered the
+   rollback.
+
+4. **Record it, then start the pipeline path.** Write the version IDs, time and
+   reason in the incident evidence. Production now runs versions that neither
+   `main` nor the newest `production/*` tag describes. The next `Deploy
+   Production`, whatever its cause, redeploys `main` with the regression still
+   in it.
+
+What a Worker rollback does not change:
+
+- **D1.** No migration is reversed and no row comes back. Production applies
+  migrations *before* it deploys, so each migration is meant to work with the
+  previous release's code: that is the `rollout: expand-contract` rule in
+  `services/backend/scripts/verify-migrations.mjs`. That makes a rollback of one
+  release the case the schema was built for. Even then, the marker only records
+  that its author considered the pairing; it does not prove the pairing holds.
+  No rule at all covers rolling back past two or more releases that carried
+  migrations, so check which schema the older code expects first.
+- **Durable Object state.** `RateLimiter` keeps its storage. Cloudflare refuses a
+  rollback that crosses a Durable Object class migration (the `migrations` array
+  in `services/backend/wrangler.jsonc`). It also refuses one to a version bound
+  to an R2 bucket, KV namespace or queue that no longer exists.
+
+What it does change, beyond the code: **secrets.** A secret belongs to a version,
+which is why `wrangler secret put` creates a deployment. Rolling back past a
+secret change therefore brings the old value back along with the old code. If a
+secret was rotated because it leaked, a rollback past that rotation puts the
+leaked value back in service.
+
+### Pipeline: revert on `main` as a hotfix
+
+The permanent fix is an ordinary [hotfix](#hotfixes) whose change is a revert. It
+passes every release gate, including Staging provenance.
+
+1. Branch from `main`:
+
+   ```powershell
+   git switch main
+   git pull --ff-only
+   git switch -c hotfix/revert-<short-description>
+   ```
+
+2. Revert the bad change. For one feature, revert its squash commit from
+   `develop`, which `main` contains through the promotion that shipped it:
+   `git revert <squash-sha>`. To revert a whole promotion, revert its merge
+   commit against the first parent: `git revert -m 1 <promotion-merge-sha>`.
+3. **If the reverted change added a migration, keep the migration file.**
+   Restore it into the revert commit. Production has already applied it, and D1
+   does not go back. Deleting the file only makes the repository disagree with
+   the remote ledger, and it frees the file's number for a different migration
+   while the ledger still records the old one. If the schema change itself has
+   to be undone, do it with a new forward migration, per the
+   [database migration guide](./database-migrations.md).
+4. Push and open a pull request into `main`. The same checks apply as for any
+   hotfix.
+5. Merge with **Create a merge commit**.
+6. Dispatch `Deploy Staging` with the workflow ref set to `main`, and wait for it
+   to succeed. The revert commit is on an unprotected `hotfix/*` branch, which
+   the `staging` environment refuses (see [Hotfixes](#hotfixes)), so the merge's
+   second parent cannot get a Staging record. The record has to be on the
+   merge commit itself.
+7. Dispatch `Deploy Production` with `main`'s tip, which is the merge commit. The
+   provenance step should print that the release was itself deployed to Staging.
+   This deploy replaces any versions the emergency path rolled back to, which is
+   intended: after it, Production, `main` and the newest `production/*` tag all
+   agree again.
+8. Back-merge `main` into `staging`, then into `develop`, as for every hotfix.
+   Until that is done, `develop` and `staging` still hold the change Production
+   just dropped. Once they carry the revert, re-land the change by reverting the
+   revert on a `fix/*` branch from `develop`, with the fix on top, so it goes
+   through Staging like any other change.
+
+If step 7 fails with "No successful Staging deployment for `<sha>` or its second
+parent", step 6 was skipped or failed. Run step 6, then dispatch Production again
+with the same SHA. If `main` has moved in the meantime, the SHA is no longer the
+tip and will be refused, so start again from step 6 with the new tip.
+
+### Migration problems
+
+A code rollback, by either path, does **not** reverse D1 migrations. Database
+migrations are forward-only unless a reviewed recovery procedure explicitly says
+otherwise.
 For migration problems, stop and follow the [database migration guide](./database-migrations.md)
 and [D1 migration drift runbook](../runbooks/d1-migration-drift.md). Do not edit
 the remote D1 migration ledger manually.
+
+### Staging regressions
 
 For a Staging regression, open a fix or revert pull request into `develop`, run
 the checks, then promote `develop` to `staging` and let the Staging workflow
@@ -659,5 +839,6 @@ least privilege, before the release that needs it.
 | Release services/backend/Admin | Promote `staging` to `main` as a merge commit, then dispatch Production with `main`'s tip |
 | Just shipped a hotfix | Back-merge `main` into `staging` and `develop` before anything else |
 | Release Android publicly | Use the separate, approved Google Play release process when available |
-| Production code regression | Redeploy the last known-good SHA |
+| Production code regression, now | `npx wrangler rollback <version-id>` on each affected Worker, with the owner's Cloudflare credentials. D1 is not reversed. Never re-dispatch an older SHA; Production refuses anything but `main`'s tip |
+| Production code regression, for good | Revert on `main` as a hotfix, dispatch `Deploy Staging` against `main`, then `Deploy Production` with `main`'s tip, then back-merge |
 | Production migration problem | Use the migration runbook; do not assume code rollback reverses data changes |

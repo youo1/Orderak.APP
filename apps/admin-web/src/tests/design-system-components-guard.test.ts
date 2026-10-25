@@ -121,16 +121,16 @@ describe('verify-design-system-components.mjs', () => {
     expect(result.output).toContain('ZzUnusedProbe.kt');
   }, 120_000);
 
-  it('fails when FeatureAvailabilityChip loses its only main-source caller, even though the inventory still lists it', () => {
+  it('fails when GateNotice loses its only main-source caller, even though the inventory still lists it', () => {
     const root = sandbox();
     const gate = path.join(root, CORE_UI, 'FeatureGate.kt');
     const text = readFileSync(gate, 'utf8');
-    expect(text).toContain('FeatureAvailabilityChip');
-    writeFileSync(gate, text.replace(/FeatureAvailabilityChip/g, 'ZzRemovedCall'));
+    expect(text).toContain('GateNotice');
+    writeFileSync(gate, text.replace(/GateNotice/g, 'ZzRemovedCall'));
     const result = run(root);
     expect(result.status, result.output).not.toBe(0);
-    expect(result.output).toContain('FeatureAvailabilityChip');
-    expect(result.output).toContain('SemanticChip.kt');
+    expect(result.output).toContain('GateNotice');
+    expect(result.output).toContain('FeedbackComponents.kt');
   }, 120_000);
 
   it('fails on a reintroduced unused admin export, even when a test imports it', () => {
@@ -176,12 +176,12 @@ describe('verify-design-system-components.mjs', () => {
     const root = sandbox();
     const inventory = path.join(root, INVENTORY);
     const lines = readFileSync(inventory, 'utf8').split(/\r?\n/);
-    const rows = rowsNaming(lines, 'FeatureAvailabilityChip');
-    expect(rows, 'exactly one inventory row names FeatureAvailabilityChip').toHaveLength(1);
+    const rows = rowsNaming(lines, 'SemanticChip');
+    expect(rows, 'exactly one inventory row names SemanticChip').toHaveLength(1);
     writeFileSync(inventory, lines.filter((_, index) => index !== rows[0]).join('\n'));
     const result = run(root);
     expect(result.status, result.output).not.toBe(0);
-    expect(result.output).toContain('FeatureAvailabilityChip');
+    expect(result.output).toContain('SemanticChip');
     expect(result.output).toContain('SemanticChip.kt');
     expect(result.output).toContain('design-system-components.md');
   }, 120_000);
@@ -190,10 +190,10 @@ describe('verify-design-system-components.mjs', () => {
     const root = sandbox();
     const inventory = path.join(root, INVENTORY);
     const lines = readFileSync(inventory, 'utf8').split(/\r?\n/);
-    const rows = rowsNaming(lines, 'FeatureAvailabilityChip');
+    const rows = rowsNaming(lines, 'SemanticChip');
     expect(rows).toHaveLength(1);
     const original = lines[rows[0]];
-    const ghostCells = cells(original).map((cell) => (normalise(cell) === 'FeatureAvailabilityChip' ? ' `ZzGhostChip` ' : cell));
+    const ghostCells = cells(original).map((cell) => (normalise(cell) === 'SemanticChip' ? ' `ZzGhostChip` ' : cell));
     const ghost = `|${ghostCells.join('|')}|`;
     lines.splice(rows[0] + 1, 0, ghost);
     writeFileSync(inventory, lines.join('\n'));
@@ -207,8 +207,8 @@ describe('verify-design-system-components.mjs', () => {
     const root = sandbox();
     const inventory = path.join(root, INVENTORY);
     const lines = readFileSync(inventory, 'utf8').split(/\r?\n/);
-    const rows = rowsNaming(lines, 'FeatureAvailabilityChip');
-    expect(rows, 'exactly one inventory row names FeatureAvailabilityChip').toHaveLength(1);
+    const rows = rowsNaming(lines, 'SemanticChip');
+    expect(rows, 'exactly one inventory row names SemanticChip').toHaveLength(1);
     const original = lines[rows[0]];
     const correctPath = 'apps/seller-android/app/src/main/java/app/orderak/seller/core/ui/SemanticChip.kt';
     const wrongPath = 'apps/seller-android/app/src/main/java/app/orderak/seller/core/ui/theme/SemanticChip.kt';
@@ -217,7 +217,7 @@ describe('verify-design-system-components.mjs', () => {
     writeFileSync(inventory, lines.join('\n'));
     const result = run(root);
     expect(result.status, result.output).not.toBe(0);
-    expect(result.output).toContain('FeatureAvailabilityChip');
+    expect(result.output).toContain('SemanticChip');
     expect(result.output).toContain(correctPath);
     expect(result.output).toContain(wrongPath);
   }, 120_000);
@@ -291,17 +291,17 @@ describe('verify-design-system-components.mjs', () => {
     const headerIndex = lines.findIndex((line) => cells(line).map((cell) => cell.trim()).includes('Callers'));
     expect(headerIndex, 'inventory header names a Callers column').not.toBe(-1);
     const callersIndex = cells(lines[headerIndex]).map((cell) => cell.trim()).indexOf('Callers');
-    const rows = rowsNaming(lines, 'SyncStatusBanner');
-    expect(rows, 'exactly one inventory row names SyncStatusBanner').toHaveLength(1);
+    const rows = rowsNaming(lines, 'GateNotice');
+    expect(rows, 'exactly one inventory row names GateNotice').toHaveLength(1);
     const rowCells = cells(lines[rows[0]]);
-    expect(rowCells[callersIndex]).toContain('MainScreen.kt');
+    expect(rowCells[callersIndex]).toContain('FeatureGate.kt');
     rowCells[callersIndex] = ' ';
     lines[rows[0]] = `|${rowCells.join('|')}|`;
     writeFileSync(inventory, lines.join('\n'));
     const result = run(root);
     expect(result.status, result.output).not.toBe(0);
-    expect(result.output).toContain('SyncStatusBanner');
-    expect(result.output).toContain('MainScreen.kt');
+    expect(result.output).toContain('GateNotice');
+    expect(result.output).toContain('FeatureGate.kt');
     expect(result.output).toContain('design-system-components.md');
   }, 120_000);
 

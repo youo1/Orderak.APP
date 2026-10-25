@@ -10,8 +10,8 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.tooling.preview.Preview
-import app.orderak.seller.core.ui.NoticeBanner
-import app.orderak.seller.core.ui.SemanticRole
+import app.orderak.seller.core.ui.Banner
+import app.orderak.seller.core.ui.BannerState
 import app.orderak.seller.core.ui.theme.OrderakTheme
 import com.android.tools.screenshot.PreviewTest
 
@@ -188,8 +188,8 @@ fun todayErrorDark() {
 
 @Composable
 private fun offlineNotice() {
-    NoticeBanner(
-        role = SemanticRole.Info,
+    Banner(
+        state = BannerState.Information,
         title = "يتم استخدام إعدادات الباقة المحفوظة",
         message = "حدود الخطة المعروضة هي آخر حاجة اتزامنت. هتتحدّث أول ما الاتصال يرجع.",
     )

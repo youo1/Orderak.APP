@@ -66,12 +66,14 @@ function activeTrivyLines(text: string): string[] {
 }
 
 describe('pnpm-workspace.yaml: new bounded overrides', () => {
-  it('overrides undici to >=7.29.1 <8, citing both advisories', () => {
-    const idx = findLineIndexContaining(workspaceYaml, /undici(@\S+)?:\s*">=7\.29\.1 <8"/);
+  // The floor moved from 7.29.1 to 7.30.1 on 2026-10-25 for GHSA-xjj6-f33q-929c.
+  it('overrides undici to >=7.30.1 <8, citing all three advisories', () => {
+    const idx = findLineIndexContaining(workspaceYaml, /undici(@\S+)?:\s*">=7\.30\.1 <8"/);
     expect(idx).toBeGreaterThanOrEqual(0);
     const ctx = nearbyTextBefore(workspaceYaml, idx);
     expect(ctx).toContain('GHSA-rfgv-xxqx-mfg5');
     expect(ctx).toContain('GHSA-w293-vg96-wgc3');
+    expect(ctx).toContain('GHSA-xjj6-f33q-929c');
   });
 
   it('overrides brace-expansion 1.x to >=1.1.20 <2, citing both advisories', () => {
@@ -106,17 +108,29 @@ describe('pnpm-workspace.yaml: new bounded overrides', () => {
   });
 });
 
-describe('pnpm-workspace.yaml: braces and sharp waivers', () => {
-  it('ignoreGhsas is exactly the two existing ids plus the braces and sharp waivers', () => {
+describe('pnpm-workspace.yaml: braces, sharp and zod waivers', () => {
+  it('ignoreGhsas is exactly the two existing ids plus the braces, sharp and zod waivers', () => {
     const ids = extractIgnoreGhsas(workspaceYaml);
     expect(new Set(ids)).toEqual(
       new Set([
+        'GHSA-mrhx-c7xc-m3w5',
         'GHSA-qxc2-j82w-r537',
         'GHSA-rgj7-g3m4-5g8c',
         'GHSA-vfj7-8cjw-p6xm',
         'GHSA-wq5f-xc86-pv6w',
       ]),
     );
+  });
+
+  it('the GHSA-mrhx-c7xc-m3w5 waiver documents the exact pin, the test-pool reason and 2026-11-05 expiry', () => {
+    const idx = findLineIndexContaining(workspaceYaml, /^# GHSA-mrhx-c7xc-m3w5 \(high, CVE-2023-54404\)/);
+    expect(idx).toBeGreaterThanOrEqual(0);
+    const ctx = workspaceYaml.split(/\r?\n/).slice(idx, idx + 12).join('\n').toLowerCase();
+    expect(ctx).toContain('@cloudflare/vitest-pool-workers@0.23.0');
+    expect(ctx).toContain('pins exactly');
+    expect(ctx).toContain('4.6.6');
+    expect(ctx).toContain('never in a worker');
+    expect(ctx).toContain('2026-11-05');
   });
 
   it('the GHSA-vfj7-8cjw-p6xm entry documents CVE, reason and 2026-11-05 expiry', () => {
@@ -141,15 +155,26 @@ describe('pnpm-workspace.yaml: braces and sharp waivers', () => {
   });
 });
 
-describe('.trivyignore: braces and sharp waivers', () => {
-  it('contains exactly the existing undici waiver plus the new braces and sharp waivers', () => {
+describe('.trivyignore: braces, sharp and zod waivers', () => {
+  it('contains exactly the existing undici waiver plus the braces, sharp and zod waivers', () => {
     expect(new Set(activeTrivyLines(trivyIgnore))).toEqual(
       new Set([
         'CVE-2026-85024 exp:2026-12-31',
         'CVE-2026-93687 exp:2026-11-05',
         'GHSA-wq5f-xc86-pv6w exp:2026-11-05',
+        'CVE-2023-54404 exp:2026-11-05',
       ]),
     );
+  });
+
+  it('the CVE-2023-54404 entry documents the zod advisory, the test-pool reason and 2026-11-05 expiry', () => {
+    const idx = findLineIndexContaining(trivyIgnore, /^CVE-2023-54404 exp:2026-11-05$/);
+    expect(idx).toBeGreaterThanOrEqual(0);
+    const ctx = nearbyTextBefore(trivyIgnore, idx, 14).toLowerCase();
+    expect(ctx).toContain('ghsa-mrhx-c7xc-m3w5');
+    expect(ctx).toContain('@cloudflare/vitest-pool-workers@0.23.0');
+    expect(ctx).toContain('4.6.6');
+    expect(ctx).toContain('2026-11-05');
   });
 
   it('the CVE-2026-93687 entry documents the reason and 2026-11-05 expiry', () => {
@@ -174,12 +199,20 @@ describe('.trivyignore: braces and sharp waivers', () => {
 });
 
 describe('pnpm-lock.yaml: resolved versions land inside the overridden ranges', () => {
-  it('undici resolves to >=7.29.1 <8 everywhere it appears', () => {
+  it('undici resolves to >=7.30.1 <8 everywhere it appears', () => {
     const versions = collectVersions(lockfile, 'undici');
     expect(versions.length).toBeGreaterThan(0);
     for (const v of versions) {
-      expect(gte(v, '7.29.1')).toBe(true);
+      expect(gte(v, '7.30.1')).toBe(true);
       expect(lt(v, '8.0.0')).toBe(true);
+    }
+  });
+
+  it('postal-mime, which parses inbound email in the Worker, resolves past GHSA-f2hq-32vh-53cc (>=4.0.8)', () => {
+    const versions = collectVersions(lockfile, 'postal-mime');
+    expect(versions.length).toBeGreaterThan(0);
+    for (const v of versions) {
+      expect(gte(v, '4.0.8')).toBe(true);
     }
   });
 
@@ -208,15 +241,41 @@ describe('pnpm-lock.yaml: resolved versions land inside the overridden ranges', 
     }
   });
 
-  it('sharp keeps its pre-existing resolved versions with no override-forced upgrade', () => {
+  it('sharp keeps the versions its miniflare parents pin, with no override-forced upgrade', () => {
+    // 0.35.2 is the miniflare that @cloudflare/vitest-pool-workers pins exactly;
+    // 0.35.5 is the miniflare under wrangler 4.149.0. Both waivers stay while 0.35.2 does.
     const versions = collectVersions(lockfile, 'sharp');
     expect(versions.length).toBeGreaterThan(0);
-    expect(new Set(versions)).toEqual(new Set(['0.35.2', '0.35.4']));
+    expect(new Set(versions)).toEqual(new Set(['0.35.2', '0.35.5']));
   });
 
   it('braces still resolves to 3.0.3 (no fixed release exists to move to)', () => {
     const versions = collectVersions(lockfile, 'braces');
     expect(versions.length).toBeGreaterThan(0);
     expect(versions.every((v) => v === '3.0.3')).toBe(true);
+  });
+
+  it('fast-uri resolves to >=3.1.8 <4 everywhere it appears (GHSA-hrr3-gc8f-f4qj)', () => {
+    const versions = collectVersions(lockfile, 'fast-uri');
+    expect(versions.length).toBeGreaterThan(0);
+    for (const v of versions) {
+      expect(gte(v, '3.1.8')).toBe(true);
+      expect(lt(v, '4.0.0')).toBe(true);
+    }
+  });
+
+  it('the only zod below 4.6.6 is the 4.4.3 the waived test pool pins', () => {
+    const vulnerable = collectVersions(lockfile, 'zod').filter((v) => lt(v, '4.6.6'));
+    expect(vulnerable.length).toBeGreaterThan(0);
+    expect(new Set(vulnerable)).toEqual(new Set(['4.4.3']));
+  });
+});
+
+describe('pnpm-workspace.yaml: the fast-uri floor', () => {
+  it('overrides fast-uri to >=3.1.8 <4, citing the advisory that raised it', () => {
+    const idx = findLineIndexContaining(workspaceYaml, /fast-uri@<3\.1\.8:\s*">=3\.1\.8 <4"/);
+    expect(idx).toBeGreaterThanOrEqual(0);
+    const ctx = nearbyTextBefore(workspaceYaml, idx);
+    expect(ctx).toContain('GHSA-hrr3-gc8f-f4qj');
   });
 });

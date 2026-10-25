@@ -45,11 +45,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import app.orderak.seller.core.ui.FullScreenLoading
 import app.orderak.seller.R
 import app.orderak.seller.data.db.ProductEntity
-import app.orderak.seller.core.ui.NoticeBanner
-import app.orderak.seller.core.ui.SemanticRole
+import app.orderak.seller.core.ui.Banner
+import app.orderak.seller.core.ui.BannerState
 import app.orderak.seller.core.ui.theme.LocalOrderakMotion
 import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 import app.orderak.seller.core.money.DEFAULT_CURRENCY
@@ -57,6 +56,8 @@ import app.orderak.seller.core.money.formatAmount
 import app.orderak.seller.core.money.formatAmountLabel
 import app.orderak.seller.core.text.formatCount
 import app.orderak.seller.domain.PayMethod
+import app.orderak.seller.core.ui.Skeleton
+import app.orderak.seller.core.ui.SkeletonVariant
 
 /** S7 — convert a chat into a structured order in <30s (quick form + qty steppers). */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -187,7 +188,7 @@ fun NewOrderContent(
             if (catalogue == null) {
                 // Not read yet. Saying "you have no products" here would tell a
                 // seller mid-sale that they have nothing to sell.
-                item { FullScreenLoading() }
+                item { Skeleton(SkeletonVariant.ListRows, Modifier.padding(LocalOrderakSpacing.current.space4)) }
             } else if (catalogue.isEmpty()) {
                 // `products_empty` is the store surface's copy, and it sends the
                 // seller to a ➕: "tap ➕ and add your first product with a photo".
@@ -267,8 +268,8 @@ fun NewOrderContent(
                 // Red text alone. A seller who cannot distinguish it from the
                 // label above never learns the order was blocked on stock.
                 item {
-                    NoticeBanner(
-                        role = SemanticRole.Danger,
+                    Banner(
+                        state = BannerState.Error,
                         title = stringResource(R.string.order_stock_error),
                         message = stringResource(R.string.order_stock_error_body),
                     )
@@ -279,8 +280,8 @@ fun NewOrderContent(
                 // The "—" total says something is wrong without saying what. This
                 // says what, and what to do about it.
                 item {
-                    NoticeBanner(
-                        role = SemanticRole.Danger,
+                    Banner(
+                        state = BannerState.Error,
                         title = stringResource(R.string.order_mixed_currency_title),
                         message = stringResource(R.string.order_mixed_currency_body),
                     )
@@ -291,8 +292,8 @@ fun NewOrderContent(
                 // The write failed and the draft survived, so the honest thing to
                 // say is that nothing was lost and the button is still there.
                 item {
-                    NoticeBanner(
-                        role = SemanticRole.Danger,
+                    Banner(
+                        state = BannerState.Error,
                         title = stringResource(R.string.order_save_failed_title),
                         message = stringResource(R.string.order_save_failed_body),
                     )

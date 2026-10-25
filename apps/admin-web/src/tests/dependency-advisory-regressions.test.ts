@@ -31,7 +31,8 @@ describe('pnpm-workspace.yaml: pre-existing overrides are untouched', () => {
   it('keeps the five overrides unrelated to this task, verbatim', () => {
     expect(workspaceYaml).toContain('lodash@<4.17.24: ">=4.17.24"');
     expect(workspaceYaml).toContain('uuid@<11.1.1: ">=11.1.1"');
-    expect(workspaceYaml).toContain('fast-uri@<3.1.6: ">=3.1.7 <4"');
+    // Raised on purpose on 2026-10-24 for GHSA-hrr3-gc8f-f4qj; still inside major 3.
+    expect(workspaceYaml).toContain('fast-uri@<3.1.8: ">=3.1.8 <4"');
     expect(workspaceYaml).toContain('qs@<6.16.0: ">=6.16.0"');
     expect(workspaceYaml).toContain('js-yaml@<3.15.2: ">=3.15.2 <4"');
   });
