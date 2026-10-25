@@ -123,6 +123,7 @@ describe("Sentry data collection", () => {
 		for (const options of optionsSeen) {
 			expect(options?.dsn).toBe(DSN);
 			expect(options?.tracePropagationTargets).toEqual([]);
+			expect(options?.traceLifecycle).toBe("stream");
 			expect(options?.dataCollection).toMatchObject({
 				userInfo: false,
 				cookies: false,

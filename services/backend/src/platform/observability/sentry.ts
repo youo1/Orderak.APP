@@ -61,6 +61,9 @@ export function sentryOptions(env: { SENTRY_DSN?: string }): CloudflareOptions {
 		// Without this, every outgoing call (Google, DeepSeek, Turnstile) carries
 		// Sentry's trace headers, which name this project to someone else.
 		tracePropagationTargets: [],
+		// Span streaming, the default, pinned: in static mode Sentry skips this
+		// beforeSendSpan, and a SENTRY_TRACE_LIFECYCLE variable can choose it.
+		traceLifecycle: "stream",
 		beforeSend(event) {
 			if (event.request?.url) event.request.url = redactUrl(event.request.url);
 			if (event.transaction) event.transaction = redactUrl(event.transaction);
@@ -69,9 +72,10 @@ export function sentryOptions(env: { SENTRY_DSN?: string }): CloudflareOptions {
 			}
 			return event;
 		},
+		// If this throws, Sentry sends the span unmodified, so it must not.
 		beforeSendSpan(span) {
 			span.name = redactUrl(span.name);
-			const attributes = span.attributes as Record<string, unknown>;
+			const attributes = (span.attributes ?? {}) as Record<string, unknown>;
 			for (const [key, value] of Object.entries(attributes)) {
 				if (typeof value === "string") {
 					attributes[key] = redactUrl(value);
