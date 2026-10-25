@@ -354,7 +354,7 @@ file calls `ModalBottomSheet`. The rules are checked on the kit's own previews a
 
 These tests reach the previews by name, so they compile on a tree where the kit
 does not exist yet and fail by assertion there. `SheetPickerSearchTest` locks the
-picker's Arabic-aware matching (a bare alef finds the alef with hamza, a teh
+picker's Arabic-aware matching (the shared `SearchText` folding) (a bare alef finds the alef with hamza, a teh
 marbuta typed as heh still matches), so a seller is not offered a manual entry
 for a name the list has. Two rules belong to the caller and are not enforced by
 the kit: the destructive confirmation's verb (the caller passes `confirmLabel`;

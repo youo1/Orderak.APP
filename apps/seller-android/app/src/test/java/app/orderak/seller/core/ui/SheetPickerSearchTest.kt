@@ -6,7 +6,6 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -72,11 +71,5 @@ class SheetPickerSearchTest {
         show("قنا")
         rule.onAllNodesWithText("use as entered").assertCountEquals(1)
         rule.onAllNodesWithText("no match").assertCountEquals(1)
-    }
-
-    @Test
-    fun theComparisonFormDropsVowelMarksAndTatweel() {
-        assertEquals(searchForm("مُحَمَّد"), searchForm("محمد"))
-        assertEquals(searchForm("كـتاب"), searchForm("كتاب"))
     }
 }

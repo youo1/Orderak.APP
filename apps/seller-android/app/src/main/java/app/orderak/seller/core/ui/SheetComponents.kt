@@ -39,6 +39,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import app.orderak.seller.core.text.SearchText
 import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 import app.orderak.seller.core.ui.theme.full
 
@@ -78,28 +79,6 @@ data class SheetAction(
 
 /** One choice in a [PickerSheet]. [key] identifies it; [label] is what the seller reads. */
 data class PickerOption(val key: String, val label: String)
-
-/**
- * A label or a query in the form the picker compares: lower case, with the
- * Arabic spellings a seller types interchangeably made one. Typing «الاسكندرية»
- * must find «الإسكندرية», or the sheet would offer a manual entry for a city
- * the list already has and the seller could create a duplicate.
- *
- * Alef with hamza or madda and alef wasla become a bare alef, alef maksura
- * becomes yeh, teh marbuta becomes heh, and the vowel marks and the tatweel go.
- */
-internal fun searchForm(text: String): String = buildString {
-    for (char in text.lowercase()) {
-        when (char) {
-            '\u0623', '\u0625', '\u0622', '\u0671' -> append('\u0627')
-            '\u0649' -> append('\u064A')
-            '\u0629' -> append('\u0647')
-            '\u0640' -> Unit
-            in '\u064B'..'\u065F', '\u0670' -> Unit
-            else -> append(char)
-        }
-    }
-}
 
 /**
  * The frame every sheet shares: a rounded top edge, a handle, a pinned header,
@@ -298,14 +277,17 @@ fun PickerSheet(
     val spacing = LocalOrderakSpacing.current
     val searchable = mode == PickerSheetMode.SearchableWithManualEntry
     val trimmed = query.trim()
-    val needle = searchForm(trimmed)
+    // The same folding the customer and product searches use: the spellings of an
+    // Arabic name a seller types interchangeably find each other, so the sheet
+    // does not offer a manual entry for a name the list already has.
+    val needle = SearchText.fold(trimmed)
     val shown = if (searchable && trimmed.isNotEmpty()) {
-        options.filter { searchForm(it.label).contains(needle) }
+        options.filter { SearchText.matches(trimmed, it.label) }
     } else {
         options
     }
     val offerManualEntry = searchable && trimmed.isNotEmpty() &&
-        options.none { searchForm(it.label) == needle }
+        options.none { SearchText.fold(it.label) == needle }
     SheetFrame(
         modifier = modifier,
         header = {
