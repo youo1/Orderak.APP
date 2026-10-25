@@ -9,12 +9,12 @@ packages:
 # content-addressable store (and its disk savings) with a compatible layout.
 nodeLinker: hoisted
 
-# workerd, esbuild, and @sentry/cli download platform-specific binaries in a
-# postinstall script — without these the Workers runtime and bundler cannot run.
+# workerd and esbuild download platform-specific binaries in a postinstall
+# script — without these the Workers runtime and bundler cannot run.
+# @sentry/vite-plugin 11 no longer uses @sentry/cli, so it has no entry here.
 # @scarf/scarf is install analytics only, so it stays disabled.
 allowBuilds:
   '@scarf/scarf': false
-  '@sentry/cli': true
   esbuild: true
   workerd: true
 
