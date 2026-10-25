@@ -591,4 +591,15 @@
         <item>Fayoum</item>
         <item>Zagazig</item>
     </string-array>
+    <string name="field_preview_name_label">Nom de la boutique</string>
+    <string name="field_preview_name_value">Boutique Nour</string>
+    <string name="field_preview_name_helper">Vos clients voient ce nom</string>
+    <string name="field_preview_name_error">Saisissez le nom de la boutique</string>
+    <string name="field_preview_phone_label">Numéro de téléphone</string>
+    <string name="field_preview_phone_error">Saisissez un numéro valide</string>
+    <string name="field_preview_country">Égypte</string>
+    <string name="field_preview_price_label">Prix</string>
+    <string name="field_preview_price_error">Saisissez un prix</string>
+    <string name="field_preview_currency">EGP</string>
+    <string name="field_preview_otp_error">Le code est incorrect</string>
 </resources>

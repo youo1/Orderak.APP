@@ -617,4 +617,15 @@
         <item>الفيوم</item>
         <item>الزقازيق</item>
     </string-array>
+    <string name="field_preview_name_label">اسم المتجر</string>
+    <string name="field_preview_name_value">متجر نور</string>
+    <string name="field_preview_name_helper">يراه عملاؤك</string>
+    <string name="field_preview_name_error">أدخل اسم المتجر</string>
+    <string name="field_preview_phone_label">رقم الهاتف</string>
+    <string name="field_preview_phone_error">أدخل رقم هاتف صحيحًا</string>
+    <string name="field_preview_country">مصر</string>
+    <string name="field_preview_price_label">السعر</string>
+    <string name="field_preview_price_error">أدخل السعر</string>
+    <string name="field_preview_currency">ج.م</string>
+    <string name="field_preview_otp_error">الرمز غير صحيح</string>
 </resources>

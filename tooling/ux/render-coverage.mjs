@@ -198,6 +198,21 @@ export const RENDERS = {
   snackbarFailureWithRetry: { kind: "component", state: "FailureWithRetry", note: "Snackbar for a failure, with retry" },
   snackbarNoAction: { kind: "component", state: "NoAction", note: "Snackbar with no action" },
 
+  // R1b-1: the text-entry kit, in the eight-variant matrix. All four are kit-pending.
+  textFieldEmpty: { kind: "component", state: "Empty", note: "TextField empty, required mark" },
+  textFieldFilled: { kind: "component", state: "Filled", note: "TextField with a value" },
+  textFieldRequiredError: { kind: "component", state: "RequiredError", note: "TextField error replacing the helper" },
+  textFieldHelperAndCounter: { kind: "component", state: "HelperAndCounter", note: "TextField with a helper and a counter" },
+  textFieldDisabled: { kind: "component", state: "Disabled", note: "TextField switched off" },
+  phoneFieldEmpty: { kind: "component", state: "Empty", note: "PhoneField empty, left to right" },
+  phoneFieldFilled: { kind: "component", state: "Filled", note: "PhoneField with a number" },
+  phoneFieldError: { kind: "component", state: "Error", note: "PhoneField with an error under the row" },
+  moneyFieldFilled: { kind: "component", state: "Filled", note: "MoneyField in the locale's digits with the currency" },
+  moneyFieldError: { kind: "component", state: "Error", note: "MoneyField with an error" },
+  otpFieldEmpty: { kind: "component", state: "Empty", note: "OtpField, first cell active" },
+  otpFieldPartial: { kind: "component", state: "Partial", note: "OtpField part filled" },
+  otpFieldError: { kind: "component", state: "Error", note: "OtpField failed, error under the cells" },
+
   componentGalleryLight: { kind: "component", note: "the shared component vocabulary, light" },
   componentGalleryDark: { kind: "component", note: "the shared component vocabulary, dark" },
   componentGalleryGreyscale: { kind: "component", note: "the vocabulary survives greyscale" },

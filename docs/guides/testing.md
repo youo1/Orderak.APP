@@ -324,6 +324,26 @@ are still marked `kit-pending`, with adopter `R2` in their own column;
 row only when that adopter is named, and fails if the component gains a
 production caller while still pending.
 
+### Shared input components
+
+`TextField`, `PhoneField`, `MoneyField` and `OtpField` live in
+`app/src/main/java/app/orderak/seller/core/ui/InputComponents.kt`. All four are
+`kit-pending`, adopted by the surfaces that ask for the input (R3 for the entry
+screens, R6 for the price); the 38 raw `OutlinedTextField` calls stay until their
+screen is redesigned. The thirteen `@PreviewTest` functions in
+`app/src/screenshotTest/java/app/orderak/seller/core/ui/InputFieldScreenshotTest.kt`
+carry `FeedbackPreviews`.
+
+- `InputFieldTextRulesTest` is the text the money and phone fields let through:
+  Arabic-Indic digits become Latin ones, the Arabic decimal separator and the
+  comma are a dot, a second separator is ignored, a currency with no minor unit
+  takes none.
+- `InputFieldBehaviourTest` runs the fields in Arabic: the required mark, the
+  error replacing the helper and being the semantic error, the counter in
+  Arabic-Indic digits, `onLeave` called once when focus moves away, the amount
+  drawn in the locale's digits, the phone row left to right with a 48dp country
+  button, and six code cells in left-to-right order that take only digits.
+
 ### Shared overlay components
 
 `BottomSheet`, `PickerSheet` and `ConfirmSheet` live in
