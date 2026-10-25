@@ -185,6 +185,19 @@ export const RENDERS = {
   gateNoticeLockedByPlanPurchaseClosed: { kind: "component", state: "LockedByPlanPurchaseClosed", note: "GateNotice locked by plan, nothing to press while purchase is closed" },
   gateNoticeNotBuilt: { kind: "component", state: "NotBuilt", note: "GateNotice not built: no chip, no button" },
 
+  // R1a-2: the overlay kit, in the same eight-variant matrix. A sheet is drawn
+  // over a visible screen and a scrim, not inside a ModalBottomSheet window the
+  // harness does not capture. All four are kit-pending (adopter R2).
+  bottomSheetActions: { kind: "component", state: "ActionList", note: "BottomSheet action list with a pinned closing action" },
+  pickerSheetSingleChoice: { kind: "component", state: "SingleChoice", note: "PickerSheet single choice, long list scrolling inside the 90% bound" },
+  pickerSheetSearchableWithManualEntry: { kind: "component", state: "SearchableWithManualEntry", note: "PickerSheet searchable, no match, offering the value as entered" },
+  confirmSheetDestructive: { kind: "component", state: "Destructive", note: "ConfirmSheet destructive, with the destructive verb" },
+  confirmSheetRegular: { kind: "component", state: "Regular", note: "ConfirmSheet regular" },
+  confirmSheetInProgress: { kind: "component", state: "InProgress", note: "ConfirmSheet in progress, both buttons disabled" },
+  snackbarUndo: { kind: "component", state: "Undo", note: "Snackbar with undo" },
+  snackbarFailureWithRetry: { kind: "component", state: "FailureWithRetry", note: "Snackbar for a failure, with retry" },
+  snackbarNoAction: { kind: "component", state: "NoAction", note: "Snackbar with no action" },
+
   componentGalleryLight: { kind: "component", note: "the shared component vocabulary, light" },
   componentGalleryDark: { kind: "component", note: "the shared component vocabulary, dark" },
   componentGalleryGreyscale: { kind: "component", note: "the vocabulary survives greyscale" },

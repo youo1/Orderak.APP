@@ -124,7 +124,7 @@ The rules run as follows:
 |------|------|-------|-----------|
 | 1 — `Label` | merged | every node with an `OnClick` action or `ToggleableState` exposes `ContentDescription` or `Text` | non-blank |
 | 2 — `Target` | merged | Compose `touchBoundsInRoot` at least 48dp on both axes, and no overlap with another actionable node unless one is an ancestor | ≥ 48dp |
-| 3 — `Contrast` | unmerged | for every semantics root (`onAllNodes(isRoot())`, so dialog windows are audited too) crop each text node's `boundsInRoot` from that root's `captureToImage()` and measure it with ATF's `ContrastSwatch`, built directly from a `BitmapImage` over the captured bitmap and the node's bounds | ≥ 4.5:1 normal; ≥ 3:1 large (≥ 18sp, or ≥ 14sp at weight ≥ 700) |
+| 3 — `Contrast` | unmerged | for every active semantics root (`onAllNodes(isRoot())`: the activity, and each dialog or popup window) crop each text node's `boundsInRoot` from that root's own pixels and measure it with ATF's `ContrastSwatch`, built directly from a `BitmapImage` over the captured bitmap and the node's bounds | ≥ 4.5:1 normal; ≥ 3:1 large (≥ 18sp, or ≥ 14sp at weight ≥ 700) |
 
 A node counts as disabled when it or any ancestor (the `node.parent` chain)
 carries `SemanticsProperties.Disabled`: the unmerged `Text` child of a disabled
@@ -132,17 +132,17 @@ carries `SemanticsProperties.Disabled`: the unmerged `Text` child of a disabled
 inactive controls. Disabled, zero-size, and empty-`touchBoundsInRoot` nodes are
 skipped for `Label` and `Target`. The separately specified zero-size node
 exclusion is the only `Contrast` skip: a text node with non-zero size whose
-`boundsInRoot` is empty or whose crop does not intersect that root's captured
-image is an empty or out-of-image crop and fails the audit naming the preview,
-node text, and bounds, never a silent skip. Skipped nodes are counted in the per-preview `println` summary, not reported. Rule 2 uses Compose touch
+crop does not intersect that root's captured image, even after its scroll
+container has been moved to show it, is an out-of-image crop and fails the audit
+naming the preview, node text, and bounds, never a silent skip. Skipped nodes are counted in the per-preview `println` summary, not reported. Rule 2 uses Compose touch
 bounds, never drawn component dimensions. Rule 3 measures one text node at a
 time, never merged row pixels; the large-text decision comes from the node's
 `GetTextLayoutResult`, and an unspecified size counts as normal. Image-only nodes
 produce no `Contrast` diagnostic, and the audit never touches the network.
 `ContrastSwatch` is referenced directly at compile time, never reflectively, and
 there is no hand-written contrast fallback: a crop ATF finds to be a single
-colour (the dialog window is not captured under Robolectric) is reported as
-`Contrast not measurable` rather than a fabricated ratio, and any other
+colour is reported as `Contrast not measurable` rather than a fabricated
+ratio, and any other
 measurement failure fails the audit with the preview and node text. Each preview case aggregates the diagnostics from
 every locale variant; diagnostics not matched by `KNOWN_FINDINGS` fail the named
 `<File>ScreenshotTestKt <function>` case with the full finding text, so a real
@@ -162,6 +162,35 @@ below 3:1) must each fail with a diagnostic naming its intended rule, with
 accessible controls that produce no diagnostics, so an audit that fails
 everything cannot satisfy them.
 
+**Windows and the fold.** `AccessibilityAuditWindowsAcceptanceTest` locks how far
+the audit reaches:
+
+- A dialog is its own window with its own pixels. The activity's capture returns
+  the activity's surface, so a dialog or popup root is drawn from its own view
+  and its text is measured against its own surface. A dialog whose text has
+  failing contrast produces a measured `Contrast` finding naming the preview and
+  the locale, and a compliant dialog produces none.
+- `auditAccessibility(rule, preview, capture)` takes the function that reads a
+  root's pixels. A root that has text but whose pixels cannot be read is a
+  `Contrast` finding ("in a window that was not captured"), never a pass.
+- Text that is not wholly in the frame, hidden or only partly shown, is measured
+  where a seller would read it. Its nearest scroll container is moved just far
+  enough to show it whole (trying the other direction when a horizontal
+  container runs against the layout direction), the root is captured again, the
+  text is measured and the container goes back. The way back is read from the
+  container's own scroll values, not from the amount asked for, because a scroll
+  stops at the ends of its content; if it cannot be restored, or the root cannot
+  be captured again, that is a finding, never a stale measurement.
+  `boundsInRoot` is clipped to the node's ancestors, so a node under the fold
+  has empty bounds; its place comes from its position and size. Text that no
+  scroll container can bring into the frame still fails as out of the image.
+- Touch targets are compared where a finger can reach them: a scroll container
+  clips its rows, so a row half scrolled out of sight does not overlap the
+  button pinned beside the container.
+- A dialog is drawn onto a transparent bitmap, so its text must sit on the
+  dialog's own surface; text placed straight on the scrim has nothing opaque
+  behind it to measure.
+
 **Blocked findings (`KNOWN_FINDINGS`).** Findings whose smallest correct fix
 changes pixels, while the exact affected reference PNG is not individually
 listed in `allowed_files`, are recorded in the `KNOWN_FINDINGS` list in
@@ -171,18 +200,11 @@ control is not measured, because WCAG 1.4.3 exempts inactive components.
 
 | Preview | Rule | Node text / kind | Reason | Plan |
 |---|---|---|---|---|
-| `ProductEditScreenshotTestKt.productEditConfirmDelete` | Contrast | `text "إلغاء"` | Dialog window not captured under Robolectric | R1 — audit dialog window capture and colour tokens |
-| `ProductEditScreenshotTestKt.productEditConfirmDelete` | Contrast | `text "امسح المنتج"` | Dialog window not captured under Robolectric | R1 — audit dialog window capture and colour tokens |
-| `ProductEditScreenshotTestKt.productEditConfirmDelete` | Contrast | `text "تحذف المنتج؟ مش هينفع ترجّعه بعد كده."` | Dialog window not captured under Robolectric | R1 — audit dialog window capture and colour tokens |
-| `ProductEditScreenshotTestKt.productEditConfirmDelete` | Contrast | `text "حذف"` | Dialog window not captured under Robolectric | R1 — audit dialog window capture and colour tokens |
-| `ProductEditScreenshotTestKt.productEditStockConflictDark` | Contrast | `text "اكتب ١٢ برضه"` | Dialog window not captured under Robolectric | R1 — audit dialog window capture and colour tokens |
-| `ProductEditScreenshotTestKt.productEditStockConflictDark` | Contrast | `text "انت كتبت ١٢، والمحل دلوقتي عنده ٩ — جه طلب وانت بتعدّل. باقي تعديلاتك اتحفظت."` | Dialog window not captured under Robolectric | R1 — audit dialog window capture and colour tokens |
-| `ProductEditScreenshotTestKt.productEditStockConflictDark` | Contrast | `text "خليها ٩"` | Dialog window not captured under Robolectric | R1 — audit dialog window capture and colour tokens |
-| `ProductEditScreenshotTestKt.productEditStockConflict` | Contrast | `text "اكتب ١٢ برضه"` | Dialog window not captured under Robolectric | R1 — audit dialog window capture and colour tokens |
-| `ProductEditScreenshotTestKt.productEditStockConflict` | Contrast | `text "انت كتبت ١٢، والمحل دلوقتي عنده ٩ — جه طلب وانت بتعدّل. باقي تعديلاتك اتحفظت."` | Dialog window not captured under Robolectric | R1 — audit dialog window capture and colour tokens |
-| `ProductEditScreenshotTestKt.productEditStockConflict` | Contrast | `text "خليها ٩"` | Dialog window not captured under Robolectric | R1 — audit dialog window capture and colour tokens |
 | `AccountScreenshotTestKt.accountContentLight` | Contrast | `text "رقم فودافون كاش"` | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
 | `AccountScreenshotTestKt.accountLoadingLight` | Contrast | `text "رقم فودافون كاش"` | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
+| `AccountScreenshotTestKt.accountFreePlan` | Contrast | `text "رقم فودافون كاش"` (measured 4.26:1 once scrolled into view) | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
+| `AccountScreenshotTestKt.accountFreePlanUpgradable` | Contrast | `text "رقم فودافون كاش"` (measured 4.26:1 once scrolled into view) | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
+| `AccountScreenshotTestKt.accountLinkPending` | Contrast | `text "رقم فودافون كاش"` (measured 4.26:1 once scrolled into view) | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
 | `OrdersScreenshotTestKt.ordersBothGroupsDark` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
 | `OrdersScreenshotTestKt.ordersBothGroupsLight` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
 | `OrdersScreenshotTestKt.ordersContentDark` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
@@ -191,32 +213,6 @@ control is not measured, because WCAG 1.4.3 exempts inactive components.
 | `OrdersScreenshotTestKt.ordersErrorLight` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
 | `OrdersScreenshotTestKt.ordersFilteredToNone` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
 | `OrdersScreenshotTestKt.ordersFilteredUnpaid` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
-| `AccountScreenshotTestKt.accountContentDark` | Contrast | out of frame, 6: "إجراءات الحساب", "احفظ", "تسجيل خروج", "حالة طلب الحذف", "طلب حذف الحساب", "لغة التطبيق" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `AccountScreenshotTestKt.accountContentLight` | Contrast | out of frame, 6: "إجراءات الحساب", "احفظ", "تسجيل خروج", "حالة طلب الحذف", "طلب حذف الحساب", "لغة التطبيق" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `AccountScreenshotTestKt.accountFreePlan` | Contrast | out of frame, 7: "إجراءات الحساب", "احفظ", "تسجيل خروج", "حالة طلب الحذف", "رقم فودافون كاش", "طلب حذف الحساب", "لغة التطبيق" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `AccountScreenshotTestKt.accountFreePlanUpgradable` | Contrast | out of frame, 7: "إجراءات الحساب", "احفظ", "تسجيل خروج", "حالة طلب الحذف", "رقم فودافون كاش", "طلب حذف الحساب", "لغة التطبيق" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `AccountScreenshotTestKt.accountLinkPending` | Contrast | out of frame, 7: "إجراءات الحساب", "احفظ", "تسجيل خروج", "حالة طلب الحذف", "رقم فودافون كاش", "طلب حذف الحساب", "لغة التطبيق" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `AccountScreenshotTestKt.accountLoadingDark` | Contrast | out of frame, 6: "إجراءات الحساب", "احفظ", "تسجيل خروج", "حالة طلب الحذف", "طلب حذف الحساب", "لغة التطبيق" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `AccountScreenshotTestKt.accountLoadingLight` | Contrast | out of frame, 6: "إجراءات الحساب", "احفظ", "تسجيل خروج", "حالة طلب الحذف", "طلب حذف الحساب", "لغة التطبيق" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `AuthScreenshotTestKt.authCountryPicker` | Contrast | out of frame, 2: "+372", "🇪🇪  إستونيا" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `AuthScreenshotTestKt.authCountryPickerDark` | Contrast | out of frame, 2: "+372", "🇪🇪  إستونيا" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `AuthScreenshotTestKt.authCountryPickerSearch` | Contrast | out of frame, 2: "+213", "🇩🇿  الجزائر" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `BillingScreenshotTestKt.plansContentDark` | Contrast | out of frame, 4: "برو", "غير محدود" ×2, "متاح" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `BillingScreenshotTestKt.plansContentLight` | Contrast | out of frame, 4: "برو", "غير محدود" ×2, "متاح" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `BillingScreenshotTestKt.plansPurchaseOpen` | Contrast | out of frame, 4: "برو", "غير محدود" ×2, "متاح" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `OrdersScreenshotTestKt.ordersBothGroupsDark` | Contrast | out of frame, 1: "جديد" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `OrdersScreenshotTestKt.ordersBothGroupsLight` | Contrast | out of frame, 1: "جديد" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `OrdersScreenshotTestKt.ordersContentDark` | Contrast | out of frame, 1: "جديد" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `OrdersScreenshotTestKt.ordersContentLight` | Contrast | out of frame, 1: "جديد" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `OrdersScreenshotTestKt.ordersErrorDark` | Contrast | out of frame, 1: "جديد" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `OrdersScreenshotTestKt.ordersErrorLight` | Contrast | out of frame, 1: "جديد" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `OrdersScreenshotTestKt.ordersFilteredToNone` | Contrast | out of frame, 1: "جديد" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `OrdersScreenshotTestKt.ordersFilteredUnpaid` | Contrast | out of frame, 1: "جديد" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `StoreGroupScreenshotTestKt.storeInfoContentDark` | Contrast | out of frame, 4: "احفظ", "التصنيف الفرعي", "الشعار", "صورة الغلاف" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `StoreGroupScreenshotTestKt.storeInfoContentLight` | Contrast | out of frame, 4: "احفظ", "التصنيف الفرعي", "الشعار", "صورة الغلاف" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `StoreGroupScreenshotTestKt.storeInfoIdentityLight` | Contrast | out of frame, 4: "احفظ", "التصنيف الفرعي", "الشعار", "صورة الغلاف" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `StoreGroupScreenshotTestKt.storeInfoSaving` | Contrast | out of frame, 3: "التصنيف الفرعي", "الشعار", "صورة الغلاف" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
-| `StoreGroupScreenshotTestKt.storeInfoSlugTaken` | Contrast | out of frame, 4: "احفظ", "التصنيف الفرعي", "الشعار", "صورة الغلاف" | Text crop outside the captured frame | R1 — keep the audited text node inside the visible frame |
 | `ShopSetupScreenshotTestKt.setupAccountDark` | Label | 2 inline links (terms, privacy) | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
 | `ShopSetupScreenshotTestKt.setupAccountEmpty` | Label | 2 inline links (terms, privacy) | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
 | `ShopSetupScreenshotTestKt.setupAccountInvalidEmail` | Label | 2 inline links (terms, privacy) | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
@@ -265,9 +261,13 @@ deferred to R3 as recorded in the table above. The fixes landed in this change a
 | `feature/shopsetup/ShopSetupScreen.kt` | `Label` plus duplicate-bounds `Target` on the read-only birth-year field and its overlay click target | clickable full-size overlay sibling declared last in the `Box` with `contentDescription` = `setup_birth_year_open_description`, and the read-only field wrapped in `clearAndSetSemantics {}` so the control exposes one labelled actionable node while the overlay still receives every tap; the overlay carries the chosen year as its `stateDescription` |
 | `feature/auth/AuthOtpForm.kt` | `Label` on the transparent OTP `BasicTextField` | field `contentDescription` = `auth_otp_title` |
 
-The out-of-frame table rows above are the empty/out-of-image text crops the
-harness cannot measure; they are not screen-accessibility findings. The audit
-still returns a diagnostic for each one so a silent skip is impossible. Inline
+The table once carried 10 dialog rows ("dialog window not captured") and 90
+out-of-frame rows (text under the fold). Both groups were retired by measuring,
+not by exemption: the dialogs are drawn from their own windows and the 90 texts
+are scrolled into view, and every one of them passes. Measuring them also found
+the three Account rows above, which the out-of-frame entries had been hiding.
+The audit still returns a diagnostic for text it cannot bring into the frame, so
+a silent skip is impossible. Inline
 text links are audited like every other actionable node: Compose gives each
 `withLink` range its own clickable semantics node with no `Text` of its own, so
 the terms/privacy links in `OnboardingLegalText` are recorded in
@@ -318,11 +318,48 @@ reference per declared variant, so a missing variant fails the guard.
 Every screen draws its banners, empty, error, loading and gate states through
 these components; the older `NoticeBanner`, `SyncStatusBanner`,
 `FullScreenEmpty`, `FullScreenError`, `FullScreenLoading`, `LockedByPlanNotice`,
-`NotBuiltNotice`, and `FeatureAvailabilityChip` are gone. `OfflineStrip` is the
-one component still marked `kit-pending`, with adopter `R2` in its own column;
+`NotBuiltNotice`, and `FeatureAvailabilityChip` are gone. `OfflineStrip` and the four overlay components below
+are still marked `kit-pending`, with adopter `R2` in their own column;
 `tooling/repository/verify-design-system-components.mjs` allows a kit-pending
 row only when that adopter is named, and fails if the component gains a
 production caller while still pending.
+
+### Shared overlay components
+
+`BottomSheet`, `PickerSheet` and `ConfirmSheet` live in
+`app/src/main/java/app/orderak/seller/core/ui/SheetComponents.kt`, and
+`Snackbar` in `SnackbarComponent.kt`. All four are `kit-pending`, with adopter
+`R2`. Their state vocabulary is `PickerSheetMode`, `ConfirmSheetState` and
+`SnackbarState`, which `SheetKitStatesAcceptanceTest` pins; the same test fails
+when a preview is not named for an entry of its enum, or an entry has no
+preview (an earlier attempt called `SnackbarState.valueOf("FailureRetry")` for a
+state named `FailureWithRetry`). The nine `@PreviewTest` functions in
+`app/src/screenshotTest/java/app/orderak/seller/core/ui/SheetOverlayScreenshotTest.kt`
+carry `FeedbackPreviews`, so each has the eight variants.
+
+A sheet is drawn over a visible screen and a scrim, never inside a
+`ModalBottomSheet`, which composes into a separate window the screenshot harness
+does not capture (see `LanguageSheet.kt`); the test class also fails if either
+file calls `ModalBottomSheet`. The rules are checked on the kit's own previews at
+100% and 200%:
+
+- `SheetBoundsAcceptanceTest`: a sheet is never taller than 90% of the height
+  available to it, its actions stay on its bottom edge and inside the available
+  area, and a sheet at its bound has a scrolling body.
+- `SheetKitBehaviourAcceptanceTest`: a destructive confirmation uses the
+  destructive verb and a regular one does not, an in-progress confirmation
+  disables both buttons, a long list reaches the bound and scrolls with its
+  actions in reach, and the Snackbar action is a 48dp target, beside the message
+  at normal text and below it, with the message across the full width, at 200%.
+
+These tests reach the previews by name, so they compile on a tree where the kit
+does not exist yet and fail by assertion there. `SheetPickerSearchTest` locks the
+picker's Arabic-aware matching (a bare alef finds the alef with hamza, a teh
+marbuta typed as heh still matches), so a seller is not offered a manual entry
+for a name the list has. Two rules belong to the caller and are not enforced by
+the kit: the destructive confirmation's verb (the caller passes `confirmLabel`;
+the previews pass `common_delete`) and the Snackbar's stacking, which follows
+the font scale (from 1.5) and not the width available.
 
 ### Screenshot validation (`validateStagingDebugScreenshotTest`)
 

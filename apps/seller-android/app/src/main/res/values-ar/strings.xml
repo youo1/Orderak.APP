@@ -586,4 +586,35 @@
     <string name="error_state_try_again_later">حاول مرة أخرى بعد قليل.</string>
     <string name="error_state_service_unavailable_title">الخدمة غير متاحة الآن</string>
     <string name="error_state_service_unavailable_kept">وما كتبته باقٍ هنا. حاول بعد قليل.</string>
+    <string name="sheet_close">إغلاق</string>
+    <string name="sheet_actions_title">خيارات الطلب</string>
+    <string name="sheet_action_share">مشاركة الطلب</string>
+    <string name="sheet_action_duplicate">تكرار الطلب</string>
+    <string name="sheet_action_print">طباعة الإيصال</string>
+    <string name="sheet_picker_title">اختيار المدينة</string>
+    <string name="sheet_preview_query_unlisted">قنا</string>
+    <string name="sheet_confirm_delete_title">حذف هذا المنتج؟</string>
+    <string name="sheet_confirm_delete_message">لا يمكن التراجع عن هذا الإجراء.</string>
+    <string name="sheet_confirm_delete_in_progress">جارٍ الحذف…</string>
+    <string name="sheet_confirm_ship_title">تحديد هذا الطلب كمشحون؟</string>
+    <string name="sheet_confirm_ship_message">سيصل إشعار إلى العميل.</string>
+    <string name="sheet_confirm_ship_action">تحديد كمشحون</string>
+    <string name="snackbar_undo_message">تمت أرشفة الطلب</string>
+    <string name="snackbar_undo_action">تراجع</string>
+    <string name="snackbar_failure_message">تعذّر حفظ التغييرات</string>
+    <string name="snackbar_copied_message">تم النسخ</string>
+    <string-array name="sheet_preview_cities">
+        <item>القاهرة</item>
+        <item>الإسكندرية</item>
+        <item>الجيزة</item>
+        <item>المنصورة</item>
+        <item>طنطا</item>
+        <item>أسوان</item>
+        <item>الأقصر</item>
+        <item>السويس</item>
+        <item>بورسعيد</item>
+        <item>الإسماعيلية</item>
+        <item>الفيوم</item>
+        <item>الزقازيق</item>
+    </string-array>
 </resources>

@@ -554,4 +554,35 @@
     <string name="error_state_try_again_later">Try again in a moment.</string>
     <string name="error_state_service_unavailable_title">The service isn’t available right now</string>
     <string name="error_state_service_unavailable_kept">What you typed is still here. Try again in a moment.</string>
+    <string name="sheet_close">Close</string>
+    <string name="sheet_actions_title">Order options</string>
+    <string name="sheet_action_share">Share order</string>
+    <string name="sheet_action_duplicate">Duplicate order</string>
+    <string name="sheet_action_print">Print receipt</string>
+    <string name="sheet_picker_title">Choose a city</string>
+    <string name="sheet_preview_query_unlisted">Qena</string>
+    <string name="sheet_confirm_delete_title">Delete this product?</string>
+    <string name="sheet_confirm_delete_message">This can’t be undone.</string>
+    <string name="sheet_confirm_delete_in_progress">Deleting…</string>
+    <string name="sheet_confirm_ship_title">Mark this order as shipped?</string>
+    <string name="sheet_confirm_ship_message">Your customer is notified.</string>
+    <string name="sheet_confirm_ship_action">Mark as shipped</string>
+    <string name="snackbar_undo_message">Order archived</string>
+    <string name="snackbar_undo_action">Undo</string>
+    <string name="snackbar_failure_message">Couldn’t save your changes</string>
+    <string name="snackbar_copied_message">Copied</string>
+    <string-array name="sheet_preview_cities">
+        <item>Cairo</item>
+        <item>Alexandria</item>
+        <item>Giza</item>
+        <item>Mansoura</item>
+        <item>Tanta</item>
+        <item>Aswan</item>
+        <item>Luxor</item>
+        <item>Suez</item>
+        <item>Port Said</item>
+        <item>Ismailia</item>
+        <item>Fayoum</item>
+        <item>Zagazig</item>
+    </string-array>
 </resources>

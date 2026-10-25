@@ -560,4 +560,35 @@
     <string name="error_state_try_again_later">Réessayez dans un instant.</string>
     <string name="error_state_service_unavailable_title">Le service est indisponible pour le moment</string>
     <string name="error_state_service_unavailable_kept">Ce que vous avez saisi est conservé. Réessayez dans un instant.</string>
+    <string name="sheet_close">Fermer</string>
+    <string name="sheet_actions_title">Options de la commande</string>
+    <string name="sheet_action_share">Partager la commande</string>
+    <string name="sheet_action_duplicate">Dupliquer la commande</string>
+    <string name="sheet_action_print">Imprimer le reçu</string>
+    <string name="sheet_picker_title">Choisir une ville</string>
+    <string name="sheet_preview_query_unlisted">Qena</string>
+    <string name="sheet_confirm_delete_title">Supprimer ce produit ?</string>
+    <string name="sheet_confirm_delete_message">Cette action est irréversible.</string>
+    <string name="sheet_confirm_delete_in_progress">Suppression…</string>
+    <string name="sheet_confirm_ship_title">Marquer cette commande comme expédiée ?</string>
+    <string name="sheet_confirm_ship_message">Votre client est averti.</string>
+    <string name="sheet_confirm_ship_action">Marquer comme expédiée</string>
+    <string name="snackbar_undo_message">Commande archivée</string>
+    <string name="snackbar_undo_action">Annuler</string>
+    <string name="snackbar_failure_message">Impossible d’enregistrer vos modifications</string>
+    <string name="snackbar_copied_message">Copié</string>
+    <string-array name="sheet_preview_cities">
+        <item>Le Caire</item>
+        <item>Alexandrie</item>
+        <item>Gizeh</item>
+        <item>Mansourah</item>
+        <item>Tanta</item>
+        <item>Assouan</item>
+        <item>Louxor</item>
+        <item>Suez</item>
+        <item>Port-Saïd</item>
+        <item>Ismaïlia</item>
+        <item>Fayoum</item>
+        <item>Zagazig</item>
+    </string-array>
 </resources>
