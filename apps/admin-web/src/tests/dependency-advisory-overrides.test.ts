@@ -66,12 +66,14 @@ function activeTrivyLines(text: string): string[] {
 }
 
 describe('pnpm-workspace.yaml: new bounded overrides', () => {
-  it('overrides undici to >=7.29.1 <8, citing both advisories', () => {
-    const idx = findLineIndexContaining(workspaceYaml, /undici(@\S+)?:\s*">=7\.29\.1 <8"/);
+  // The floor moved from 7.29.1 to 7.30.1 on 2026-10-25 for GHSA-xjj6-f33q-929c.
+  it('overrides undici to >=7.30.1 <8, citing all three advisories', () => {
+    const idx = findLineIndexContaining(workspaceYaml, /undici(@\S+)?:\s*">=7\.30\.1 <8"/);
     expect(idx).toBeGreaterThanOrEqual(0);
     const ctx = nearbyTextBefore(workspaceYaml, idx);
     expect(ctx).toContain('GHSA-rfgv-xxqx-mfg5');
     expect(ctx).toContain('GHSA-w293-vg96-wgc3');
+    expect(ctx).toContain('GHSA-xjj6-f33q-929c');
   });
 
   it('overrides brace-expansion 1.x to >=1.1.20 <2, citing both advisories', () => {
@@ -197,12 +199,20 @@ describe('.trivyignore: braces, sharp and zod waivers', () => {
 });
 
 describe('pnpm-lock.yaml: resolved versions land inside the overridden ranges', () => {
-  it('undici resolves to >=7.29.1 <8 everywhere it appears', () => {
+  it('undici resolves to >=7.30.1 <8 everywhere it appears', () => {
     const versions = collectVersions(lockfile, 'undici');
     expect(versions.length).toBeGreaterThan(0);
     for (const v of versions) {
-      expect(gte(v, '7.29.1')).toBe(true);
+      expect(gte(v, '7.30.1')).toBe(true);
       expect(lt(v, '8.0.0')).toBe(true);
+    }
+  });
+
+  it('postal-mime, which parses inbound email in the Worker, resolves past GHSA-f2hq-32vh-53cc (>=4.0.8)', () => {
+    const versions = collectVersions(lockfile, 'postal-mime');
+    expect(versions.length).toBeGreaterThan(0);
+    for (const v of versions) {
+      expect(gte(v, '4.0.8')).toBe(true);
     }
   });
 

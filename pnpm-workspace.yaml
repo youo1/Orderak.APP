@@ -107,7 +107,12 @@ overrides:
   # bound keeps the pin inside major 7, the range miniflare declares.
   # Reaches the tree only through miniflare (wrangler dev and the Workers test
   # pool) and jsdom in the admin tests, never in a bundled Worker.
-  undici@<7.29.1: ">=7.29.1 <8"
+  #
+  # GHSA-xjj6-f33q-929c (high, CVE-2026-109869), published 2026-10-23 — a
+  # response with too many content-encodings throws an unhandled error and
+  # takes the process down. Fixed in 7.30.1, so the floor moved there; the
+  # same paths and the same bound inside major 7.
+  undici@<7.30.1: ">=7.30.1 <8"
   # GHSA-qhr7-859c-m2p7 (high) and GHSA-6j4f-fj2g-mc7p (high) — brace-expansion
   # allocates without bound on crafted `{a,b,c}` patterns, so a small input
   # exhausts memory. Fixed in 1.1.20. The major-specific selector keeps the 1.x
