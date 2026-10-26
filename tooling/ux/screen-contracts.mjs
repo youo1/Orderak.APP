@@ -217,10 +217,14 @@ export const CONTRACTS = [
     id: "today",
     kotlinRoute: null,
     surface: "today",
-    purpose: "شغل النهارده: عدّادات، استهلاك الخطة، رابط الكتالوج، تنبيهات",
+    purpose: "ما ينتظر البائع الآن: الطلبات الجديدة وغير المدفوعة وجاهزة الشحن، وأحدث ما يحتاج إجراءً، ورابط المتجر",
     entry: ["MainRoute — السطح الافتراضي"],
     exit: ["OrderDetailsRoute", "AnnouncementsRoute", "SubscriptionRoute", "مشاركة الكتالوج"],
-    data: ["today counters", "entitlement usage", "catalog link", "unread announcements", "billing notices"],
+    // Phase R4. The plan left this surface except when it needs the seller: the
+    // monthly limit at 90% or more, and a billing notice that asks for action.
+    // "Entitlement usage" as a standing card is gone; the rest of the plan is on
+    // the subscription screen.
+    data: ["today counters", "open orders", "month sales", "catalog link", "unread announcements", "billing notices that ask for action", "plan usage at 90% or more"],
     actions: [
       { do: "pull to refresh", via: "onRefresh" },
       { do: "share catalog", via: "productsForShare" },
@@ -228,7 +232,11 @@ export const CONTRACTS = [
       // earned: no counter opened an order, and all three opened the same
       // unfiltered list. Each now opens the orders it counts.
       { do: "open filtered orders", via: "onOpenCounter" },
-      { do: "retry a failed plan refresh", via: "onRetry" },
+      { do: "open order", via: "onOpenOrder" },
+      { do: "add first product", via: "onAddProduct" },
+      // The summary could not be read from the device, or the plan refresh failed.
+      // The plan refresh retry moves to the subscription screen with its error (R9).
+      { do: "retry", via: "onRetry" },
       { do: "open announcements", via: "onOpenAnnouncements" },
     ],
     states: ["loading", "content", "empty", "error"],

@@ -53,10 +53,12 @@ import androidx.navigation.compose.rememberNavController
 import app.orderak.seller.R
 import app.orderak.seller.app.navigation.SellerSurface
 import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
+import app.orderak.seller.domain.OrderStatus
 import app.orderak.seller.feature.orders.OrdersFilter
 import app.orderak.seller.feature.today.TodayCounter
 import app.orderak.seller.feature.today.TodayScreen
 import app.orderak.seller.feature.today.TodayUiState
+import app.orderak.seller.core.money.Money
 import app.orderak.seller.core.ui.Banner
 import app.orderak.seller.core.ui.BottomNav
 import app.orderak.seller.core.ui.Fab
@@ -78,7 +80,6 @@ import app.orderak.seller.data.billing.EntitlementRefreshResult
 import app.orderak.seller.data.billing.EntitlementSyncState
 import app.orderak.seller.core.share.shareStoreLink
 import app.orderak.seller.feature.products.shareCatalogText
-import app.orderak.seller.feature.operations.AnnouncementsDashboardIndicator
 import app.orderak.seller.feature.operations.OperationsViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -131,6 +132,7 @@ fun MainScreen(
     viewModel: MainViewModel = hiltViewModel()
 ) {
     val shopName by viewModel.shopName.collectAsStateWithLifecycle()
+    val hasProducts by viewModel.hasProducts.collectAsStateWithLifecycle()
     val storeUrl by viewModel.storeUrl.collectAsStateWithLifecycle()
     val sellerPhone by viewModel.sellerPhone.collectAsStateWithLifecycle()
     val entitlementState by viewModel.entitlementState.collectAsStateWithLifecycle()
@@ -206,6 +208,7 @@ fun MainScreen(
         // A count not read yet draws no badge: it is not a claim of zero.
         unpaidOrders = unpaidOrders ?: 0,
         hasUnreadAnnouncements = hasUnreadAnnouncements,
+        canCreateOrder = hasProducts != false,
         versionWarning = versionWarningText,
         onUpdateVersion = versionPolicy?.store_url?.takeIf { it.isNotBlank() }?.let { url ->
             { runCatching { uriHandler.openUri(url) } }
@@ -220,6 +223,10 @@ fun MainScreen(
                     storeUrl = storeUrl,
                     entitlementState = entitlementState,
                     syncStatus = syncStatus,
+                    unreadAnnouncements = announcements?.count { !it.is_read } ?: 0,
+                    onOpenOrder = onOpenOrder,
+                    onAddProduct = onAddProduct,
+                    onOpenSubscription = onOpenSubscription,
                     onRetrySync = { RefreshScheduler.refreshNow(appContext) },
                     onRefresh = { RefreshScheduler.refreshNow(appContext); viewModel.refreshPlanSettings() },
                     // Each counter carries the question it counts, so the list it
@@ -227,6 +234,7 @@ fun MainScreen(
                     // the seller to the same unfiltered page.
                     onOpenCounter = { counter ->
                         requestedOrdersFilter = when (counter) {
+                            TodayCounter.New -> OrdersFilter.Status(OrderStatus.NEW)
                             TodayCounter.Today -> OrdersFilter.Today
                             TodayCounter.Unpaid -> OrdersFilter.Unpaid
                             TodayCounter.ToShip -> OrdersFilter.ToShip
@@ -345,6 +353,8 @@ fun MainShellContent(
     hasUnreadAnnouncements: Boolean = false,
     versionWarning: String? = null,
     onUpdateVersion: (() -> Unit)? = null,
+    /** An order needs a product, so with none the FAB is not offered. */
+    canCreateOrder: Boolean = true,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     content: @Composable () -> Unit,
 ) {
@@ -352,14 +362,17 @@ fun MainShellContent(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            // The app name until the shop's own arrives. Not a blank bar,
-            // and not a guess at the shop's name.
-            TopBar(title = shopName ?: stringResource(R.string.app_name))
+            // اليوم draws its own large title and its bell; the other surfaces keep the
+            // shop's name here until each brings its own bar (R5 to R8). The app name
+            // until the shop's own arrives: not a blank bar, and not a guess.
+            if (surface != SellerSurface.Today) {
+                TopBar(title = shopName ?: stringResource(R.string.app_name))
+            }
         },
         floatingActionButton = {
             // اليوم only: on every other surface the primary action is that
             // surface's own, and two would compete.
-            if (surface == SellerSurface.Today) {
+            if (surface == SellerSurface.Today && canCreateOrder) {
                 Fab(
                     label = stringResource(R.string.order_new_title),
                     icon = Icons.Outlined.Add,
@@ -407,6 +420,10 @@ private fun DashboardTab(
     storeUrl: String?,
     entitlementState: EntitlementSyncState,
     syncStatus: String?,
+    unreadAnnouncements: Int,
+    onOpenOrder: (Long) -> Unit,
+    onAddProduct: () -> Unit,
+    onOpenSubscription: () -> Unit,
     onRetrySync: () -> Unit,
     onRefresh: () -> Unit,
     onOpenCounter: (TodayCounter) -> Unit,
@@ -415,8 +432,12 @@ private fun DashboardTab(
     val adManager = LocalAdManager.current
     val shopName by viewModel.shopName.collectAsStateWithLifecycle()
     val today by viewModel.todayCount.collectAsStateWithLifecycle()
+    val newOrders by viewModel.newCount.collectAsStateWithLifecycle()
     val unpaid by viewModel.unpaidCount.collectAsStateWithLifecycle()
     val toShip by viewModel.toShipCount.collectAsStateWithLifecycle()
+    val latestOrders by viewModel.latestOpenOrders.collectAsStateWithLifecycle()
+    val monthSales by viewModel.monthSales.collectAsStateWithLifecycle()
+    val summaryFailed by viewModel.summaryFailed.collectAsStateWithLifecycle()
 
     // Lightweight COUNT(*) instead of collecting the full product list here.
     val hasProducts by viewModel.hasProducts.collectAsStateWithLifecycle()
@@ -437,15 +458,21 @@ private fun DashboardTab(
         TodayScreen(
             state = TodayUiState(
                 shopName = shopName,
+                newCount = newOrders,
                 todayCount = today,
                 unpaidCount = unpaid,
                 toShipCount = toShip,
                 hasProducts = hasProducts,
+                summaryFailed = summaryFailed,
+                unreadAnnouncements = unreadAnnouncements,
+                latestOrders = latestOrders,
+                monthSales = monthSales?.let { Money(it.totalMinor, it.currency) },
+                storeUrl = storeUrl,
                 planError = entitlementState.error,
-                hasPlanSnapshot = entitlementState.config != null,
-                usingOfflinePlan = entitlementState.freshness == EntitlementFreshness.OFFLINE,
             ),
             onOpenCounter = onOpenCounter,
+            onOpenOrder = onOpenOrder,
+            onAddProduct = onAddProduct,
             onShareCatalog = {
                 scope.launch {
                     val url = storeUrl
@@ -454,12 +481,16 @@ private fun DashboardTab(
                 }
             },
             onOpenAnnouncements = onOpenAnnouncements,
-            onRetry = onRetrySync,
+            onRetry = {
+                // One retry for both things that can be behind: the sync, and a summary
+                // the device could not read.
+                viewModel.retrySummary()
+                onRetrySync()
+            },
             modifier = Modifier.fillMaxSize(),
             planNotices = {
                 Column(verticalArrangement = Arrangement.spacedBy(LocalOrderakSpacing.current.space2)) {
                     PlanStatusBanners(entitlementState)
-                    AnnouncementsDashboardIndicator(onOpenAnnouncements)
                     if (syncStatus == "running" || syncStatus == "pending" || syncStatus == "failed") {
                         val failed = syncStatus == "failed"
                         Banner(
@@ -471,7 +502,7 @@ private fun DashboardTab(
                     }
                 }
             },
-            planUsage = { entitlementState.config?.let { config -> PlanUsageCard(config) } },
+            planUsage = { entitlementState.config?.let { config -> PlanUsageCard(config, onOpenSubscription) } },
             footer = { adManager.Banner(Modifier.fillMaxWidth()) },
         )
     }
@@ -592,20 +623,31 @@ private fun PlanNotice(text: String, dismissible: Boolean, onDismiss: () -> Unit
     }
 }
 
+/** From this share of a limit used, the plan is worth the seller's attention on اليوم. */
+private const val PLAN_ATTENTION_AT = 0.9f
+
+/**
+ * The plan, on اليوم, only when it needs the seller.
+ *
+ * Where limits are enforced, a buyer's order from the link is refused once the
+ * monthly limit is reached, and the seller would not otherwise know. Below 90%
+ * the plan is on its own screen, حسابي › الاشتراك, not here.
+ */
 @Composable
-private fun PlanUsageCard(config: BackendConfig) {
+private fun PlanUsageCard(config: BackendConfig, onOpenSubscription: () -> Unit) {
     val spacing = LocalOrderakSpacing.current
     // Rows, order and unlimited handling all come from core/ui/PlanUsage.kt, so
-    // this card and the subscription screen cannot drift apart again. It used to
-    // keep its own list and its own filter, and the two screens disagreed about
-    // what an unlimited plan looks like.
-    val rows = planUsageRows(config)
+    // this card and the subscription screen cannot drift apart again.
+    val rows = planUsageRows(config).filter { it.limit != null && it.limit > 0 && it.used.toFloat() / it.limit >= PLAN_ATTENTION_AT }
     if (rows.isEmpty()) return
 
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth().padding(spacing.space4), verticalArrangement = Arrangement.spacedBy(spacing.space3)) {
             Text(stringResource(R.string.plan_usage_title), style = MaterialTheme.typography.titleMedium)
             rows.forEach { row -> PlanUsageRowItem(row) }
+            TextButton(onClick = onOpenSubscription, modifier = Modifier.heightIn(min = spacing.minimumTouchTarget)) {
+                Text(stringResource(R.string.today_plan_details))
+            }
         }
     }
 }

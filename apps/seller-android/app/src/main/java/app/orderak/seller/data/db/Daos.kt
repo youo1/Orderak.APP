@@ -131,6 +131,9 @@ interface CategoryDao {
     }
 }
 
+/** One currency's total, as the query for اليوم returns it. */
+data class MonthSalesRow(val currency: String, val totalMinor: Long)
+
 @Dao
 interface OrderDao {
     @Query("SELECT * FROM orders ORDER BY createdAt DESC")
@@ -194,6 +197,37 @@ interface OrderDao {
 
     @Query("SELECT COUNT(*) FROM orders WHERE status = 'PAID'")
     fun countToShip(): Flow<Int>
+
+    /** Orders nobody has confirmed yet: the first thing waiting on the seller. */
+    @Query("SELECT COUNT(*) FROM orders WHERE status = 'NEW'")
+    fun countNew(): Flow<Int>
+
+    /**
+     * The newest orders that are not finished, for اليوم.
+     *
+     * Open means new, confirmed, paid or shipped; done and cancelled are over.
+     * Newest first, because the question is what arrived last.
+     */
+    @Query(
+        "SELECT * FROM orders WHERE status IN ('NEW','CONFIRMED','PAID','SHIPPED') " +
+            "ORDER BY createdAt DESC LIMIT :limit",
+    )
+    fun latestOpen(limit: Int): Flow<List<OrderEntity>>
+
+    /**
+     * What the month's orders add up to, in one currency.
+     *
+     * A cancelled order is not a sale. A store sells in the currency it was set up
+     * with, so one currency is the normal case; if the month holds more than one,
+     * the one used most recently is shown rather than adding unlike money.
+     * Null when there is no order this month, which is not the same as a sum of 0.
+     */
+    @Query(
+        "SELECT currency, SUM(totalMinor) AS totalMinor FROM orders " +
+            "WHERE createdAt >= :since AND status != 'CANCELLED' " +
+            "GROUP BY currency ORDER BY MAX(createdAt) DESC LIMIT 1",
+    )
+    fun salesSince(since: Long): Flow<MonthSalesRow?>
 
     @Query("SELECT MAX(remoteId) FROM orders")
     suspend fun maxRemoteId(): Long?
