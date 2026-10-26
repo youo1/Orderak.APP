@@ -756,4 +756,31 @@
     <string name="product_stock_conflict_message">You entered %1$s, and the stock is now %2$s. Nothing is saved yet.</string>
     <string name="product_stock_conflict_take_shop">Use the store’s number (%1$s)</string>
     <string name="product_stock_conflict_save_mine">Save mine (%1$s)</string>
+    <string name="categories_add_bar">Add a category</string>
+    <string name="categories_sheet_add_title">New category</string>
+    <string name="categories_sheet_rename_title">Rename category</string>
+    <string name="categories_field">Category name</string>
+    <string name="categories_empty_title">No categories yet</string>
+    <string name="categories_empty_body">Products can be sold without a category.</string>
+    <string name="categories_delete_title">Delete “%1$s”?</string>
+    <string name="categories_row_more">Options for %1$s</string>
+    <plurals name="categories_delete_body">
+        <item quantity="one">%1$s product will have no category.</item>
+        <item quantity="other">%1$s products will have no category.</item>
+    </plurals>
+    <string name="store_info_cover_add">Add a cover image</string>
+    <string name="store_info_change">Change</string>
+    <string name="store_info_section_identity">Identity</string>
+    <string name="store_info_section_link">Your store link</string>
+    <string name="store_info_section_activity">Activity</string>
+    <string name="store_info_section_contact">Contact</string>
+    <string name="store_info_slug_note">The code at the end never changes, so old links keep working after a rename.</string>
+    <string name="store_info_bar_reason">Choose an available link name</string>
+    <string name="catalog_languages_error">The translations could not be read</string>
+    <string name="catalog_languages_empty">Translations are created once you add products</string>
+    <string name="catalog_languages_summary">%1$s of %2$s approved</string>
+    <string name="translation_status_reviewed">Approved</string>
+    <string name="translation_status_machine">Machine translation</string>
+    <string name="translation_status_missing">Missing</string>
+    <string name="translation_save_approve">Save and approve</string>
 </resources>

@@ -383,7 +383,7 @@ export const CONTRACTS = [
       // model since it was written and no screen ever offered it, so a typo in a
       // category name was permanent — the only way out was deleting the
       // category, which takes its products' filing with it.
-      { do: "rename", via: "pendingRename" },
+      { do: "rename", via: "onRename" },
       { do: "reorder", status: "planned", why: "no ordering control exists on the screen" },
       { do: "delete", via: "delete" },
     ],
