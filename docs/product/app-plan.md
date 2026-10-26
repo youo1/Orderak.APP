@@ -553,6 +553,19 @@ only from a current response; stale/offline blocking policy becomes a visible
 warning so an unavailable network cannot permanently lock out the seller.
 `MainRoute#version-governance` is included in the screen manifest.
 
+The order page (Phase R5, details) is titled by the order's number with the time under
+it. It shows where the order stands: the status chip and the five steps it moves
+through (a cancelled order replaces them with a notice). The customer is a row that
+opens their page; the products come with their line totals and the total as the
+largest figure; the payment section names the method, offers the manual payment
+and the receipt check only until the order is paid, and lists what has been
+recorded. The one bar at the bottom holds the next step, named for what happens
+("تأكيد الطلب", "تم الدفع", "تم الشحن", "إكمال الطلب"), and cancelling in its secondary
+slot while it is allowed; a finished or cancelled order has no bar. An order not
+yet on the account disables the step and says why on screen. Cancelling asks in a
+sheet that states the consequence (the products return to stock and a cancelled
+order cannot be restored) and puts the verb on the button.
+
 الطلبات (Phase R5, list) has a large title and a pinned row of filters: all, unpaid,
 ready to ship, today, and one chip, الحالة, that opens a sheet with the six exact
 statuses and names the one chosen. The orders that still need the seller come

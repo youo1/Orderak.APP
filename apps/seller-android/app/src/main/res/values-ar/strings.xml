@@ -731,4 +731,15 @@
         <item quantity="many">%1$s منتجًا</item>
         <item quantity="other">%1$s منتج</item>
     </plurals>
+    <string name="order_heading">طلب %1$s</string>
+    <string name="order_next_confirm">تأكيد الطلب</string>
+    <string name="order_next_paid">تم الدفع</string>
+    <string name="order_next_shipped">تم الشحن</string>
+    <string name="order_next_done">إكمال الطلب</string>
+    <string name="order_bar_unsent_reason">تُتاح الخطوة التالية بعد أن يستلم الخادم هذا الطلب</string>
+    <string name="order_cancel_sheet_title">إلغاء الطلب %1$s؟</string>
+    <string name="order_cancel_sheet_body">ستعود المنتجات إلى المخزون، ولا يمكن استعادة الطلب بعد إلغائه.</string>
+    <string name="order_paid_with">طريقة الدفع</string>
+    <string name="order_advance_to_fallback">التالي</string>
+    <string name="order_note_title">ملاحظة</string>
 </resources>

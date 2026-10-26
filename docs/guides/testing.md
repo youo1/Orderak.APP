@@ -361,7 +361,7 @@ and `SettingsRow` live in `core/ui/StructureComponents.kt`; `MetricTile`,
 `ChatBubble` and `Composer` in `core/ui/DataComponents.kt`. Eight now have a
 caller (`TopBar`, `BottomNav` and `Fab` in the shell, `SectionHeader`,
 `MetricTile`, `StepList`, `MoneyText` and `CountText` on اليوم, `FilterChipRow` and
-`PickerSheet` on الطلبات) and are no longer
+`PickerSheet` on الطلبات, `BottomActionBar`, `KeyValueRow`, `StatusStepper` and `Avatar` on the order page) and are no longer
 pending; the others stay `kit-pending`, with the adopting surface named in
 their row. `ListRow` and
 `StatusChip` are not here: they absorb `PriorityListRow` and `SemanticChip`, which

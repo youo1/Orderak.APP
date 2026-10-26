@@ -702,4 +702,15 @@
         <item quantity="many">%1$s d’articles</item>
         <item quantity="other">%1$s articles</item>
     </plurals>
+    <string name="order_heading">Commande %1$s</string>
+    <string name="order_next_confirm">Confirmer la commande</string>
+    <string name="order_next_paid">Marquer comme payée</string>
+    <string name="order_next_shipped">Marquer comme expédiée</string>
+    <string name="order_next_done">Terminer la commande</string>
+    <string name="order_bar_unsent_reason">L’étape suivante s’ouvre quand le serveur a reçu cette commande</string>
+    <string name="order_cancel_sheet_title">Annuler la commande %1$s ?</string>
+    <string name="order_cancel_sheet_body">Les produits retournent en stock, et une commande annulée ne peut pas être rétablie.</string>
+    <string name="order_paid_with">Moyen de paiement</string>
+    <string name="order_advance_to_fallback">Suivant</string>
+    <string name="order_note_title">Note</string>
 </resources>
