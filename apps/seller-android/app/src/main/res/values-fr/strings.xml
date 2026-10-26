@@ -663,4 +663,14 @@
     <string name="struct_chat_time">10:42</string>
     <string name="struct_composer_placeholder">Écrire un message</string>
     <string name="app_version_banner_action">Mettre à jour</string>
+    <string name="restricted_suspended_title">Votre compte est suspendu pour le moment</string>
+    <string name="restricted_suspended_body">Votre boutique est masquée aux acheteurs et ne peut pas être gérée tant que l’examen n’est pas terminé.</string>
+    <string name="restricted_banned_title">Votre compte a été fermé définitivement</string>
+    <string name="restricted_banned_body">La raison est un manquement aux conditions d’utilisation. Vous pouvez demander un nouvel examen de la décision.</string>
+    <string name="restricted_check_status">Vérifier l’état</string>
+    <string name="restricted_request_review">Demander un examen</string>
+    <string name="restricted_delete_data">Supprimer mon compte et mes données</string>
+    <string name="restricted_mail_suspended">Orderak : mon compte est suspendu</string>
+    <string name="restricted_mail_banned">Orderak : examen de la décision sur mon compte</string>
+    <string name="restricted_mail_delete">Orderak : suppression de mon compte et de mes données</string>
 </resources>

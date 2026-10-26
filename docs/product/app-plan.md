@@ -553,6 +553,15 @@ only from a current response; stale/offline blocking policy becomes a visible
 warning so an unavailable network cannot permanently lock out the seller.
 `MainRoute#version-governance` is included in the screen manifest.
 
+The restricted-account page (Phase R3, proposal R1) tells the seller which of two
+things happened, from the status the server sends. A suspension ends: the page
+is in warning colours, offers support first and a way to check the status, and
+signs out. A ban does not: the page is in error colours, names the reason class,
+offers a review of the decision and the deletion of the seller's own data (both
+by mail to support, with the status in the subject) and signs out, and has no
+status check, because checking would change nothing. Signing out asks first and
+states that the local business data on the device is removed.
+
 The main shell (Phase R2) draws the five surfaces with the shared bottom bar:
 labels always shown, a filled icon on the chosen surface, the number of unpaid
 orders on الطلبات (nothing is drawn for a count not read yet or for zero) and a

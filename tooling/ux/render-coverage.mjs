@@ -504,6 +504,8 @@ export const RENDERS = {
   // arrow that did nothing.
   restrictedAccountLight: { kind: "screen", contract: "restricted-account", state: "content", theme: "light" },
   restrictedAccountDark: { kind: "screen", contract: "restricted-account", state: "content", theme: "dark" },
+  restrictedBannedLight: { kind: "screen", contract: "restricted-account", state: "content", theme: "light", note: "banned: a lock, a review of the decision, deletion of own data, no status check" },
+  restrictedBannedDark: { kind: "screen", contract: "restricted-account", state: "content", theme: "dark", note: "banned, dark" },
 
   // ================= shop setup =================
   // Both step composables took a ShopSetupViewModel directly, so the second

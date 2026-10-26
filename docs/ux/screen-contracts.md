@@ -329,7 +329,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Entry | SplashRoute — حساب مقيَّد · أي شاشة — إشارة CREDENTIAL_REJECTED/ACCOUNT_RESTRICTED |
 | Exit | SupportRoute · AuthRoute — تسجيل خروج |
 | Data | restriction reason · support entry point |
-| Actions | contact support `restricted_contact` · sign out `onLogout` |
+| Actions | contact support `restricted_contact` · check status `onCheckAgain` · request review `restricted_request_review` · delete account and data `restricted_delete_data` · sign out `onLogout` |
 
 ### `account`
 
