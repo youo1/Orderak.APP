@@ -366,8 +366,11 @@ uploading.
 `TopBar`, `BottomNav`, `BottomActionBar`, `Fab`, `SectionHeader`, `KeyValueRow`
 and `SettingsRow` live in `core/ui/StructureComponents.kt`; `MetricTile`,
 `StatusStepper`, `StepList`, `MoneyText`, `CountText`, `Avatar`, `Thumbnail`,
-`ChatBubble` and `Composer` in `core/ui/DataComponents.kt`. All sixteen are
-`kit-pending`, with the adopting surface named in their row. `ListRow` and
+`ChatBubble` and `Composer` in `core/ui/DataComponents.kt`. Eight now have a
+caller (`TopBar`, `BottomNav` and `Fab` in the shell, `SectionHeader`,
+`MetricTile`, `StepList`, `MoneyText` and `CountText` on اليوم) and are no longer
+pending; the other eight stay `kit-pending`, with the adopting surface named in
+their row. `ListRow` and
 `StatusChip` are not here: they absorb `PriorityListRow` and `SemanticChip`, which
 changes existing screens, so they come in their own change with the owner's
 approval of the references. The 22 `@PreviewTest` functions in

@@ -553,6 +553,20 @@ only from a current response; stale/offline blocking policy becomes a visible
 warning so an unavailable network cannot permanently lock out the seller.
 `MainRoute#version-governance` is included in the screen manifest.
 
+اليوم (Phase R4, proposal T1) shows what waits for the seller: three tiles in the
+order an order moves through the shop (new, unpaid, ready to ship), each opening
+the orders it counts; the two newest orders that are not finished, as rows that
+open the order; the day so far (today's orders and this month's sales in one
+currency, none when there is no order this month); the store link with its share
+button; and the ad last. A count not read yet is a placeholder and a count that
+could not be read is a dash with a retry, never a zero. With no products the
+surface is one invitation to add the first and the checklist setup left, and the
+new-order button is not offered. The bell opens the announcements and carries a
+dot while one is unread. The plan appears only when it needs the seller: a
+monthly limit at 90% or more, or a billing notice that asks for action; the rest
+of it is on the subscription screen. A failed plan refresh keeps its banner here
+until that screen takes it (R9).
+
 The restricted-account page (Phase R3, proposal R1) tells the seller which of two
 things happened, from the status the server sends. A suspension ends: the page
 is in warning colours, offers support first and a way to check the status, and

@@ -699,4 +699,19 @@
     <string name="restricted_mail_suspended">أوردرَك: حسابي موقوف</string>
     <string name="restricted_mail_banned">أوردرَك: مراجعة القرار الخاص بحسابي</string>
     <string name="restricted_mail_delete">أوردرَك: حذف حسابي وبياناتي</string>
+    <string name="today_hello">مرحبًا</string>
+    <string name="today_counter_new">جديدة</string>
+    <string name="today_counter_unpaid">غير مدفوعة</string>
+    <string name="today_counter_to_ship">جاهزة للشحن</string>
+    <string name="today_orders_today">طلبات اليوم</string>
+    <string name="today_sales_month">مبيعات هذا الشهر</string>
+    <string name="today_section_waiting">بانتظارك</string>
+    <string name="today_section_latest">أحدث ما يحتاج إجراءً</string>
+    <string name="today_view_all">عرض الكل</string>
+    <string name="today_link_title">رابط متجرك</string>
+    <string name="today_link_share">مشاركة</string>
+    <string name="today_empty_title">متجرك جاهز، ينقصه منتجات</string>
+    <string name="today_empty_action">إضافة أول منتج</string>
+    <string name="today_error_title">تعذّرت قراءة أرقام اليوم</string>
+    <string name="today_plan_details">تفاصيل الخطة</string>
 </resources>

@@ -674,4 +674,19 @@
     <string name="restricted_mail_suspended">Orderak: my account is suspended</string>
     <string name="restricted_mail_banned">Orderak: review of the decision on my account</string>
     <string name="restricted_mail_delete">Orderak: delete my account and data</string>
+    <string name="today_hello">Hello</string>
+    <string name="today_counter_new">New</string>
+    <string name="today_counter_unpaid">Unpaid</string>
+    <string name="today_counter_to_ship">Ready to ship</string>
+    <string name="today_orders_today">Orders today</string>
+    <string name="today_sales_month">Sales this month</string>
+    <string name="today_section_waiting">Waiting for you</string>
+    <string name="today_section_latest">Latest orders that need action</string>
+    <string name="today_view_all">View all</string>
+    <string name="today_link_title">Your store link</string>
+    <string name="today_link_share">Share</string>
+    <string name="today_empty_title">Your store is ready; it needs products</string>
+    <string name="today_empty_action">Add your first product</string>
+    <string name="today_error_title">Couldn’t read today’s figures</string>
+    <string name="today_plan_details">Plan details</string>
 </resources>

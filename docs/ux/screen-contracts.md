@@ -117,7 +117,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 
 ### `today`
 
-شغل النهارده: عدّادات، استهلاك الخطة، رابط الكتالوج، تنبيهات
+ما ينتظر البائع الآن: الطلبات الجديدة وغير المدفوعة وجاهزة الشحن، وأحدث ما يحتاج إجراءً، ورابط المتجر
 
 | | |
 | --- | --- |
@@ -128,8 +128,8 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Status | implemented |
 | Entry | MainRoute — السطح الافتراضي |
 | Exit | OrderDetailsRoute · AnnouncementsRoute · SubscriptionRoute · مشاركة الكتالوج |
-| Data | today counters · entitlement usage · catalog link · unread announcements · billing notices |
-| Actions | pull to refresh `onRefresh` · share catalog `productsForShare` · open filtered orders `onOpenCounter` · retry a failed plan refresh `onRetry` · open announcements `onOpenAnnouncements` |
+| Data | today counters · open orders · month sales · catalog link · unread announcements · billing notices that ask for action · plan usage at 90% or more |
+| Actions | pull to refresh `onRefresh` · share catalog `productsForShare` · open filtered orders `onOpenCounter` · open order `onOpenOrder` · add first product `onAddProduct` · retry `onRetry` · open announcements `onOpenAnnouncements` |
 
 ## Surface: orders
 

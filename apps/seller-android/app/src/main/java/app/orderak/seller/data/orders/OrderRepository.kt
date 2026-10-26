@@ -69,6 +69,9 @@ class OrderRepository @Inject constructor(
     fun countToday(startOfDay: Long) = orderDao.countSince(startOfDay)
     fun countUnpaid() = orderDao.countUnpaid()
     fun countToShip() = orderDao.countToShip()
+    fun countNew() = orderDao.countNew()
+    fun latestOpen(limit: Int) = orderDao.latestOpen(limit)
+    fun salesSince(since: Long) = orderDao.salesSince(since)
 
     /**
      * Record an order the seller took outside the storefront.

@@ -10,9 +10,11 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.tooling.preview.Preview
+import app.orderak.seller.core.money.Money
 import app.orderak.seller.core.ui.Banner
 import app.orderak.seller.core.ui.BannerState
 import app.orderak.seller.core.ui.theme.OrderakTheme
+import app.orderak.seller.data.db.OrderEntity
 import com.android.tools.screenshot.PreviewTest
 
 private fun Modifier.greyscale(): Modifier = drawWithContent {
@@ -43,12 +45,28 @@ private fun Modifier.greyscale(): Modifier = drawWithContent {
  */
 private val LOADED = TodayUiState(
     shopName = "حلواني الأمل",
+    newCount = 4,
     todayCount = 7,
     unpaidCount = 3,
     toShipCount = 2,
     hasProducts = true,
-    hasPlanSnapshot = true,
+    unreadAnnouncements = 2,
+    latestOrders = listOf(
+        OrderEntity(
+            id = 2, remoteId = 102, buyerPhone = "+201000000002", buyerName = "منى السيد",
+            status = "NEW", payMethod = "CASH", totalMinor = 125000, currency = "EGP", createdAt = ORDER_TIME,
+        ),
+        OrderEntity(
+            id = 1, remoteId = 101, buyerPhone = "+201000000001", buyerName = "أحمد علي",
+            status = "PAID", payMethod = "CASH", totalMinor = 48000, currency = "EGP", createdAt = ORDER_TIME - 3_600_000,
+        ),
+    ),
+    monthSales = Money(1_845_000, "EGP"),
+    storeUrl = "https://orderak.app/EG-halawany-K7M2Q9XA",
 )
+
+/** A fixed moment, so the date on each row is the same in every render. */
+private const val ORDER_TIME = 1_790_000_000_000L
 
 @Composable
 private fun Today(state: TodayUiState, notices: @Composable () -> Unit = {}) {
@@ -56,7 +74,9 @@ private fun Today(state: TodayUiState, notices: @Composable () -> Unit = {}) {
         TodayScreen(
             state = state,
             onOpenCounter = {},
+            onOpenOrder = {},
             onShareCatalog = {},
+            onAddProduct = {},
             onOpenAnnouncements = {},
             onRetry = {},
             planNotices = notices,
@@ -115,6 +135,7 @@ fun todayLoadingDark() {
 
 private val EMPTY = TodayUiState(
     shopName = "حلواني الأمل",
+    newCount = 0,
     todayCount = 0,
     unpaidCount = 0,
     toShipCount = 0,
@@ -144,7 +165,7 @@ fun todayEmptyDark() {
 // different facts. `EMPTY` above cannot show this on its own: it also carries the
 // no-products card, so the sentence would be one block among several.
 
-private val CALM = LOADED.copy(todayCount = 4, unpaidCount = 0, toShipCount = 0)
+private val CALM = LOADED.copy(newCount = 0, todayCount = 4, unpaidCount = 0, toShipCount = 0, latestOrders = emptyList())
 
 @PreviewTest
 @Preview(name = "Today nothing waiting light", locale = "ar")
@@ -161,11 +182,14 @@ fun todayNothingWaitingDark() {
 }
 
 // ---- error -----------------------------------------------------------
-// The counters stay REAL here. They come from local Room queries and do not
-// depend on the network, so blanking them would hide data the seller has. Only
-// the plan refresh failed, and only that is reported.
+// The local summary could not be read. The figures are dashes, not zeros, a
+// banner says so with a retry, and the link is still there to share: it is a
+// stored value, not one of the figures that failed.
 
-private val ERRORED = LOADED.copy(planError = "ماقدرناش نوصل للسيرفر. الأرقام تحت من الجهاز.")
+private val ERRORED = LOADED.copy(
+    newCount = null, unpaidCount = null, toShipCount = null, todayCount = null,
+    latestOrders = emptyList(), monthSales = null, summaryFailed = true,
+)
 
 @PreviewTest
 @Preview(name = "Today error light", locale = "ar")
@@ -200,7 +224,7 @@ private fun offlineNotice() {
 @Composable
 fun todayOfflineLight() {
     OrderakTheme(darkTheme = false) {
-        Today(LOADED.copy(usingOfflinePlan = true)) { offlineNotice() }
+        Today(LOADED) { offlineNotice() }
     }
 }
 
@@ -209,7 +233,7 @@ fun todayOfflineLight() {
 @Composable
 fun todayOfflineDark() {
     OrderakTheme(darkTheme = true) {
-        Today(LOADED.copy(usingOfflinePlan = true)) { offlineNotice() }
+        Today(LOADED) { offlineNotice() }
     }
 }
 
