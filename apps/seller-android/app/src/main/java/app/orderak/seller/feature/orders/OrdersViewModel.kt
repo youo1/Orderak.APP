@@ -72,6 +72,10 @@ class OrdersViewModel @Inject constructor(
             .map { it.keys }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
+    /** How many lines each order has, by local id; an order with none read yet is simply absent. */
+    val itemCounts: StateFlow<Map<Long, Int>> =
+        repo.itemCounts.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
     fun setFilter(filter: OrdersFilter) { this.filter.value = filter }
 
     /** The status chips still speak in statuses; null clears to [OrdersFilter.All]. */

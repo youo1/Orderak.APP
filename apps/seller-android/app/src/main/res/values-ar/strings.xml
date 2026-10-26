@@ -714,4 +714,21 @@
     <string name="today_empty_action">إضافة أول منتج</string>
     <string name="today_error_title">تعذّرت قراءة أرقام اليوم</string>
     <string name="today_plan_details">تفاصيل الخطة</string>
+    <string name="orders_status_filter">الحالة</string>
+    <string name="orders_status_sheet_title">التصفية حسب الحالة</string>
+    <string name="orders_empty_title">لا توجد طلبات بعد</string>
+    <string name="orders_empty_body">تصل الطلبات من رابطك تلقائيًا، ويمكنك أيضًا تسجيل طلب يدويًا.</string>
+    <string name="orders_empty_action">تسجيل طلب يدوي</string>
+    <string name="orders_filtered_title">لا توجد طلبات مطابقة لهذه التصفية</string>
+    <string name="orders_filtered_action">عرض كل الطلبات</string>
+    <string name="orders_sync_pending">بعض الطلبات على هذا الهاتف فقط ولم تُرسَل بعد</string>
+    <string name="orders_sync_refused">رفض الخادم طلبًا سجّلته يدويًا</string>
+    <plurals name="orders_item_count">
+        <item quantity="zero">بلا منتجات</item>
+        <item quantity="one">منتج واحد</item>
+        <item quantity="two">منتجان</item>
+        <item quantity="few">%1$s منتجات</item>
+        <item quantity="many">%1$s منتجًا</item>
+        <item quantity="other">%1$s منتج</item>
+    </plurals>
 </resources>

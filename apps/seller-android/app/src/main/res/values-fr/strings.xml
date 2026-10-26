@@ -688,4 +688,18 @@
     <string name="today_empty_action">Ajouter votre premier produit</string>
     <string name="today_error_title">Impossible de lire les chiffres du jour</string>
     <string name="today_plan_details">Détails du forfait</string>
+    <string name="orders_status_filter">Statut</string>
+    <string name="orders_status_sheet_title">Filtrer par statut</string>
+    <string name="orders_empty_title">Aucune commande pour le moment</string>
+    <string name="orders_empty_body">Les commandes de votre lien arrivent toutes seules. Vous pouvez aussi en enregistrer une à la main.</string>
+    <string name="orders_empty_action">Enregistrer une commande</string>
+    <string name="orders_filtered_title">Aucune commande ne correspond à ce filtre</string>
+    <string name="orders_filtered_action">Afficher toutes les commandes</string>
+    <string name="orders_sync_pending">Certaines commandes sont seulement sur ce téléphone et n’ont pas encore été envoyées</string>
+    <string name="orders_sync_refused">Le serveur a refusé une commande enregistrée à la main</string>
+    <plurals name="orders_item_count">
+        <item quantity="one">%1$s article</item>
+        <item quantity="many">%1$s d’articles</item>
+        <item quantity="other">%1$s articles</item>
+    </plurals>
 </resources>

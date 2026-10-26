@@ -65,6 +65,9 @@ private val MIXED = listOf(
     order(6, "محمود العزب", OrderStatus.CANCELLED, 215_000, createdAt = 1_757_950_000_000),
 )
 
+/** How many lines each fixture order has, so every row can say "3 items". */
+private val ITEM_COUNTS = mapOf(1L to 3, 2L to 1, 3L to 2, 4L to 5, 5L to 1, 6L to 2)
+
 @Composable
 private fun orders(
     state: OrdersUiState,
@@ -72,7 +75,7 @@ private fun orders(
 ) {
     OrderakTheme(darkTheme = dark) {
         Surface {
-            OrdersContent(state = state, onOpen = {}, onNew = {}, onFilter = {}, onRetry = {})
+            OrdersContent(state = state.copy(itemCounts = ITEM_COUNTS), onOpen = {}, onNew = {}, onFilter = {}, onRetry = {})
         }
     }
 }
@@ -162,5 +165,20 @@ fun ordersFilteredUnpaid() = orders(
     OrdersUiState(
         orders = ORDERS.filter { it.status == OrderStatus.NEW.name || it.status == OrderStatus.CONFIRMED.name },
         filter = OrdersFilter.Unpaid,
+    ),
+)
+
+// ---- a status chosen in the sheet --------------------------------------
+// The chip that opens the sheet names the status that was chosen and is drawn
+// chosen. The sheet itself is the kit's `pickerSheetSingleChoice`: a modal window
+// is not captured by the harness.
+
+@PreviewTest
+@Preview(name = "Orders filtered status", locale = "ar")
+@Composable
+fun ordersFilteredStatus() = orders(
+    OrdersUiState(
+        orders = MIXED.filter { it.status == OrderStatus.PAID.name },
+        filter = OrdersFilter.Status(OrderStatus.PAID),
     ),
 )
