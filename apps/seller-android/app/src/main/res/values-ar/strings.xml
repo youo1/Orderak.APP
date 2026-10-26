@@ -333,11 +333,11 @@
     <string name="slug_reserved">محجوز</string>
     <string name="slug_network">تعذر التحقق من التوفر</string>
     <string name="slug_invalid">استخدم 3 أحرف أو أرقام أو شرطات على الأقل</string>
-    <string name="app_version_warning">يتوفر إصدار أحدث من أوردرَك.</string>
+    <string name="app_version_warning">يتوفر إصدار أحدث من Orderak.</string>
     <string name="app_version_stale_warning">تعذر تحديث سياسة الإصدار. يمكنك المتابعة مؤقتًا والمحاولة عند الاتصال بالإنترنت.</string>
     <string name="app_version_update_title">التحديث مطلوب</string>
     <string name="app_version_update_body">حدّث أوردرَك من Google Play للمتابعة بأمان.</string>
-    <string name="app_version_update_action">فتح Google Play</string>
+    <string name="app_version_update_action">التحديث من Google Play</string>
     <string name="app_version_blocked_title">إصدار التطبيق غير متاح</string>
     <string name="app_version_blocked_body">تم تعطيل هذا الإصدار لأسباب أمنية. ثبّت الإصدار الحالي للمتابعة.</string>
     <string name="app_version_maintenance_title">أوردرَك قيد الصيانة</string>
@@ -688,4 +688,5 @@
     <string name="struct_chat_mine">لم يصل طلبي بعد</string>
     <string name="struct_chat_time">١٠:٤٢</string>
     <string name="struct_composer_placeholder">اكتب رسالة</string>
+    <string name="app_version_banner_action">تحديث</string>
 </resources>

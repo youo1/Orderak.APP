@@ -553,6 +553,15 @@ only from a current response; stale/offline blocking policy becomes a visible
 warning so an unavailable network cannot permanently lock out the seller.
 `MainRoute#version-governance` is included in the screen manifest.
 
+The main shell (Phase R2) draws the five surfaces with the shared bottom bar:
+labels always shown, a filled icon on the chosen surface, the number of unpaid
+orders on الطلبات (nothing is drawn for a count not read yet or for zero) and a
+dot on حسابي while an announcement is unread. A version warning is a banner above
+every surface, with an "update" action, and cannot be dismissed. Force update
+replaces the shell with one screen whose only button is the store link; blocked
+and maintenance are waits, so they have no button and look again by themselves
+every minute.
+
 ## Rules (from AGENTS.md)
 
 - Never store DeepSeek, OpenAI, Claude, Gemini, Cloudflare, Firebase server,

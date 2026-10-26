@@ -480,6 +480,8 @@ export const RENDERS = {
   shellAccount: { kind: "screen", contract: "main-shell", state: "content", theme: "light" },
   shellNoShopName: { kind: "screen", contract: "main-shell", state: "content", theme: "light", note: "the app name, not a blank bar and not a guess" },
   shellEnglish: { kind: "screen", contract: "main-shell", state: "content", theme: "light", note: "where the five labels are longest" },
+  shellBadges: { kind: "screen", contract: "main-shell", state: "content", theme: "light", note: "the unpaid count on الطلبات and the unread dot on حسابي" },
+  shellVersionWarning: { kind: "screen", contract: "version-governance", state: "content", theme: "light", note: "a non-dismissible banner above the surface, with its own action" },
 
   versionForceUpdateLight: { kind: "screen", contract: "version-governance", state: "content", theme: "light", note: "the only mode that offers a store link — the only one the seller can act on" },
   versionForceUpdateDark: { kind: "screen", contract: "version-governance", state: "content", theme: "dark" },

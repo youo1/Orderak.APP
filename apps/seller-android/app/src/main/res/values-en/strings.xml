@@ -319,7 +319,7 @@
     <string name="app_version_stale_warning">Version policy could not be refreshed. You can continue temporarily; retry when online.</string>
     <string name="app_version_update_title">Update required</string>
     <string name="app_version_update_body">Update Orderak from Google Play to continue securely.</string>
-    <string name="app_version_update_action">Open Google Play</string>
+    <string name="app_version_update_action">Update from Google Play</string>
     <string name="app_version_blocked_title">This app version is unavailable</string>
     <string name="app_version_blocked_body">This version was disabled for safety. Install the current release before continuing.</string>
     <string name="app_version_maintenance_title">Orderak is under maintenance</string>
@@ -656,4 +656,5 @@
     <string name="struct_chat_mine">My order has not arrived</string>
     <string name="struct_chat_time">10:42</string>
     <string name="struct_composer_placeholder">Write a message</string>
+    <string name="app_version_banner_action">Update</string>
 </resources>

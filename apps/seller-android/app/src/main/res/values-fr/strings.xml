@@ -313,11 +313,11 @@
     <string name="slug_reserved">Réservé</string>
     <string name="slug_network">Disponibilité non vérifiée</string>
     <string name="slug_invalid">Utilisez au moins 3 lettres, chiffres ou tirets</string>
-    <string name="app_version_warning">Une version plus récente d’Orderak is available.</string>
+    <string name="app_version_warning">Une version plus récente d’Orderak est disponible.</string>
     <string name="app_version_stale_warning">La politique de version n’a pas pu être actualisée. Vous pouvez continuer temporairement et réessayer en ligne.</string>
     <string name="app_version_update_title">Mise à jour requise</string>
     <string name="app_version_update_body">Mettez Orderak à jour depuis Google Play pour continuer en toute sécurité.</string>
-    <string name="app_version_update_action">Ouvrir Google Play</string>
+    <string name="app_version_update_action">Mettre à jour depuis Google Play</string>
     <string name="app_version_blocked_title">Cette version est indisponible</string>
     <string name="app_version_blocked_body">Cette version a été désactivée par sécurité. Installez la version actuelle pour continuer.</string>
     <string name="app_version_maintenance_title">Orderak est en maintenance</string>
@@ -662,4 +662,5 @@
     <string name="struct_chat_mine">Ma commande n’est pas arrivée</string>
     <string name="struct_chat_time">10:42</string>
     <string name="struct_composer_placeholder">Écrire un message</string>
+    <string name="app_version_banner_action">Mettre à jour</string>
 </resources>
