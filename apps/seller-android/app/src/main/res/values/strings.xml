@@ -324,7 +324,7 @@
     <string name="app_version_stale_warning">Version policy could not be refreshed. You can continue temporarily; retry when online.</string>
     <string name="app_version_update_title">Update required</string>
     <string name="app_version_update_body">Update Orderak from Google Play to continue securely.</string>
-    <string name="app_version_update_action">Open Google Play</string>
+    <string name="app_version_update_action">Update from Google Play</string>
     <string name="app_version_blocked_title">This app version is unavailable</string>
     <string name="app_version_blocked_body">This version was disabled for safety. Install the current release before continuing.</string>
     <string name="app_version_maintenance_title">Orderak is under maintenance</string>
@@ -561,4 +561,107 @@
     <string name="error_state_try_again_later">Try again in a moment.</string>
     <string name="error_state_service_unavailable_title">The service isn’t available right now</string>
     <string name="error_state_service_unavailable_kept">What you typed is still here. Try again in a moment.</string>
+    <string name="sheet_close">Close</string>
+    <string name="sheet_actions_title">Order options</string>
+    <string name="sheet_action_share">Share order</string>
+    <string name="sheet_action_duplicate">Duplicate order</string>
+    <string name="sheet_action_print">Print receipt</string>
+    <string name="sheet_picker_title">Choose a city</string>
+    <string name="sheet_preview_query_unlisted">Qena</string>
+    <string name="sheet_confirm_delete_title">Delete this product?</string>
+    <string name="sheet_confirm_delete_message">This can’t be undone.</string>
+    <string name="sheet_confirm_delete_in_progress">Deleting…</string>
+    <string name="sheet_confirm_ship_title">Mark this order as shipped?</string>
+    <string name="sheet_confirm_ship_message">Your customer is notified.</string>
+    <string name="sheet_confirm_ship_action">Mark as shipped</string>
+    <string name="snackbar_undo_message">Order archived</string>
+    <string name="snackbar_undo_action">Undo</string>
+    <string name="snackbar_failure_message">Couldn’t save your changes</string>
+    <string name="snackbar_copied_message">Copied</string>
+    <string-array name="sheet_preview_cities">
+        <item>Cairo</item>
+        <item>Alexandria</item>
+        <item>Giza</item>
+        <item>Mansoura</item>
+        <item>Tanta</item>
+        <item>Aswan</item>
+        <item>Luxor</item>
+        <item>Suez</item>
+        <item>Port Said</item>
+        <item>Ismailia</item>
+        <item>Fayoum</item>
+        <item>Zagazig</item>
+    </string-array>
+    <string name="field_preview_name_label">Store name</string>
+    <string name="field_preview_name_value">Nour Shop</string>
+    <string name="field_preview_name_helper">Your customers see this name</string>
+    <string name="field_preview_name_error">Enter the store name</string>
+    <string name="field_preview_phone_label">Phone number</string>
+    <string name="field_preview_phone_error">Enter a valid phone number</string>
+    <string name="field_preview_country">Egypt</string>
+    <string name="field_preview_price_label">Price</string>
+    <string name="field_preview_price_error">Enter a price</string>
+    <string name="field_preview_currency">EGP</string>
+    <string name="field_preview_otp_error">The code is not correct</string>
+    <string name="stepper_decrease">Decrease quantity</string>
+    <string name="stepper_increase">Increase quantity</string>
+    <string name="choice_preview_city_label">City</string>
+    <string name="choice_preview_city_value">Tanta</string>
+    <string name="choice_preview_city_error">Choose a city</string>
+    <string name="choice_preview_switch_label">Show in the store</string>
+    <string name="choice_preview_switch_helper">Customers can see it and order it</string>
+    <string name="choice_preview_cash">Cash</string>
+    <string name="choice_preview_instapay">InstaPay</string>
+    <string name="choice_preview_wallet">E-wallet</string>
+    <string name="choice_preview_age_label">I confirm I am 18 or older</string>
+    <string name="choice_preview_age_error">Confirm to continue</string>
+    <string name="choice_preview_filter_all">All</string>
+    <string name="choice_preview_filter_new">New</string>
+    <string name="choice_preview_filter_unpaid">Unpaid</string>
+    <string name="choice_preview_filter_ready">Ready to ship</string>
+    <string name="choice_preview_filter_more">More</string>
+    <string name="choice_preview_image_label">Product photo</string>
+    <string name="choice_preview_image_add">Add a photo</string>
+    <string name="choice_preview_image_uploading">Uploading…</string>
+    <string name="choice_preview_image_failed">The upload failed</string>
+    <string name="struct_title_orders">Orders</string>
+    <string name="struct_action_search">Search</string>
+    <string name="struct_action_share">Share</string>
+    <string name="struct_action_announcements">Announcements</string>
+    <string name="struct_overflow">More options</string>
+    <string name="struct_nav_today">Today</string>
+    <string name="struct_nav_orders">Orders</string>
+    <string name="struct_nav_store">Store</string>
+    <string name="struct_nav_customers">Customers</string>
+    <string name="struct_nav_account">Account</string>
+    <string name="struct_bar_register">Register order</string>
+    <string name="struct_bar_total">Total</string>
+    <string name="struct_bar_reason">Add at least one item to continue</string>
+    <string name="struct_fab_new_order">New order</string>
+    <string name="struct_section_latest">Latest orders</string>
+    <string name="struct_section_all">View all</string>
+    <string name="struct_not_read">not read yet</string>
+    <string name="struct_step_new">New</string>
+    <string name="struct_step_confirmed">Confirmed</string>
+    <string name="struct_step_paid">Paid</string>
+    <string name="struct_step_shipped">Shipped</string>
+    <string name="struct_step_completed">Completed</string>
+    <string name="struct_step_cancelled">This order was cancelled</string>
+    <string name="struct_setup_created">Store created</string>
+    <string name="struct_setup_created_detail">Your link is ready</string>
+    <string name="struct_setup_product">Add your first product</string>
+    <string name="struct_setup_product_detail">Customers need something to order</string>
+    <string name="struct_setup_share">Share your link</string>
+    <string name="struct_setup_share_detail">Send it to your customers</string>
+    <string name="struct_kv_subtotal">Subtotal</string>
+    <string name="struct_kv_delivery">Delivery</string>
+    <string name="struct_settings_devices">Devices</string>
+    <string name="struct_settings_language">App language</string>
+    <string name="struct_settings_language_value">English</string>
+    <string name="struct_settings_delete">Delete account</string>
+    <string name="struct_chat_theirs">Hello, how can we help?</string>
+    <string name="struct_chat_mine">My order has not arrived</string>
+    <string name="struct_chat_time">10:42</string>
+    <string name="struct_composer_placeholder">Write a message</string>
+    <string name="app_version_banner_action">Update</string>
 </resources>

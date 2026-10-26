@@ -34,6 +34,9 @@ private fun shell(
     surface: SellerSurface,
     shopName: String? = "بوتيك منى",
     dark: Boolean = false,
+    unpaidOrders: Int = 0,
+    hasUnreadAnnouncements: Boolean = false,
+    versionWarning: String? = null,
 ) {
     OrderakTheme(darkTheme = dark) {
         Surface {
@@ -42,6 +45,10 @@ private fun shell(
                 surface = surface,
                 onSurface = {},
                 onNewOrder = {},
+                unpaidOrders = unpaidOrders,
+                hasUnreadAnnouncements = hasUnreadAnnouncements,
+                versionWarning = versionWarning,
+                onUpdateVersion = versionWarning?.let { {} },
             ) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
@@ -101,6 +108,30 @@ fun shellNoShopName() = shell(SellerSurface.Today, shopName = null)
 @Composable
 fun shellEnglish() = shell(SellerSurface.Orders, shopName = "Mona Boutique")
 
+/**
+ * The unpaid count on الطلبات and the dot on حسابي.
+ *
+ * The count is the number of orders waiting for payment; the dot says an
+ * announcement has not been read. Neither is drawn when its value has not been
+ * read yet, because that is not a claim of zero.
+ */
+@PreviewTest
+@Preview(name = "Shell badges", locale = "ar")
+@Composable
+fun shellBadges() = shell(SellerSurface.Orders, unpaidOrders = 3, hasUnreadAnnouncements = true)
+
+/**
+ * A newer version exists: a banner above every surface, with its own action and
+ * no way to dismiss it.
+ */
+@PreviewTest
+@Preview(name = "Shell version warning", locale = "ar")
+@Composable
+fun shellVersionWarning() = shell(
+    SellerSurface.Today,
+    versionWarning = androidx.compose.ui.res.stringResource(app.orderak.seller.R.string.app_version_warning),
+)
+
 // ---- governance ---------------------------------------------------------
 
 @Composable
@@ -117,9 +148,9 @@ private fun blocking(
 /**
  * An update the seller must take.
  *
- * The only one of the three that offers a store link, because it is the only one
- * they can act on — the other two are waits, and a button that cannot help is
- * worse than no button.
+ * The only one of the three with a button ("Update from Google Play"), because it
+ * is the only one they can act on. The other two are waits, and a button that
+ * cannot help is worse than no button.
  */
 @PreviewTest
 @Preview(name = "Version force update light", locale = "ar")
@@ -144,7 +175,7 @@ fun versionForceUpdateDark() = blocking(
 @Composable
 fun versionBlocked() = blocking(VersionUiMode.BLOCKED)
 
-/** A maintenance window — a wait, and the retry is the only thing to offer. */
+/** A maintenance window: a wait, with no button; the screen looks again by itself. */
 @PreviewTest
 @Preview(name = "Version maintenance", locale = "ar")
 @Composable

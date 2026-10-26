@@ -333,11 +333,11 @@
     <string name="slug_reserved">محجوز</string>
     <string name="slug_network">تعذر التحقق من التوفر</string>
     <string name="slug_invalid">استخدم 3 أحرف أو أرقام أو شرطات على الأقل</string>
-    <string name="app_version_warning">يتوفر إصدار أحدث من أوردرَك.</string>
+    <string name="app_version_warning">يتوفر إصدار أحدث من Orderak.</string>
     <string name="app_version_stale_warning">تعذر تحديث سياسة الإصدار. يمكنك المتابعة مؤقتًا والمحاولة عند الاتصال بالإنترنت.</string>
     <string name="app_version_update_title">التحديث مطلوب</string>
     <string name="app_version_update_body">حدّث أوردرَك من Google Play للمتابعة بأمان.</string>
-    <string name="app_version_update_action">فتح Google Play</string>
+    <string name="app_version_update_action">التحديث من Google Play</string>
     <string name="app_version_blocked_title">إصدار التطبيق غير متاح</string>
     <string name="app_version_blocked_body">تم تعطيل هذا الإصدار لأسباب أمنية. ثبّت الإصدار الحالي للمتابعة.</string>
     <string name="app_version_maintenance_title">أوردرَك قيد الصيانة</string>
@@ -586,4 +586,107 @@
     <string name="error_state_try_again_later">حاول مرة أخرى بعد قليل.</string>
     <string name="error_state_service_unavailable_title">الخدمة غير متاحة الآن</string>
     <string name="error_state_service_unavailable_kept">وما كتبته باقٍ هنا. حاول بعد قليل.</string>
+    <string name="sheet_close">إغلاق</string>
+    <string name="sheet_actions_title">خيارات الطلب</string>
+    <string name="sheet_action_share">مشاركة الطلب</string>
+    <string name="sheet_action_duplicate">تكرار الطلب</string>
+    <string name="sheet_action_print">طباعة الإيصال</string>
+    <string name="sheet_picker_title">اختيار المدينة</string>
+    <string name="sheet_preview_query_unlisted">قنا</string>
+    <string name="sheet_confirm_delete_title">حذف هذا المنتج؟</string>
+    <string name="sheet_confirm_delete_message">لا يمكن التراجع عن هذا الإجراء.</string>
+    <string name="sheet_confirm_delete_in_progress">جارٍ الحذف…</string>
+    <string name="sheet_confirm_ship_title">تحديد هذا الطلب كمشحون؟</string>
+    <string name="sheet_confirm_ship_message">سيصل إشعار إلى العميل.</string>
+    <string name="sheet_confirm_ship_action">تحديد كمشحون</string>
+    <string name="snackbar_undo_message">تمت أرشفة الطلب</string>
+    <string name="snackbar_undo_action">تراجع</string>
+    <string name="snackbar_failure_message">تعذّر حفظ التغييرات</string>
+    <string name="snackbar_copied_message">تم النسخ</string>
+    <string-array name="sheet_preview_cities">
+        <item>القاهرة</item>
+        <item>الإسكندرية</item>
+        <item>الجيزة</item>
+        <item>المنصورة</item>
+        <item>طنطا</item>
+        <item>أسوان</item>
+        <item>الأقصر</item>
+        <item>السويس</item>
+        <item>بورسعيد</item>
+        <item>الإسماعيلية</item>
+        <item>الفيوم</item>
+        <item>الزقازيق</item>
+    </string-array>
+    <string name="field_preview_name_label">اسم المتجر</string>
+    <string name="field_preview_name_value">متجر نور</string>
+    <string name="field_preview_name_helper">يراه عملاؤك</string>
+    <string name="field_preview_name_error">أدخل اسم المتجر</string>
+    <string name="field_preview_phone_label">رقم الهاتف</string>
+    <string name="field_preview_phone_error">أدخل رقم هاتف صحيحًا</string>
+    <string name="field_preview_country">مصر</string>
+    <string name="field_preview_price_label">السعر</string>
+    <string name="field_preview_price_error">أدخل السعر</string>
+    <string name="field_preview_currency">ج.م</string>
+    <string name="field_preview_otp_error">الرمز غير صحيح</string>
+    <string name="stepper_decrease">إنقاص الكمية</string>
+    <string name="stepper_increase">زيادة الكمية</string>
+    <string name="choice_preview_city_label">المدينة</string>
+    <string name="choice_preview_city_value">طنطا</string>
+    <string name="choice_preview_city_error">اختر المدينة</string>
+    <string name="choice_preview_switch_label">إظهار في المتجر</string>
+    <string name="choice_preview_switch_helper">يستطيع العملاء رؤيته وطلبه</string>
+    <string name="choice_preview_cash">نقدًا</string>
+    <string name="choice_preview_instapay">إنستاباي</string>
+    <string name="choice_preview_wallet">محفظة إلكترونية</string>
+    <string name="choice_preview_age_label">أؤكد أن عمري 18 عامًا أو أكثر</string>
+    <string name="choice_preview_age_error">أكّد للمتابعة</string>
+    <string name="choice_preview_filter_all">الكل</string>
+    <string name="choice_preview_filter_new">جديدة</string>
+    <string name="choice_preview_filter_unpaid">غير مدفوعة</string>
+    <string name="choice_preview_filter_ready">جاهزة للشحن</string>
+    <string name="choice_preview_filter_more">المزيد</string>
+    <string name="choice_preview_image_label">صورة المنتج</string>
+    <string name="choice_preview_image_add">إضافة صورة</string>
+    <string name="choice_preview_image_uploading">جارٍ الرفع…</string>
+    <string name="choice_preview_image_failed">تعذّر رفع الصورة</string>
+    <string name="struct_title_orders">الطلبات</string>
+    <string name="struct_action_search">بحث</string>
+    <string name="struct_action_share">مشاركة</string>
+    <string name="struct_action_announcements">الإعلانات</string>
+    <string name="struct_overflow">خيارات إضافية</string>
+    <string name="struct_nav_today">اليوم</string>
+    <string name="struct_nav_orders">الطلبات</string>
+    <string name="struct_nav_store">المتجر</string>
+    <string name="struct_nav_customers">العملاء</string>
+    <string name="struct_nav_account">حسابي</string>
+    <string name="struct_bar_register">تسجيل الطلب</string>
+    <string name="struct_bar_total">الإجمالي</string>
+    <string name="struct_bar_reason">أضف منتجًا واحدًا على الأقل للمتابعة</string>
+    <string name="struct_fab_new_order">طلب جديد</string>
+    <string name="struct_section_latest">آخر الطلبات</string>
+    <string name="struct_section_all">عرض الكل</string>
+    <string name="struct_not_read">لم تُقرأ بعد</string>
+    <string name="struct_step_new">جديد</string>
+    <string name="struct_step_confirmed">مؤكَّد</string>
+    <string name="struct_step_paid">مدفوع</string>
+    <string name="struct_step_shipped">مشحون</string>
+    <string name="struct_step_completed">مكتمل</string>
+    <string name="struct_step_cancelled">أُلغي هذا الطلب</string>
+    <string name="struct_setup_created">تم إنشاء المتجر</string>
+    <string name="struct_setup_created_detail">رابطك جاهز</string>
+    <string name="struct_setup_product">أضف أول منتج</string>
+    <string name="struct_setup_product_detail">يحتاج العملاء إلى شيء يطلبونه</string>
+    <string name="struct_setup_share">شارك رابطك</string>
+    <string name="struct_setup_share_detail">أرسله إلى عملائك</string>
+    <string name="struct_kv_subtotal">المجموع الفرعي</string>
+    <string name="struct_kv_delivery">التوصيل</string>
+    <string name="struct_settings_devices">الأجهزة</string>
+    <string name="struct_settings_language">لغة التطبيق</string>
+    <string name="struct_settings_language_value">العربية</string>
+    <string name="struct_settings_delete">حذف الحساب</string>
+    <string name="struct_chat_theirs">مرحبًا، كيف يمكننا مساعدتك؟</string>
+    <string name="struct_chat_mine">لم يصل طلبي بعد</string>
+    <string name="struct_chat_time">١٠:٤٢</string>
+    <string name="struct_composer_placeholder">اكتب رسالة</string>
+    <string name="app_version_banner_action">تحديث</string>
 </resources>

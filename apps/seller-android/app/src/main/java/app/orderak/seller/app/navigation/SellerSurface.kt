@@ -3,7 +3,12 @@ package app.orderak.seller.app.navigation
 import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Person
@@ -30,18 +35,20 @@ import app.orderak.seller.R
 enum class SellerSurface(
     @StringRes val labelRes: Int,
     val icon: ImageVector,
+    /** The filled glyph the bottom bar draws while this surface is the chosen one. */
+    val selectedIcon: ImageVector,
 ) {
     /** Today's work: counters, plan usage, the catalog link, notices. */
-    Today(R.string.nav_dashboard, Icons.Filled.Home),
+    Today(R.string.nav_dashboard, Icons.Outlined.Home, Icons.Filled.Home),
 
     /** Orders, ordered by whether they need the seller. */
-    Orders(R.string.nav_orders, Icons.AutoMirrored.Outlined.ReceiptLong),
+    Orders(R.string.nav_orders, Icons.AutoMirrored.Outlined.ReceiptLong, Icons.AutoMirrored.Filled.ReceiptLong),
 
     /** The catalog: products, categories, the public storefront. */
-    Store(R.string.nav_products, Icons.Outlined.Inventory2),
+    Store(R.string.nav_products, Icons.Outlined.Inventory2, Icons.Filled.Inventory2),
 
     /** Customers and their history. */
-    Customers(R.string.nav_customers, Icons.Outlined.Group),
+    Customers(R.string.nav_customers, Icons.Outlined.Group, Icons.Filled.Group),
 
     /**
      * Identity, plan, devices, support — grouped rather than listed flat.
@@ -50,7 +57,7 @@ enum class SellerSurface(
      * reachable until this surface had been checked against it entry by entry;
      * it has been, so the route is gone and this is the only way in.
      */
-    Account(R.string.nav_account, Icons.Outlined.Person),
+    Account(R.string.nav_account, Icons.Outlined.Person, Icons.Filled.Person),
     ;
 
     companion object {

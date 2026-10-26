@@ -313,11 +313,11 @@
     <string name="slug_reserved">Réservé</string>
     <string name="slug_network">Disponibilité non vérifiée</string>
     <string name="slug_invalid">Utilisez au moins 3 lettres, chiffres ou tirets</string>
-    <string name="app_version_warning">Une version plus récente d’Orderak is available.</string>
+    <string name="app_version_warning">Une version plus récente d’Orderak est disponible.</string>
     <string name="app_version_stale_warning">La politique de version n’a pas pu être actualisée. Vous pouvez continuer temporairement et réessayer en ligne.</string>
     <string name="app_version_update_title">Mise à jour requise</string>
     <string name="app_version_update_body">Mettez Orderak à jour depuis Google Play pour continuer en toute sécurité.</string>
-    <string name="app_version_update_action">Ouvrir Google Play</string>
+    <string name="app_version_update_action">Mettre à jour depuis Google Play</string>
     <string name="app_version_blocked_title">Cette version est indisponible</string>
     <string name="app_version_blocked_body">Cette version a été désactivée par sécurité. Installez la version actuelle pour continuer.</string>
     <string name="app_version_maintenance_title">Orderak est en maintenance</string>
@@ -560,4 +560,107 @@
     <string name="error_state_try_again_later">Réessayez dans un instant.</string>
     <string name="error_state_service_unavailable_title">Le service est indisponible pour le moment</string>
     <string name="error_state_service_unavailable_kept">Ce que vous avez saisi est conservé. Réessayez dans un instant.</string>
+    <string name="sheet_close">Fermer</string>
+    <string name="sheet_actions_title">Options de la commande</string>
+    <string name="sheet_action_share">Partager la commande</string>
+    <string name="sheet_action_duplicate">Dupliquer la commande</string>
+    <string name="sheet_action_print">Imprimer le reçu</string>
+    <string name="sheet_picker_title">Choisir une ville</string>
+    <string name="sheet_preview_query_unlisted">Qena</string>
+    <string name="sheet_confirm_delete_title">Supprimer ce produit ?</string>
+    <string name="sheet_confirm_delete_message">Cette action est irréversible.</string>
+    <string name="sheet_confirm_delete_in_progress">Suppression…</string>
+    <string name="sheet_confirm_ship_title">Marquer cette commande comme expédiée ?</string>
+    <string name="sheet_confirm_ship_message">Votre client est averti.</string>
+    <string name="sheet_confirm_ship_action">Marquer comme expédiée</string>
+    <string name="snackbar_undo_message">Commande archivée</string>
+    <string name="snackbar_undo_action">Annuler</string>
+    <string name="snackbar_failure_message">Impossible d’enregistrer vos modifications</string>
+    <string name="snackbar_copied_message">Copié</string>
+    <string-array name="sheet_preview_cities">
+        <item>Le Caire</item>
+        <item>Alexandrie</item>
+        <item>Gizeh</item>
+        <item>Mansourah</item>
+        <item>Tanta</item>
+        <item>Assouan</item>
+        <item>Louxor</item>
+        <item>Suez</item>
+        <item>Port-Saïd</item>
+        <item>Ismaïlia</item>
+        <item>Fayoum</item>
+        <item>Zagazig</item>
+    </string-array>
+    <string name="field_preview_name_label">Nom de la boutique</string>
+    <string name="field_preview_name_value">Boutique Nour</string>
+    <string name="field_preview_name_helper">Vos clients voient ce nom</string>
+    <string name="field_preview_name_error">Saisissez le nom de la boutique</string>
+    <string name="field_preview_phone_label">Numéro de téléphone</string>
+    <string name="field_preview_phone_error">Saisissez un numéro valide</string>
+    <string name="field_preview_country">Égypte</string>
+    <string name="field_preview_price_label">Prix</string>
+    <string name="field_preview_price_error">Saisissez un prix</string>
+    <string name="field_preview_currency">EGP</string>
+    <string name="field_preview_otp_error">Le code est incorrect</string>
+    <string name="stepper_decrease">Diminuer la quantité</string>
+    <string name="stepper_increase">Augmenter la quantité</string>
+    <string name="choice_preview_city_label">Ville</string>
+    <string name="choice_preview_city_value">Tanta</string>
+    <string name="choice_preview_city_error">Choisissez une ville</string>
+    <string name="choice_preview_switch_label">Afficher dans la boutique</string>
+    <string name="choice_preview_switch_helper">Les clients peuvent le voir et le commander</string>
+    <string name="choice_preview_cash">Espèces</string>
+    <string name="choice_preview_instapay">InstaPay</string>
+    <string name="choice_preview_wallet">Portefeuille électronique</string>
+    <string name="choice_preview_age_label">Je confirme avoir 18 ans ou plus</string>
+    <string name="choice_preview_age_error">Confirmez pour continuer</string>
+    <string name="choice_preview_filter_all">Toutes</string>
+    <string name="choice_preview_filter_new">Nouvelles</string>
+    <string name="choice_preview_filter_unpaid">Impayées</string>
+    <string name="choice_preview_filter_ready">Prêtes à expédier</string>
+    <string name="choice_preview_filter_more">Plus</string>
+    <string name="choice_preview_image_label">Photo du produit</string>
+    <string name="choice_preview_image_add">Ajouter une photo</string>
+    <string name="choice_preview_image_uploading">Envoi en cours…</string>
+    <string name="choice_preview_image_failed">L’envoi a échoué</string>
+    <string name="struct_title_orders">Commandes</string>
+    <string name="struct_action_search">Rechercher</string>
+    <string name="struct_action_share">Partager</string>
+    <string name="struct_action_announcements">Annonces</string>
+    <string name="struct_overflow">Plus d’options</string>
+    <string name="struct_nav_today">Aujourd’hui</string>
+    <string name="struct_nav_orders">Commandes</string>
+    <string name="struct_nav_store">Boutique</string>
+    <string name="struct_nav_customers">Clients</string>
+    <string name="struct_nav_account">Mon compte</string>
+    <string name="struct_bar_register">Enregistrer la commande</string>
+    <string name="struct_bar_total">Total</string>
+    <string name="struct_bar_reason">Ajoutez au moins un article pour continuer</string>
+    <string name="struct_fab_new_order">Nouvelle commande</string>
+    <string name="struct_section_latest">Dernières commandes</string>
+    <string name="struct_section_all">Tout voir</string>
+    <string name="struct_not_read">pas encore lu</string>
+    <string name="struct_step_new">Nouvelle</string>
+    <string name="struct_step_confirmed">Confirmée</string>
+    <string name="struct_step_paid">Payée</string>
+    <string name="struct_step_shipped">Expédiée</string>
+    <string name="struct_step_completed">Terminée</string>
+    <string name="struct_step_cancelled">Cette commande a été annulée</string>
+    <string name="struct_setup_created">Boutique créée</string>
+    <string name="struct_setup_created_detail">Votre lien est prêt</string>
+    <string name="struct_setup_product">Ajoutez votre premier produit</string>
+    <string name="struct_setup_product_detail">Vos clients ont besoin de quelque chose à commander</string>
+    <string name="struct_setup_share">Partagez votre lien</string>
+    <string name="struct_setup_share_detail">Envoyez-le à vos clients</string>
+    <string name="struct_kv_subtotal">Sous-total</string>
+    <string name="struct_kv_delivery">Livraison</string>
+    <string name="struct_settings_devices">Appareils</string>
+    <string name="struct_settings_language">Langue de l’application</string>
+    <string name="struct_settings_language_value">Français</string>
+    <string name="struct_settings_delete">Supprimer le compte</string>
+    <string name="struct_chat_theirs">Bonjour, comment pouvons-nous vous aider ?</string>
+    <string name="struct_chat_mine">Ma commande n’est pas arrivée</string>
+    <string name="struct_chat_time">10:42</string>
+    <string name="struct_composer_placeholder">Écrire un message</string>
+    <string name="app_version_banner_action">Mettre à jour</string>
 </resources>
