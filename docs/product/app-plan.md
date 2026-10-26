@@ -553,6 +553,17 @@ only from a current response; stale/offline blocking policy becomes a visible
 warning so an unavailable network cannot permanently lock out the seller.
 `MainRoute#version-governance` is included in the screen manifest.
 
+الطلبات (Phase R5, list) has a large title and a pinned row of filters: all, unpaid,
+ready to ship, today, and one chip, الحالة, that opens a sheet with the six exact
+statuses and names the one chosen. The orders that still need the seller come
+first, with their count, then the finished ones. A row says which order, how many
+lines and how long ago ("#١٠٤٢ · ٣ منتجات · قبل ساعة"; after a week a date): the
+number is the server's when the order has one and this phone's otherwise, and is
+written without grouping because it is a name. A banner appears only while a
+manual order is still only on this phone, or the server refused one. With no
+order at all the page explains that link orders arrive by themselves and offers a
+manual one; a filter with no match keeps the chips and offers all orders.
+
 اليوم (Phase R4, proposal T1) shows what waits for the seller: three tiles in the
 order an order moves through the shop (new, unpaid, ready to ship), each opening
 the orders it counts; the two newest orders that are not finished, as rows that

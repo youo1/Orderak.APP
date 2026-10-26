@@ -267,7 +267,6 @@ private data class KnownFinding(
 }
 private data class KnownKind(val reason: String, val plan: String)
 private val KNOWN_KINDS: Map<String, KnownKind> = mapOf(
-    "TS" to KnownKind("Touch target is below the 48dp minimum", "B5: enlarge the kit control to a 48dp target"),
     "CF" to KnownKind("Field label colour is below the 4.5:1 threshold", "R1: use the accessible onSurfaceVariant token"),
     "CG" to KnownKind("Text colour is below the WCAG threshold", "R1: use the accessible design-system colour token"),
     "IL" to KnownKind(
@@ -281,14 +280,6 @@ private val KNOWN_FINDINGS: List<KnownFinding> = """
         CF|AccountScreenshotTestKt.accountFreePlan|Contrast|text "رقم فودافون كاش"
         CF|AccountScreenshotTestKt.accountFreePlanUpgradable|Contrast|text "رقم فودافون كاش"
         CF|AccountScreenshotTestKt.accountLinkPending|Contrast|text "رقم فودافون كاش"
-        TS|OrdersScreenshotTestKt.ordersBothGroupsDark|Target|touch target
-        TS|OrdersScreenshotTestKt.ordersBothGroupsLight|Target|touch target
-        TS|OrdersScreenshotTestKt.ordersContentDark|Target|touch target
-        TS|OrdersScreenshotTestKt.ordersContentLight|Target|touch target
-        TS|OrdersScreenshotTestKt.ordersErrorDark|Target|touch target
-        TS|OrdersScreenshotTestKt.ordersErrorLight|Target|touch target
-        TS|OrdersScreenshotTestKt.ordersFilteredToNone|Target|touch target
-        TS|OrdersScreenshotTestKt.ordersFilteredUnpaid|Target|touch target
         IL|ShopSetupScreenshotTestKt.setupAccountDark|Label|has no ContentDescription or Text
         IL|ShopSetupScreenshotTestKt.setupAccountDark|Label|has no ContentDescription or Text
         IL|ShopSetupScreenshotTestKt.setupAccountEmpty|Label|has no ContentDescription or Text

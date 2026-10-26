@@ -689,4 +689,17 @@
     <string name="today_empty_action">Add your first product</string>
     <string name="today_error_title">Couldn’t read today’s figures</string>
     <string name="today_plan_details">Plan details</string>
+    <string name="orders_status_filter">Status</string>
+    <string name="orders_status_sheet_title">Filter by status</string>
+    <string name="orders_empty_title">No orders yet</string>
+    <string name="orders_empty_body">Orders from your link arrive by themselves. You can also record one by hand.</string>
+    <string name="orders_empty_action">Record an order by hand</string>
+    <string name="orders_filtered_title">No orders match this filter</string>
+    <string name="orders_filtered_action">Show all orders</string>
+    <string name="orders_sync_pending">Some orders are only on this phone and have not been sent yet</string>
+    <string name="orders_sync_refused">The server refused an order you recorded by hand</string>
+    <plurals name="orders_item_count">
+        <item quantity="one">%1$s item</item>
+        <item quantity="other">%1$s items</item>
+    </plurals>
 </resources>

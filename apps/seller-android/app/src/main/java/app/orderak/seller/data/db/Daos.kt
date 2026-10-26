@@ -131,6 +131,9 @@ interface CategoryDao {
     }
 }
 
+/** How many lines an order has, as the orders list reads them. */
+data class OrderItemCount(val orderId: Long, val itemCount: Int)
+
 /** One currency's total, as the query for اليوم returns it. */
 data class MonthSalesRow(val currency: String, val totalMinor: Long)
 
@@ -197,6 +200,10 @@ interface OrderDao {
 
     @Query("SELECT COUNT(*) FROM orders WHERE status = 'PAID'")
     fun countToShip(): Flow<Int>
+
+    /** The number of lines of every order, for the list to say "3 items" without loading them all. */
+    @Query("SELECT orderId, COUNT(*) AS itemCount FROM order_items GROUP BY orderId")
+    fun itemCounts(): Flow<List<OrderItemCount>>
 
     /** Orders nobody has confirmed yet: the first thing waiting on the seller. */
     @Query("SELECT COUNT(*) FROM orders WHERE status = 'NEW'")

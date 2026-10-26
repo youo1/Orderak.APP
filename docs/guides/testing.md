@@ -205,14 +205,6 @@ control is not measured, because WCAG 1.4.3 exempts inactive components.
 | `AccountScreenshotTestKt.accountFreePlan` | Contrast | `text "رقم فودافون كاش"` (measured 4.26:1 once scrolled into view) | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
 | `AccountScreenshotTestKt.accountFreePlanUpgradable` | Contrast | `text "رقم فودافون كاش"` (measured 4.26:1 once scrolled into view) | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
 | `AccountScreenshotTestKt.accountLinkPending` | Contrast | `text "رقم فودافون كاش"` (measured 4.26:1 once scrolled into view) | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
-| `OrdersScreenshotTestKt.ordersBothGroupsDark` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
-| `OrdersScreenshotTestKt.ordersBothGroupsLight` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
-| `OrdersScreenshotTestKt.ordersContentDark` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
-| `OrdersScreenshotTestKt.ordersContentLight` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
-| `OrdersScreenshotTestKt.ordersErrorDark` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
-| `OrdersScreenshotTestKt.ordersErrorLight` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
-| `OrdersScreenshotTestKt.ordersFilteredToNone` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
-| `OrdersScreenshotTestKt.ordersFilteredUnpaid` | Target | `touch target` | Touch target below 48dp | B5 — enlarge the kit control to a 48dp target |
 | `ShopSetupScreenshotTestKt.setupAccountDark` | Label | 2 inline links (terms, privacy) | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
 | `ShopSetupScreenshotTestKt.setupAccountEmpty` | Label | 2 inline links (terms, privacy) | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
 | `ShopSetupScreenshotTestKt.setupAccountInvalidEmail` | Label | 2 inline links (terms, privacy) | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
@@ -368,8 +360,9 @@ and `SettingsRow` live in `core/ui/StructureComponents.kt`; `MetricTile`,
 `StatusStepper`, `StepList`, `MoneyText`, `CountText`, `Avatar`, `Thumbnail`,
 `ChatBubble` and `Composer` in `core/ui/DataComponents.kt`. Eight now have a
 caller (`TopBar`, `BottomNav` and `Fab` in the shell, `SectionHeader`,
-`MetricTile`, `StepList`, `MoneyText` and `CountText` on اليوم) and are no longer
-pending; the other eight stay `kit-pending`, with the adopting surface named in
+`MetricTile`, `StepList`, `MoneyText` and `CountText` on اليوم, `FilterChipRow` and
+`PickerSheet` on الطلبات) and are no longer
+pending; the others stay `kit-pending`, with the adopting surface named in
 their row. `ListRow` and
 `StatusChip` are not here: they absorb `PriorityListRow` and `SemanticChip`, which
 changes existing screens, so they come in their own change with the owner's

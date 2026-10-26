@@ -309,6 +309,8 @@ fun FilterChipRow(
     modifier: Modifier = Modifier,
     moreLabel: String? = null,
     onMore: (() -> Unit)? = null,
+    /** The last chip stands for a choice made in its sheet, so it is drawn chosen. */
+    moreSelected: Boolean = false,
 ) {
     val spacing = LocalOrderakSpacing.current
     Row(
@@ -327,7 +329,7 @@ fun FilterChipRow(
         }
         if (moreLabel != null && onMore != null) {
             FilterChip(
-                selected = false,
+                selected = moreSelected,
                 onClick = onMore,
                 label = { Text(moreLabel) },
                 trailingIcon = { Icon(Icons.Filled.ArrowDropDown, contentDescription = null) },

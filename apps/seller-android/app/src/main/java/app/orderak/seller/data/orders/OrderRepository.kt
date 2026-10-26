@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.first
 import app.orderak.seller.domain.OrderStatus
 import app.orderak.seller.domain.PayMethod
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -70,6 +71,7 @@ class OrderRepository @Inject constructor(
     fun countUnpaid() = orderDao.countUnpaid()
     fun countToShip() = orderDao.countToShip()
     fun countNew() = orderDao.countNew()
+    val itemCounts = orderDao.itemCounts().map { rows -> rows.associate { it.orderId to it.itemCount } }
     fun latestOpen(limit: Int) = orderDao.latestOpen(limit)
     fun salesSince(since: Long) = orderDao.salesSince(since)
 

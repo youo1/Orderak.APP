@@ -330,6 +330,9 @@ private fun NavHostController.navigateToSurface(target: SellerSurface) {
     }
 }
 
+/** The surfaces that draw their own large title, so the shell does not draw its bar over it. */
+private val SURFACES_WITH_OWN_BAR = setOf(SellerSurface.Today, SellerSurface.Orders)
+
 /**
  * The five-surface shell: what stays on screen whichever surface is showing.
  *
@@ -365,7 +368,7 @@ fun MainShellContent(
             // اليوم draws its own large title and its bell; the other surfaces keep the
             // shop's name here until each brings its own bar (R5 to R8). The app name
             // until the shop's own arrives: not a blank bar, and not a guess.
-            if (surface != SellerSurface.Today) {
+            if (surface !in SURFACES_WITH_OWN_BAR) {
                 TopBar(title = shopName ?: stringResource(R.string.app_name))
             }
         },
