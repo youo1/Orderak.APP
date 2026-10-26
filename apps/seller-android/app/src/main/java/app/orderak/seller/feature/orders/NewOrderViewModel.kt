@@ -125,6 +125,13 @@ class NewOrderViewModel @Inject constructor(
         _state.value = _state.value.copy(phone = next)
         savedState[KEY_PHONE] = next
     }
+    /** The buyer's country, kept with the digits already typed as far as that country allows. */
+    fun onCountry(iso: String) {
+        val max = Countries.nationalDigitsMax(Countries.byIso(iso))
+        val phone = _state.value.phone.take(max)
+        _state.value = _state.value.copy(countryIso = iso, phone = phone)
+        savedState[KEY_PHONE] = phone
+    }
     fun onName(v: String) {
         val next = v.take(40)
         _state.value = _state.value.copy(name = next)

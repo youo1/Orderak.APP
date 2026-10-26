@@ -129,10 +129,10 @@
     <string name="status_done">Terminé</string>
     <string name="status_cancelled">Annulé</string>
 
-    <string name="pay_vfcash">Vodafone Cash</string>
+    <string name="pay_vfcash">Portefeuille électronique</string>
     <string name="pay_instapay">InstaPay</string>
     <string name="pay_fawry">Fawry</string>
-    <string name="pay_cod">Paiement à la livraison</string>
+    <string name="pay_cod">Espèces</string>
 
     <string name="order_details_title">Commande #%1$d</string>
     <string name="order_whatsapp">Discuter sur WhatsApp</string>
@@ -713,4 +713,18 @@
     <string name="order_paid_with">Moyen de paiement</string>
     <string name="order_advance_to_fallback">Suivant</string>
     <string name="order_note_title">Note</string>
+    <string name="order_new_customer">Client</string>
+    <string name="order_new_add_product">Ajouter un produit</string>
+    <string name="order_new_add_note">Ajouter une note</string>
+    <string name="order_new_stock_left">Seulement %1$s disponible</string>
+    <string name="order_new_saving">Enregistrement…</string>
+    <string name="order_new_bar_reason">Saisissez le numéro du client et ajoutez un produit</string>
+    <string name="order_new_discard_title">Abandonner cette commande ?</string>
+    <string name="order_new_discard_body">Ce que vous avez saisi sera perdu.</string>
+    <string name="order_new_discard_confirm">Abandonner</string>
+    <string name="order_new_keep_editing">Continuer</string>
+    <string name="order_new_picker_done">Terminé</string>
+    <string name="order_new_picker_stock">En stock : %1$s</string>
+    <string name="order_new_country_title">Pays</string>
+    <string name="order_new_country_search">Rechercher par pays ou indicatif</string>
 </resources>

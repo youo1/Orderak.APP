@@ -1,5 +1,31 @@
 package app.orderak.seller.feature.orders
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import app.orderak.seller.core.money.Money
+import app.orderak.seller.core.phone.Countries
+import app.orderak.seller.core.ui.BottomActionBar
+import app.orderak.seller.core.ui.ConfirmSheet
+import app.orderak.seller.core.ui.ConfirmSheetState
+import app.orderak.seller.core.ui.MoneyText
+import app.orderak.seller.core.ui.PhoneField
+import app.orderak.seller.core.ui.PickerOption
+import app.orderak.seller.core.ui.PickerSheet
+import app.orderak.seller.core.ui.PickerSheetMode
+import app.orderak.seller.core.ui.SectionHeader
+import app.orderak.seller.core.ui.SegmentedChoice
+import app.orderak.seller.core.ui.Stepper
+import app.orderak.seller.core.ui.TextField
+import app.orderak.seller.core.ui.TopBar
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -79,6 +105,7 @@ fun NewOrderScreen(
         selectedCurrency = viewModel.selectedCurrency(),
         actions = NewOrderActions(
             onPhone = viewModel::onPhone,
+            onCountry = viewModel::onCountry,
             onName = viewModel::onName,
             onNote = viewModel::onNote,
             onPayMethod = viewModel::onPayMethod,
@@ -93,6 +120,7 @@ fun NewOrderScreen(
 /** What the new-order form can ask the view model to do, as data. */
 data class NewOrderActions(
     val onPhone: (String) -> Unit = {},
+    val onCountry: (String) -> Unit = {},
     val onName: (String) -> Unit = {},
     val onNote: (String) -> Unit = {},
     val onPayMethod: (PayMethod) -> Unit = {},
@@ -103,9 +131,11 @@ data class NewOrderActions(
 /**
  * The manual order form, as a function of its state.
  *
- * This screen was already honest about loading — `products` is nullable and it
- * branches on null before deciding the catalogue is empty — so the split here
- * buys renders rather than a fix.
+ * Top to bottom: the customer (phone with its country, and an optional name), the
+ * products chosen so far with a stepper on each and a button that opens the picker,
+ * how it is to be paid (only the methods this store accepts), and an optional note
+ * behind a button. The bar at the bottom holds the running total and "record the
+ * order". Closing a form that has something in it asks first.
  *
  * [totalMinor] and [selectedCurrency] arrive already computed. The second is
  * nullable on purpose: minor units only add up within one currency, so a basket
@@ -123,162 +153,65 @@ fun NewOrderContent(
     onCreated: (Long) -> Unit,
 ) {
     val locale = LocalConfiguration.current.locales[0]
-    // The screen's rhythm, from the system. Every padding and gap below was a
-    // hand-written dp value — 8, 12 and 24, which happen to be tokens, and were
-    // still the reason a change to the spacing scale would not have reached here.
-    // The note was one short: the list's own gutter is 16, a fourth literal that a
-    // change to the scale could not reach either.
     val spacing = LocalOrderakSpacing.current
     val catalogue = products
     // `selectedCurrency` is null for a mixed selection once anything is picked —
-    // see NewOrderViewModel.selectedCurrency. The total already renders "—" in
-    // that case, and Save must not stay live beside it: it used to be the live
-    // control on a mixed selection, and pressing it crashed the screen.
+    // see NewOrderViewModel.selectedCurrency. The total renders "—" in that case, and
+    // Save must not stay live beside it: pressing it used to crash the screen.
     val mixedCurrency = state.hasItems && selectedCurrency == null
+    var productSheet by rememberSaveable { mutableStateOf(false) }
+    var countrySheet by rememberSaveable { mutableStateOf(false) }
+    var noteOpen by rememberSaveable { mutableStateOf(false) }
+    var countryQuery by rememberSaveable { mutableStateOf("") }
+    var discardSheet by rememberSaveable { mutableStateOf(false) }
+    val hasDraft = state.phone.isNotEmpty() || state.name.isNotEmpty() || state.note.isNotEmpty() || state.hasItems
+    val leave = { if (hasDraft && !state.saving) discardSheet = true else onBack() }
+    BackHandler(enabled = hasDraft && !state.saving) { discardSheet = true }
+    val country = remember(state.countryIso, locale) { Countries.localized(Countries.byIso(state.countryIso), locale) }
+    val locked = state.saving
+
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.order_new_title), modifier = Modifier.semantics { heading() }) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                }
+            TopBar(
+                title = stringResource(R.string.order_new_title),
+                onBack = leave,
+                backDescription = stringResource(R.string.sheet_close),
+                closeIcon = true,
             )
-        }
+        },
+        bottomBar = {
+            BottomActionBar(
+                primaryLabel = stringResource(if (locked) R.string.order_new_saving else R.string.order_save),
+                onPrimary = { actions.save(onCreated) },
+                primaryEnabled = state.canSave && !locked && !mixedCurrency,
+                disabledReason = if (!state.canSave && !locked) stringResource(R.string.order_new_bar_reason) else null,
+                summaryLabel = stringResource(R.string.order_total),
+                // No total across currencies: see NewOrderViewModel.selectedCurrency.
+                summaryValue = selectedCurrency?.let { formatAmountLabel(totalMinor, it, locale) } ?: "\u2014",
+            )
+        },
     ) { padding ->
         LazyColumn(
-            // `imePadding` so the keyboard lifts the form instead of covering the
-            // field being typed into — and the Save button under it. This screen
-            // is a form with three text fields and a submit button at the bottom
-            // of the scroll, which is the exact shape that needs it.
+            // `imePadding` so the keyboard lifts the form instead of covering the field
+            // being typed into.
             modifier = Modifier.fillMaxSize().padding(padding).imePadding(),
             contentPadding = PaddingValues(spacing.space4),
             verticalArrangement = Arrangement.spacedBy(spacing.space3),
         ) {
-            item { CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                val phoneInvalid = state.phone.isNotEmpty() && !state.phoneValid
-                OutlinedTextField(
-                    value = state.phone, onValueChange = actions.onPhone,
-                    label = { Text(stringResource(R.string.order_buyer_phone)) },
-                    singleLine = true, isError = phoneInvalid,
-                    // `isError` on its own is an outline that turns red and
-                    // nothing more, on a form whose Save button stays dead until
-                    // the number is complete: the reason the order cannot be
-                    // recorded travelled as a colour, which is the one signal the
-                    // system forbids it to rest on. The stock banner below is this
-                    // screen's own argument that red alone leaves the seller
-                    // without the reason.
-                    supportingText = if (phoneInvalid) {
-                        { Text(stringResource(R.string.order_phone_invalid)) }
-                    } else {
-                        null
-                    },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            } }
-            item { OutlinedTextField(
-                value = state.name, onValueChange = actions.onName,
-                label = { Text(stringResource(R.string.order_buyer_name_opt)) },
-                singleLine = true, modifier = Modifier.fillMaxWidth()
-            ) }
-
-            item { Text(stringResource(R.string.order_items_title), style = MaterialTheme.typography.titleMedium) }
-            if (catalogue == null) {
-                // Not read yet. Saying "you have no products" here would tell a
-                // seller mid-sale that they have nothing to sell.
-                item { Skeleton(SkeletonVariant.ListRows, Modifier.padding(LocalOrderakSpacing.current.space4)) }
-            } else if (catalogue.isEmpty()) {
-                // `products_empty` is the store surface's copy, and it sends the
-                // seller to a ➕: "tap ➕ and add your first product with a photo".
-                // This screen has no ➕ — the only one is on المتجر, one surface
-                // away behind the back arrow — so the state told a seller to tap
-                // something that is not here, which is a dead end rather than a
-                // next step. The tab that does have the button is the next step.
-                item {
-                    Text(
-                        stringResource(R.string.order_no_products_body),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-            }
-            items(catalogue.orEmpty(), key = { it.id }) { p ->
-                val q = state.qty[p.id] ?: 0
-                Card {
-                    Row(Modifier.fillMaxWidth().padding(spacing.space3), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                p.name,
-                                style = MaterialTheme.typography.bodyLarge.copy(
-                                    textDirection = TextDirection.Content,
-                                ),
-                            )
-                            Text(
-                                formatAmountLabel(p.priceMinor, p.currency, locale),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        // qty stepper — forced LTR (− count +)
-                        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                val decLabel = stringResource(R.string.order_qty_decrease, p.name)
-                                IconButton(onClick = { actions.changeQty(p, -1) }, enabled = q > 0) {
-                                    Text("−", style = MaterialTheme.typography.titleLarge,
-                                        modifier = Modifier.semantics {
-                                            contentDescription = decLabel
-                                        })
-                                }
-                                Text(
-                                    formatCount(q, locale),
-                                    style = MaterialTheme.typography.titleMedium,
-                                )
-                                val incLabel = stringResource(R.string.order_qty_increase, p.name)
-                                IconButton(onClick = { actions.changeQty(p, +1) }, enabled = q < p.stock) {
-                                    Text("+", style = MaterialTheme.typography.titleLarge,
-                                        modifier = Modifier.semantics {
-                                            contentDescription = incLabel
-                                        })
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            item { Text(stringResource(R.string.order_pay_method), style = MaterialTheme.typography.titleMedium) }
-            item { FlowRow(horizontalArrangement = Arrangement.spacedBy(spacing.space2)) {
-                state.payMethods.forEach { m ->
-                    FilterChip(
-                        selected = state.payMethod == m,
-                        onClick = { actions.onPayMethod(m) },
-                        label = { Text(payMethodLabel(m)) }
-                    )
-                }
-            } }
-
-            item { OutlinedTextField(
-                value = state.note, onValueChange = actions.onNote,
-                label = { Text(stringResource(R.string.order_note_opt)) },
-                modifier = Modifier.fillMaxWidth()
-            ) }
-
-            if (state.stockError) {
-                // Red text alone. A seller who cannot distinguish it from the
-                // label above never learns the order was blocked on stock.
+            if (state.saveFailed) {
+                // The write failed and the draft survived, so the honest thing to say is
+                // that nothing was lost and the button is still there.
                 item {
                     Banner(
                         state = BannerState.Error,
-                        title = stringResource(R.string.order_stock_error),
-                        message = stringResource(R.string.order_stock_error_body),
+                        title = stringResource(R.string.order_save_failed_title),
+                        message = stringResource(R.string.order_save_failed_body),
                     )
                 }
             }
-
             if (mixedCurrency) {
-                // The "—" total says something is wrong without saying what. This
-                // says what, and what to do about it.
+                // The "—" total says something is wrong without saying what. This says
+                // what, and what to do about it.
                 item {
                     Banner(
                         state = BannerState.Error,
@@ -288,37 +221,182 @@ fun NewOrderContent(
                 }
             }
 
-            if (state.saveFailed) {
-                // The write failed and the draft survived, so the honest thing to
-                // say is that nothing was lost and the button is still there.
+            item { SectionHeader(title = stringResource(R.string.order_new_customer)) }
+            item {
+                val phoneInvalid = state.phone.isNotEmpty() && !state.phoneValid
+                PhoneField(
+                    dialCode = "+" + country.dialCode,
+                    countryDescription = country.name,
+                    number = state.phone,
+                    onNumberChange = actions.onPhone,
+                    onPickCountry = { countrySheet = true },
+                    label = stringResource(R.string.order_buyer_phone),
+                    // The reason the order cannot be recorded is said, not only coloured.
+                    error = if (phoneInvalid) stringResource(R.string.order_phone_invalid) else null,
+                    enabled = !locked,
+                )
+            }
+            item {
+                TextField(
+                    value = state.name,
+                    onValueChange = actions.onName,
+                    label = stringResource(R.string.order_buyer_name_opt),
+                    enabled = !locked,
+                )
+            }
+
+            item { SectionHeader(title = stringResource(R.string.order_items_title)) }
+            when {
+                // Not read yet. Saying "you have no products" here would tell a seller
+                // mid-sale that they have nothing to sell.
+                catalogue == null -> item { Skeleton(SkeletonVariant.ListRows) }
+                // The next step is on المتجر, one surface away, and this says so.
+                catalogue.isEmpty() -> item {
+                    Text(stringResource(R.string.order_no_products_body), style = MaterialTheme.typography.bodyMedium)
+                }
+                else -> {
+                    val lines = catalogue.filter { (state.qty[it.id] ?: 0) > 0 }
+                    items(lines, key = { it.id }) { p ->
+                        val q = state.qty[p.id] ?: 0
+                        Column {
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        p.name,
+                                        style = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.Content),
+                                    )
+                                    MoneyText(
+                                        Money(p.priceMinor, p.currency),
+                                        style = MaterialTheme.typography.labelMedium.copy(color = MaterialTheme.colorScheme.primary),
+                                    )
+                                }
+                                Stepper(
+                                    value = q,
+                                    onValueChange = { actions.changeQty(p, it - q) },
+                                    decreaseDescription = stringResource(R.string.order_qty_decrease, p.name),
+                                    increaseDescription = stringResource(R.string.order_qty_increase, p.name),
+                                    max = p.stock,
+                                    enabled = !locked,
+                                )
+                            }
+                            // A line over stock says so under that line.
+                            if (state.stockError && q > p.stock) {
+                                Text(
+                                    stringResource(R.string.order_new_stock_left, formatCount(p.stock, locale)),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            }
+                        }
+                    }
+                    item {
+                        OutlinedButton(
+                            onClick = { productSheet = true },
+                            enabled = !locked,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = spacing.minimumTouchTarget),
+                        ) { Text(stringResource(R.string.order_new_add_product)) }
+                    }
+                }
+            }
+            if (state.stockError) {
                 item {
                     Banner(
                         state = BannerState.Error,
-                        title = stringResource(R.string.order_save_failed_title),
-                        message = stringResource(R.string.order_save_failed_body),
+                        title = stringResource(R.string.order_stock_error),
+                        message = stringResource(R.string.order_stock_error_body),
                     )
                 }
             }
 
-            item { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.order_total), style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.width(spacing.space2))
-                Text(
-                    // No total across currencies: see NewOrderViewModel.selectedCurrency.
-                    selectedCurrency
-                        ?.let { formatAmountLabel(totalMinor, it, locale) }
-                        ?: "—",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.primary
+            item { SectionHeader(title = stringResource(R.string.order_pay_method)) }
+            item {
+                // Only what this store accepts: cash always, the others once their details
+                // are saved. The chosen one is filled.
+                SegmentedChoice(
+                    options = state.payMethods.map { payMethodLabel(it) },
+                    selectedIndex = state.payMethods.indexOf(state.payMethod),
+                    onSelect = { actions.onPayMethod(state.payMethods[it]) },
+                    enabled = !locked,
                 )
-            } }
+            }
 
-            item { Button(
-                onClick = { actions.save(onCreated) },
-                enabled = state.canSave && !state.saving && !mixedCurrency,
-                modifier = Modifier.fillMaxWidth()
-            ) { Text(stringResource(R.string.order_save)) } }
+            item {
+                if (noteOpen || state.note.isNotEmpty()) {
+                    TextField(
+                        value = state.note,
+                        onValueChange = actions.onNote,
+                        label = stringResource(R.string.order_note_opt),
+                        singleLine = false,
+                        enabled = !locked,
+                    )
+                } else {
+                    TextButton(onClick = { noteOpen = true }, modifier = Modifier.heightIn(min = spacing.minimumTouchTarget)) {
+                        Text(stringResource(R.string.order_new_add_note))
+                    }
+                }
+            }
             item { Spacer(Modifier.height(spacing.space6)) }
+        }
+    }
+
+    if (productSheet && catalogue != null) {
+        ModalBottomSheet(
+            onDismissRequest = { productSheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+        ) {
+            NewOrderProductSheet(
+                products = catalogue,
+                quantities = state.qty,
+                onChange = actions.changeQty,
+                onDone = { productSheet = false },
+            )
+        }
+    }
+
+    if (countrySheet) {
+        ModalBottomSheet(
+            onDismissRequest = { countrySheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = null,
+            shape = RoundedCornerShape(spacing.space0),
+        ) {
+            PickerSheet(
+                mode = PickerSheetMode.SearchableWithManualEntry,
+                title = stringResource(R.string.order_new_country_title),
+                options = remember(locale) {
+                    Countries.curated(locale).map { PickerOption(it.iso, "${it.flag}  ${it.name}  +${it.dialCode}") }
+                },
+                selectedKey = state.countryIso,
+                onSelect = { option -> countrySheet = false; actions.onCountry(option.key) },
+                closeLabel = stringResource(R.string.sheet_close),
+                onClose = { countrySheet = false },
+                query = countryQuery,
+                onQueryChange = { countryQuery = it },
+                searchPlaceholder = stringResource(R.string.order_new_country_search),
+                noResultsLabel = stringResource(R.string.setup_city_no_results),
+            )
+        }
+    }
+
+    if (discardSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { discardSheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = null,
+            shape = RoundedCornerShape(spacing.space0),
+        ) {
+            ConfirmSheet(
+                state = ConfirmSheetState.Destructive,
+                title = stringResource(R.string.order_new_discard_title),
+                message = stringResource(R.string.order_new_discard_body),
+                confirmLabel = stringResource(R.string.order_new_discard_confirm),
+                cancelLabel = stringResource(R.string.order_new_keep_editing),
+                onConfirm = { discardSheet = false; onBack() },
+                onCancel = { discardSheet = false },
+            )
         }
     }
 }
