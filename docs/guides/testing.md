@@ -361,6 +361,25 @@ value; the switch, checkbox, segmented choice and chips respond to a tap; the
 image tile offers retry only after a failure and is not tappable while
 uploading.
 
+### Shared structure and data components
+
+`TopBar`, `BottomNav`, `BottomActionBar`, `Fab`, `SectionHeader`, `KeyValueRow`
+and `SettingsRow` live in `core/ui/StructureComponents.kt`; `MetricTile`,
+`StatusStepper`, `StepList`, `MoneyText`, `CountText`, `Avatar`, `Thumbnail`,
+`ChatBubble` and `Composer` in `core/ui/DataComponents.kt`. All sixteen are
+`kit-pending`, with the adopting surface named in their row. `ListRow` and
+`StatusChip` are not here: they absorb `PriorityListRow` and `SemanticChip`, which
+changes existing screens, so they come in their own change with the owner's
+approval of the references. The 22 `@PreviewTest` functions in
+`app/src/screenshotTest/java/app/orderak/seller/core/ui/StructureScreenshotTest.kt`
+carry `FeedbackPreviews`. `StructureBehaviourTest` runs them in Arabic: icons are
+labelled 48dp targets and a third top-bar action is dropped; the bottom bar shows
+every label, marks the chosen item and counts in Arabic-Indic digits; a disabled
+action bar says why on screen; a count not read yet is never zero; a cancelled
+order replaces the stepper; money and counts are in Arabic-Indic digits; initials
+come from the first two words; the composer sends only what was written and a
+closed one has no field; the seller's bubble is at the left in Arabic.
+
 ### Shared overlay components
 
 `BottomSheet`, `PickerSheet` and `ConfirmSheet` live in
