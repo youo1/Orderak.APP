@@ -337,8 +337,10 @@ export const CONTRACTS = [
     actions: [
       { do: "add product", via: "onAdd" },
       { do: "edit product", via: "onEdit" },
-      { do: "search", via: "SearchField" },
-      { do: "open categories", status: "planned", why: "the entry lives on the account surface, not here" },
+      { do: "search", via: "onQueryChange" },
+      { do: "open categories", via: "onOpenCategories" },
+      { do: "open store information", via: "onOpenStoreInfo" },
+      { do: "open catalogue languages", via: "onOpenLanguages" },
     ],
     states: ["loading", "content", "empty", "error"],
     offline: true,

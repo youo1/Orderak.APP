@@ -197,7 +197,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Entry | MainRoute — تاب المتجر |
 | Exit | ProductEditRoute · CategoriesRoute · StoreInfoRoute · PaywallRoute — عند الحد |
 | Data | products page · product limit usage |
-| Actions | add product `onAdd` · edit product `onEdit` · search `SearchField` · open categories *(planned)* |
+| Actions | add product `onAdd` · edit product `onEdit` · search `onQueryChange` · open categories `onOpenCategories` · open store information `onOpenStoreInfo` · open catalogue languages `onOpenLanguages` |
 
 ### `product-edit`
 

@@ -589,6 +589,25 @@ how it is paid (only the methods this store accepts: نقدًا, إنستابا�
 basket in two currencies has no total and cannot be recorded. A write that fails
 keeps the draft and says so.
 
+المتجر (Phase R6, store) has a large title and, under it in every state, three tonal
+chips that open the store's pages: بيانات المتجر, التصنيفات and اللغات. The product meter
+stays here, because this is where the limited thing is created, then the search and a
+row per product: thumbnail, name, "price · المتبقي n", and a chip only when it matters
+(نفد in warning, مخفي in neutral). The one floating button is "إضافة منتج", and at the
+plan limit it says so and opens the limit. With no product the page says «متجرك فارغ»
+and offers the first product in place of the button; a search with no match names the
+query and offers to clear it; products saved only on the phone get a warning above the
+meter; a failed read offers a retry. Sharing the catalogue is in the bar.
+
+The product form (Phase R6, product editor) closes with an ✕. The image comes first,
+then name, price in the product's own currency, stock as a stepper, "ظاهر في المتجر"
+as a switch, and the category as a field that opens a list (with "no category"). The
+description is behind "تفاصيل إضافية". The bar holds "حفظ" and says what is missing
+while it cannot be pressed. Delete is in the overflow and asks in a sheet. A failed
+write keeps the form and says why in a banner (the plan limit opens the plans); a stock
+changed by an order while editing opens a sheet with both numbers and chooses for
+neither.
+
 اليوم (Phase R4, proposal T1) shows what waits for the seller: three tiles in the
 order an order moves through the shop (new, unpaid, ready to ship), each opening
 the orders it counts; the two newest orders that are not finished, as rows that
