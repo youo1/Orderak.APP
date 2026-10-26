@@ -577,6 +577,18 @@ manual order is still only on this phone, or the server refused one. With no
 order at all the page explains that link orders arrive by themselves and offers a
 manual one; a filter with no match keeps the chips and offers all orders.
 
+طلب جديد (Phase R5, manual order) is a form that closes with an ✕, and closing it
+asks first when anything was entered. It has three parts in the order a sale is
+told: the customer (a phone number with its country, chosen from a searchable
+list, and an optional name), the products (only those chosen are listed, each with
+a stepper that stops at the stock; a button opens a searchable picker that shows
+the stock on every row, and a line over stock says how many are available), and
+how it is paid (only the methods this store accepts: نقدًا, إنستاباي, محفظة
+إلكترونية). A note is behind a button. The bar holds the total and
+«تسجيل الطلب»; while the order cannot be recorded it says what is missing, and a
+basket in two currencies has no total and cannot be recorded. A write that fails
+keeps the draft and says so.
+
 اليوم (Phase R4, proposal T1) shows what waits for the seller: three tiles in the
 order an order moves through the shop (new, unpaid, ready to ship), each opening
 the orders it counts; the two newest orders that are not finished, as rows that

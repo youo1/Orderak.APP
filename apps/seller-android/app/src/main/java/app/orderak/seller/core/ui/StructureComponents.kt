@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -67,6 +68,8 @@ fun TopBar(
     subtitle: String? = null,
     onBack: (() -> Unit)? = null,
     backDescription: String = "",
+    /** A form closes with an X; a page goes back with an arrow that points the way the language reads. */
+    closeIcon: Boolean = false,
     large: Boolean = false,
     actions: List<TopBarAction> = emptyList(),
     onOverflow: (() -> Unit)? = null,
@@ -80,7 +83,10 @@ fun TopBar(
         ) {
             if (onBack != null) {
                 IconButton(onClick = onBack, modifier = Modifier.size(spacing.minimumTouchTarget)) {
-                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = backDescription)
+                    Icon(
+                        if (closeIcon) Icons.Outlined.Close else Icons.AutoMirrored.Outlined.ArrowBack,
+                        contentDescription = backDescription,
+                    )
                 }
             }
             Column(Modifier.weight(1f).padding(horizontal = spacing.space2)) {

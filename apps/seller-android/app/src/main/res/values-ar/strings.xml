@@ -139,10 +139,10 @@
     <string name="status_cancelled">ملغي</string>
 
     <!-- Pay methods -->
-    <string name="pay_vfcash">فودافون كاش</string>
-    <string name="pay_instapay">انستاباي</string>
+    <string name="pay_vfcash">محفظة إلكترونية</string>
+    <string name="pay_instapay">إنستاباي</string>
     <string name="pay_fawry">فوري</string>
-    <string name="pay_cod">كاش عند الاستلام</string>
+    <string name="pay_cod">نقدًا</string>
 
     <!-- S6 Order details -->
     <string name="order_details_title">أوردر #%1$d</string>
@@ -742,4 +742,18 @@
     <string name="order_paid_with">طريقة الدفع</string>
     <string name="order_advance_to_fallback">التالي</string>
     <string name="order_note_title">ملاحظة</string>
+    <string name="order_new_customer">العميل</string>
+    <string name="order_new_add_product">إضافة منتج</string>
+    <string name="order_new_add_note">إضافة ملاحظة</string>
+    <string name="order_new_stock_left">المتاح %1$s فقط</string>
+    <string name="order_new_saving">جارٍ التسجيل…</string>
+    <string name="order_new_bar_reason">أدخل رقم هاتف العميل وأضف منتجًا</string>
+    <string name="order_new_discard_title">تجاهل الطلب؟</string>
+    <string name="order_new_discard_body">ستُفقد البيانات التي أدخلتها.</string>
+    <string name="order_new_discard_confirm">تجاهل</string>
+    <string name="order_new_keep_editing">متابعة التعديل</string>
+    <string name="order_new_picker_done">تم</string>
+    <string name="order_new_picker_stock">المتاح: %1$s</string>
+    <string name="order_new_country_title">الدولة</string>
+    <string name="order_new_country_search">ابحث باسم الدولة أو رمزها</string>
 </resources>

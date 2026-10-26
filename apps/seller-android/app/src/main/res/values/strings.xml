@@ -133,10 +133,10 @@
     <string name="status_done">Done</string>
     <string name="status_cancelled">Cancelled</string>
 
-    <string name="pay_vfcash">Vodafone Cash</string>
+    <string name="pay_vfcash">E-wallet</string>
     <string name="pay_instapay">InstaPay</string>
     <string name="pay_fawry">Fawry</string>
-    <string name="pay_cod">Cash on delivery</string>
+    <string name="pay_cod">Cash</string>
 
     <string name="order_details_title">Order #%1$d</string>
     <string name="order_whatsapp">Chat on WhatsApp</string>
@@ -713,4 +713,18 @@
     <string name="order_paid_with">Payment method</string>
     <string name="order_advance_to_fallback">Next</string>
     <string name="order_note_title">Note</string>
+    <string name="order_new_customer">Customer</string>
+    <string name="order_new_add_product">Add a product</string>
+    <string name="order_new_add_note">Add a note</string>
+    <string name="order_new_stock_left">Only %1$s available</string>
+    <string name="order_new_saving">Recording…</string>
+    <string name="order_new_bar_reason">Enter the customer’s phone number and add a product</string>
+    <string name="order_new_discard_title">Discard this order?</string>
+    <string name="order_new_discard_body">What you entered will be lost.</string>
+    <string name="order_new_discard_confirm">Discard</string>
+    <string name="order_new_keep_editing">Keep editing</string>
+    <string name="order_new_picker_done">Done</string>
+    <string name="order_new_picker_stock">In stock: %1$s</string>
+    <string name="order_new_country_title">Country</string>
+    <string name="order_new_country_search">Search by country or calling code</string>
 </resources>

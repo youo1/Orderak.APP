@@ -179,7 +179,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Entry | orders · today |
 | Exit | OrderDetailsRoute — بعد الإنشاء، مع popUpTo · رجوع |
 | Data | product picker |
-| Actions | add line `changeQty` · set customer `onPhone` · submit `save` |
+| Actions | add line `changeQty` · set customer `onPhone` · choose country `onCountry` · submit `save` |
 
 ## Surface: store
 

@@ -311,6 +311,7 @@ export const CONTRACTS = [
     actions: [
       { do: "add line", via: "changeQty" },
       { do: "set customer", via: "onPhone" },
+      { do: "choose country", via: "onCountry" },
       { do: "submit", via: "save" },
     ],
     states: ["content", "loading", "error"],
