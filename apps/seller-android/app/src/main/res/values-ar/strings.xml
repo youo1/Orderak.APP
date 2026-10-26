@@ -689,4 +689,14 @@
     <string name="struct_chat_time">١٠:٤٢</string>
     <string name="struct_composer_placeholder">اكتب رسالة</string>
     <string name="app_version_banner_action">تحديث</string>
+    <string name="restricted_suspended_title">حسابك موقوف مؤقتًا</string>
+    <string name="restricted_suspended_body">متجرك مخفي عن المشترين ولا يمكن إدارته حتى تنتهي المراجعة.</string>
+    <string name="restricted_banned_title">أُوقف حسابك نهائيًا</string>
+    <string name="restricted_banned_body">السبب مخالفة شروط الاستخدام. يمكنك طلب مراجعة القرار.</string>
+    <string name="restricted_check_status">التحقق من الحالة</string>
+    <string name="restricted_request_review">طلب مراجعة القرار</string>
+    <string name="restricted_delete_data">حذف حسابي وبياناتي</string>
+    <string name="restricted_mail_suspended">أوردرَك: حسابي موقوف</string>
+    <string name="restricted_mail_banned">أوردرَك: مراجعة القرار الخاص بحسابي</string>
+    <string name="restricted_mail_delete">أوردرَك: حذف حسابي وبياناتي</string>
 </resources>

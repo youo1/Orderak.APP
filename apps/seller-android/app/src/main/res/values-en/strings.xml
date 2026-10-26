@@ -657,4 +657,14 @@
     <string name="struct_chat_time">10:42</string>
     <string name="struct_composer_placeholder">Write a message</string>
     <string name="app_version_banner_action">Update</string>
+    <string name="restricted_suspended_title">Your account is suspended for now</string>
+    <string name="restricted_suspended_body">Your store is hidden from buyers and cannot be managed until the review ends.</string>
+    <string name="restricted_banned_title">Your account has been closed for good</string>
+    <string name="restricted_banned_body">This is because of a breach of the terms of use. You can ask for the decision to be reviewed.</string>
+    <string name="restricted_check_status">Check the status</string>
+    <string name="restricted_request_review">Ask for a review</string>
+    <string name="restricted_delete_data">Delete my account and data</string>
+    <string name="restricted_mail_suspended">Orderak: my account is suspended</string>
+    <string name="restricted_mail_banned">Orderak: review of the decision on my account</string>
+    <string name="restricted_mail_delete">Orderak: delete my account and data</string>
 </resources>

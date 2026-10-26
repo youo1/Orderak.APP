@@ -153,6 +153,13 @@ export const CONTRACTS = [
       // main shell, so the control opens a mailto intent instead. The exit
       // above said SupportRoute and was wrong about how, not whether.
       { do: "contact support", via: "restricted_contact" },
+      // Suspended only: a suspension can end, so checking is worth doing. A ban
+      // cannot change by being checked, so the banned page has no such button.
+      { do: "check status", via: "onCheckAgain" },
+      // Banned only: the first action becomes a review of the decision, and the
+      // seller's own data can be asked to be deleted. Both open mail, as support does.
+      { do: "request review", via: "restricted_request_review" },
+      { do: "delete account and data", via: "restricted_delete_data" },
       { do: "sign out", via: "onLogout" },
     ],
     states: ["content"],
