@@ -1,4 +1,17 @@
 package app.orderak.seller.feature.operations
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
+import androidx.compose.material3.rememberModalBottomSheetState
+import app.orderak.seller.core.ui.ChatBubble
+import app.orderak.seller.core.ui.Composer
+import app.orderak.seller.core.ui.ConfirmSheet
+import app.orderak.seller.core.ui.ConfirmSheetState
+import app.orderak.seller.core.ui.EmptyState
+import app.orderak.seller.core.ui.EmptyStateKind
+import app.orderak.seller.core.ui.SectionHeader
+import app.orderak.seller.core.ui.StepItem
+import app.orderak.seller.core.ui.StepList
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -267,7 +280,6 @@ fun AiAssistantScreen(onBack: () -> Unit, vm: OperationsViewModel = hiltViewMode
     val error by vm.error.collectAsStateWithLifecycle()
     val config by vm.entitlements.config.collectAsStateWithLifecycle()
     var input by rememberSaveable { mutableStateOf("") }
-    var confirmingReset by remember { mutableStateOf(false) }
 
     AiAssistantContent(
         messages = messages,
@@ -279,48 +291,24 @@ fun AiAssistantScreen(onBack: () -> Unit, vm: OperationsViewModel = hiltViewMode
         onBack = onBack,
         onSend = { vm.sendChat(input); input = "" },
         onRetry = vm::retryChat,
-        onReset = { confirmingReset = true },
+        // Clearing the conversation is irreversible and local, so it is confirmed in a sheet the
+        // page raises; this runs after the confirmation.
+        onReset = vm::resetChat,
     )
-
-    // Clearing the conversation is irreversible and local, so it is confirmed
-    // rather than immediate. It used to happen on the first tap, on a control
-    // that sat next to the question box.
-    if (confirmingReset) {
-        AlertDialog(
-            onDismissRequest = { confirmingReset = false },
-            title = { Text(stringResource(R.string.ai_reset)) },
-            text = { Text(stringResource(R.string.ai_reset_confirm)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        vm.resetChat()
-                        confirmingReset = false
-                    },
-                ) {
-                    Text(stringResource(R.string.ai_reset), color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmingReset = false }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            },
-        )
-    }
 }
 
 /**
  * The assistant, as a function of its state.
  *
- * Unlike the other pages in this file, an empty list here is the truth on
- * arrival: nothing loads on entry, so a chat with no messages is a chat nobody
- * has started. That is why this screen is the reason `_busy` could not simply
- * seed true for all six — it would have spun here forever.
+ * A top bar whose overflow holds "بدء محادثة جديدة" (which asks first), an information banner
+ * saying answers are generated and can be wrong, the quota meter, the conversation as bubbles
+ * and the composer at the bottom. While an answer is being written a typing bubble stands in the
+ * conversation; the chat stays on screen and the send button waits.
  *
- * Its contract declares an empty state and it had none, drawing the disclosure
- * over blank space. It now says what the box is for.
+ * Unlike the other pages here, an empty list is the truth on arrival: nothing loads on entry, so
+ * a chat with no messages is a chat nobody has started, and the page says what the box is for.
  */
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AiAssistantContent(
     messages: List<Pair<Boolean, String>>,
@@ -336,36 +324,32 @@ fun AiAssistantContent(
 ) {
     val spacing = LocalOrderakSpacing.current
     val locale = LocalConfiguration.current.locales[0]
-    // `busy` is only ever true while a question is sending: nothing loads on
-    // entry. It is not passed to OperationPage, which would replace the whole
-    // conversation with a loading placeholder; the chat stays on screen with a
-    // progress bar above the box, and the send button waits.
+    var confirmingReset by rememberSaveable { mutableStateOf(false) }
     OperationPage(
         title = stringResource(R.string.ai_assistant_title),
         onBack = onBack,
+        // `busy` is not passed: it would replace the whole conversation with a loading placeholder.
         error = error,
         onRetry = onRetry,
+        onOverflow = { confirmingReset = true },
+        overflowDescription = stringResource(R.string.ai_reset),
+        bottomBar = {
+            Composer(
+                value = input,
+                onValueChange = { onInputChange(it.take(2000)) },
+                onSend = { if (input.isNotBlank() && !busy) onSend() },
+                placeholder = stringResource(R.string.ai_message),
+                sendDescription = stringResource(R.string.common_send),
+            )
+        },
     ) {
-        Text(stringResource(R.string.ai_disclosure), style = MaterialTheme.typography.bodySmall)
-        // The quota, as a count against a limit that is drawn the one way this app
-        // draws one. It was the last place that built the pair itself — two
-        // `formatCount` values inside `usage_value` ("%1$s / %2$s") — and that is
-        // the shape `core/text/Counts.kt` exists to replace: an Arabic-Indic digit
-        // is bidi class AN, so a count and a ceiling joined by a plain separator
-        // reorder inside an Arabic paragraph and "٣ / ٢٠" renders as twenty of
-        // three. `formatCountOfLimit` is where those marks live and why — and
-        // `UsageMeter` reads it for the same reason.
-        //
-        // The ceiling follows the same reading the shared usage rows use: mode
-        // "unlimited" — or a value the snapshot does not carry — is a count
-        // without a ceiling, never an assumed zero.
+        Banner(state = BannerState.Information, title = stringResource(R.string.ai_disclosure))
+        // The quota as a count against a limit, drawn the one way this app draws one:
+        // `formatCountOfLimit` keeps an Arabic-Indic count and its ceiling from reordering. A mode
+        // "unlimited", or a value the snapshot does not carry, is a count without a ceiling.
         entitlements?.get(FeatureKeys.MAX_AI_REQUESTS_PER_MONTH)?.let { quota ->
             quota.used?.let { used ->
-                val limit = if (quota.mode == "unlimited") {
-                    null
-                } else {
-                    (quota.value as? JsonPrimitive)?.intOrNull
-                }
+                val limit = if (quota.mode == "unlimited") null else (quota.value as? JsonPrimitive)?.intOrNull
                 Text(
                     stringResource(R.string.usage_ai_requests) + ": " +
                         if (limit == null) {
@@ -378,54 +362,38 @@ fun AiAssistantContent(
             }
         }
         if (messages.isEmpty()) {
-            // The declared empty state, which this screen did not have: it drew
-            // the disclosure and the quota over blank space. The input box stays
-            // — a chat with nothing in it is waiting, not broken — so this is a
-            // line rather than an EmptyState.
             Text(
                 stringResource(R.string.ai_empty_hint),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        messages.forEach { (seller, text) ->
-            val isSeller = seller
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = if (isSeller) {
-                    androidx.compose.material3.CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    )
-                } else {
-                    androidx.compose.material3.CardDefaults.cardColors()
-                },
-            ) {
-                Column(Modifier.padding(spacing.space3)) {
-                    Text(
-                        if (isSeller) stringResource(R.string.ai_you) else stringResource(R.string.ai_assistant_title),
-                        style = MaterialTheme.typography.labelMedium,
-                    )
-                    Text(text, style = MaterialTheme.typography.bodyMedium)
-                }
-            }
-        }
+        messages.forEach { (seller, text) -> ChatBubble(text = text, mine = seller) }
         if (busy) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            ChatBubble(text = stringResource(R.string.ai_typing), mine = false)
         }
-        OutlinedTextField(
-            value = input,
-            onValueChange = { onInputChange(it.take(2000)) },
-            label = { Text(stringResource(R.string.ai_message)) },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Button(
-            enabled = input.isNotBlank() && !busy,
-            onClick = { onSend() },
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text(stringResource(R.string.common_send)) }
-        // Not while a question is sending: the reply would land in a cleared
-        // chat as an answer with no question before it.
-        TextButton(onClick = onReset, enabled = !busy) { Text(stringResource(R.string.ai_reset)) }
+    }
+
+    if (confirmingReset) {
+        ModalBottomSheet(
+            onDismissRequest = { confirmingReset = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = null,
+            shape = RoundedCornerShape(spacing.space0),
+        ) {
+            ConfirmSheet(
+                // Not while a question is sending: the reply would land in a cleared chat as an
+                // answer with no question before it.
+                state = if (busy) ConfirmSheetState.InProgress else ConfirmSheetState.Destructive,
+                title = stringResource(R.string.ai_reset_title),
+                message = stringResource(R.string.ai_reset_body),
+                confirmLabel = stringResource(R.string.ai_reset),
+                cancelLabel = stringResource(R.string.common_cancel),
+                onConfirm = { confirmingReset = false; onReset() },
+                onCancel = { confirmingReset = false },
+            )
+        }
     }
 }
 
@@ -455,12 +423,16 @@ fun DeletionStatusScreen(onBack: () -> Unit, vm: OperationsViewModel = hiltViewM
 /**
  * The account-deletion status, as a function of its state.
  *
- * [loaded] is separate from [request] because null is a real answer here — "you
- * have no deletion request" — and it is also the seed. Without the flag this
- * page told a seller with a pending request that they had none, for as long as
- * the call took, which on this particular page is the worst thing it could say.
+ * Read-only: it makes the right to deletion visible, with dates attached. A card with a
+ * three-step timeline (submitted, verified, completes by the deadline), then what is deleted and
+ * what the law may keep, in plain words. Requesting and cancelling are not here; the request
+ * lives in حسابي, and with none this page says so and points there.
+ *
+ * [loaded] is separate from [request] because null is a real answer here ("you have no deletion
+ * request") and it is also the seed. Without the flag this page told a seller with a pending
+ * request that they had none for as long as the call took, which on this page is the worst thing
+ * it could say.
  */
-
 @Composable
 fun DeletionStatusContent(
     request: DeletionRequestDto?,
@@ -471,6 +443,7 @@ fun DeletionStatusContent(
     onRetry: () -> Unit,
 ) {
     val spacing = LocalOrderakSpacing.current
+    val locale = LocalConfiguration.current.locales[0]
     OperationPage(
         title = stringResource(R.string.deletion_status_title),
         onBack = onBack,
@@ -480,24 +453,49 @@ fun DeletionStatusContent(
         loading = SkeletonVariant.DetailBlock,
     ) {
         if (request == null) {
-            Text(
-                stringResource(R.string.deletion_status_none),
-                style = MaterialTheme.typography.titleLarge,
+            EmptyState(
+                kind = EmptyStateKind.Empty,
+                title = stringResource(R.string.deletion_status_none),
+                message = stringResource(R.string.deletion_none_pointer),
+                icon = Icons.Outlined.Inbox,
             )
         } else {
-            Text(
-                stringResource(R.string.deletion_status_label, request.status),
-                style = MaterialTheme.typography.titleLarge,
-            )
-            request.requested_at?.let { Text(stringResource(R.string.deletion_requested_at, it)) }
-            request.deadline_at?.let { Text(stringResource(R.string.deletion_deadline_at, it)) }
-            request.verified_at?.let { Text(stringResource(R.string.deletion_verified_at, it)) }
-            request.completed_at?.let { Text(stringResource(R.string.deletion_completed_at, it)) }
+            val pending = stringResource(R.string.deletion_step_pending)
+            Surface(
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                StepList(
+                    steps = listOf(
+                        StepItem(
+                            stringResource(R.string.deletion_step_submitted),
+                            formatServerDate(request.requested_at, locale) ?: pending,
+                            done = request.requested_at != null,
+                        ),
+                        StepItem(
+                            stringResource(R.string.deletion_step_verified),
+                            formatServerDate(request.verified_at, locale) ?: pending,
+                            done = request.verified_at != null,
+                        ),
+                        StepItem(
+                            stringResource(R.string.deletion_step_completes),
+                            formatServerDate(request.completed_at, locale)
+                                ?: formatServerDate(request.deadline_at, locale)?.let { stringResource(R.string.deletion_step_by, it) }
+                                ?: pending,
+                            done = request.completed_at != null,
+                        ),
+                    ),
+                    modifier = Modifier.padding(spacing.space4),
+                )
+            }
             request.notes?.takeIf { it.isNotBlank() }?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        Spacer(Modifier.height(spacing.space2))
-        Text(stringResource(R.string.deletion_status_help), style = MaterialTheme.typography.bodySmall)
+        SectionHeader(title = stringResource(R.string.deletion_deleted_title))
+        Text(stringResource(R.string.deletion_deleted_body), style = MaterialTheme.typography.bodyMedium)
+        SectionHeader(title = stringResource(R.string.deletion_kept_title))
+        Text(stringResource(R.string.deletion_kept_body), style = MaterialTheme.typography.bodyMedium)
     }
 }

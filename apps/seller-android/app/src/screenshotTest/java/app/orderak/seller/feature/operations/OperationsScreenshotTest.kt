@@ -93,7 +93,7 @@ private fun support(
                 onBack = {},
                 onRetry = {},
                 onTicket = {},
-                onNew = {},
+                onCreate = { _, _ -> },
             )
         }
     }

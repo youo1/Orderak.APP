@@ -632,6 +632,25 @@ figures (orders, total spent, last order), «عن العميل» with the other 
 customer's orders, newest first. Editing is one sheet that also says the number is the customer's identity and
 does not change; where the plan does not open it the card is read-only and a notice says so.
 
+حسابي (Phase R8) has a large title, the person and the shop, and the plan card in commerce colours: the plan, its
+two meters closest to their limits, and «التفاصيل» into the subscription page; until entitlements answer the card holds
+placeholders and never says «الخطة المجانية» as a guess. Rows are grouped by what the seller is doing: متجرك (store
+information, التصنيفات, catalogue languages, and the real store link, which a tap copies), المدفوعات والأمان (payment
+methods, showing which of نقدًا · إنستاباي · محفظة إلكترونية are on; devices and passkeys; «ترقية الخطة» only while
+purchase is open), المساعدة (support; announcements with the unread count; the assistant, or a notice that the plan
+does not include it), أنت (personal details, language) and الحساب (deletion status, delete account, sign out).
+Payment details, the plans to buy, deleting the account and signing out are sheets; deleting and signing out state
+their consequence. بياناتك الشخصية asks for the full name (and says where it appears), shows the sign-in number as
+verified, and keeps the email optional; changing the email says the old one stays in use until the new one is
+confirmed. It no longer asks for a photo or a birth year; what is stored is carried through unchanged on save.
+الدعم lists tickets with a number and an open/closed chip and one bar «تذكرة جديدة» (a sheet); a ticket is a
+conversation of bubbles with a composer, replaced on a closed ticket by the sentence that says so. إعلانات Orderak
+puts unread items first with a dot; tapping one opens it in place and marks it read. حذف الحساب (status) is a
+three-step timeline with dates, then what is deleted and what the law may keep (the wording of the last line needs a
+legal check). الأجهزة lists the devices («هذا الجهاز» on this phone, «تسجيل خروجه» on the others) and the passkeys
+(overflow: rename, remove) with sheets that ask first. المساعد has an overflow with «بدء محادثة جديدة» (asks first),
+the disclosure banner, the quota meter, bubbles, a typing bubble and the composer.
+
 اليوم (Phase R4, proposal T1) shows what waits for the seller: three tiles in the
 order an order moves through the shop (new, unpaid, ready to ship), each opening
 the orders it counts; the two newest orders that are not finished, as rows that

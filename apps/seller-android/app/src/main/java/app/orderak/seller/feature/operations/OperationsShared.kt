@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import androidx.compose.foundation.clickable
+import app.orderak.seller.core.ui.TopBar
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -325,25 +326,28 @@ internal fun OperationPage(
     isEmpty: Boolean = false,
     /** The shape of the content this page waits for: rows for a list, a block for a detail page. */
     loading: SkeletonVariant = SkeletonVariant.ListRows,
+    /** The status under the title, when the page has one. */
+    subtitle: String? = null,
+    /** An overflow in the bar, for the one action that belongs to the whole page. */
+    onOverflow: (() -> Unit)? = null,
+    overflowDescription: String = "",
+    /** One bar at the bottom: the page's primary action, or a composer. */
+    bottomBar: @Composable () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     val spacing = LocalOrderakSpacing.current
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(title, modifier = Modifier.semantics { heading() }) },
-                navigationIcon = {
-                    if (onBack != null) {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = stringResource(R.string.common_back),
-                            )
-                        }
-                    }
-                },
+            TopBar(
+                title = title,
+                subtitle = subtitle,
+                onBack = onBack,
+                backDescription = stringResource(R.string.common_back),
+                onOverflow = onOverflow,
+                overflowDescription = overflowDescription,
             )
         },
+        bottomBar = bottomBar,
     ) { padding ->
         Column(
             Modifier
@@ -379,3 +383,15 @@ internal fun OperationPage(
         }
     }
 }
+
+/** The server's timestamps are SQLite `YYYY-MM-DD HH:MM:SS` (UTC) or ISO; both parse, and absent is null. */
+internal fun serverMillis(raw: String?): Long? {
+    if (raw.isNullOrBlank()) return null
+    return runCatching {
+        java.time.Instant.parse(if ('T' in raw) raw else raw.replace(' ', 'T') + "Z").toEpochMilli()
+    }.getOrNull()
+}
+
+/** A server timestamp as a date in the reader's locale, or null when there is none. */
+internal fun formatServerDate(raw: String?, locale: java.util.Locale): String? =
+    serverMillis(raw)?.let { java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM, locale).format(java.util.Date(it)) }

@@ -84,7 +84,6 @@ export const RENDERS = {
   assistantQuota: { kind: "component", note: "a count against a limit in Arabic, in that order — the pair swaps when it is built from two separate numbers" },
   devicesAtDeviceLimit: { kind: "component", note: "the device allowance the contract declares as this screen's data, drawn at the ceiling" },
   categoriesLoadingSeededList: { kind: "component", note: "loading with the seeded empty list production actually passes, which is the frame the empty message used to appear under" },
-  sellerProfilePhotoUploadFailed: { kind: "component", note: "a photo that never reached storage, named beside the control that caused it" },
 
   // ---- components, not screens ----
   // Each of these renders a shared component with a surface's copy in it. That

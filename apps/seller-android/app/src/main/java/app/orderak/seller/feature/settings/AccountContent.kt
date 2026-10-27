@@ -1,5 +1,40 @@
 package app.orderak.seller.feature.settings
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material.icons.outlined.Payments
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextDirection
+import app.orderak.seller.core.text.formatCount
+import app.orderak.seller.core.ui.Avatar
+import app.orderak.seller.core.ui.BottomSheet
+import app.orderak.seller.core.ui.ConfirmSheet
+import app.orderak.seller.core.ui.ConfirmSheetState
+import app.orderak.seller.core.ui.PlanUsageRow
+import app.orderak.seller.core.ui.PlanUsageRowItem
+import app.orderak.seller.core.ui.SectionHeader
+import app.orderak.seller.core.ui.SemanticRole
+import app.orderak.seller.core.ui.SettingsRow
+import app.orderak.seller.core.ui.SheetAction
+import app.orderak.seller.core.ui.Skeleton
+import app.orderak.seller.core.ui.SkeletonVariant
+import app.orderak.seller.core.ui.TextField
+import app.orderak.seller.core.ui.TopBar
+import app.orderak.seller.core.ui.colors
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -74,8 +109,31 @@ data class AccountUiState(
     val purchaseOpen: Boolean = false,
     /** The published store link, or null while it is still being issued. */
     val storeUrl: String? = null,
+    /** The person behind the shop; null until the profile has been read. */
+    val sellerName: String? = null,
+    val shopName: String? = null,
+    /** Usage against the plan's limits; null until entitlements answer. */
+    val usage: List<PlanUsageRow>? = null,
+    val unreadAnnouncements: Int = 0,
 )
 
+/**
+ * حسابي, as a function of its state.
+ *
+ * A large title; the person and the shop; the plan card in commerce colours with its two
+ * meters closest to the limit; then rows grouped by what the seller is trying to do: متجرك,
+ * المدفوعات والأمان, المساعدة, أنت and الحساب. Payment details, the plans to buy, deleting the
+ * account and signing out are sheets raised from here, not dialogs.
+ *
+ * Two fields are nullable on purpose: [AccountUiState.planName] and
+ * [AccountUiState.aiAvailable] used to seed with an answer rather than with "not yet", so every
+ * paying seller opening this page was told they were on the free plan until the config
+ * arrived. They are null until known and this composable withholds rather than guesses.
+ *
+ * The language sheet and the snackbar stay in `SettingsScreen`: they are conversations, not
+ * states of the surface.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AccountContent(
     state: AccountUiState,
@@ -95,256 +153,228 @@ fun AccountContent(
     onOpenDevices: () -> Unit,
     onOpenSubscription: () -> Unit,
     onOpenDeletionStatus: () -> Unit,
+    /** The seller confirmed deleting the account, in the sheet this page raises. */
     onRequestDeletion: () -> Unit,
+    /** The seller confirmed signing out, in the sheet this page raises. */
     onRequestLogout: () -> Unit,
     /** The app's own language sheet, which the shell's top bar used to open. */
     onOpenAppLanguage: () -> Unit,
     modifier: Modifier = Modifier,
+    onCopyLink: (String) -> Unit = {},
 ) {
     val spacing = LocalOrderakSpacing.current
+    var sheet by rememberSaveable { mutableStateOf<String?>(null) }
+    val storeLink = state.storeUrl?.takeIf { it.isNotBlank() }
+    val payments = buildList {
+        add(stringResource(R.string.pay_cod))
+        if (instapay.isNotBlank()) add(stringResource(R.string.pay_instapay))
+        if (vfcash.isNotBlank()) add(stringResource(R.string.pay_vfcash))
+    }.joinToString(" · ")
+
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        // ── Plan section ──
-        val plan = state.planName
-        if (plan == null) {
-            PlanSkeleton()
-        } else {
-            Text(
-                stringResource(R.string.settings_current_plan, plan),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = spacing.space4, vertical = spacing.space3),
-            )
-        }
-        // A plan list is not permission to sell one. `purchaseOpen` is the
-        // same decision the subscription screen and the limit notices read,
-        // so the account surface can no longer disagree with them (I-5).
-        if (state.purchaseOpen && state.billingPlans.isNotEmpty()) {
-            state.billingPlans.forEach { plan ->
-                OutlinedButton(
-                    onClick = { onPurchase(plan) },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.space4),
-                ) {
+        TopBar(title = stringResource(R.string.nav_account), large = true)
+
+        // The person and the shop.
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = spacing.space4, vertical = spacing.space2),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(spacing.space3),
+        ) {
+            Avatar(name = state.sellerName ?: state.shopName.orEmpty())
+            Column {
+                Text(
+                    state.sellerName ?: state.shopName ?: "",
+                    style = MaterialTheme.typography.titleMedium.copy(textDirection = TextDirection.Content),
+                )
+                if (state.sellerName != null && state.shopName != null) {
                     Text(
-                        plan.localizedPrice?.let {
-                            stringResource(
-                                R.string.settings_choose_plan_priced,
-                                plan.product.name,
-                                plan.product.base_plan_id,
-                                it,
-                            )
-                        } ?: stringResource(
-                            R.string.settings_choose_plan,
-                            plan.product.name,
-                            plan.product.base_plan_id,
-                        )
+                        state.shopName,
+                        style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Content),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Spacer(Modifier.height(spacing.space2))
             }
         }
-        Spacer(Modifier.height(spacing.space2))
 
-        // ── Store and identity ──
-        //
-        // Named for the group, not for its first row. The header used to be
-        // `store_info_title`, which is also the label of the row directly beneath
-        // it, so the group announced itself and then immediately repeated itself.
-        // "Store and identity" is the contract's own name for this group
-        // ("المتجر والهوية"), and it is the one that covers the seller profile too.
-        SettingsSectionHeader(stringResource(R.string.settings_store_group_title))
-        SettingsListItem(Icons.Outlined.Store, stringResource(R.string.store_info_title), onOpenStoreInfo)
-        SettingsListItem(Icons.Outlined.Category, stringResource(R.string.categories_title), onOpenCategories)
-        SettingsListItem(Icons.Outlined.Translate, stringResource(R.string.catalog_languages_title), onOpenCatalogLanguages)
-        SettingsListItem(Icons.Outlined.Person, stringResource(R.string.seller_profile_title), onOpenSellerProfile)
-        Spacer(Modifier.height(spacing.space2))
+        PlanCard(state, onOpenSubscription)
 
-        // ── Support ──
-        //
-        // Named for the group, for the same reason as the store group above — and
-        // this header was the third one that did not. It read `support_title`, which
-        // is also the label of the Support row directly beneath it, so the group
-        // announced itself and then immediately repeated itself; and the group holds
-        // three rows, not one — the seller's tickets, the platform's announcements
-        // and the AI assistant — so the single member it named was not even the
-        // group. `docs/redesign/recon/android-ui-audit.md` lists this header with
-        // the other two (§4.3 item 4, "support_title heads Support + Announcements
-        // + AI") while §4.4 records only two as fixed. The name now covers every row
-        // beneath it: help is the tickets and the assistant, updates are the
-        // announcements.
-        SettingsSectionHeader(stringResource(R.string.settings_support_group_title))
-        SettingsListItem(Icons.Outlined.SupportAgent, stringResource(R.string.support_title), onOpenSupport)
-        SettingsListItem(Icons.Outlined.Campaign, stringResource(R.string.announcements_title), onOpenAnnouncements)
-        // Withheld while unknown, rather than hidden-as-decided. `true` shows
-        // it, `false` explains it, and `null` means entitlements have not
-        // answered — three cases, where the seeded boolean could only express two.
-        //
-        // `false` used to omit the row entirely. That is what `FeatureGate` exists
-        // to prevent: a plan without AI saw nothing at all, so the seller could not
-        // tell "your plan does not include this" from "this product has no AI".
-        //
-        // The upgrade control is offered only when there is somewhere for it to go.
-        // `purchaseOpen` is the same answer every other upgrade affordance in the
-        // app reads, and with billing closed it is false — so the notice states the
-        // lock and offers nothing to press, rather than sending the seller to a plan
-        // comparison that cannot change their plan. This is what the screenshot
-        // fixture was already asserting when it said the entry was omitted "rather
-        // than showing it locked"; the omission was the part that was wrong.
+        SectionHeader(stringResource(R.string.account_group_store), Modifier.padding(horizontal = spacing.space4))
+        SettingsRow(stringResource(R.string.store_info_title), onOpenStoreInfo, icon = Icons.Outlined.Store)
+        SettingsRow(stringResource(R.string.store_manage_categories), onOpenCategories, icon = Icons.Outlined.Category)
+        SettingsRow(stringResource(R.string.catalog_languages_title), onOpenCatalogLanguages, icon = Icons.Outlined.Translate)
+        // The real link, read-only; a tap copies it.
+        SettingsRow(
+            title = stringResource(R.string.account_store_link),
+            onClick = { storeLink?.let(onCopyLink) },
+            icon = Icons.Outlined.Link,
+            value = storeLink ?: stringResource(R.string.settings_link_pending),
+        )
+
+        SectionHeader(stringResource(R.string.account_group_payments), Modifier.padding(horizontal = spacing.space4))
+        SettingsRow(
+            stringResource(R.string.account_payments_row),
+            { sheet = SHEET_PAYMENT },
+            icon = Icons.Outlined.Payments,
+            value = payments,
+        )
+        SettingsRow(stringResource(R.string.devices_title), onOpenDevices, icon = Icons.Outlined.Devices)
+        // Only while the account may buy: the same answer every other upgrade affordance reads.
+        if (state.purchaseOpen && state.billingPlans.isNotEmpty()) {
+            SettingsRow(stringResource(R.string.account_upgrade), { sheet = SHEET_PLANS }, icon = Icons.Outlined.Subscriptions)
+        }
+
+        SectionHeader(stringResource(R.string.account_group_help), Modifier.padding(horizontal = spacing.space4))
+        SettingsRow(stringResource(R.string.support_title), onOpenSupport, icon = Icons.Outlined.SupportAgent)
+        SettingsRow(
+            title = stringResource(R.string.announcements_title),
+            onClick = onOpenAnnouncements,
+            icon = Icons.Outlined.Campaign,
+            value = state.unreadAnnouncements.takeIf { it > 0 }?.let { formatCount(it, LocalConfiguration.current.locales[0]) },
+        )
+        // Withheld while unknown; shown once the plan includes it; a plan without it says so
+        // rather than hiding the row, so "not on your plan" is told apart from "no such thing".
         when (state.aiAvailable) {
-            true -> SettingsListItem(
-                Icons.Outlined.SmartToy,
-                stringResource(R.string.ai_assistant_title),
-                onOpenAiAssistant,
-            )
-            null -> EntrySkeleton()
+            true -> SettingsRow(stringResource(R.string.ai_assistant_title), onOpenAiAssistant, icon = Icons.Outlined.SmartToy)
+            null -> Skeleton(SkeletonVariant.ListRows, Modifier.padding(horizontal = spacing.space4))
             false -> FeatureGate(
                 availability = FeatureAvailability.LockedByPlan,
                 onUpgrade = onOpenSubscription.takeIf { state.purchaseOpen },
                 modifier = Modifier.padding(horizontal = spacing.space4, vertical = spacing.space2),
             ) {}
         }
-        Spacer(Modifier.height(spacing.space2))
 
-        // ── Devices and subscription ──
-        //
-        // The header used to be `devices_title`, so a group of three named one of
-        // them. The contract names this group "الأجهزة والاشتراك" — devices and
-        // subscription — and deletion status has moved out of it, to the group
-        // whose action it is the status of. That leaves the header true of every
-        // row beneath it.
-        SettingsSectionHeader(stringResource(R.string.settings_devices_group_title))
-        SettingsListItem(Icons.Outlined.Devices, stringResource(R.string.devices_title), onOpenDevices)
-        SettingsListItem(Icons.Outlined.Subscriptions, stringResource(R.string.subscription_title), onOpenSubscription)
-        Spacer(Modifier.height(spacing.space2))
+        SectionHeader(stringResource(R.string.account_group_you), Modifier.padding(horizontal = spacing.space4))
+        SettingsRow(stringResource(R.string.account_personal), onOpenSellerProfile, icon = Icons.Outlined.Person)
+        SettingsRow(stringResource(R.string.account_language), onOpenAppLanguage, icon = Icons.Outlined.Language)
 
-        // ── Payout section ──
-        SettingsSectionHeader(stringResource(R.string.settings_payout_title))
-        // The catalogue link is shown, not edited here.
-        //
-        // This group used to carry a second `slug` field, and it was the one
-        // without the server check. `StoreInfoScreen` — the store surface — owns
-        // the slug properly: it queries `/api/v1/slug/check`, tells the seller
-        // whether the name is available, taken or reserved, and keeps Save
-        // disabled until it is free. This one wrote: the value went to local
-        // storage, `savePayout` triggered a refresh, and `SellerRefresher` pushed
-        // it through `api.register`. A taken name therefore made the whole
-        // registration fail, which stops the sync — every pull and push behind it
-        // — while the snackbar said "Payout details saved". The seller's feedback
-        // and the truth came from different places.
-        //
-        // `products_catalog.custom_catalog_slug` is a store FIELD in
-        // `docs/ux/feature-surface-map.md` too, so the map and the working
-        // implementation agree against this copy. The link stays visible because
-        // knowing your public URL is the account's business; changing it is the
-        // store's.
-        Text(
-            stringResource(R.string.settings_link_title),
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(horizontal = spacing.space4, vertical = spacing.space1),
-        )
-        val saved = state.storeUrl?.takeIf { it.isNotBlank() }
-        Text(
-            text = saved ?: stringResource(R.string.settings_link_pending),
-            style = MaterialTheme.typography.bodySmall,
-            color = if (saved != null) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-            modifier = Modifier.padding(horizontal = spacing.space4),
-        )
-        Spacer(Modifier.height(spacing.space2))
-        OutlinedTextField(
-            value = instapay,
-            onValueChange = { onInstapayChange(it.take(60)) },
-            label = { Text(stringResource(R.string.settings_instapay)) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.space4),
-        )
-        OutlinedTextField(
-            value = vfcash,
-            onValueChange = { onVfcashChange(it.filter(Char::isDigit).take(11)) },
-            label = { Text(stringResource(R.string.settings_vfcash)) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.space4),
-        )
-        Button(
-            onClick = onSavePayout,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.space4, vertical = spacing.space2),
-        ) { Text(stringResource(R.string.settings_save)) }
-        Spacer(Modifier.height(spacing.space4))
-
-        // ── Account actions ──
-        //
-        // The contract declares six groups and this is the sixth, which until now
-        // had no header at all: two error-coloured lines at the end of a long
-        // scroll read as leftovers rather than as the group they are.
-        //
-        // They were also `Text` with a clickable modifier and 12dp of padding, which
-        // is 24dp around a 20dp line — under this product's own 48dp floor, on the
-        // two rows where a mis-tap is most expensive. As list rows they meet it.
-        SettingsSectionHeader(stringResource(R.string.settings_account_actions))
-        // The status of a deletion request, beside the control that makes one.
-        // It sat under the devices header, where it named neither the group nor
-        // itself, and where a seller looking for "did my deletion go through?"
-        // would not think to look.
-        SettingsListItem(
-            Icons.Outlined.Delete,
-            stringResource(R.string.deletion_status_title),
-            onOpenDeletionStatus,
-        )
-        // The app's own language, which the shell's top bar used to hold as an icon.
-        // The contract's six groups have no home for a preference, so it sits with
-        // the other things that are about the account rather than about the shop;
-        // §4.4 of the Android audit records that the contract does not name it.
-        SettingsListItem(
-            Icons.Outlined.Language,
-            stringResource(R.string.settings_app_language),
-            onOpenAppLanguage,
-        )
-        SettingsListItem(
-            Icons.Outlined.Delete,
-            stringResource(R.string.settings_delete_account),
-            onRequestDeletion,
-            destructive = true,
-        )
-        SettingsListItem(
-            Icons.Outlined.Logout,
-            stringResource(R.string.settings_logout),
-            onRequestLogout,
-            destructive = true,
-        )
+        SectionHeader(stringResource(R.string.account_group_account), Modifier.padding(horizontal = spacing.space4))
+        SettingsRow(stringResource(R.string.deletion_status_title), onOpenDeletionStatus, icon = Icons.Outlined.Delete)
+        SettingsRow(stringResource(R.string.account_delete), { sheet = SHEET_DELETE }, icon = Icons.Outlined.Delete, danger = true)
+        SettingsRow(stringResource(R.string.account_logout), { sheet = SHEET_LOGOUT }, icon = Icons.Outlined.Logout, danger = true)
         Spacer(Modifier.height(spacing.space6))
+    }
+
+    val open = sheet
+    if (open != null) {
+        ModalBottomSheet(
+            onDismissRequest = { sheet = null },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = null,
+            shape = RoundedCornerShape(spacing.space0),
+        ) {
+            when (open) {
+                SHEET_PAYMENT -> Column(
+                    Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(spacing.space4),
+                    verticalArrangement = Arrangement.spacedBy(spacing.space3),
+                ) {
+                    Text(
+                        stringResource(R.string.account_payment_title),
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.semantics { heading() },
+                    )
+                    TextField(
+                        value = instapay,
+                        onValueChange = { onInstapayChange(it.take(60)) },
+                        label = stringResource(R.string.account_instapay),
+                    )
+                    TextField(
+                        value = vfcash,
+                        onValueChange = { onVfcashChange(it.filter(Char::isDigit).take(11)) },
+                        label = stringResource(R.string.account_wallet),
+                    )
+                    Text(
+                        stringResource(R.string.account_payment_help),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Button(
+                        onClick = { onSavePayout(); sheet = null },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = spacing.minimumTouchTarget),
+                    ) { Text(stringResource(R.string.product_save_bar)) }
+                    TextButton(
+                        onClick = { sheet = null },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = spacing.minimumTouchTarget),
+                    ) { Text(stringResource(R.string.common_cancel)) }
+                }
+                SHEET_PLANS -> BottomSheet(
+                    title = stringResource(R.string.account_plans_title),
+                    actions = state.billingPlans.map { plan ->
+                        SheetAction(
+                            label = plan.localizedPrice?.let {
+                                stringResource(R.string.settings_choose_plan_priced, plan.product.name, plan.product.base_plan_id, it)
+                            } ?: stringResource(R.string.settings_choose_plan, plan.product.name, plan.product.base_plan_id),
+                            onClick = { sheet = null; onPurchase(plan) },
+                        )
+                    },
+                    closeLabel = stringResource(R.string.sheet_close),
+                    onClose = { sheet = null },
+                )
+                SHEET_DELETE -> ConfirmSheet(
+                    state = ConfirmSheetState.Destructive,
+                    title = stringResource(R.string.account_delete_title),
+                    message = stringResource(R.string.account_delete_body),
+                    confirmLabel = stringResource(R.string.account_delete),
+                    cancelLabel = stringResource(R.string.common_cancel),
+                    onConfirm = { sheet = null; onRequestDeletion() },
+                    onCancel = { sheet = null },
+                )
+                SHEET_LOGOUT -> ConfirmSheet(
+                    state = ConfirmSheetState.Destructive,
+                    title = stringResource(R.string.account_logout_title),
+                    message = stringResource(R.string.account_logout_body),
+                    confirmLabel = stringResource(R.string.account_logout),
+                    cancelLabel = stringResource(R.string.common_cancel),
+                    onConfirm = { sheet = null; onRequestLogout() },
+                    onCancel = { sheet = null },
+                )
+            }
+        }
     }
 }
 
+private const val SHEET_PAYMENT = "payment"
+private const val SHEET_PLANS = "plans"
+private const val SHEET_DELETE = "delete"
+private const val SHEET_LOGOUT = "logout"
+
 /**
- * A shape where the plan name will be, not a guess at what it says.
- *
- * Same treatment as اليوم's counters: the row keeps its height so nothing
- * jumps when the real value lands.
+ * The plan, in commerce colours: its name, the two meters closest to their limits, and
+ * "التفاصيل" into the subscription page. Until entitlements answer the card holds placeholders,
+ * never "الخطة المجانية" as a guess.
  */
 @Composable
-private fun PlanSkeleton() {
+private fun PlanCard(state: AccountUiState, onDetails: () -> Unit) {
     val spacing = LocalOrderakSpacing.current
+    val colors = SemanticRole.Commerce.colors()
+    val name = state.planName
     Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        modifier = Modifier
-            .padding(horizontal = spacing.space4, vertical = spacing.space3)
-            .height(20.dp)
-            .fillMaxWidth(0.55f)
-            .clip(MaterialTheme.shapes.extraSmall),
-    ) {}
-}
-
-/** The same, for an entry whose presence is not yet decided. */
-@Composable
-private fun EntrySkeleton() {
-    val spacing = LocalOrderakSpacing.current
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        modifier = Modifier
-            .padding(horizontal = spacing.space4, vertical = spacing.space3)
-            .height(24.dp)
-            .fillMaxWidth(0.4f)
-            .clip(MaterialTheme.shapes.extraSmall),
-    ) {}
+        shape = MaterialTheme.shapes.large,
+        color = colors.container,
+        contentColor = colors.onContainer,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.space4, vertical = spacing.space2),
+    ) {
+        Column(Modifier.padding(spacing.space4), verticalArrangement = Arrangement.spacedBy(spacing.space3)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                if (name == null) {
+                    Skeleton(SkeletonVariant.ListRows, Modifier.weight(1f))
+                } else {
+                    Text(
+                        stringResource(R.string.settings_current_plan, name),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                TextButton(onClick = onDetails, modifier = Modifier.heightIn(min = spacing.minimumTouchTarget)) {
+                    Text(stringResource(R.string.account_plan_details))
+                }
+            }
+            // The two closest to their limit: those are the ones a seller will meet next.
+            state.usage.orEmpty()
+                .filter { it.limit != null && it.limit > 0 }
+                .sortedByDescending { it.used.toFloat() / it.limit!! }
+                .take(2)
+                .forEach { PlanUsageRowItem(it) }
+        }
+    }
 }

@@ -1,4 +1,10 @@
 package app.orderak.seller.feature.operations
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.style.TextOverflow
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -130,8 +136,12 @@ fun AnnouncementsScreen(onBack: () -> Unit, vm: OperationsViewModel = hiltViewMo
     )
 }
 
-/** The announcements list, as a function of its state. */
-
+/**
+ * The announcements list, as a function of its state.
+ *
+ * Platform news without an inbox to manage: unread items first, each with a dot, a title, two
+ * lines of the text and the date. Tapping an item opens it in place and marks it read.
+ */
 @Composable
 fun AnnouncementsContent(
     items: List<AnnouncementDto>?,
@@ -142,6 +152,9 @@ fun AnnouncementsContent(
     onRead: (Long) -> Unit,
 ) {
     val spacing = LocalOrderakSpacing.current
+    val locale = LocalConfiguration.current.locales[0]
+    // Opened in place; remembered through rotation as plain ids.
+    var opened by rememberSaveable { mutableStateOf(listOf<Long>()) }
     OperationPage(
         title = stringResource(R.string.announcements_title),
         onBack = onBack,
@@ -150,24 +163,60 @@ fun AnnouncementsContent(
         onRetry = onRetry,
         isEmpty = items?.isEmpty() == true,
         empty = {
-            EmptyState(kind = EmptyStateKind.Empty, title = stringResource(R.string.common_empty))
+            EmptyState(kind = EmptyStateKind.Empty, title = stringResource(R.string.announcements_empty))
         },
     ) {
-        items.orEmpty().forEach { a ->
-            Card(
-                onClick = { onRead(a.id) },
+        // Unread first; the sort is stable, so the server's order holds inside each group.
+        items.orEmpty().sortedBy { it.is_read }.forEach { a ->
+            val open = a.id in opened
+            val newLabel = stringResource(R.string.announcement_new)
+            Surface(
+                onClick = {
+                    opened = if (open) opened - a.id else opened + a.id
+                    if (!a.is_read) onRead(a.id)
+                },
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surfaceContainerLowest,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Column(Modifier.padding(spacing.space4)) {
-                    Text(localizedJson(a.title_i18n), style = MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.height(spacing.space1))
-                    Text(localizedJson(a.body_i18n), style = MaterialTheme.typography.bodyMedium)
-                    if (!a.is_read) {
+                Row(
+                    Modifier.padding(spacing.space3),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.space3),
+                ) {
+                    // The dot says "new" in words as well as in colour.
+                    Box(
+                        Modifier
+                            .padding(top = spacing.space2)
+                            .size(spacing.space2)
+                            .then(
+                                if (a.is_read) {
+                                    Modifier
+                                } else {
+                                    Modifier
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary)
+                                        .semantics { contentDescription = newLabel }
+                                },
+                            ),
+                    )
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(spacing.space1)) {
                         Text(
-                            stringResource(R.string.announcement_new),
-                            color = MaterialTheme.colorScheme.primary,
-                            style = MaterialTheme.typography.labelMedium,
+                            localizedJson(a.title_i18n),
+                            style = MaterialTheme.typography.titleSmall.copy(textDirection = TextDirection.Content),
                         )
+                        Text(
+                            localizedJson(a.body_i18n),
+                            style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Content),
+                            maxLines = if (open) Int.MAX_VALUE else 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        formatServerDate(a.starts_at, locale)?.let {
+                            Text(
+                                it,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
             }
