@@ -240,42 +240,48 @@ fun OrderDetailsContent(
     val order = data.order
     val status = runCatching { OrderStatus.valueOf(order.status) }.getOrDefault(OrderStatus.NEW) // Fix(#5)
 
-    // S6a result dialog
+    // S6a: what the receipt check found, as a sheet. The payment is recorded locally even when
+    // the order could not be moved to PAID, so "auto-confirmed" would otherwise overstate what
+    // happened.
     (proof as? ProofUiState.Result)?.let { r ->
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = actions.dismissProofResult,
-            confirmButton = {
-                TextButton(onClick = actions.dismissProofResult) { Text(stringResource(R.string.common_ok)) }
-            },
-            title = {
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = null,
+            shape = RoundedCornerShape(spacing.space0),
+        ) {
+            Column(
+                Modifier.fillMaxWidth().padding(spacing.space4),
+                verticalArrangement = Arrangement.spacedBy(spacing.space2),
+            ) {
                 Text(
                     if (r.result.verified) stringResource(R.string.payment_verified_ok)
-                    else stringResource(R.string.payment_flagged_title)
+                    else stringResource(R.string.payment_flagged_title),
+                    style = MaterialTheme.typography.titleLarge,
                 )
-            },
-            text = {
-                Column {
-                    if (!r.result.verified) {
-                        if (!r.result.amountMatched) Text(stringResource(R.string.payment_flag_amount))
-                        if (r.result.ref == null) Text(stringResource(R.string.payment_flag_ref))
-                        if (r.result.duplicateRef) Text(stringResource(R.string.payment_flag_dup))
-                    }
-                    // The payment is recorded locally even when the order could not
-                    // be moved to PAID, so "auto-confirmed" above would otherwise
-                    // overstate what happened.
-                    if (r.result.verified && !r.statusApplied) {
-                        Text(
-                            stringResource(R.string.order_status_update_failed),
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                    Spacer(Modifier.height(spacing.space2))
-                    Text(stringResource(R.string.payment_disclaimer),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (!r.result.verified) {
+                    if (!r.result.amountMatched) Text(stringResource(R.string.payment_flag_amount))
+                    if (r.result.ref == null) Text(stringResource(R.string.payment_flag_ref))
+                    if (r.result.duplicateRef) Text(stringResource(R.string.payment_flag_dup))
                 }
+                if (r.result.verified && !r.statusApplied) {
+                    Text(
+                        stringResource(R.string.order_status_update_failed),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                Text(
+                    stringResource(R.string.payment_disclaimer),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Button(
+                    onClick = actions.dismissProofResult,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = spacing.minimumTouchTarget),
+                ) { Text(stringResource(R.string.common_ok)) }
             }
-        )
+        }
     }
 
     // The order's name: the server's number when it has one, this phone's own otherwise,

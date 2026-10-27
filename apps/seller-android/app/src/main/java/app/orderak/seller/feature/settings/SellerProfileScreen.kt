@@ -143,27 +143,6 @@ class SellerProfileViewModel @Inject constructor(
         }
     }
 
-    fun uploadProfilePhoto(uri: Uri, onResult: (String?) -> Unit) = viewModelScope.launch {
-        val phone = sessionStore.phone.first() ?: return@launch
-        val secret = sessionStore.currentSecret()
-        val prepared = withContext(Dispatchers.IO) { prepareImage(uri) }
-        val (bytes, mime) = prepared ?: run { onResult(null); return@launch }
-        if (bytes.isEmpty()) { onResult(null); return@launch }
-        val ext = when (mime) {
-            "image/png" -> "png"
-            "image/webp" -> "webp"
-            "image/gif" -> "gif"
-            else -> "jpg"
-        }
-        val res = api.uploadMedia(phone, secret, "profile", bytes, "profile.$ext", mime)
-        if (res.ok && res.url != null) {
-            _profilePhotoUri.value = res.url
-            onResult(res.url)
-        } else {
-            onResult(null)
-        }
-    }
-
     fun resendEmailVerification(onReauthenticate: () -> Unit) = viewModelScope.launch {
         val phone = sessionStore.phone.first() ?: return@launch
         val secret = sessionStore.currentSecret()
@@ -190,40 +169,6 @@ class SellerProfileViewModel @Inject constructor(
             else -> result.error ?: "failed"
         }
         _busy.value = false
-    }
-
-    private fun prepareImage(uri: Uri): Pair<ByteArray, String>? {
-        return try {
-            val resolver = appContext.contentResolver
-            val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            resolver.openInputStream(uri)?.use {
-                android.graphics.BitmapFactory.decodeStream(it, null, bounds)
-            }
-            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-            var sample = 1
-            while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= 800) sample *= 2
-            val bitmap = resolver.openInputStream(uri)?.use {
-                android.graphics.BitmapFactory.decodeStream(
-                    it, null,
-                    android.graphics.BitmapFactory.Options().apply { inSampleSize = sample },
-                )
-            } ?: return null
-            try {
-                val png = resolver.getType(uri) == "image/png"
-                val format =
-                    if (png) android.graphics.Bitmap.CompressFormat.PNG else android.graphics.Bitmap.CompressFormat.JPEG
-                java.io.ByteArrayOutputStream().use { output ->
-                    if (!bitmap.compress(format, if (png) 100 else 85, output)) return null
-                    output.toByteArray() to if (png) "image/png" else "image/jpeg"
-                }
-            } finally {
-                bitmap.recycle()
-            }
-        } catch (_: Exception) {
-            null
-        } catch (_: OutOfMemoryError) {
-            null
-        }
     }
 }
 

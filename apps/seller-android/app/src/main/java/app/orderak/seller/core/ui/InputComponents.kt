@@ -1,5 +1,13 @@
 package app.orderak.seller.core.ui
 
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.autofill.AutofillNode
+import androidx.compose.ui.autofill.AutofillType
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalAutofill
+import androidx.compose.ui.platform.LocalAutofillTree
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -176,6 +184,7 @@ private fun FieldInput(
     visualTransformation: VisualTransformation,
     onLeave: (() -> Unit)?,
     showSupport: Boolean,
+    trailingIcon: (@Composable () -> Unit)? = null,
 ) {
     OutlinedTextField(
         value = value,
@@ -190,6 +199,7 @@ private fun FieldInput(
         } else {
             null
         },
+        trailingIcon = trailingIcon,
         isError = error != null,
         enabled = enabled,
         singleLine = singleLine,
@@ -209,6 +219,11 @@ private fun FieldInput(
  * screen owns. The number is always laid out left to right, even in Arabic, and
  * is digits only: Arabic-Indic digits are turned into Latin ones as they are
  * typed, because the number is stored and sent as digits.
+ *
+ * [flag] is drawn before the dialling code. [visualTransformation] groups the
+ * digits as the country writes them without changing what is stored or sent.
+ * [validDescription], when given, draws a check at the end of the field and names
+ * it for a screen reader: the screen passes it only once the number is complete.
  */
 @Composable
 fun PhoneField(
@@ -223,6 +238,9 @@ fun PhoneField(
     error: String? = null,
     enabled: Boolean = true,
     onLeave: (() -> Unit)? = null,
+    flag: String? = null,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+    validDescription: String? = null,
 ) {
     val spacing = LocalOrderakSpacing.current
     Column(modifier.fillMaxWidth()) {
@@ -252,7 +270,10 @@ fun PhoneField(
                         .semantics { contentDescription = "$countryDescription $dialCode" }
                         .testTag("orderak.phone.country"),
                 ) {
-                    Text(isolated(dialCode), style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        isolated(if (flag.isNullOrBlank()) dialCode else "$flag $dialCode"),
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
                     Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
                 }
                 FieldInput(
@@ -269,9 +290,18 @@ fun PhoneField(
                     enabled = enabled,
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                    visualTransformation = VisualTransformation.None,
+                    visualTransformation = visualTransformation,
                     onLeave = onLeave,
                     showSupport = false,
+                    trailingIcon = validDescription?.takeIf { error == null }?.let { description ->
+                        {
+                            Icon(
+                                Icons.Filled.CheckCircle,
+                                contentDescription = description,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    },
                 )
             }
         }
@@ -425,7 +455,9 @@ fun OtpField(
                     .semantics {
                         contentDescription = label
                         if (error != null) error(error)
-                    },
+                    }
+                    // SMS Autofill from Play Services fills the whole code at once.
+                    .smsAutofill { raw -> if (enabled) onValueChange(latinDigits(raw).take(OtpCodeLength)) },
                 decorationBox = { input ->
                     Box(contentAlignment = Alignment.Center) {
                         Row(
@@ -487,4 +519,21 @@ private fun OtpCell(digit: Char?, active: Boolean, failed: Boolean, modifier: Mo
             color = if (failed) colors.onErrorContainer else colors.onSurface,
         )
     }
+}
+
+/**
+ * Asks the system to fill this field with the SMS code it has just read, while the field has
+ * focus, and hands the whole text to [onFill]. It is the one place the kit uses the autofill tree.
+ */
+@OptIn(ExperimentalComposeUiApi::class)
+private fun Modifier.smsAutofill(onFill: (String) -> Unit): Modifier = composed {
+    val autofill = LocalAutofill.current
+    val node = remember { AutofillNode(autofillTypes = listOf(AutofillType.SmsOtpCode), onFill = onFill) }
+    LocalAutofillTree.current += node
+    this.onGloballyPositioned { node.boundingBox = it.boundsInWindow() }
+        .onFocusChanged { focus ->
+            autofill?.run {
+                if (focus.isFocused) requestAutofillForNode(node) else cancelAutofillForNode(node)
+            }
+        }
 }

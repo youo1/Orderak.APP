@@ -391,7 +391,8 @@ fun ConfirmSheet(
     title: String,
     message: String,
     confirmLabel: String,
-    cancelLabel: String,
+    /** Null when the sheet only informs and its one button is the whole answer. */
+    cancelLabel: String?,
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
@@ -429,12 +430,14 @@ fun ConfirmSheet(
                 }
                 Text(confirmLabel, style = MaterialTheme.typography.labelLarge)
             }
-            SheetSecondaryButton(
-                label = cancelLabel,
-                onClick = onCancel,
-                enabled = !busy,
-                modifier = Modifier.testTag("orderak.sheet.cancel"),
-            )
+            if (cancelLabel != null) {
+                SheetSecondaryButton(
+                    label = cancelLabel,
+                    onClick = onCancel,
+                    enabled = !busy,
+                    modifier = Modifier.testTag("orderak.sheet.cancel"),
+                )
+            }
         },
         body = {
             Text(

@@ -405,7 +405,7 @@ production URL returns the public 404.
 | `PUT`  | `/api/v1/products/{product_code}` | Replace one product's editable metadata. Never writes stock. |
 | `DELETE` | `/api/v1/products/{product_code}` | Delete one product. Stock movements are kept. |
 | `PATCH` | `/api/v1/products/{product_code}/stock` | Adjust stock under compare-and-set; a stale revision answers `409 stale_stock`. |
-| `POST` | `/api/v1/media/upload` | Multipart image upload to R2 → `{ url }`. Served publicly at `GET /media/{key}`. |
+| `POST` | `/api/v1/media/upload` | Multipart image upload to R2 → `{ url }`. Served publicly at `GET /media/{key}`. `kind` is `logo`, `cover` or `product`; `kind=profile` (the seller's own photo, no longer collected) answers `400 profile_photo_not_accepted`. |
 
 `PUT /api/v1/store` is the authenticated path for adding or changing business
 category and city after setup. A taxonomy selection (`business_category_id`,

@@ -140,6 +140,14 @@ jobs:
       - name: Verify the design-system component inventory
         run: node tooling/repository/verify-design-system-components.mjs
 
+      # D-15: every Arabic string a seller or a buyer reads is Modern Standard Arabic. The test
+      # runs first so a broken guard fails as a broken guard.
+      - name: Test the Arabic register guard
+        run: node --test tooling/repository/verify-arabic-register.test.mjs
+
+      - name: Verify the Arabic register
+        run: node tooling/repository/verify-arabic-register.mjs
+
       # The D-14 mark is exported once under design/assets/brand and copied to
       # Android, the backend and the admin panel. A served copy that drifts from
       # its export, a colour off the design-system roles, or a manifest/landing/

@@ -1,5 +1,10 @@
 package app.orderak.seller.feature.settings
 
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import app.orderak.seller.core.ui.ConfirmSheet
+import app.orderak.seller.core.ui.ConfirmSheetState
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -324,11 +329,24 @@ fun SettingsScreen(
     }
 
     deletionResult?.let { success ->
-        AlertDialog(
+        val spacing = LocalOrderakSpacing.current
+        ModalBottomSheet(
             onDismissRequest = { deletionResult = null },
-            text = { Text(stringResource(if (success) R.string.settings_delete_requested else R.string.settings_delete_failed)) },
-            confirmButton = { TextButton(onClick = { deletionResult = null }) { Text(stringResource(R.string.common_ok)) } },
-        )
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = null,
+            shape = RoundedCornerShape(spacing.space0),
+        ) {
+            ConfirmSheet(
+                state = if (success) ConfirmSheetState.Regular else ConfirmSheetState.Destructive,
+                title = stringResource(if (success) R.string.settings_delete_requested_title else R.string.settings_delete_failed_title),
+                message = stringResource(if (success) R.string.settings_delete_requested else R.string.settings_delete_failed),
+                confirmLabel = stringResource(R.string.common_ok),
+                cancelLabel = null,
+                onConfirm = { deletionResult = null },
+                onCancel = { deletionResult = null },
+            )
+        }
     }
 }
 

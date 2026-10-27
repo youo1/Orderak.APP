@@ -8,15 +8,15 @@
     <string name="error_generic">حدث خطأ، حاول مرة أخرى</string>
 
     <!-- S1 Auth -->
-    <string name="auth_title">جاهز للبيع على أوردرك؟</string>
+    <string name="auth_title">هل أنت مستعد للبيع على أوردرك؟</string>
     <string name="auth_subtitle">يلا نبدأ.</string>
     <string name="auth_phone_label">رقم الموبايل</string>
     <string name="auth_phone_hint">اكتب رقمك</string>
     <string name="auth_phone_reason">هنبعت كود لتأكيد رقمك.</string>
     <string name="auth_use_my_number">استخدام رقمي</string>
     <string name="auth_phone_hint_unavailable">اقتراح رقم الهاتف غير متاح. أدخل رقمك يدويًا.</string>
-    <string name="auth_phone_invalid">اكتب رقم موبايل صحيح</string>
-    <string name="auth_unsupported_country">أوردرك جاي لدولتك قريب!</string>
+    <string name="auth_phone_invalid">اكتب رقم هاتف صحيحًا</string>
+    <string name="auth_unsupported_country">سيصل أوردرك إلى بلدك قريبًا!</string>
     <string name="auth_send_code">إرسال كود التأكيد</string>
     <string name="auth_verify_code">تأكيد الكود</string>
     <string name="auth_otp_title">تأكيد الرقم</string>
@@ -24,12 +24,12 @@
     <string name="auth_resend_in">إعادة طلب خلال %1$s ثانية</string>
     <string name="auth_resend">إعادة إرسال الكود</string>
     <string name="auth_change_number">غيّر الرقم</string>
-    <string name="auth_otp_invalid">كود غير صحيح، جرب تاني.</string>
-    <string name="auth_send_failed">فشل إرسال الكود، جرب تاني.</string>
+    <string name="auth_otp_invalid">الرمز غير صحيح، حاول مرة أخرى.</string>
+    <string name="auth_send_failed">تعذّر إرسال الرمز، حاول مرة أخرى.</string>
     <string name="auth_too_many_requests">محاولات كثيرة، انتظر قليلًا.</string>
     <string name="auth_network_unavailable">لا يوجد اتصال بالإنترنت.</string>
     <string name="auth_app_verification_failed">فشل فحص الأمان، حدث التطبيق.</string>
-    <string name="auth_send_timeout">انتهى وقت المحاولة، جرب تاني.</string>
+    <string name="auth_send_timeout">انتهت مهلة المحاولة، حاول مرة أخرى.</string>
     <string name="auth_otp_expired">صلاحية الكود انتهت، اطلب كود جديد.</string>
     <string name="auth_verifying">جاري التأكيد…</string>
     <string name="auth_otp_code_entered">تم إدخال الكود</string>
@@ -279,12 +279,12 @@
     <string name="common_retry">إعادة المحاولة</string>
     <string name="order_cancel_confirm">هل تلغي الطلب وتعيد كمياته إلى المخزون؟</string>
     <string name="product_delete_confirm">هل تحذف المنتج؟ لا يمكن استرجاعه بعد ذلك.</string>
-    <string name="product_stock_conflict_title">المخزون اتغيّر</string>
+    <string name="product_stock_conflict_title">تغيّر المخزون</string>
     <string name="product_stock_conflict_body">أدخلتَ %1$s، والمخزون في المتجر الآن %2$s، فقد وصل طلب أثناء التعديل. حُفظت بقية تعديلاتك.</string>
-    <string name="product_stock_conflict_use_shop">خليها %1$s</string>
+    <string name="product_stock_conflict_use_shop">اجعله %1$s</string>
     <string name="product_stock_conflict_keep_mine">اكتب %1$s على أي حال</string>
     <string name="category_delete_confirm">هل تحذف التصنيف؟ ستبقى المنتجات بلا تصنيف.</string>
-    <string name="category_rename">غيّر اسم الفئة</string>
+    <string name="category_rename">تغيير اسم التصنيف</string>
     <string name="categories_error">تعذّر تحديث التصنيفات. حاول مرة أخرى.</string>
     <string name="settings_delete_confirm">هل ترسل طلب حذف الحساب؟ سيُنفَّذ الطلب خلال المدة المنشورة.</string>
     <string name="settings_logout_confirm">هل تسجّل الخروج وتحذف بيانات العمل المحلية من هذا الجهاز؟</string>
@@ -513,12 +513,12 @@
          لحد ما القايمة دي تفضى، عشان كده لازم البايع يشوفها ويتصرف. -->
     <string name="products_stuck_title">منتجات ليست على حسابك</string>
     <plurals name="products_stuck_body">
-        <item quantity="zero">مفيش منتجات متسجلة على الموبايل ده بس.</item>
-        <item quantity="one">فيه منتج متسجل على الموبايل ده بس. الكتالوج مش هيتحدّث لحد ما يتبعت أو يتمسح.</item>
-        <item quantity="two">فيه منتجين متسجلين على الموبايل ده بس. الكتالوج مش هيتحدّث لحد ما يتبعتوا أو يتمسحوا.</item>
-        <item quantity="few">فيه %s منتجات متسجلة على الموبايل ده بس. الكتالوج مش هيتحدّث لحد ما يتبعتوا أو يتمسحوا.</item>
-        <item quantity="many">فيه %s منتجًا متسجلة على الموبايل ده بس. الكتالوج مش هيتحدّث لحد ما يتبعتوا أو يتمسحوا.</item>
-        <item quantity="other">فيه %s منتج متسجل على الموبايل ده بس. الكتالوج مش هيتحدّث لحد ما يتبعتوا أو يتمسحوا.</item>
+        <item quantity="zero">لا توجد منتجات مسجّلة على هذا الهاتف فقط.</item>
+        <item quantity="one">يوجد منتج واحد مسجّل على هذا الهاتف فقط. لن يتحدّث الكتالوج حتى يُرسَل أو يُحذف.</item>
+        <item quantity="two">يوجد منتجان مسجّلان على هذا الهاتف فقط. لن يتحدّث الكتالوج حتى يُرسَلا أو يُحذفا.</item>
+        <item quantity="few">يوجد %s منتجات مسجّلة على هذا الهاتف فقط. لن يتحدّث الكتالوج حتى تُرسَل أو تُحذف.</item>
+        <item quantity="many">يوجد %s منتجًا مسجّلًا على هذا الهاتف فقط. لن يتحدّث الكتالوج حتى تُرسَل أو تُحذف.</item>
+        <item quantity="other">يوجد %s منتج مسجّل على هذا الهاتف فقط. لن يتحدّث الكتالوج حتى يُرسَل أو يُحذف.</item>
     </plurals>
     <string name="products_stuck_action">اعرضهم</string>
     <string name="products_stuck_dialog_title">ليست على حسابك</string>
@@ -907,4 +907,6 @@
     <string name="setup_later">لاحقًا</string>
     <string name="setup_bar_title">إعداد المتجر</string>
     <string name="splash_error">تعذّر فتح متجرك</string>
+    <string name="settings_delete_requested_title">تم إرسال الطلب</string>
+    <string name="settings_delete_failed_title">لم يُرسَل الطلب</string>
 </resources>

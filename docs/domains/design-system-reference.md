@@ -244,8 +244,14 @@ to *their data*. A shopkeeper's tool, not a SaaS dashboard.
 ## Localization
 
 en / ar / fr ship together, and Arabic is the primary market, not a translation
-layer. `values-ar/strings.xml` is the largest of the three and the copy is
-Egyptian colloquial.
+layer. `values-ar/strings.xml` is the largest of the three and the copy is Modern
+Standard Arabic (decision D-15, 28 September 2026), in the app, the storefront,
+the emails and the errors. One word per concept: طلب (never أوردر), نقدًا,
+إنستاباي, محفظة إلكترونية, تصنيف, هاتف (never موبايل), حذف (never مسح),
+المتجر, الخطة. The brand is written أوردرك. `tooling/repository/verify-arabic-register.mjs`
+fails on a word from the glossary's colloquial column; the sign-in strings
+(two consent strings) wait on the authentication contract's owner approval and are listed
+there with the reason.
 
 - **No hard-coded direction.** Logical properties only; every layout mirrors.
 - Directional icons auto-mirror; brand marks and media controls do not.
