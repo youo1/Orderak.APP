@@ -623,6 +623,15 @@ One bar saves, and it says why it cannot while the link name is not available.
 approved, and a row per product with its name, the translation under it and a chip (معتمدة, ترجمة آلية,
 ناقصة). A row opens a sheet with the source above and one button, "حفظ واعتماد".
 
+العملاء (Phase R7) has a large title and a search by name or number (Arabic-Indic digits find Latin ones). A
+row has the customer's initials, the name or, with none, the number, "number · n orders" and what they have
+spent; with orders in more than one currency the row says «عملات مختلفة» instead of a total that would be
+wrong. With no customer the page says they appear after the first order, and offers neither a search nor a
+button. The customer page has a header (large avatar, name, number always left to right, «تواصل»), three
+figures (orders, total spent, last order), «عن العميل» with the other contact and the note and «تعديل», and the
+customer's orders, newest first. Editing is one sheet that also says the number is the customer's identity and
+does not change; where the plan does not open it the card is read-only and a notice says so.
+
 اليوم (Phase R4, proposal T1) shows what waits for the seller: three tiles in the
 order an order moves through the shop (new, unpaid, ready to ship), each opening
 the orders it counts; the two newest orders that are not finished, as rows that

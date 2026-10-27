@@ -783,4 +783,16 @@
     <string name="translation_status_machine">Traduction automatique</string>
     <string name="translation_status_missing">Manquante</string>
     <string name="translation_save_approve">Enregistrer et approuver</string>
+    <string name="customers_empty_title">Les clients apparaissent ici automatiquement</string>
+    <string name="customers_empty_body">Après la première commande.</string>
+    <string name="customers_row_detail">%1$s · %2$s</string>
+    <string name="customers_mixed_currencies">Devises différentes</string>
+    <string name="customer_about">À propos du client</string>
+    <string name="customer_edit">Modifier</string>
+    <string name="customer_edit_title">Modifier le client</string>
+    <string name="customer_none">Non renseigné</string>
+    <string name="customer_figure_orders">Commandes</string>
+    <string name="customer_figure_spent">Total dépensé</string>
+    <string name="customer_figure_last">Dernière commande</string>
+    <string name="customer_phone_is_identity_sheet">Le numéro %1$s est l’identité du client et ne change pas.</string>
 </resources>
