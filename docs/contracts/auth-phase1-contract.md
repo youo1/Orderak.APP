@@ -8,7 +8,7 @@ authoritative_for: [auth-contract]
 ---
 # Versioned Seller Authentication Contract
 
-**Contract version:** 9
+**Contract version:** 10
 **Owner approval required:** Ayman Mohamed Abdellatif  
 **Protected since:** 13 July 2026
 
@@ -153,9 +153,10 @@ version 8 and is specified in guarantee 10.
     must not start OTP automatically.
 21. Phone entry and the six-digit OTP are stages of one visual screen. After
     code dispatch, the exact country and phone stay visible but locked. SMS
-    Autofill may populate all six digits, but only an explicit Verify action may
-    submit them. Change number or Back clears the active phone-bound OTP
-    session. Firebase instant verification remains allowed to complete directly.
+    Autofill may populate all six digits. The sixth digit, typed or autofilled,
+    submits them (version 10); an explicit Verify action remains as the retry
+    after a refused code. Change number or Back clears the active phone-bound
+    OTP session. Firebase instant verification remains allowed to complete directly.
 22. New-seller account step 1 requires affirmative age confirmation, not a
     birth year. The request must carry `age_confirmed: true`, and the flow
     records the exact canonical Arabic statement `عمري ١٨ عامًا أو أكثر`, the
@@ -340,6 +341,14 @@ Phone Hint service-failure feedback. It does not change the Firebase provider,
 OTP timing, code rules, fallback policy, consent evidence, backend verification,
 device limits, or Passkey cancellation behavior.
 
+**Approved evolution:** 27 October 2026 — version 10 is the deliberate change to
+guarantee 21 that the owner approved for the seller redesign (plan item R3): the
+sixth digit of the OTP, typed or filled in by SMS Autofill, now verifies by
+itself. The explicit Verify action stays as the retry after a refused code.
+Nothing else about the OTP changed: the phone is still locked and phone-bound,
+the generation check, the timeouts, the resend rule, Firebase instant
+verification, throttling, consent, logout and recovery are as in version 9.
+
 ## Version 7 contract-evidence migration approval
 
 On 1 August 2026 the owner explicitly approved evolving the protection model
@@ -358,3 +367,19 @@ non-authenticating request ID is attached for sanitized correlation. Internal
 auth/onboarding flags dropped their implementation-version suffix only. No
 Firebase, OTP, Passkey, consent, timeout, logout, recovery, locale, iOS, or PWA
 behavior changed.
+
+## Version 10 interaction approval
+
+On 27 October 2026 the owner explicitly approved migrating this contract so that
+the OTP verifies automatically on the sixth digit, as the approved seller
+redesign (plan item R3, sign-in) specifies, and approved updating the guard on
+purpose. The migration rationale: a six-digit code has no further input to wait
+for, and SMS Autofill already fills all six at once, so a separate press only
+adds a step; a refused code still needs a deliberate retry, which the Verify
+action keeps. The guard now requires `if (completesCode(code)) submitOtp()` in
+`AuthViewModel`, the single `submitOtp()` that guards short codes and a
+verification in flight, and the unchanged phone lock, change-number and
+no-predictive-back rules. `AuthViewModel.completesCode` is covered by a unit
+test. Firebase provider, OTP generation and security timeouts, exact-phone
+verification, numeric device recovery, Passkey guarantees, consent evidence,
+throttling, logout and rollback behavior remain unchanged.

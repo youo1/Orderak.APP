@@ -57,8 +57,9 @@ import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 
 /**
  * OTP entry form — title, subtitle, 6-digit code input, inline error,
- * resend timer and change-number link. Verification is an explicit bottom
- * action owned by the screen, including after SMS Autofill.
+ * resend timer and change-number link. The sixth digit, typed or filled in by SMS
+ * Autofill, verifies by itself (contract v10); the bottom Verify action owned by
+ * the screen remains as the retry after a refused code.
  *
  * Every color comes from [MaterialTheme.colorScheme];
  * every text style from [MaterialTheme.typography].
