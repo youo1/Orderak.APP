@@ -249,7 +249,7 @@ Standard Arabic (decision D-15, 28 September 2026), in the app, the storefront,
 the emails and the errors. One word per concept: طلب (never أوردر), نقدًا,
 إنستاباي, محفظة إلكترونية, تصنيف, هاتف (never موبايل), حذف (never مسح),
 المتجر, الخطة. The brand is written أوردرك. `tooling/repository/verify-arabic-register.mjs`
-fails on a word from the glossary's colloquial column; the sign-in strings
+fails on a word from the glossary's colloquial column in the app strings, the backend dictionary and the public landing page (which names no price: purchase is closed, so plans are shown in the app); the sign-in strings
 (two consent strings) wait on the authentication contract's owner approval and are listed
 there with the reason.
 
