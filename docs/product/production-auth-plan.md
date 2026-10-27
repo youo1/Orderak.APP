@@ -209,7 +209,7 @@ Google Play requires in-app and public-web account deletion paths.
    produce the same account/session semantics as Firebase SMS.
 6. **Phase 6 / modern auth rollout (implemented, default-off):** Welcome, Credential
     Manager Passkeys for returning sellers, Firebase OTP creation/recovery,
-    conditional phone fallback, inline locked-phone OTP with explicit Verify,
+    conditional phone fallback, inline locked-phone OTP that verifies on the sixth digit (Verify as the retry),
     immediate post-OTP Passkey opt-in with the system ceremony deferred until
     Store step 2 succeeds, consent plus required private year of birth on
     Account step 1, atomic/idempotent Store step 2, encrypted resumable local

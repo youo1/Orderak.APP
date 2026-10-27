@@ -93,7 +93,7 @@ private fun support(
                 onBack = {},
                 onRetry = {},
                 onTicket = {},
-                onNew = {},
+                onCreate = { _, _ -> },
             )
         }
     }
@@ -231,7 +231,7 @@ private fun catalogLanguages(
                 onBack = {},
                 onRetry = {},
                 onLang = {},
-                onEdit = {},
+                onSave = { _, _, _ -> },
             )
         }
     }

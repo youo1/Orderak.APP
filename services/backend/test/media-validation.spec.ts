@@ -17,10 +17,10 @@ const WEBP = new Uint8Array([
 	0x52, 0x49, 0x46, 0x46, 0x1a, 0, 0, 0, 0x57, 0x45, 0x42, 0x50,
 ]);
 
-function upload(bytes: Uint8Array, filename: string, claimedType: string, headers: Record<string, string>) {
+function upload(bytes: Uint8Array, filename: string, claimedType: string, headers: Record<string, string>, kind = "product") {
 	const form = new FormData();
 	form.append("file", new File([bytes], filename, { type: claimedType }), filename);
-	form.append("kind", "product");
+	form.append("kind", kind);
 
 	// authHeaders() sets content-type: application/json, which would override the
 	// multipart boundary the FormData body needs and make formData() reject the
@@ -88,5 +88,12 @@ describe("media upload validates the bytes, not the label", () => {
 		expect(served.status).toBe(200);
 		expect(served.headers.get("content-type")).toBe("image/png");
 		expect(served.headers.get("x-content-type-options")).toBe("nosniff");
+	});
+
+	it("refuses a seller profile photo: a profile holds only what is used", async () => {
+		const store = await registerStore();
+		const response = await upload(PNG, "me.png", "image/png", authHeaders(store), "profile");
+		expect(response.status).toBe(400);
+		expect(await response.json()).toMatchObject({ code: "profile_photo_not_accepted" });
 	});
 });

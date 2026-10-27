@@ -1,15 +1,11 @@
 package app.orderak.seller.app.navigation
 
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import app.orderak.seller.core.ui.BottomNav
+import app.orderak.seller.core.ui.NavItem
 import app.orderak.seller.core.ui.theme.OrderakTheme
 import com.android.tools.screenshot.PreviewTest
 
@@ -23,24 +19,17 @@ import com.android.tools.screenshot.PreviewTest
  */
 @Composable
 private fun SurfaceBar(selected: SellerSurface) {
-    NavigationBar {
-        SellerSurface.entries.forEach { item ->
-            val label = stringResource(item.labelRes)
-            NavigationBarItem(
-                selected = selected == item,
-                onClick = {},
-                icon = { Icon(item.icon, contentDescription = label) },
-                label = { Text(label) },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
-                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
+    BottomNav(
+        items = SellerSurface.entries.map { item ->
+            NavItem(
+                label = stringResource(item.labelRes),
+                icon = item.icon,
+                selectedIcon = item.selectedIcon,
             )
-        }
-    }
+        },
+        selectedIndex = SellerSurface.entries.indexOf(selected),
+        onSelect = {},
+    )
 }
 
 @PreviewTest

@@ -57,6 +57,27 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.orderak.seller.core.phone.CustomerPhone
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.semantics.Role
+import app.orderak.seller.core.money.Money
+import app.orderak.seller.core.text.formatNumber
+import app.orderak.seller.core.ui.Avatar
+import app.orderak.seller.core.ui.BottomActionBar
+import app.orderak.seller.core.ui.ConfirmSheet
+import app.orderak.seller.core.ui.ConfirmSheetState
+import app.orderak.seller.core.ui.KeyValueRow
+import app.orderak.seller.core.ui.MoneyText
+import app.orderak.seller.core.ui.SectionHeader
+import app.orderak.seller.core.ui.StatusStepper
+import app.orderak.seller.core.ui.TopBar
+import app.orderak.seller.core.ui.TopBarAction
+import app.orderak.seller.core.ui.isolated
+import java.text.DateFormat
 import app.orderak.seller.R
 import app.orderak.seller.core.ui.FeatureAvailability
 import app.orderak.seller.data.db.OrderWithItems
@@ -203,21 +224,10 @@ fun OrderDetailsContent(
         // not decoration here: without it the screen is a trap.
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = {
-                        Text(
-                            stringResource(R.string.order_details_missing_title),
-                            modifier = Modifier.semantics { heading() },
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = stringResource(R.string.common_back),
-                            )
-                        }
-                    },
+                TopBar(
+                    title = stringResource(R.string.order_details_missing_title),
+                    onBack = onBack,
+                    backDescription = stringResource(R.string.common_back),
                 )
             },
         ) { padding ->
@@ -230,76 +240,107 @@ fun OrderDetailsContent(
     val order = data.order
     val status = runCatching { OrderStatus.valueOf(order.status) }.getOrDefault(OrderStatus.NEW) // Fix(#5)
 
-    // S6a result dialog
+    // S6a: what the receipt check found, as a sheet. The payment is recorded locally even when
+    // the order could not be moved to PAID, so "auto-confirmed" would otherwise overstate what
+    // happened.
     (proof as? ProofUiState.Result)?.let { r ->
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = actions.dismissProofResult,
-            confirmButton = {
-                TextButton(onClick = actions.dismissProofResult) { Text(stringResource(R.string.common_ok)) }
-            },
-            title = {
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = null,
+            shape = RoundedCornerShape(spacing.space0),
+        ) {
+            Column(
+                Modifier.fillMaxWidth().padding(spacing.space4),
+                verticalArrangement = Arrangement.spacedBy(spacing.space2),
+            ) {
                 Text(
                     if (r.result.verified) stringResource(R.string.payment_verified_ok)
-                    else stringResource(R.string.payment_flagged_title)
+                    else stringResource(R.string.payment_flagged_title),
+                    style = MaterialTheme.typography.titleLarge,
                 )
-            },
-            text = {
-                Column {
-                    if (!r.result.verified) {
-                        if (!r.result.amountMatched) Text(stringResource(R.string.payment_flag_amount))
-                        if (r.result.ref == null) Text(stringResource(R.string.payment_flag_ref))
-                        if (r.result.duplicateRef) Text(stringResource(R.string.payment_flag_dup))
-                    }
-                    // The payment is recorded locally even when the order could not
-                    // be moved to PAID, so "auto-confirmed" above would otherwise
-                    // overstate what happened.
-                    if (r.result.verified && !r.statusApplied) {
-                        Text(
-                            stringResource(R.string.order_status_update_failed),
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                    Spacer(Modifier.height(spacing.space2))
-                    Text(stringResource(R.string.payment_disclaimer),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (!r.result.verified) {
+                    if (!r.result.amountMatched) Text(stringResource(R.string.payment_flag_amount))
+                    if (r.result.ref == null) Text(stringResource(R.string.payment_flag_ref))
+                    if (r.result.duplicateRef) Text(stringResource(R.string.payment_flag_dup))
                 }
+                if (r.result.verified && !r.statusApplied) {
+                    Text(
+                        stringResource(R.string.order_status_update_failed),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                Text(
+                    stringResource(R.string.payment_disclaimer),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Button(
+                    onClick = actions.dismissProofResult,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = spacing.minimumTouchTarget),
+                ) { Text(stringResource(R.string.common_ok)) }
             }
-        )
+        }
     }
 
+    // The order's name: the server's number when it has one, this phone's own otherwise,
+    // written without grouping and isolated so its digits never reorder inside Arabic.
+    val number = isolated("#" + formatNumber(order.remoteId ?: order.id, locale))
+    val timeFormat = remember(locale) { DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, locale) }
+    // Disabled until the server has acknowledged the order (BR-305a). A transition
+    // applied here alone would be a pipeline that exists on one phone: the server
+    // would hold the order at NEW, a reinstall would replay work already done, and a
+    // local-only cancellation would restore stock here while the server kept it
+    // consumed. The banner at the top says why.
+    val acknowledged = !order.livesOnlyOnThisPhone
+    val next = status.next
+    val whatsApp = stringResource(R.string.order_whatsapp)
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.order_details_title, order.id), modifier = Modifier.semantics { heading() }) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
-                actions = {
-                    IconButton(onClick = {
-                        val digits = try {
-                            val util = com.google.i18n.phonenumbers.PhoneNumberUtil.getInstance()
-                            val parsed = util.parse(order.buyerPhone, "EG")
-                            util.format(parsed, com.google.i18n.phonenumbers.PhoneNumberUtil.PhoneNumberFormat.E164)
-                                .removePrefix("+")
-                        } catch (_: Exception) {
-                            order.buyerPhone.filter(Char::isDigit)
-                        }
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$digits"))
-                        onOpenIntent(intent)
-                    }) {
-                        Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = stringResource(R.string.order_whatsapp))
-                    }
-                }
+            TopBar(
+                title = stringResource(R.string.order_heading, number),
+                subtitle = timeFormat.format(Date(order.createdAt)),
+                onBack = onBack,
+                backDescription = stringResource(R.string.common_back),
+                actions = listOf(
+                    TopBarAction(
+                        icon = Icons.AutoMirrored.Filled.Chat,
+                        description = whatsApp,
+                        onClick = {
+                            val digits = try {
+                                val util = com.google.i18n.phonenumbers.PhoneNumberUtil.getInstance()
+                                val parsed = util.parse(order.buyerPhone, "EG")
+                                util.format(parsed, com.google.i18n.phonenumbers.PhoneNumberUtil.PhoneNumberFormat.E164)
+                                    .removePrefix("+")
+                            } catch (_: Exception) {
+                                order.buyerPhone.filter(Char::isDigit)
+                            }
+                            onOpenIntent(Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$digits")))
+                        },
+                    ),
+                ),
             )
-        }
+        },
+        bottomBar = {
+            // The next step, named for what happens, and cancelling in the secondary
+            // slot while it is allowed. A finished or cancelled order has neither.
+            if (next != null || status.canCancel) {
+                BottomActionBar(
+                    primaryLabel = next?.let { nextStepLabel(it) } ?: stringResource(R.string.order_cancel),
+                    onPrimary = if (next != null) actions.advance else { { onConfirmCancel(true) } },
+                    primaryEnabled = acknowledged,
+                    disabledReason = if (!acknowledged) stringResource(R.string.order_bar_unsent_reason) else null,
+                    secondaryLabel = if (next != null && status.canCancel) stringResource(R.string.order_cancel) else null,
+                    onSecondary = if (next != null && status.canCancel && acknowledged) { { onConfirmCancel(true) } } else null,
+                )
+            }
+        },
     ) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).padding(spacing.space4).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(spacing.space3)
+            verticalArrangement = Arrangement.spacedBy(spacing.space4),
         ) {
             // Above the order, not below it. A seller who opens this screen to
             // check whether the order is safe should not have to scroll to find
@@ -311,201 +352,159 @@ fun OrderDetailsContent(
                 )
             }
 
-            Card {
-                Column(Modifier.fillMaxWidth().padding(spacing.space3)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(order.buyerName ?: order.buyerPhone, style = MaterialTheme.typography.titleMedium)
-                            Text(order.buyerPhone, style = MaterialTheme.typography.bodySmall)
-                        }
-                        // The contract has always declared CustomerRoute as an
-                        // exit from here and there was no way to reach it: from
-                        // an order you could not get to the person who placed it,
-                        // or to the rest of what they have bought.
-                        //
-                        // The key is derived exactly as the refresher derives it
-                        // (CustomerPhone.keyFor), because a key built any other
-                        // way addresses a row that does not exist.
-                        IconButton(onClick = {
-                            onOpenCustomer(CustomerPhone.keyFor(order.buyerPhone, countryIso))
-                        }) {
-                            Icon(
-                                Icons.Outlined.Person,
-                                contentDescription = stringResource(R.string.customer_open),
-                            )
-                        }
-                        StatusChip(status)
-                    }
-                    order.note?.let {
-                        Spacer(Modifier.height(spacing.space2))
-                        Text(it, style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
+            // Where the order stands: the chip, then the steps it moves through.
+            Column(verticalArrangement = Arrangement.spacedBy(spacing.space3)) {
+                StatusChip(status)
+                val steps = listOf(OrderStatus.NEW, OrderStatus.CONFIRMED, OrderStatus.PAID, OrderStatus.SHIPPED, OrderStatus.DONE)
+                StatusStepper(
+                    steps = steps.map { statusLabel(it) },
+                    currentIndex = steps.indexOf(status).coerceAtLeast(0),
+                    cancelledLabel = if (status == OrderStatus.CANCELLED) statusLabel(OrderStatus.CANCELLED) else null,
+                )
             }
 
-            Card {
-                Column(Modifier.fillMaxWidth().padding(spacing.space3)) {
-                    data.items.forEach { item ->
-                        Row(Modifier.fillMaxWidth().padding(vertical = spacing.space1)) {
-                            Text(
-                                "${formatCount(item.qty, locale)}×",
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                            Spacer(Modifier.width(spacing.space2))
-                            Text(item.productName, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                            Text(formatAmountLabel(item.qty * item.priceMinor, order.currency, locale),
-                                style = MaterialTheme.typography.bodyMedium)
-                        }
-                    }
-                    HorizontalDivider(Modifier.padding(vertical = spacing.space2))
-                    Row(Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.order_total), Modifier.weight(1f),
-                            style = MaterialTheme.typography.titleMedium)
-                        Text(formatAmountLabel(order.totalMinor, order.currency, locale),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.primary)
-                    }
+            // The customer, as a row that opens their page. The contract has always
+            // declared CustomerRoute as an exit from here. The key is derived exactly as
+            // the refresher derives it (CustomerPhone.keyFor), because a key built any
+            // other way addresses a row that does not exist.
+            val buyer = order.buyerName ?: order.buyerPhone
+            val openCustomer = stringResource(R.string.customer_open)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = spacing.minimumTouchTarget)
+                    .clickable(role = Role.Button, onClickLabel = openCustomer) {
+                        onOpenCustomer(CustomerPhone.keyFor(order.buyerPhone, countryIso))
+                    },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(spacing.space3),
+            ) {
+                Avatar(name = buyer)
+                Column(Modifier.weight(1f)) {
+                    Text(buyer, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        isolated(order.buyerPhone),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
+                Icon(
+                    Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
-            // Payment section (S6a) — only until Paid
-            if (status == OrderStatus.NEW || status == OrderStatus.CONFIRMED) {
-                Card {
-                    Column(Modifier.fillMaxWidth().padding(spacing.space3), verticalArrangement = Arrangement.spacedBy(spacing.space2)) {
-                        Text(stringResource(R.string.payment_section_title), style = MaterialTheme.typography.titleMedium)
-                        Text(payMethodLabel(runCatching { PayMethod.valueOf(order.payMethod) }.getOrDefault(PayMethod.COD)), style = MaterialTheme.typography.bodyMedium)
-                        if (proof is ProofUiState.Running) {
-                            // The system names this size: `iconMedium` is "a
-                            // standalone icon: a leading slot, a control, an inline
-                            // progress spinner", and the app's other four inline
-                            // spinners read it. This one carried a bare 24.dp, the
-                            // size the system gives a navigation glyph.
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                CircularProgressIndicator(
-                                    Modifier.size(spacing.iconMedium),
-                                    strokeWidth = 2.dp,
-                                )
-                                Spacer(Modifier.width(spacing.space3))
-                                Text(stringResource(R.string.payment_checking))
-                            }
-                        } else {
-                            FeatureGate(
-                                availability = ocrAvailability,
-                                onUpgrade = null,
-                            ) {
-                                Button(
-                                    onClick = {
-                                        onPickProof()
-                                    },
-                                    modifier = Modifier.fillMaxWidth()
-                                ) { Text(stringResource(R.string.payment_verify)) }
-                            }
-                            OutlinedButton(onClick = actions.markPaidManually, modifier = Modifier.fillMaxWidth()) {
-                                Text(stringResource(R.string.payment_manual))
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Payment history
-            //
-            // Three states, not two. `isNullOrEmpty()` drew one branch for an
-            // unread list and for a read list with nothing in it, so the
-            // nullability the doc comment above asks for had no rendering
-            // consequence at all: a seller could not tell "no transfer has been
-            // recorded" from "nothing has been read yet" — the two answers this
-            // page exists to give. Null says nothing, because it knows nothing;
-            // empty says so.
-            if (payments != null && payments.isEmpty()) {
-                Card {
-                    Column(Modifier.fillMaxWidth().padding(spacing.space3), verticalArrangement = Arrangement.spacedBy(spacing.space2)) {
-                        Text(stringResource(R.string.payment_history_title), style = MaterialTheme.typography.titleMedium)
+            // The products, each with its line total, then the total as the largest figure.
+            Column {
+                SectionHeader(title = stringResource(R.string.order_items_title))
+                data.items.forEach { item ->
+                    Row(Modifier.fillMaxWidth().padding(vertical = spacing.space1), verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            stringResource(R.string.payment_history_none),
+                            isolated(formatCount(item.qty, locale)) + " ×",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        Spacer(Modifier.width(spacing.space2))
+                        Text(item.productName, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                        MoneyText(Money(item.qty * item.priceMinor, order.currency), style = MaterialTheme.typography.bodyMedium)
                     }
                 }
+                HorizontalDivider(Modifier.padding(vertical = spacing.space2))
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.order_total), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                    MoneyText(
+                        Money(order.totalMinor, order.currency),
+                        style = MaterialTheme.typography.headlineMedium.copy(color = MaterialTheme.colorScheme.primary),
+                    )
+                }
             }
-            if (!payments.isNullOrEmpty()) {
-                Card {
-                    Column(Modifier.fillMaxWidth().padding(spacing.space3), verticalArrangement = Arrangement.spacedBy(spacing.space1)) {
-                        Text(stringResource(R.string.payment_history_title), style = MaterialTheme.typography.titleMedium)
-                        val dateFormat = remember(locale) {
-                            SimpleDateFormat("yyyy-MM-dd HH:mm", locale)
+
+            // The payment: how it is to be paid, the way to record it by hand while the
+            // status allows, the receipt check behind its gate, and what has been recorded.
+            Column(verticalArrangement = Arrangement.spacedBy(spacing.space2)) {
+                SectionHeader(title = stringResource(R.string.payment_section_title))
+                KeyValueRow(
+                    label = stringResource(R.string.order_paid_with),
+                    value = payMethodLabel(runCatching { PayMethod.valueOf(order.payMethod) }.getOrDefault(PayMethod.COD)),
+                )
+                // Only until Paid.
+                if (status == OrderStatus.NEW || status == OrderStatus.CONFIRMED) {
+                    if (proof is ProofUiState.Running) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(Modifier.size(spacing.iconMedium), strokeWidth = spacing.space1 / 2)
+                            Spacer(Modifier.width(spacing.space3))
+                            Text(stringResource(R.string.payment_checking))
                         }
-                        payments.forEach { payment ->
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Column(Modifier.weight(1f)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(stringResource(R.string.payment_ref_label, payment.ref), style = MaterialTheme.typography.bodyMedium)
-                                        Spacer(Modifier.width(spacing.space1))
-                                        Text(
-                                            if (payment.verified) stringResource(R.string.payment_verified_badge)
-                                            else stringResource(R.string.payment_flagged_badge),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = if (payment.verified) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-                                        )
-                                    }
-                                    Text(formatAmountLabel(payment.amountMinor, payment.currency, locale),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text(dateFormat.format(Date(payment.createdAt)),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                                if (!payment.proofPath.isNullOrBlank()) {
-                                    // "📎" stood here. Emoji are copy, not
-                                    // iconography, and this is not copy: it is the
-                                    // one mark that a receipt from
-                                    // `payments_finance.receipt_image_attachment`
-                                    // exists, drawn as an unlabelled glyph a screen
-                                    // reader cannot describe and a locale cannot
-                                    // translate. It is a row icon, so `iconSmall`.
-                                    Icon(
-                                        imageVector = Icons.Outlined.AttachFile,
-                                        contentDescription = stringResource(R.string.payment_proof_attached),
-                                        modifier = Modifier.size(spacing.iconSmall),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    } else {
+                        FeatureGate(availability = ocrAvailability, onUpgrade = null) {
+                            Button(
+                                onClick = onPickProof,
+                                modifier = Modifier.fillMaxWidth().heightIn(min = spacing.minimumTouchTarget),
+                            ) { Text(stringResource(R.string.payment_verify)) }
+                        }
+                        OutlinedButton(
+                            onClick = actions.markPaidManually,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = spacing.minimumTouchTarget),
+                        ) { Text(stringResource(R.string.payment_manual)) }
+                    }
+                }
+                // Three states, not two: null says nothing, because it knows nothing; empty
+                // says no payment has been recorded. A seller opens this page precisely to
+                // check whether a transfer landed.
+                if (payments != null && payments.isEmpty()) {
+                    Text(
+                        stringResource(R.string.payment_history_none),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (!payments.isNullOrEmpty()) {
+                    val dateFormat = remember(locale) { SimpleDateFormat("yyyy-MM-dd HH:mm", locale) }
+                    Text(stringResource(R.string.payment_history_title), style = MaterialTheme.typography.titleSmall)
+                    payments.forEach { payment ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Column(Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(stringResource(R.string.payment_ref_label, payment.ref), style = MaterialTheme.typography.bodyMedium)
+                                    Spacer(Modifier.width(spacing.space1))
+                                    Text(
+                                        if (payment.verified) stringResource(R.string.payment_verified_badge)
+                                        else stringResource(R.string.payment_flagged_badge),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (payment.verified) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                                     )
                                 }
+                                Text(
+                                    formatAmountLabel(payment.amountMinor, payment.currency, locale),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Text(
+                                    dateFormat.format(Date(payment.createdAt)),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
-                            if (payment != payments.last()) {
-                                HorizontalDivider(Modifier.padding(vertical = spacing.space1))
+                            if (!payment.proofPath.isNullOrBlank()) {
+                                // The one mark that a receipt exists, drawn as an icon a screen
+                                // reader can describe and a locale can translate (not an emoji).
+                                Icon(
+                                    imageVector = Icons.Outlined.AttachFile,
+                                    contentDescription = stringResource(R.string.payment_proof_attached),
+                                    modifier = Modifier.size(spacing.iconSmall),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
                         }
+                        if (payment != payments.last()) HorizontalDivider(Modifier.padding(vertical = spacing.space1))
                     }
                 }
             }
 
-            // Status actions.
-            //
-            // Disabled until the server has acknowledged the order (BR-305a). A
-            // transition applied here alone would be a pipeline that exists on
-            // one phone: the server would hold the order at NEW, a reinstall
-            // would replay work already done, and a local-only cancellation
-            // would restore stock here while the server kept it consumed.
-            // Offering a control that cannot do what it says is worse than
-            // greying it out and saying why, which the banner above does.
-            val acknowledged = !order.livesOnlyOnThisPhone
-            status.next?.let { next ->
-                Button(
-                    onClick = actions.advance,
-                    enabled = acknowledged,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.order_advance_to, statusLabel(next)))
-                }
-            }
-            if (status.canCancel) {
-                OutlinedButton(
-                    onClick = { onConfirmCancel(true) },
-                    enabled = acknowledged,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.order_cancel), color = MaterialTheme.colorScheme.error)
+            order.note?.let {
+                Column {
+                    SectionHeader(title = stringResource(R.string.order_note_title))
+                    Text(it, style = MaterialTheme.typography.bodyMedium)
                 }
             }
             Spacer(Modifier.height(spacing.space6))
@@ -513,40 +512,57 @@ fun OrderDetailsContent(
     }
 
     if (confirmDiscard) {
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { onConfirmDiscard(false) },
-            title = { Text(stringResource(R.string.order_refused_discard)) },
-            text = { Text(stringResource(R.string.order_refused_discard_confirm)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    onConfirmDiscard(false)
-                    actions.discardRefused(onBack)
-                }) {
-                    Text(
-                        stringResource(R.string.order_refused_discard),
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { onConfirmDiscard(false) }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            },
-        )
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = null,
+            shape = RoundedCornerShape(spacing.space0),
+        ) {
+            ConfirmSheet(
+                state = ConfirmSheetState.Destructive,
+                title = stringResource(R.string.order_refused_discard),
+                message = stringResource(R.string.order_refused_discard_confirm),
+                confirmLabel = stringResource(R.string.order_refused_discard),
+                cancelLabel = stringResource(R.string.common_cancel),
+                onConfirm = { onConfirmDiscard(false); actions.discardRefused(onBack) },
+                onCancel = { onConfirmDiscard(false) },
+            )
+        }
     }
 
     if (confirmCancel) {
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { onConfirmCancel(false) },
-            title = { Text(stringResource(R.string.order_cancel)) },
-            text = { Text(stringResource(R.string.order_cancel_confirm)) },
-            confirmButton = {
-                TextButton(onClick = { onConfirmCancel(false); actions.cancel(onBack) }) {
-                    Text(stringResource(R.string.order_cancel), color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = { TextButton(onClick = { onConfirmCancel(false) }) { Text(stringResource(R.string.common_cancel)) } },
-        )
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = null,
+            shape = RoundedCornerShape(spacing.space0),
+        ) {
+            // The consequence in one sentence, and the verb on the button, in the error
+            // colour: what cannot be undone says so.
+            ConfirmSheet(
+                state = ConfirmSheetState.Destructive,
+                title = stringResource(R.string.order_cancel_sheet_title, number),
+                message = stringResource(R.string.order_cancel_sheet_body),
+                confirmLabel = stringResource(R.string.order_cancel),
+                cancelLabel = stringResource(R.string.common_back),
+                onConfirm = { onConfirmCancel(false); actions.cancel(onBack) },
+                onCancel = { onConfirmCancel(false) },
+            )
+        }
     }
 }
+
+/** What moving the order on to [status] is called: the step named for what happens. */
+@Composable
+private fun nextStepLabel(status: OrderStatus): String = stringResource(
+    when (status) {
+        OrderStatus.CONFIRMED -> R.string.order_next_confirm
+        OrderStatus.PAID -> R.string.order_next_paid
+        OrderStatus.SHIPPED -> R.string.order_next_shipped
+        OrderStatus.DONE -> R.string.order_next_done
+        // Nothing moves an order to NEW or CANCELLED; the name is only a fallback.
+        else -> R.string.order_advance_to_fallback
+    },
+)

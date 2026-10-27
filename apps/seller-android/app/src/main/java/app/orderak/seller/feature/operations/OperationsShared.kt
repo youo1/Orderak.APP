@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import androidx.compose.foundation.clickable
+import app.orderak.seller.core.ui.TopBar
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -107,7 +108,16 @@ class OperationsViewModel @Inject constructor(
     val entitlements: EntitlementManager,
     val billingManager: BillingManager,
     private val passkeyClient: PasskeyClient,
+    private val entitlementRepository: app.orderak.seller.data.billing.EntitlementRepository,
 ) : ViewModel() {
+    /** The plan refresh: its error, its freshness and when the figures were read. */
+    val planSync = entitlementRepository.state
+
+    /** Run the plan refresh again after it failed. */
+    fun retryPlan() {
+        viewModelScope.launch { entitlementRepository.refresh(force = true) }
+    }
+
     private val _busy = MutableStateFlow(false)
     val busy = _busy.asStateFlow()
     private val _error = MutableStateFlow<String?>(null)
@@ -325,25 +335,28 @@ internal fun OperationPage(
     isEmpty: Boolean = false,
     /** The shape of the content this page waits for: rows for a list, a block for a detail page. */
     loading: SkeletonVariant = SkeletonVariant.ListRows,
+    /** The status under the title, when the page has one. */
+    subtitle: String? = null,
+    /** An overflow in the bar, for the one action that belongs to the whole page. */
+    onOverflow: (() -> Unit)? = null,
+    overflowDescription: String = "",
+    /** One bar at the bottom: the page's primary action, or a composer. */
+    bottomBar: @Composable () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     val spacing = LocalOrderakSpacing.current
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(title, modifier = Modifier.semantics { heading() }) },
-                navigationIcon = {
-                    if (onBack != null) {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = stringResource(R.string.common_back),
-                            )
-                        }
-                    }
-                },
+            TopBar(
+                title = title,
+                subtitle = subtitle,
+                onBack = onBack,
+                backDescription = stringResource(R.string.common_back),
+                onOverflow = onOverflow,
+                overflowDescription = overflowDescription,
             )
         },
+        bottomBar = bottomBar,
     ) { padding ->
         Column(
             Modifier
@@ -379,3 +392,20 @@ internal fun OperationPage(
         }
     }
 }
+
+/**
+ * The server's timestamps are SQLite `YYYY-MM-DD HH:MM:SS` (UTC) or ISO; both parse, and absent is
+ * null. Only the first 19 characters are read: the seconds are as fine as any screen needs.
+ */
+internal fun serverMillis(raw: String?): Long? {
+    if (raw == null || raw.length < 19) return null
+    return runCatching {
+        val format = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+        format.timeZone = java.util.TimeZone.getTimeZone("UTC")
+        format.parse(raw.substring(0, 19).replace('T', ' '))?.time
+    }.getOrNull()
+}
+
+/** A server timestamp as a date in the reader's locale, or null when there is none. */
+internal fun formatServerDate(raw: String?, locale: java.util.Locale): String? =
+    serverMillis(raw)?.let { java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM, locale).format(java.util.Date(it)) }

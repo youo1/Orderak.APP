@@ -19,7 +19,8 @@ import kotlinx.serialization.Serializable
 @Serializable data class CustomerRoute(val customerKey: String)
 @Serializable data object StoreInfoRoute
 @Serializable data object CategoriesRoute
-@Serializable data object RestrictedAccountRoute
+/** [status] is what the server sent, `suspended` or `banned`; the page draws its own variant for each. */
+@Serializable data class RestrictedAccountRoute(val status: String = "suspended")
 @Serializable data object SupportRoute
 @Serializable data class SupportTicketRoute(val id: Long)
 @Serializable data object AnnouncementsRoute

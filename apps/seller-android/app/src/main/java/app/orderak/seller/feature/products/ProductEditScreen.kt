@@ -1,74 +1,64 @@
 package app.orderak.seller.feature.products
 
-import app.orderak.seller.data.billing.FeatureKeys
-import app.orderak.seller.data.db.CategoryEntity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.AddAPhoto
-import androidx.compose.material3.Button
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextDirection
-import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 import app.orderak.seller.R
+import app.orderak.seller.core.money.exponentOf
 import app.orderak.seller.core.text.formatCount
-import coil3.compose.AsyncImage
-import java.io.File
+import app.orderak.seller.core.ui.Banner
+import app.orderak.seller.core.ui.BannerState
+import app.orderak.seller.core.ui.BottomActionBar
+import app.orderak.seller.core.ui.ConfirmSheet
+import app.orderak.seller.core.ui.ConfirmSheetState
+import app.orderak.seller.core.ui.ImagePickerState
+import app.orderak.seller.core.ui.ImagePickerTile
+import app.orderak.seller.core.ui.MoneyField
+import app.orderak.seller.core.ui.PickerOption
+import app.orderak.seller.core.ui.PickerSheet
+import app.orderak.seller.core.ui.PickerSheetMode
+import app.orderak.seller.core.ui.SelectField
 import app.orderak.seller.core.ui.Skeleton
 import app.orderak.seller.core.ui.SkeletonVariant
+import app.orderak.seller.core.ui.Stepper
+import app.orderak.seller.core.ui.SwitchRow
+import app.orderak.seller.core.ui.TextField
+import app.orderak.seller.core.ui.TopBar
+import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
+import app.orderak.seller.data.billing.FeatureKeys
+import app.orderak.seller.data.db.CategoryEntity
+import coil3.compose.AsyncImage
+import java.io.File
 
 /** S9 — photo-first product form (camera capture arrives with CameraX; photo picker now). */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -132,6 +122,11 @@ data class ProductEditActions(
 /**
  * The product form, as a function of its state.
  *
+ * Image first, because buyers see the image first; then name, price in the product's
+ * currency, stock as a stepper, whether it shows on the storefront, and the category.
+ * The description sits behind "more details". Deleting lives in the overflow and asks
+ * in a sheet; a stock conflict is a sheet too, because it is a question, not an error.
+ *
  * `state.loaded` is the whole reason this screen has a loading state: it was
  * computed in three places in the view model and read in none, so opening an
  * existing product drew an empty form first — blank name, stock "1" — and
@@ -150,222 +145,204 @@ fun ProductEditContent(
     onBack: () -> Unit,
     onLimitReached: (String) -> Unit,
 ) {
-    // Declared on the composable rather than inside the Scaffold's content
-    // lambda: the delete confirmation below the Scaffold is on the same screen
-    // and reads the same scale.
     val spacing = LocalOrderakSpacing.current
+    val locale = LocalConfiguration.current.locales[0]
+    var categorySheet by rememberSaveable { mutableStateOf(false) }
+    var moreOpen by rememberSaveable { mutableStateOf(false) }
+    val locked = state.saving
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(stringResource(if (state.id > 0) R.string.product_edit_title else R.string.product_add_title))
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                }
+            TopBar(
+                title = stringResource(if (state.id > 0) R.string.product_edit_heading else R.string.product_new_heading),
+                onBack = onBack,
+                backDescription = stringResource(R.string.sheet_close),
+                closeIcon = true,
+                // The overflow holds delete and nothing else, so a new product has none.
+                onOverflow = if (state.id > 0 && state.loaded) ({ onConfirmDelete(true) }) else null,
+                overflowDescription = stringResource(R.string.product_delete),
             )
-        }
+        },
+        bottomBar = {
+            if (state.loaded) {
+                BottomActionBar(
+                    primaryLabel = stringResource(R.string.product_save_bar),
+                    onPrimary = { actions.save(onBack) },
+                    primaryEnabled = state.canSave && !locked,
+                    disabledReason = if (!state.canSave && !locked) stringResource(R.string.product_save_reason) else null,
+                )
+            }
+        },
     ) { padding ->
-        // `loaded` was computed in three places in the view model and read in
-        // none. Opening an existing product therefore drew an empty form first —
-        // blank name, stock "1" — and swapped in the real values when Room
-        // answered, so anything the seller typed in between was overwritten by
-        // the product they had opened to edit.
+        // Opening an existing product used to draw an empty form first, then overwrite
+        // whatever the seller had typed in between. Skeleton fields until Room answers.
         if (!state.loaded) {
-            Skeleton(SkeletonVariant.DetailBlock, Modifier.padding(padding).padding(LocalOrderakSpacing.current.space4))
+            Skeleton(SkeletonVariant.DetailBlock, Modifier.padding(padding).padding(spacing.space4))
             return@Scaffold
         }
         Column(
-            Modifier.fillMaxSize().padding(padding).padding(spacing.space4).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(spacing.space4)
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .imePadding()
+                .verticalScroll(rememberScrollState())
+                .padding(spacing.space4),
+            verticalArrangement = Arrangement.spacedBy(spacing.space4),
         ) {
-            val pickPhotoLabel = stringResource(R.string.product_pick_photo)
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(180.dp)
-                    .clip(MaterialTheme.shapes.large)
-                    // Named only while a photo is shown: without one, the visible label below already names
-                    // the box, and a description would make TalkBack read it twice.
-                    .semantics { if (state.imagePath != null) contentDescription = pickPhotoLabel }
-                    .clickable {
-                        onPickImage()
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                state.imagePath?.let { path ->
-                    AsyncImage(model = File(path), contentDescription = null,
-                        modifier = Modifier.fillMaxSize())
-                } ?: run {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Outlined.AddAPhoto, contentDescription = null,
-                            modifier = Modifier.size(40.dp), tint = MaterialTheme.colorScheme.primary)
-                        Spacer(Modifier.height(spacing.space2))
-                        Text(stringResource(R.string.product_pick_photo), style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
-            }
-
-            OutlinedTextField(
-                value = state.name, onValueChange = actions.onName,
-                label = { Text(stringResource(R.string.product_name_label)) },
-                singleLine = true, modifier = Modifier.fillMaxWidth()
-            )
-
-            OutlinedTextField(
-                value = state.description, onValueChange = actions.onDescription,
-                label = { Text(stringResource(R.string.product_description_label)) },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 2
-            )
-
-            // prices/numbers are LTR runs (Plan §3.1)
-            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                Row(horizontalArrangement = Arrangement.spacedBy(spacing.space3)) {
-                    OutlinedTextField(
-                        value = state.priceText, onValueChange = actions.onPrice,
-                        label = { Text(stringResource(R.string.product_price_label)) },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.weight(1f)
-                    )
-                    OutlinedTextField(
-                        value = state.stockText, onValueChange = actions.onStock,
-                        label = { Text(stringResource(R.string.product_stock_label)) },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.toggleable(
-                    value = state.available,
-                    onValueChange = actions.onAvailable,
-                    role = Role.Switch,
-                ),
-            ) {
-                // onCheckedChange = null drops the Switch's own 48dp minimum interactive size; keep it, so the
-                // row lays out exactly as before and only its semantics change.
-                Switch(
-                    checked = state.available,
-                    onCheckedChange = null,
-                    modifier = Modifier.minimumInteractiveComponentSize(),
-                )
-                Text(stringResource(R.string.product_available), Modifier.padding(start = spacing.space2))
-            }
-
-            // Category picker (optional). Manage the list in Settings → Categories.
-            if (categories.isNotEmpty()) {
-                Text(stringResource(R.string.categories_title), style = MaterialTheme.typography.titleMedium)
-                Row(
-                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(spacing.space2)
-                ) {
-                    // The chip that means "no category". It borrowed
-                    // `product_discount_none` — "بدون خصم", "no discount" — the
-                    // string written for a discount control this screen does not
-                    // draw (ProductEditViewModel.save says as much), so the picker
-                    // offered "no discount" under a heading that reads «الأقسام».
-                    FilterChip(
-                        selected = state.categoryCode == null,
-                        onClick = { actions.onCategory(null) },
-                        label = { Text(stringResource(R.string.product_category_none)) }
-                    )
-                    categories.forEach { c ->
-                        FilterChip(
-                            selected = state.categoryCode == c.categoryCode,
-                            onClick = { actions.onCategory(c.categoryCode) },
-                            label = {
-                                Text(
-                                    c.name,
-                                    style = MaterialTheme.typography.labelLarge.copy(
-                                        textDirection = TextDirection.Content,
-                                    ),
-                                )
-                            }
-                        )
-                    }
-                }
-            }
-
-            // A failed write that says nothing is the worst of the three outcomes.
-            //
-            // The data authority contract's Class A rule is that an operation
-            // which cannot reach the server "fails, visibly" — nothing is queued
-            // and nothing is written, so the only thing standing between the
-            // seller and a silently discarded edit is this line. Until now the
-            // screen rendered the plan limit and nothing else, which meant a save
-            // with no connection re-enabled the button and left no trace.
+            // A failed write that says nothing is the worst of the three outcomes. The
+            // data authority contract's Class A rule is that an operation which cannot
+            // reach the server "fails, visibly": nothing is queued, nothing is written,
+            // so this banner is the only thing between the seller and a silently
+            // discarded edit. The form below it is kept as it was.
             state.writeError?.takeIf { it != ProductWriteError.PLAN_LIMIT }?.let { error ->
-                Text(
-                    stringResource(
+                Banner(
+                    state = BannerState.Error,
+                    title = stringResource(R.string.product_save_failed_title),
+                    message = stringResource(
                         when (error) {
                             ProductWriteError.OFFLINE -> R.string.error_network
                             ProductWriteError.UNKNOWN_CATEGORY -> R.string.error_not_found
-                            // Covered by the block below, which says more than a
-                            // sentence can; listed so this `when` stays total.
+                            // Covered by the banner below, which says more than a sentence
+                            // can; listed so this `when` stays total.
                             ProductWriteError.PLAN_LIMIT -> R.string.error_plan_limit
                             ProductWriteError.REFUSED -> R.string.error_generic
                         },
                     ),
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            if (state.quotaExceeded) {
+                // The paywall names the limit, the usage and what the next plan gives; the
+                // input on this screen survives because the paywall's exit pops.
+                Banner(
+                    state = BannerState.Error,
+                    title = stringResource(R.string.product_save_failed_title),
+                    message = stringResource(R.string.error_plan_limit),
+                    actionLabel = stringResource(R.string.paywall_view_plans),
+                    onAction = { onLimitReached(FeatureKeys.MAX_PRODUCTS) },
                 )
             }
 
-            if (state.quotaExceeded) {
-                // A one-line error told the seller a save had failed and nothing
-                // about why or what to do. The paywall names the limit, the
-                // usage and what the next plan gives; the input on this screen
-                // survives because the paywall's exit pops rather than resets.
-                Column(verticalArrangement = Arrangement.spacedBy(spacing.space1)) {
-                    Text(
-                        stringResource(R.string.error_plan_limit),
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
+            ImagePickerTile(
+                state = if (state.imagePath == null) ImagePickerState.Placeholder else ImagePickerState.Preview,
+                label = stringResource(R.string.product_image_label),
+                addLabel = stringResource(R.string.product_image_add),
+                onPick = onPickImage,
+            ) {
+                state.imagePath?.let { path ->
+                    AsyncImage(
+                        model = File(path),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
                     )
-                    TextButton(onClick = { onLimitReached(FeatureKeys.MAX_PRODUCTS) }) {
-                        Text(stringResource(R.string.paywall_view_plans))
-                    }
                 }
             }
 
-            Button(
-                onClick = { actions.save(onBack) },
-                enabled = state.canSave && !state.saving,
-                modifier = Modifier.fillMaxWidth()
-            ) { Text(stringResource(R.string.product_save)) }
-
-            if (state.id > 0) {
+            TextField(
+                value = state.name,
+                onValueChange = actions.onName,
+                label = stringResource(R.string.product_name_label),
+                required = true,
+                enabled = !locked,
+            )
+            MoneyField(
+                value = state.priceText,
+                onValueChange = actions.onPrice,
+                label = stringResource(R.string.product_price_field),
+                currency = state.currency,
+                fractionDigits = exponentOf(state.currency),
+                required = true,
+                enabled = !locked,
+            )
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(stringResource(R.string.product_stock_label), style = MaterialTheme.typography.bodyLarge)
+                Stepper(
+                    value = state.stockText.toIntOrNull() ?: 0,
+                    onValueChange = { actions.onStock(it.toString()) },
+                    decreaseDescription = stringResource(R.string.product_stock_decrease),
+                    increaseDescription = stringResource(R.string.product_stock_increase),
+                    max = MAX_STOCK,
+                    enabled = !locked,
+                )
+            }
+            SwitchRow(
+                label = stringResource(R.string.product_visible),
+                checked = state.available,
+                onCheckedChange = actions.onAvailable,
+                enabled = !locked,
+            )
+            // Optional. The list is managed from the store page, one tap from here.
+            if (categories.isNotEmpty()) {
+                SelectField(
+                    label = stringResource(R.string.product_category_field),
+                    value = categories.firstOrNull { it.categoryCode == state.categoryCode }?.name
+                        ?: stringResource(R.string.product_category_none),
+                    onClick = { categorySheet = true },
+                    enabled = !locked,
+                )
+            }
+            if (moreOpen || state.description.isNotEmpty()) {
+                TextField(
+                    value = state.description,
+                    onValueChange = actions.onDescription,
+                    label = stringResource(R.string.product_description_label),
+                    singleLine = false,
+                    enabled = !locked,
+                )
+            } else {
                 TextButton(
-                    onClick = { onConfirmDelete(true) },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        stringResource(R.string.product_delete),
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
+                    onClick = { moreOpen = true },
+                    modifier = Modifier.heightIn(min = spacing.minimumTouchTarget),
+                ) { Text(stringResource(R.string.product_more_details)) }
             }
         }
     }
 
+    if (categorySheet) {
+        ModalBottomSheet(
+            onDismissRequest = { categorySheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = null,
+            shape = RoundedCornerShape(spacing.space0),
+        ) {
+            PickerSheet(
+                mode = PickerSheetMode.SingleChoice,
+                title = stringResource(R.string.product_category_field),
+                options = listOf(PickerOption(NO_CATEGORY, stringResource(R.string.product_category_none))) +
+                    categories.mapNotNull { c -> c.categoryCode?.let { PickerOption(it, c.name) } },
+                selectedKey = state.categoryCode ?: NO_CATEGORY,
+                onSelect = { option ->
+                    categorySheet = false
+                    actions.onCategory(option.key.takeIf { it != NO_CATEGORY })
+                },
+                closeLabel = stringResource(R.string.sheet_close),
+                onClose = { categorySheet = false },
+            )
+        }
+    }
+
     if (confirmDelete) {
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { onConfirmDelete(false) },
-            title = { Text(stringResource(R.string.product_delete)) },
-            text = { Text(stringResource(R.string.product_delete_confirm)) },
-            confirmButton = {
-                TextButton(onClick = { onConfirmDelete(false); actions.delete(onBack) }) {
-                    Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = { TextButton(onClick = { onConfirmDelete(false) }) { Text(stringResource(R.string.common_cancel)) } },
-        )
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = null,
+            shape = RoundedCornerShape(spacing.space0),
+        ) {
+            ConfirmSheet(
+                state = ConfirmSheetState.Destructive,
+                title = stringResource(R.string.product_delete_title),
+                message = stringResource(R.string.product_delete_body),
+                confirmLabel = stringResource(R.string.common_delete),
+                cancelLabel = stringResource(R.string.common_cancel),
+                onConfirm = { onConfirmDelete(false); actions.delete(onBack) },
+                onCancel = { onConfirmDelete(false) },
+            )
+        }
     }
 
     // The stock conflict, which is a question rather than an error.
@@ -381,39 +358,32 @@ fun ProductEditContent(
     // tapping away, and it is the half of the choice that cannot destroy
     // anything — their number is still in the field afterwards, unsaved.
     state.stockConflict?.let { conflict ->
-        val locale = LocalConfiguration.current.locales[0]
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { actions.acceptShopStock() },
-            title = { Text(stringResource(R.string.product_stock_conflict_title)) },
-            text = {
-                Text(
-                    stringResource(
-                        R.string.product_stock_conflict_body,
-                        formatCount(conflict.yours, locale),
-                        formatCount(conflict.shop, locale),
-                    ),
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { actions.acceptShopStock() }) {
-                    Text(
-                        stringResource(
-                            R.string.product_stock_conflict_use_shop,
-                            formatCount(conflict.shop, locale),
-                        ),
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { actions.reapplyMyStock(onBack) }) {
-                    Text(
-                        stringResource(
-                            R.string.product_stock_conflict_keep_mine,
-                            formatCount(conflict.yours, locale),
-                        ),
-                    )
-                }
-            },
-        )
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = null,
+            shape = RoundedCornerShape(spacing.space0),
+        ) {
+            ConfirmSheet(
+                state = ConfirmSheetState.Regular,
+                title = stringResource(R.string.product_stock_conflict_heading),
+                message = stringResource(
+                    R.string.product_stock_conflict_message,
+                    formatCount(conflict.yours, locale),
+                    formatCount(conflict.shop, locale),
+                ),
+                confirmLabel = stringResource(R.string.product_stock_conflict_take_shop, formatCount(conflict.shop, locale)),
+                cancelLabel = stringResource(R.string.product_stock_conflict_save_mine, formatCount(conflict.yours, locale)),
+                onConfirm = { actions.acceptShopStock() },
+                onCancel = { actions.reapplyMyStock(onBack) },
+            )
+        }
     }
 }
+
+/** The key the picker uses for "no category": a product may be sold without one. */
+private const val NO_CATEGORY = ""
+
+/** The most the stock field has ever accepted (five digits), now the stepper's ceiling. */
+private const val MAX_STOCK = 99_999

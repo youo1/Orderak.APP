@@ -4,6 +4,32 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.style.TextDirection
+import app.orderak.seller.core.money.formatAmountLabel
+import app.orderak.seller.core.text.formatAgo
+import app.orderak.seller.core.text.formatCount
+import app.orderak.seller.core.ui.Avatar
+import app.orderak.seller.core.ui.Banner
+import app.orderak.seller.core.ui.BannerState
+import app.orderak.seller.core.ui.EmptyState
+import app.orderak.seller.core.ui.EmptyStateKind
+import app.orderak.seller.core.ui.KeyValueRow
+import app.orderak.seller.core.ui.SectionHeader
+import app.orderak.seller.core.ui.Skeleton
+import app.orderak.seller.core.ui.SkeletonVariant
+import app.orderak.seller.core.ui.TextField
+import app.orderak.seller.core.ui.TopBar
+import app.orderak.seller.core.ui.isolated
+import java.util.Locale
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -168,19 +194,8 @@ fun CustomerDetailsScreen(
 
     val editable = viewModel.editAvailability == FeatureAvailability.Available
 
-    // Seeded from the row once it arrives, then owned by the field. Re-seeding on
-    // every emission would overwrite what the seller is currently typing each
-    // time a sync touched the row.
-    var name by rememberSaveable { mutableStateOf<String?>(null) }
-    var altContact by rememberSaveable { mutableStateOf<String?>(null) }
-    var note by rememberSaveable { mutableStateOf<String?>(null) }
-    LaunchedEffect(customer?.customerKey) {
-        customer?.let {
-            if (name == null) name = it.name.orEmpty()
-            if (altContact == null) altContact = it.altContact.orEmpty()
-            if (note == null) note = it.note.orEmpty()
-        }
-    }
+    // The last edit sent, so "retry" in the failure snackbar repeats exactly it.
+    var lastEdit by rememberSaveable { mutableStateOf<List<String>?>(null) }
 
     val savedMessage = stringResource(R.string.customer_saved)
     LaunchedEffect(saved) {
@@ -216,7 +231,7 @@ fun CustomerDetailsScreen(
             // swallow that second failure.
             viewModel.saveFailureShown()
             if (result == SnackbarResult.ActionPerformed) {
-                viewModel.save(name.orEmpty(), altContact.orEmpty(), note.orEmpty())
+                lastEdit?.let { viewModel.save(it[0], it[1], it[2]) }
             }
         }
     }
@@ -226,13 +241,7 @@ fun CustomerDetailsScreen(
         orders = orders,
         customerKey = viewModel.customerKey,
         editable = editable,
-        name = name.orEmpty(),
-        altContact = altContact.orEmpty(),
-        note = note.orEmpty(),
-        onName = { name = it.take(120) },
-        onAltContact = { altContact = it.take(120) },
-        onNote = { note = it.take(2000) },
-        onSave = viewModel::save,
+        onSave = { n, a, note -> lastEdit = listOf(n, a, note); viewModel.save(n, a, note) },
         onContact = { customer?.let { contactCustomer(context, it) } },
         onBack = onBack,
         onOpenOrder = onOpenOrder,
@@ -243,14 +252,16 @@ fun CustomerDetailsScreen(
 /**
  * One customer, as a function of their state.
  *
- * [orders] is nullable and that is the point: a customer row exists BECAUSE an
- * order arrived, so "no orders yet" is a sentence this screen can never
- * truthfully say on arrival, and the seed made it say exactly that.
+ * Top bar with back and the name; a header with a large avatar, the name, the number (always
+ * left to right) and "تواصل"; three figures (orders, total spent, last order); "عن العميل"
+ * holding the other contact and the note with "تعديل"; then their orders, newest first.
  *
- * The three text fields are seeded once by [CustomerDetailsScreen] and then
- * owned by the field, which is why they arrive here as plain values — re-seeding
- * on every emission would overwrite what the seller is typing whenever a sync
- * touched the row.
+ * [orders] is nullable and that is the point: a customer row exists BECAUSE an order arrived, so
+ * "no orders yet" is a sentence this screen can never truthfully say on arrival.
+ *
+ * Editing is one sheet (name, other contact, note, and a line saying the number is the
+ * customer's identity), seeded from the row each time it opens. Where the plan does not open
+ * it, the card is read-only and a notice that names the plan stands where "تعديل" would be.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -259,213 +270,221 @@ fun CustomerDetailsContent(
     orders: List<OrderEntity>?,
     customerKey: String,
     editable: Boolean,
-    name: String,
-    altContact: String,
-    note: String,
-    onName: (String) -> Unit,
-    onAltContact: (String) -> Unit,
-    onNote: (String) -> Unit,
     onSave: (String, String, String) -> Unit,
     onContact: () -> Unit,
     onBack: () -> Unit,
     onOpenOrder: (Long) -> Unit,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
-    // The screen's rhythm, from the system rather than written per call site.
     val spacing = LocalOrderakSpacing.current
+    val locale = LocalConfiguration.current.locales[0]
+    var editing by rememberSaveable { mutableStateOf(false) }
+    val title = customer?.name?.takeIf { it.isNotBlank() }
+        ?: orders?.firstOrNull()?.buyerName
+        ?: customer?.phone
+        ?: customerKey
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        customer?.name?.takeIf { it.isNotBlank() }
-                            ?: orders?.firstOrNull()?.buyerName
-                            ?: customer?.phone
-                            ?: customerKey,
-                        modifier = Modifier.semantics { heading() },
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                }
+            TopBar(
+                title = title,
+                onBack = onBack,
+                backDescription = stringResource(R.string.common_back),
             )
-        }
+        },
     ) { padding ->
         LazyColumn(
-            Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = spacing.space4, end = spacing.space4, bottom = spacing.space4,
-                top = padding.calculateTopPadding() + spacing.space2,
-            ),
-            verticalArrangement = Arrangement.spacedBy(spacing.space2)
+            Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(spacing.space4),
+            verticalArrangement = Arrangement.spacedBy(spacing.space3),
         ) {
             item {
-                CustomerProfileSection(
-                    customer = customer,
-                    name = name,
-                    altContact = altContact,
-                    note = note,
-                    editable = editable,
-                    onName = onName,
-                    onAltContact = onAltContact,
-                    onNote = onNote,
-                    onSave = { onSave(name, altContact, note) },
-                    onContact = onContact,
-                )
-            }
-
-            item {
-                Text(
-                    stringResource(R.string.customer_orders_heading),
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(top = spacing.space4).semantics { heading() },
-                )
-            }
-
-            if (orders != null && orders.isEmpty()) {
-                item {
-                    Box(
-                        modifier = Modifier.fillMaxWidth().padding(spacing.space8),
-                        contentAlignment = Alignment.Center,
+                Column(
+                    Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(spacing.space2),
+                ) {
+                    Avatar(name = title, size = spacing.space16)
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.titleLarge.copy(textDirection = TextDirection.Content),
+                    )
+                    customer?.let { Text(isolated(it.phone), style = MaterialTheme.typography.bodyMedium) }
+                    Button(
+                        onClick = onContact,
+                        enabled = customer != null,
+                        modifier = Modifier.heightIn(min = spacing.minimumTouchTarget),
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = Icons.Outlined.Inbox,
-                                contentDescription = null,
-                                modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Spacer(Modifier.height(spacing.space4))
-                            Text(
-                                stringResource(R.string.orders_empty),
-                                style = MaterialTheme.typography.bodyLarge,
-                                textAlign = TextAlign.Center,
-                            )
-                        }
+                        Icon(Icons.Outlined.Chat, contentDescription = null)
+                        Text(stringResource(R.string.customer_contact), Modifier.padding(start = spacing.space2))
                     }
                 }
-            } else {
-                items(orders.orEmpty(), key = { it.id }) { o -> OrderCard(o, onClick = { onOpenOrder(o.id) }) }
             }
+            if (customer != null && customer.phoneStatus != "valid") {
+                // A number that could not be resolved is usable but unmergeable, and the
+                // seller is the only one who can say what it should have been.
+                item {
+                    Banner(
+                        state = BannerState.Information,
+                        title = stringResource(R.string.customer_phone_unresolved),
+                        message = null,
+                    )
+                }
+            }
+            if (orders != null) {
+                item { CustomerFigures(orders, locale) }
+            }
+            item {
+                SectionHeader(
+                    title = stringResource(R.string.customer_about),
+                    actionLabel = if (editable && customer != null) stringResource(R.string.customer_edit) else null,
+                    onAction = { editing = true },
+                )
+            }
+            item {
+                Surface(
+                    shape = MaterialTheme.shapes.large,
+                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(Modifier.padding(spacing.space3), verticalArrangement = Arrangement.spacedBy(spacing.space2)) {
+                        KeyValueRow(
+                            label = stringResource(R.string.customer_alt_contact),
+                            value = customer?.altContact?.takeIf { it.isNotBlank() } ?: stringResource(R.string.customer_none),
+                        )
+                        KeyValueRow(
+                            label = stringResource(R.string.customer_note),
+                            value = customer?.note?.takeIf { it.isNotBlank() } ?: stringResource(R.string.customer_none),
+                        )
+                    }
+                }
+            }
+            if (!editable) {
+                // Locked rather than absent: the card is visible and read-only, so the seller
+                // can see what the feature is before deciding to pay for it.
+                item {
+                    Banner(
+                        state = BannerState.LockedByPlan,
+                        title = stringResource(R.string.customer_edit_locked),
+                        message = null,
+                    )
+                }
+            }
+
+            item { SectionHeader(title = stringResource(R.string.customer_orders_heading)) }
+            when {
+                orders == null -> item { Skeleton(SkeletonVariant.ListRows) }
+                orders.isEmpty() -> item {
+                    EmptyState(kind = EmptyStateKind.Empty, title = stringResource(R.string.orders_empty))
+                }
+                else -> items(orders, key = { it.id }) { o -> OrderCard(o, onClick = { onOpenOrder(o.id) }) }
+            }
+        }
+    }
+
+    if (editing && customer != null) {
+        ModalBottomSheet(
+            onDismissRequest = { editing = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = null,
+            shape = RoundedCornerShape(spacing.space0),
+        ) {
+            CustomerProfileSheet(
+                customer = customer,
+                onSave = { n, a, note -> onSave(n, a, note); editing = false },
+                onClose = { editing = false },
+            )
         }
     }
 }
 
+/** Orders, total spent and last order. Spent exists only within one currency; mixed says so. */
 @Composable
-private fun CustomerProfileSection(
-    customer: CustomerEntity?,
-    name: String,
-    altContact: String,
-    note: String,
-    editable: Boolean,
-    onName: (String) -> Unit,
-    onAltContact: (String) -> Unit,
-    onNote: (String) -> Unit,
-    onSave: () -> Unit,
-    onContact: () -> Unit,
-) {
-
-    // This section is its own composable, so it reads the scale itself.
+private fun CustomerFigures(orders: List<OrderEntity>, locale: Locale) {
     val spacing = LocalOrderakSpacing.current
-    Column(verticalArrangement = Arrangement.spacedBy(spacing.space2)) {
-        // The phone is shown, never edited. It is the customer's identity: an
-        // edit that changed it would silently be a different customer and would
-        // take the order history with it. The server refuses one for the same
-        // reason.
-        OutlinedTextField(
-            value = customer?.phone.orEmpty(),
-            onValueChange = {},
-            readOnly = true,
-            label = { Text(stringResource(R.string.customer_phone)) },
-            supportingText = { Text(stringResource(R.string.customer_phone_is_identity)) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
+    val currencies = orders.map { it.currency }.distinct()
+    val spent = when (currencies.size) {
+        0 -> "—"
+        1 -> formatAmountLabel(orders.sumOf { it.totalMinor }, currencies.first(), locale)
+        else -> stringResource(R.string.customers_mixed_currencies)
+    }
+    val last = orders.maxOfOrNull { it.createdAt }?.let { formatAgo(it, System.currentTimeMillis(), locale) } ?: "—"
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(spacing.space2)) {
+        Figure(stringResource(R.string.customer_figure_orders), formatCount(orders.size, locale), Modifier.weight(1f))
+        Figure(stringResource(R.string.customer_figure_spent), spent, Modifier.weight(1f))
+        Figure(stringResource(R.string.customer_figure_last), last, Modifier.weight(1f))
+    }
+}
 
-        // A number that could not be resolved is usable but unmergeable, and the
-        // seller is the only one who can say what it should have been.
-        if (customer != null && customer.phoneStatus != "valid") {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(spacing.space2),
-            ) {
-                Icon(
-                    Icons.Outlined.Info,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    stringResource(R.string.customer_phone_unresolved),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+@Composable
+private fun Figure(label: String, value: String, modifier: Modifier) {
+    val spacing = LocalOrderakSpacing.current
+    Surface(
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+        modifier = modifier,
+    ) {
+        Column(Modifier.padding(spacing.space3), verticalArrangement = Arrangement.spacedBy(spacing.space1)) {
+            Text(value, style = MaterialTheme.typography.titleMedium)
+            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+    }
+}
 
-        OutlinedTextField(
+/**
+ * The profile editor: name, other contact, note. The number is shown with a line saying it is the
+ * customer's identity and does not change, because an edit that changed it would silently be a
+ * different customer and take the order history with it.
+ */
+@Composable
+private fun CustomerProfileSheet(
+    customer: CustomerEntity,
+    onSave: (String, String, String) -> Unit,
+    onClose: () -> Unit,
+) {
+    val spacing = LocalOrderakSpacing.current
+    var name by rememberSaveable(customer.customerKey) { mutableStateOf(customer.name.orEmpty()) }
+    var alt by rememberSaveable(customer.customerKey) { mutableStateOf(customer.altContact.orEmpty()) }
+    var note by rememberSaveable(customer.customerKey) { mutableStateOf(customer.note.orEmpty()) }
+    Column(
+        Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(spacing.space4),
+        verticalArrangement = Arrangement.spacedBy(spacing.space3),
+    ) {
+        Text(
+            stringResource(R.string.customer_edit_title),
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.semantics { heading() },
+        )
+        TextField(
             value = name,
-            onValueChange = onName,
-            readOnly = !editable,
-            label = { Text(stringResource(R.string.customer_name)) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
+            onValueChange = { name = it.take(120) },
+            label = stringResource(R.string.customer_name),
         )
-        OutlinedTextField(
-            value = altContact,
-            onValueChange = onAltContact,
-            readOnly = !editable,
-            label = { Text(stringResource(R.string.customer_alt_contact)) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
+        TextField(
+            value = alt,
+            onValueChange = { alt = it.take(120) },
+            label = stringResource(R.string.customer_alt_contact),
         )
-        OutlinedTextField(
+        TextField(
             value = note,
-            onValueChange = onNote,
-            readOnly = !editable,
-            label = { Text(stringResource(R.string.customer_note)) },
-            minLines = 3,
-            modifier = Modifier.fillMaxWidth(),
+            onValueChange = { note = it.take(2000) },
+            label = stringResource(R.string.customer_note),
+            singleLine = false,
         )
-
-        Row(horizontalArrangement = Arrangement.spacedBy(spacing.space2)) {
-            OutlinedButton(onClick = onContact, enabled = customer != null) {
-                Icon(Icons.Outlined.Chat, contentDescription = null)
-                Spacer(Modifier.height(spacing.space0))
-                Text(
-                    stringResource(R.string.customer_contact),
-                    modifier = Modifier.padding(start = spacing.space2),
-                )
-            }
-            if (editable) {
-                Button(onClick = onSave, enabled = customer != null) {
-                    Text(stringResource(R.string.customer_save))
-                }
-            }
-        }
-
-        // Locked rather than absent: the fields are visible and read-only, so
-        // the seller can see what the feature is before deciding to pay for it.
-        // Icon as well as text — the state must not be carried by colour alone.
-        if (!editable) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(spacing.space2),
-            ) {
-                Icon(
-                    Icons.Outlined.Lock,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    stringResource(R.string.customer_edit_locked),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
+        Text(
+            stringResource(R.string.customer_phone_is_identity_sheet, isolated(customer.phone)),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Button(
+            onClick = { onSave(name, alt, note) },
+            modifier = Modifier.fillMaxWidth().heightIn(min = spacing.minimumTouchTarget),
+        ) { Text(stringResource(R.string.customer_save)) }
+        TextButton(
+            onClick = onClose,
+            modifier = Modifier.fillMaxWidth().heightIn(min = spacing.minimumTouchTarget),
+        ) { Text(stringResource(R.string.common_cancel)) }
     }
 }
 

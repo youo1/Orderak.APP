@@ -84,7 +84,6 @@ export const RENDERS = {
   assistantQuota: { kind: "component", note: "a count against a limit in Arabic, in that order — the pair swaps when it is built from two separate numbers" },
   devicesAtDeviceLimit: { kind: "component", note: "the device allowance the contract declares as this screen's data, drawn at the ceiling" },
   categoriesLoadingSeededList: { kind: "component", note: "loading with the seeded empty list production actually passes, which is the frame the empty message used to appear under" },
-  sellerProfilePhotoUploadFailed: { kind: "component", note: "a photo that never reached storage, named beside the control that caused it" },
 
   // ---- components, not screens ----
   // Each of these renders a shared component with a surface's copy in it. That
@@ -104,6 +103,7 @@ export const RENDERS = {
   ordersErrorDark: { kind: "screen", contract: "orders", state: "error", theme: "dark" },
   ordersFilteredToNone: { kind: "component", note: "filtered to none keeps the chips — the way out is to clear one" },
   ordersFilteredUnpaid: { kind: "component", note: "a اليوم counter's filter arrives visible, so it can be cleared" },
+  ordersFilteredStatus: { kind: "screen", contract: "orders", state: "content", theme: "light", note: "a status chosen in the sheet: the chip names it and is drawn chosen" },
   ordersBothGroupsLight: { kind: "component", note: "the split the list's own documentation always claimed: what is waiting on the seller, then what is finished — the finished rows carry the newer timestamps, which is where the old chronological order put them" },
   ordersBothGroupsDark: { kind: "component", note: "the same split in dark" },
 
@@ -184,6 +184,76 @@ export const RENDERS = {
   gateNoticeLockedByPlan: { kind: "component", state: "LockedByPlan", note: "GateNotice locked by plan, plans offered while purchase is open" },
   gateNoticeLockedByPlanPurchaseClosed: { kind: "component", state: "LockedByPlanPurchaseClosed", note: "GateNotice locked by plan, nothing to press while purchase is closed" },
   gateNoticeNotBuilt: { kind: "component", state: "NotBuilt", note: "GateNotice not built: no chip, no button" },
+
+  // R1a-2: the overlay kit, in the same eight-variant matrix. A sheet is drawn
+  // over a visible screen and a scrim, not inside a ModalBottomSheet window the
+  // harness does not capture. All four are kit-pending (adopter R2).
+  bottomSheetActions: { kind: "component", state: "ActionList", note: "BottomSheet action list with a pinned closing action" },
+  pickerSheetSingleChoice: { kind: "component", state: "SingleChoice", note: "PickerSheet single choice, long list scrolling inside the 90% bound" },
+  pickerSheetSearchableWithManualEntry: { kind: "component", state: "SearchableWithManualEntry", note: "PickerSheet searchable, no match, offering the value as entered" },
+  confirmSheetDestructive: { kind: "component", state: "Destructive", note: "ConfirmSheet destructive, with the destructive verb" },
+  confirmSheetRegular: { kind: "component", state: "Regular", note: "ConfirmSheet regular" },
+  confirmSheetInProgress: { kind: "component", state: "InProgress", note: "ConfirmSheet in progress, both buttons disabled" },
+  snackbarUndo: { kind: "component", state: "Undo", note: "Snackbar with undo" },
+  snackbarFailureWithRetry: { kind: "component", state: "FailureWithRetry", note: "Snackbar for a failure, with retry" },
+  snackbarNoAction: { kind: "component", state: "NoAction", note: "Snackbar with no action" },
+
+  // R1b-1: the text-entry kit, in the eight-variant matrix. All four are kit-pending.
+  textFieldEmpty: { kind: "component", state: "Empty", note: "TextField empty, required mark" },
+  textFieldFilled: { kind: "component", state: "Filled", note: "TextField with a value" },
+  textFieldRequiredError: { kind: "component", state: "RequiredError", note: "TextField error replacing the helper" },
+  textFieldHelperAndCounter: { kind: "component", state: "HelperAndCounter", note: "TextField with a helper and a counter" },
+  textFieldDisabled: { kind: "component", state: "Disabled", note: "TextField switched off" },
+  phoneFieldEmpty: { kind: "component", state: "Empty", note: "PhoneField empty, left to right" },
+  phoneFieldFilled: { kind: "component", state: "Filled", note: "PhoneField with a number" },
+  phoneFieldError: { kind: "component", state: "Error", note: "PhoneField with an error under the row" },
+  moneyFieldFilled: { kind: "component", state: "Filled", note: "MoneyField in the locale's digits with the currency" },
+  moneyFieldError: { kind: "component", state: "Error", note: "MoneyField with an error" },
+  otpFieldEmpty: { kind: "component", state: "Empty", note: "OtpField, first cell active" },
+  otpFieldPartial: { kind: "component", state: "Partial", note: "OtpField part filled" },
+  otpFieldError: { kind: "component", state: "Error", note: "OtpField failed, error under the cells" },
+
+  // R1b-2: the choice kit, in the eight-variant matrix. All seven are kit-pending.
+  stepperValue: { kind: "component", state: "Value", note: "Stepper mid-range" },
+  stepperAtMinimum: { kind: "component", state: "AtMinimum", note: "Stepper at its minimum, minus disabled" },
+  stepperAtMaximum: { kind: "component", state: "AtMaximum", note: "Stepper at the stock, plus disabled" },
+  selectFieldEmpty: { kind: "component", state: "Empty", note: "SelectField with nothing chosen" },
+  selectFieldFilled: { kind: "component", state: "Filled", note: "SelectField with a value" },
+  selectFieldError: { kind: "component", state: "Error", note: "SelectField with an error" },
+  switchRowOn: { kind: "component", state: "On", note: "SwitchRow on, with a helper" },
+  switchRowOff: { kind: "component", state: "Off", note: "SwitchRow off, with a helper" },
+  segmentedChoiceSelected: { kind: "component", state: "Selected", note: "SegmentedChoice with the second segment chosen" },
+  checkboxRowUnchecked: { kind: "component", state: "Unchecked", note: "CheckboxRow unchecked" },
+  checkboxRowChecked: { kind: "component", state: "Checked", note: "CheckboxRow checked" },
+  checkboxRowError: { kind: "component", state: "Error", note: "CheckboxRow with its error" },
+  filterChipRowWithMore: { kind: "component", state: "WithMore", note: "FilterChipRow with a last chip for the long tail" },
+  imagePickerTilePlaceholder: { kind: "component", state: "Placeholder", note: "ImagePickerTile inviting a photo" },
+  imagePickerTilePreview: { kind: "component", state: "Preview", note: "ImagePickerTile with a chosen image" },
+  imagePickerTileUploading: { kind: "component", state: "Uploading", note: "ImagePickerTile uploading, with a bar" },
+  imagePickerTileFailedWithRetry: { kind: "component", state: "FailedWithRetry", note: "ImagePickerTile failed, with retry" },
+
+  // R1c-1: the structure and data kit, in the eight-variant matrix. All kit-pending.
+  topBarBack: { kind: "component", state: "Back", note: "TopBar with back, subtitle, two actions and overflow" },
+  topBarLarge: { kind: "component", state: "Large", note: "TopBar with the large surface title and an unread dot" },
+  bottomNavFiveSurfaces: { kind: "component", state: "FiveSurfaces", note: "BottomNav with five surfaces, a count and a dot" },
+  bottomActionBarWithSummary: { kind: "component", state: "WithSummary", note: "BottomActionBar with a total" },
+  bottomActionBarDisabled: { kind: "component", state: "Disabled", note: "BottomActionBar disabled, saying why" },
+  bottomActionBarTwoActions: { kind: "component", state: "TwoActions", note: "BottomActionBar with a secondary action" },
+  fabExtended: { kind: "component", state: "Extended", note: "Fab extended" },
+  sectionHeaderWithAction: { kind: "component", state: "WithAction", note: "SectionHeader with a count and an action" },
+  settingsRows: { kind: "component", state: "Rows", note: "SettingsRow with a value and the danger variant" },
+  keyValueRows: { kind: "component", state: "Rows", note: "KeyValueRow with an emphasised total" },
+  metricTileContent: { kind: "component", state: "Content", note: "MetricTile in three roles" },
+  metricTileNotRead: { kind: "component", state: "NotRead", note: "MetricTile not read yet" },
+  metricTileLoading: { kind: "component", state: "Loading", note: "MetricTile loading" },
+  statusStepperCurrent: { kind: "component", state: "Current", note: "StatusStepper at its third step" },
+  statusStepperCancelled: { kind: "component", state: "Cancelled", note: "StatusStepper replaced by the cancelled banner" },
+  stepListSetup: { kind: "component", state: "Setup", note: "StepList as the setup checklist" },
+  moneyAndCountText: { kind: "component", state: "Amounts", note: "MoneyText in two currencies and CountText" },
+  avatarAndThumbnail: { kind: "component", state: "Both", note: "Avatar and Thumbnail" },
+  chatBubbles: { kind: "component", state: "Both", note: "ChatBubble from each side" },
+  composerOpen: { kind: "component", state: "Open", note: "Composer open" },
+  composerClosed: { kind: "component", state: "Closed", note: "Composer closed, saying why" },
 
   componentGalleryLight: { kind: "component", note: "the shared component vocabulary, light" },
   componentGalleryDark: { kind: "component", note: "the shared component vocabulary, dark" },
@@ -410,6 +480,8 @@ export const RENDERS = {
   shellAccount: { kind: "screen", contract: "main-shell", state: "content", theme: "light" },
   shellNoShopName: { kind: "screen", contract: "main-shell", state: "content", theme: "light", note: "the app name, not a blank bar and not a guess" },
   shellEnglish: { kind: "screen", contract: "main-shell", state: "content", theme: "light", note: "where the five labels are longest" },
+  shellBadges: { kind: "screen", contract: "main-shell", state: "content", theme: "light", note: "the unpaid count on الطلبات and the unread dot on حسابي" },
+  shellVersionWarning: { kind: "screen", contract: "version-governance", state: "content", theme: "light", note: "a non-dismissible banner above the surface, with its own action" },
 
   versionForceUpdateLight: { kind: "screen", contract: "version-governance", state: "content", theme: "light", note: "the only mode that offers a store link — the only one the seller can act on" },
   versionForceUpdateDark: { kind: "screen", contract: "version-governance", state: "content", theme: "dark" },
@@ -432,37 +504,22 @@ export const RENDERS = {
   // arrow that did nothing.
   restrictedAccountLight: { kind: "screen", contract: "restricted-account", state: "content", theme: "light" },
   restrictedAccountDark: { kind: "screen", contract: "restricted-account", state: "content", theme: "dark" },
+  restrictedBannedLight: { kind: "screen", contract: "restricted-account", state: "content", theme: "light", note: "banned: a lock, a review of the decision, deletion of own data, no status check" },
+  restrictedBannedDark: { kind: "screen", contract: "restricted-account", state: "content", theme: "dark", note: "banned, dark" },
 
   // ================= shop setup =================
-  // Both step composables took a ShopSetupViewModel directly, so the second
-  // screen a new seller ever sees could not be drawn at all — a screen with a
-  // taxonomy call, a city search, a slug check, three loading states and three
-  // error states, and renders of none of them. ShopSetupActions is what replaced
-  // that: thirteen no-op-defaulted lambdas in one value.
-  setupAccountLight: { kind: "screen", contract: "shop-setup", state: "content", theme: "light" },
-  setupAccountDark: { kind: "screen", contract: "shop-setup", state: "content", theme: "dark" },
-  setupAccountEmpty: { kind: "screen", contract: "shop-setup", state: "content", theme: "light", note: "how a seller actually meets step 1" },
-  setupStoreLight: { kind: "screen", contract: "shop-setup", state: "content", theme: "light" },
-  setupStoreDark: { kind: "screen", contract: "shop-setup", state: "content", theme: "dark" },
-  setupStoreCitySuggestions: { kind: "screen", contract: "shop-setup", state: "content", theme: "light", note: "suggestions returned; picking one closes the list" },
-  setupStoreCityManual: { kind: "screen", contract: "shop-setup", state: "content", theme: "light", note: "a town the catalogue has never heard of still has to be typeable" },
+  // One step and a ready screen. Every state is drawn through ShopSetupActions, so no Hilt graph is needed.
+  setupEmpty: { kind: "screen", contract: "shop-setup", state: "content", theme: "light", note: "how a seller actually meets it" },
+  setupFilledLight: { kind: "screen", contract: "shop-setup", state: "content", theme: "light" },
+  setupFilledDark: { kind: "screen", contract: "shop-setup", state: "content", theme: "dark" },
+  setupAgeNotConfirmed: { kind: "screen", contract: "shop-setup", state: "content", theme: "light", note: "the bar says what is missing" },
+  setupReadyLight: { kind: "screen", contract: "shop-setup", state: "content", theme: "light", note: "the ready screen" },
+  setupReadyDark: { kind: "screen", contract: "shop-setup", state: "content", theme: "dark" },
+  setupCreatingLight: { kind: "screen", contract: "shop-setup", state: "loading", theme: "light" },
+  setupCreatingDark: { kind: "screen", contract: "shop-setup", state: "loading", theme: "dark" },
+  setupErrorLight: { kind: "screen", contract: "shop-setup", state: "error", theme: "light", note: "creation failed, everything typed kept" },
+  setupErrorDark: { kind: "screen", contract: "shop-setup", state: "error", theme: "dark" },
 
-  setupAccountSaving: { kind: "screen", contract: "shop-setup", state: "loading", theme: "light" },
-  setupStoreSaving: { kind: "screen", contract: "shop-setup", state: "loading", theme: "light" },
-  setupStoreSavingDark: { kind: "screen", contract: "shop-setup", state: "loading", theme: "dark" },
-  setupStoreTaxonomyLoading: { kind: "screen", contract: "shop-setup", state: "loading", theme: "light" },
-  setupStoreCitySearching: { kind: "screen", contract: "shop-setup", state: "loading", theme: "light" },
-  setupStoreSlugChecking: { kind: "screen", contract: "shop-setup", state: "loading", theme: "light" },
-
-  setupStoreError: { kind: "screen", contract: "shop-setup", state: "error", theme: "light" },
-  setupStoreErrorDark: { kind: "screen", contract: "shop-setup", state: "error", theme: "dark" },
-  setupAccountInvalidEmail: { kind: "screen", contract: "shop-setup", state: "error", theme: "light", note: "blank is valid — email is optional — so this exists only once typed" },
-  // The render that showed a red box with no message and no visible retry, on
-  // the one step that cannot be finished without a category.
-  setupStoreTaxonomyError: { kind: "screen", contract: "shop-setup", state: "error", theme: "light", note: "blocks the flow, so it must explain itself" },
-  setupStoreCityError: { kind: "screen", contract: "shop-setup", state: "error", theme: "light", note: "does NOT block the flow — manual entry is the way through" },
-  setupStoreSlugTaken: { kind: "screen", contract: "shop-setup", state: "error", theme: "light", note: "pick another name" },
-  setupStoreSlugOffline: { kind: "screen", contract: "shop-setup", state: "error", theme: "light", note: "we do not know yet — showing TAKEN here sends a seller off to rename a shop that was never taken" },
 
   // ================= auth =================
   // The first screen a tester opens, and the contract the audit called its

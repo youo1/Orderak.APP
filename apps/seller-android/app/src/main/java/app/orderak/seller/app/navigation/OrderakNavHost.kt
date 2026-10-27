@@ -20,6 +20,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.toRoute
 import androidx.navigation.compose.rememberNavController
 import app.orderak.seller.feature.auth.AuthScreen
 import app.orderak.seller.feature.billing.PaywallScreen
@@ -85,7 +86,7 @@ fun OrderakNavHost() {
                     EntryDecision.Auth -> AuthRoute
                     is EntryDecision.ShopSetup -> ShopSetupRoute
                     is EntryDecision.Main -> MainRoute
-                    is EntryDecision.Restricted -> RestrictedAccountRoute
+                    is EntryDecision.Restricted -> RestrictedAccountRoute(decision.status)
                     is EntryDecision.Error, null -> null
                 }
                 route?.let(navController::navigateAsRoot)
@@ -109,6 +110,10 @@ fun OrderakNavHost() {
         composable<ShopSetupRoute> {
             ShopSetupScreen(
                 onDone = { navController.navigateAsRoot(SplashRoute) },
+                onAddFirstProduct = {
+                    navController.navigateAsRoot(MainRoute)
+                    navController.navigate(ProductEditRoute())
+                },
                 onExit = { navController.navigateAsRoot(AuthRoute) },
                 onReauthenticate = { navController.navigateAsRoot(AuthRoute) },
             )
@@ -220,8 +225,9 @@ fun OrderakNavHost() {
             )
         }
         composable<AiAssistantRoute> { AiAssistantScreen(onBack = { navController.popBackStack() }) }
-        composable<RestrictedAccountRoute> {
+        composable<RestrictedAccountRoute> { entry ->
             RestrictedAccountScreen(
+                status = entry.toRoute<RestrictedAccountRoute>().status,
                 onCheckAgain = { navController.navigateAsRoot(SplashRoute) },
                 onLogout = { navController.navigateAsRoot(SplashRoute) },
             )

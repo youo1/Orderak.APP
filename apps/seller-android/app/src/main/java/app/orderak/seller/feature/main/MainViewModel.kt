@@ -2,6 +2,8 @@ package app.orderak.seller.feature.main
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.orderak.seller.data.db.MonthSalesRow
+import app.orderak.seller.data.db.OrderEntity
 import app.orderak.seller.data.db.ProductEntity
 import app.orderak.seller.data.remote.StoreIdentityResolver
 import app.orderak.seller.data.catalog.CatalogRepository
@@ -11,9 +13,12 @@ import app.orderak.seller.data.billing.EntitlementRepository
 import app.orderak.seller.data.billing.EntitlementRefreshResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -48,6 +53,12 @@ class MainViewModel @Inject constructor(
 
     /** Full product list, read once at share time (only when there's no catalog link). */
     suspend fun productsForShare(): List<ProductEntity> = catalogRepo.productsOnce()
+
+    private fun startOfMonth(): Long = Calendar.getInstance().apply {
+        set(Calendar.DAY_OF_MONTH, 1)
+        set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+    }.timeInMillis
 
     private fun startOfToday(): Long = Calendar.getInstance().apply {
         set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
@@ -92,12 +103,42 @@ class MainViewModel @Inject constructor(
      * declared and the surface never had; the first Room emission replaces it,
      * which on a local COUNT(*) is immediate.
      */
-    val todayCount: StateFlow<Int?> =
-        orderRepo.countToday(startOfToday()).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-    val unpaidCount: StateFlow<Int?> =
-        orderRepo.countUnpaid().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-    val toShipCount: StateFlow<Int?> =
-        orderRepo.countToShip().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    private val _summaryFailed = MutableStateFlow(false)
+
+    /**
+     * True when the device could not read the figures above: the local summary
+     * failed, which is not the same as there being none. The surface says so and
+     * offers a retry instead of drawing a count it does not have.
+     */
+    val summaryFailed: StateFlow<Boolean> = _summaryFailed
+
+    /** A count that, if the database cannot answer, is unknown and says so once. */
+    private fun Flow<Int>.counted(): StateFlow<Int?> =
+        map<Int, Int?> { it }
+            .catch { _summaryFailed.value = true; emit(null) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    val todayCount: StateFlow<Int?> = orderRepo.countToday(startOfToday()).counted()
+    val newCount: StateFlow<Int?> = orderRepo.countNew().counted()
+    val unpaidCount: StateFlow<Int?> = orderRepo.countUnpaid().counted()
+    val toShipCount: StateFlow<Int?> = orderRepo.countToShip().counted()
+
+    /** The two newest orders that are not finished; empty until there are some. */
+    val latestOpenOrders: StateFlow<List<OrderEntity>> =
+        orderRepo.latestOpen(LATEST_OPEN_ORDERS)
+            .catch { _summaryFailed.value = true; emit(emptyList()) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** This month's sales in one currency, or null when there is no order this month. */
+    val monthSales: StateFlow<MonthSalesRow?> =
+        orderRepo.salesSince(startOfMonth())
+            .catch { _summaryFailed.value = true; emit(null) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** Read again after a failure. The flows above resubscribe when they are collected anew. */
+    fun retrySummary() {
+        _summaryFailed.value = false
+    }
 
     val entitlementState = entitlementRepository.state
     private val _planRefreshEvents = MutableSharedFlow<EntitlementRefreshResult>(extraBufferCapacity = 1)
@@ -110,3 +151,6 @@ class MainViewModel @Inject constructor(
     }
 
 }
+
+/** How many open orders اليوم lists. */
+internal const val LATEST_OPEN_ORDERS = 2

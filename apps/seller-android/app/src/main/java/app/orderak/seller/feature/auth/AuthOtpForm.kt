@@ -1,5 +1,6 @@
 package app.orderak.seller.feature.auth
 
+import app.orderak.seller.core.ui.OtpField
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -57,8 +58,9 @@ import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 
 /**
  * OTP entry form — title, subtitle, 6-digit code input, inline error,
- * resend timer and change-number link. Verification is an explicit bottom
- * action owned by the screen, including after SMS Autofill.
+ * resend timer and change-number link. The sixth digit, typed or filled in by SMS
+ * Autofill, verifies by itself (contract v10); the bottom Verify action owned by
+ * the screen remains as the retry after a refused code.
  *
  * Every color comes from [MaterialTheme.colorScheme];
  * every text style from [MaterialTheme.typography].
@@ -101,18 +103,15 @@ fun AuthOtpForm(
         Spacer(Modifier.height(spacing.space12))
 
         // ── 2. OTP digit input ─────────────────────────────────────
-        AndroidViewLayoutDirectionReset {
-            OtpCodeInput(
-                code = code,
-                onCodeChanged = onCodeChanged,
-                isError = error != null,
-                enabled = !isVerifying,
-                length = 6,
-            )
-        }
-
-        // ── 3. Inline error ───────────────────────────────────────
-        AuthErrorText(error = error)
+        // The kit's code field: six cells left to right, SMS Autofill filling all six at once,
+        // and the error under it. The sixth digit verifies by itself (contract v10).
+        OtpField(
+            value = code,
+            onValueChange = onCodeChanged,
+            label = stringResource(R.string.auth_otp_title),
+            error = error?.let { authErrorText(it) },
+            enabled = !isVerifying,
+        )
 
         Spacer(Modifier.height(spacing.space12))
 
@@ -174,148 +173,4 @@ fun AuthOtpForm(
             }
         }
     }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// OtpCodeInput — 6 individual digit boxes with auto-focus advance
-// ═══════════════════════════════════════════════════════════════
-
-@OptIn(ExperimentalComposeUiApi::class)
-@Composable
-private fun OtpCodeInput(
-    code: String,
-    onCodeChanged: (String) -> Unit,
-    isError: Boolean,
-    enabled: Boolean,
-    length: Int,
-) {
-    val spacing = LocalOrderakSpacing.current
-    // The typed digits are painted transparent and exposed only as editable text,
-    // so the actionable field node needs a name. The screen's existing title
-    // names it; no new string and no pixel change.
-    val otpFieldLabel = stringResource(R.string.auth_otp_title)
-    BasicTextField(
-        value = code,
-        onValueChange = { raw ->
-            if (enabled && (raw.length <= length)) {
-                onCodeChanged(raw.filter(Char::isDigit))
-            }
-        },
-        // Transparent, not `background`.
-        //
-        // Painting the real text in the background colour hides it only where
-        // the backdrop IS that colour, and none of the four box fills are: the
-        // boxes are tinted errorContainer, primaryContainer or surfaceVariant.
-        // In the error state the typed code was legibly visible through its own
-        // boxes — found by rendering that state for the first time. Transparent
-        // hides it against anything.
-        textStyle = TextStyle(color = Color.Transparent),
-        keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.NumberPassword,
-            imeAction = ImeAction.Done,
-        ),
-        keyboardActions = KeyboardActions(
-            onDone = { /* Verification remains an explicit screen action. */ },
-        ),
-        enabled = enabled,
-        singleLine = true,
-        modifier = Modifier
-            .fillMaxWidth()
-            .semantics { contentDescription = otpFieldLabel }
-            .autofill(
-                autofillTypes = listOf(AutofillType.SmsOtpCode),
-                onFill = onCodeChanged,
-            ),
-        decorationBox = { innerText ->
-            Box(contentAlignment = Alignment.Center) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    repeat(length) { index ->
-                        val digit = code.getOrNull(index)
-                        val isActive = index == code.length && enabled
-                        val isFilled = digit != null
-
-                        val boxBackgroundColor = when {
-                            isError -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
-                            isActive -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
-                            isFilled -> MaterialTheme.colorScheme.surface
-                            else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                        }
-
-                        val boxBorderColor = when {
-                            isError -> MaterialTheme.colorScheme.error
-                            isActive -> MaterialTheme.colorScheme.primary
-                            isFilled -> MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                            else -> MaterialTheme.colorScheme.outlineVariant
-                        }
-
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(horizontal = spacing.space1)
-                                .height(64.dp)
-                                .clip(MaterialTheme.shapes.large)
-                                .background(boxBackgroundColor)
-                                .border(
-                                    width = if (isActive || isError) 2.dp else 1.dp,
-                                    color = boxBorderColor,
-                                    shape = MaterialTheme.shapes.large,
-                                ),
-                        ) {
-                            Text(
-                                text = digit?.toString() ?: "",
-                                style = MaterialTheme.typography.headlineMedium,
-                                color = when {
-                                    isError -> MaterialTheme.colorScheme.error
-                                    else -> MaterialTheme.colorScheme.onSurface
-                                },
-                            )
-                        }
-                    }
-                }
-                // Underlying BasicTextField is invisible but receives input
-                Box(modifier = Modifier.matchParentSize()) {
-                    innerText()
-                }
-            }
-        },
-    )
-}
-
-// ═══════════════════════════════════════════════════════════════
-// Autofill extension — SMS OTP auto-read from Play Services
-// ═══════════════════════════════════════════════════════════════
-
-@OptIn(ExperimentalComposeUiApi::class)
-private fun Modifier.autofill(
-    autofillTypes: List<AutofillType>,
-    onFill: ((String) -> Unit),
-) = composed {
-    val autofill = LocalAutofill.current
-    val autofillNode = remember {
-        AutofillNode(onFill = onFill, autofillTypes = autofillTypes)
-    }
-    LocalAutofillTree.current += autofillNode
-    this.onGloballyPositioned {
-        autofillNode.boundingBox = it.boundsInWindow()
-    }.onFocusChanged { focusState ->
-        autofill?.run {
-            if (focusState.isFocused) {
-                requestAutofillForNode(autofillNode)
-            } else {
-                cancelAutofillForNode(autofillNode)
-            }
-        }
-    }
-}
-
-@Composable
-private fun AndroidViewLayoutDirectionReset(content: @Composable () -> Unit) {
-    CompositionLocalProvider(
-        LocalLayoutDirection provides LayoutDirection.Ltr,
-        content = content,
-    )
 }

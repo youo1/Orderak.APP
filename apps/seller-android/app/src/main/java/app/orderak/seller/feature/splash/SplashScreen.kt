@@ -1,5 +1,11 @@
 package app.orderak.seller.feature.splash
 
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,20 +52,32 @@ fun SplashScreen(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background,
     ) {
-        if (isError) {
-            Column(
-                modifier = Modifier.fillMaxSize().padding(spacing.space6),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Text(stringResource(R.string.operations_error))
-                Button(onClick = onRetry, modifier = Modifier.padding(top = spacing.space4)) {
-                    Text(stringResource(R.string.common_retry))
-                }
-            }
-        } else {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+        Column(
+            modifier = Modifier.fillMaxSize().padding(spacing.space6),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            // The word, centred, with a thin progress line under it. Nothing to read, nothing to
+            // tap. The mark joins it when its final drawing exists (plan item B9).
+            Text(
+                stringResource(R.string.app_name),
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(Modifier.height(spacing.space4))
+            if (isError) {
+                // The mark stays; a cause and one button.
+                Text(
+                    stringResource(R.string.splash_error),
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center,
+                )
+                Button(
+                    onClick = onRetry,
+                    modifier = Modifier.padding(top = spacing.space4).heightIn(min = spacing.minimumTouchTarget),
+                ) { Text(stringResource(R.string.common_retry)) }
+            } else {
+                LinearProgressIndicator(Modifier.width(spacing.space16 * 2))
             }
         }
     }

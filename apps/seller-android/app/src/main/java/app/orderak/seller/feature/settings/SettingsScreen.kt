@@ -1,8 +1,17 @@
 package app.orderak.seller.feature.settings
 
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import app.orderak.seller.core.ui.ConfirmSheet
+import app.orderak.seller.core.ui.ConfirmSheetState
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.platform.LocalContext
+import app.orderak.seller.core.share.copyLink
+import app.orderak.seller.core.ui.PlanUsageRow
+import app.orderak.seller.core.ui.planUsageRows
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -82,6 +91,10 @@ class SettingsViewModel @Inject constructor(
 ) : ViewModel() {
     val shopName = sessionStore.shopName.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     val storeUrl = sessionStore.storeUrl.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    val sellerName = sessionStore.fullName.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    /** Usage against the plan's limits; null until entitlements answer. */
+    val usage: StateFlow<List<PlanUsageRow>?> = entitlementManager.config.map { cfg -> cfg?.let(::planUsageRows) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     val instapay = sessionStore.instapay.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     val vfcash = sessionStore.vfcash.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     val slug = sessionStore.slug.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -230,6 +243,7 @@ fun SettingsScreen(
     onOpenSubscription: () -> Unit = {},
     onOpenAiAssistant: () -> Unit = {},
     onOpenSellerProfile: () -> Unit = {},
+    unreadAnnouncements: Int = 0,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val storeUrlSaved by viewModel.storeUrl.collectAsStateWithLifecycle()
@@ -241,12 +255,14 @@ fun SettingsScreen(
 	val billingPlans by viewModel.billingPlans.collectAsStateWithLifecycle()
 	val purchaseOpen by viewModel.purchaseOpen.collectAsStateWithLifecycle()
 	val activity = LocalActivity.current
+    val context = LocalContext.current
+    val sellerName by viewModel.sellerName.collectAsStateWithLifecycle()
+    val shopName by viewModel.shopName.collectAsStateWithLifecycle()
+    val usage by viewModel.usage.collectAsStateWithLifecycle()
 
     var instapay by rememberSaveable(instapaySaved) { mutableStateOf(instapaySaved.orEmpty()) }
     var vfcash by rememberSaveable(vfcashSaved) { mutableStateOf(vfcashSaved.orEmpty()) }
     var showLanguage by rememberSaveable { mutableStateOf(value = false) }
-    var confirmDeletion by rememberSaveable { mutableStateOf(false) }
-    var confirmLogout by rememberSaveable { mutableStateOf(false) }
     var deletionResult by rememberSaveable { mutableStateOf<Boolean?>(null) }
 
     // Saving payout details used to call the screen's onBack, which dismissed
@@ -275,6 +291,10 @@ fun SettingsScreen(
                 // Folded in here so the surface reads one boolean.
                 purchaseOpen = purchaseOpen && activity != null,
                 storeUrl = storeUrlSaved,
+                sellerName = sellerName,
+                shopName = shopName,
+                usage = usage,
+                unreadAnnouncements = unreadAnnouncements,
             ),
             instapay = instapay,
             onInstapayChange = { instapay = it },
@@ -296,9 +316,11 @@ fun SettingsScreen(
             onOpenDevices = onOpenDevices,
             onOpenSubscription = onOpenSubscription,
             onOpenDeletionStatus = onOpenDeletionStatus,
-            onRequestDeletion = { confirmDeletion = true },
-            onRequestLogout = { confirmLogout = true },
+            // Both are confirmed in sheets AccountContent raises; these run after the confirmation.
+            onRequestDeletion = { viewModel.requestAccountDeletion { deletionResult = it } },
+            onRequestLogout = { viewModel.logout(onLogout) },
             onOpenAppLanguage = { showLanguage = true },
+            onCopyLink = { copyLink(context, it) },
         )
         SnackbarHost(
             hostState = snackbarHostState,
@@ -306,39 +328,25 @@ fun SettingsScreen(
         )
     }
 
-    if (confirmDeletion) {
-        AlertDialog(
-            onDismissRequest = { confirmDeletion = false },
-            title = { Text(stringResource(R.string.settings_delete_account)) },
-            text = { Text(stringResource(R.string.settings_delete_confirm)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmDeletion = false
-                    viewModel.requestAccountDeletion { deletionResult = it }
-                }) { Text(stringResource(R.string.settings_delete_account), color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = { TextButton(onClick = { confirmDeletion = false }) { Text(stringResource(R.string.common_cancel)) } },
-        )
-    }
-    if (confirmLogout) {
-        AlertDialog(
-            onDismissRequest = { confirmLogout = false },
-            title = { Text(stringResource(R.string.settings_logout)) },
-            text = { Text(stringResource(R.string.settings_logout_confirm)) },
-            confirmButton = {
-                TextButton(onClick = { confirmLogout = false; viewModel.logout(onLogout) }) {
-                    Text(stringResource(R.string.settings_logout), color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = { TextButton(onClick = { confirmLogout = false }) { Text(stringResource(R.string.common_cancel)) } },
-        )
-    }
     deletionResult?.let { success ->
-        AlertDialog(
+        val spacing = LocalOrderakSpacing.current
+        ModalBottomSheet(
             onDismissRequest = { deletionResult = null },
-            text = { Text(stringResource(if (success) R.string.settings_delete_requested else R.string.settings_delete_failed)) },
-            confirmButton = { TextButton(onClick = { deletionResult = null }) { Text(stringResource(R.string.common_ok)) } },
-        )
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = null,
+            shape = RoundedCornerShape(spacing.space0),
+        ) {
+            ConfirmSheet(
+                state = if (success) ConfirmSheetState.Regular else ConfirmSheetState.Destructive,
+                title = stringResource(if (success) R.string.settings_delete_requested_title else R.string.settings_delete_failed_title),
+                message = stringResource(if (success) R.string.settings_delete_requested else R.string.settings_delete_failed),
+                confirmLabel = stringResource(R.string.common_ok),
+                cancelLabel = null,
+                onConfirm = { deletionResult = null },
+                onCancel = { deletionResult = null },
+            )
+        }
     }
 }
 

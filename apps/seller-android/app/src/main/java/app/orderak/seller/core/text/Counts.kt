@@ -84,6 +84,13 @@ fun formatCount(value: Int, locale: Locale): String =
     NumberFormat.getIntegerInstance(arabicIndicLocale(locale)).format(value.toLong())
 
 /**
+ * An identifier in the locale's digits and with no grouping: order number 1042 is
+ * "١٠٤٢", never "١٬٠٤٢", because it is a name, not a quantity.
+ */
+fun formatNumber(value: Long, locale: Locale): String =
+    NumberFormat.getIntegerInstance(arabicIndicLocale(locale)).apply { isGroupingUsed = false }.format(value)
+
+/**
  * Left-to-right mark. Invisible, and strong enough to stop the bidi algorithm
  * reading the separator below as Arabic.
  */

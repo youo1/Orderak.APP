@@ -291,6 +291,11 @@ class AuthViewModel @Inject constructor(
         if (current.isVerifying) return
         val code = normalizeOtpDigits(raw, OTP_LENGTH)
         _state.value = current.copy(code = code, error = null)
+        // Contract v10: the sixth digit, typed or filled in by SMS Autofill, verifies. The Verify
+        // button stays as the retry after a refused code. `submitOtp` still refuses a short code or
+        // a verification already in flight, and the phone-bound, generation-checked verify path is
+        // the same one the button uses.
+        if (completesCode(code)) submitOtp()
     }
 
     private fun submitOtp() {
@@ -595,6 +600,9 @@ class AuthViewModel @Inject constructor(
         private const val KEY_PHONE = "phone"
         private const val KEY_ISO = "country_iso"
         const val OTP_LENGTH = 6
+
+        /** Whether this many digits is the whole code, and so verifies by itself. */
+        fun completesCode(code: String): Boolean = code.length == OTP_LENGTH
         const val RESEND_SECONDS = 60
         const val MAX_NATIONAL_LEN = 15
     }

@@ -510,7 +510,7 @@ val verifyAuthPhase1Contract by tasks.registering {
 
         requireContract(contract.exists(), "The protected contract document is missing.")
         requireContract(
-			"**Contract version:** 9" in contract.readText(),
+			"**Contract version:** 10" in contract.readText(),
             "The recognized Phase 1 contract version changed without a guard migration."
         )
         requireContract(
@@ -671,13 +671,20 @@ val verifyAuthPhase1Contract by tasks.registering {
             "V6 onboarding token lifetime or encrypted local storage changed."
         )
         requireContract(
+            // Contract v10 (owner approval, 27 October 2026): the sixth digit verifies by
+            // itself; the explicit Verify action stays as the retry after a refused code.
+            // Both paths end in the same submitOtp(), which refuses a short code and a
+            // verification already in flight.
             "AuthEvent.VerifyOtp -> submitOtp()" in authViewModel &&
+                "if (completesCode(code)) submitOtp()" in authViewModel &&
+                "fun completesCode(code: String): Boolean = code.length == OTP_LENGTH" in authViewModel &&
+                "if (current.code.length != OTP_LENGTH || current.isVerifying) return" in authViewModel &&
                 "canVerifyOtp(state.code, state.isVerifying)" in authScreen &&
                 "enabled = !phoneLocked" in authScreen &&
                 "private fun changeNumber()" in authViewModel &&
                 "authRepository.clearOtpSession()" in authViewModel &&
                 "PredictiveBackHandler" !in authScreen,
-            "V6 OTP must remain inline, lock the phone, clear on change, and require explicit Verify."
+            "V6/v10 OTP must remain inline, lock the phone, clear on change, verify on the sixth digit and keep Verify as the retry."
         )
         requireContract(
             "PasskeyResult.Cancelled -> _state.value = AuthUiState.Welcome()" in authViewModel &&

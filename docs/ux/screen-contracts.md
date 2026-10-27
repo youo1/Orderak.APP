@@ -117,7 +117,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 
 ### `today`
 
-شغل النهارده: عدّادات، استهلاك الخطة، رابط الكتالوج، تنبيهات
+ما ينتظر البائع الآن: الطلبات الجديدة وغير المدفوعة وجاهزة الشحن، وأحدث ما يحتاج إجراءً، ورابط المتجر
 
 | | |
 | --- | --- |
@@ -128,8 +128,8 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Status | implemented |
 | Entry | MainRoute — السطح الافتراضي |
 | Exit | OrderDetailsRoute · AnnouncementsRoute · SubscriptionRoute · مشاركة الكتالوج |
-| Data | today counters · entitlement usage · catalog link · unread announcements · billing notices |
-| Actions | pull to refresh `onRefresh` · share catalog `productsForShare` · open filtered orders `onOpenCounter` · retry a failed plan refresh `onRetry` · open announcements `onOpenAnnouncements` |
+| Data | today counters · open orders · month sales · catalog link · unread announcements · billing notices that ask for action · plan usage at 90% or more |
+| Actions | pull to refresh `onRefresh` · share catalog `productsForShare` · open filtered orders `onOpenCounter` · open order `onOpenOrder` · add first product `onAddProduct` · retry `onRetry` · open announcements `onOpenAnnouncements` |
 
 ## Surface: orders
 
@@ -179,7 +179,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Entry | orders · today |
 | Exit | OrderDetailsRoute — بعد الإنشاء، مع popUpTo · رجوع |
 | Data | product picker |
-| Actions | add line `changeQty` · set customer `onPhone` · submit `save` |
+| Actions | add line `changeQty` · set customer `onPhone` · choose country `onCountry` · submit `save` |
 
 ## Surface: store
 
@@ -197,7 +197,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Entry | MainRoute — تاب المتجر |
 | Exit | ProductEditRoute · CategoriesRoute · StoreInfoRoute · PaywallRoute — عند الحد |
 | Data | products page · product limit usage |
-| Actions | add product `onAdd` · edit product `onEdit` · search `SearchField` · open categories *(planned)* |
+| Actions | add product `onAdd` · edit product `onEdit` · search `onQueryChange` · open categories `onOpenCategories` · open store information `onOpenStoreInfo` · open catalogue languages `onOpenLanguages` |
 
 ### `product-edit`
 
@@ -229,7 +229,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Entry | store · product-edit |
 | Exit | رجوع |
 | Data | categories · category limit usage |
-| Actions | add `create` · rename `pendingRename` · reorder *(planned)* · delete `delete` |
+| Actions | add `create` · rename `onRename` · reorder *(planned)* · delete `delete` |
 
 ### `store-info`
 
@@ -301,7 +301,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 
 ### `shop-setup`
 
-إنشاء الحساب والمتجر في خطوتين، بمسوّدة قابلة للاستئناف
+إنشاء المتجر في خطوة واحدة، ثم شاشة «متجرك جاهز» وقائمة ما تبقّى
 
 | | |
 | --- | --- |
@@ -311,9 +311,9 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Entitlement | — |
 | Status | implemented |
 | Entry | AuthRoute — تحقّق ناجح لبائع جديد |
-| Exit | MainRoute — اكتمل الإنشاء · AuthRoute — رجوع مع حفظ المسوّدة |
-| Data | resumable draft · business categories · city catalogue · slug availability |
-| Actions | save account step `next` · name the shop, and see whether its link is free `onNameChanged` · select city `onCitySelected` · create store `finish` |
+| Exit | MainRoute — اكتمل الإنشاء · ProductEditRoute — إضافة أول منتج · AuthRoute — رجوع مع حفظ المسوّدة |
+| Data | resumable draft · store link preview |
+| Actions | name the shop, and see its link preview `onNameChanged` · confirm age `onAgeConfirmedChanged` · create store `create` · share the link `share` · add the first product `addFirstProduct` · leave the rest for later `later` |
 
 ### `restricted-account`
 
@@ -329,7 +329,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Entry | SplashRoute — حساب مقيَّد · أي شاشة — إشارة CREDENTIAL_REJECTED/ACCOUNT_RESTRICTED |
 | Exit | SupportRoute · AuthRoute — تسجيل خروج |
 | Data | restriction reason · support entry point |
-| Actions | contact support `restricted_contact` · sign out `onLogout` |
+| Actions | contact support `restricted_contact` · check status `onCheckAgain` · request review `restricted_request_review` · delete account and data `restricted_delete_data` · sign out `onLogout` |
 
 ### `account`
 
@@ -472,8 +472,8 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Status | implemented |
 | Entry | account · today — لافتة الخطة · paywall |
 | Exit | PlansRoute · رجوع |
-| Data | subscription status · entitlement usage · billing flag state |
-| Actions | view plans `onViewPlans` · register interest *(planned)* · restore purchase `recoverPurchases` |
+| Data | subscription status · entitlement usage · billing flag state · plan refresh error |
+| Actions | view plans `onViewPlans` · register interest *(planned)* · restore purchase `recoverPurchases` · retry plan refresh `onRetryPlan` |
 
 ### `plans`
 

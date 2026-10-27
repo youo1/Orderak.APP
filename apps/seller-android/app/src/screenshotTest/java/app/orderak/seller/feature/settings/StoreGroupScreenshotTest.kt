@@ -54,8 +54,6 @@ private fun categories(
                 busy = false,
                 storeUrl = "https://orderak.app/EG-mona-boutique",
                 purchaseOpen = purchaseOpen,
-                newName = "",
-                onNewName = {},
                 onCreate = {},
                 onRename = { _, _ -> },
                 onDelete = {},
@@ -188,8 +186,6 @@ private fun storeInfo(
                 country = store?.country_code,
                 publicIdentifier = store?.public_identifier,
                 businessSubcategories = emptyList(),
-                businessSubcategoryExpanded = false,
-                onSubcategoryExpanded = {},
                 onSave = { _, _ -> },
                 onPickLogo = {},
                 onPickCover = {},
@@ -285,9 +281,6 @@ private fun sellerProfile(
                 profilePhotoUri = "",
                 onFullName = {},
                 onEmail = {},
-                onBirthYear = {},
-                onProfilePhotoUri = {},
-                onPickPhoto = {},
                 onResendVerification = {},
                 onSave = { _, _, _, _, _ -> },
                 onBack = {},
@@ -328,44 +321,3 @@ fun sellerProfileVerificationError() = sellerProfile(loaded = true, verification
 @Preview(name = "Seller profile saving", locale = "ar")
 @Composable
 fun sellerProfileSaving() = sellerProfile(loaded = true, busy = true)
-
-/**
- * A chosen photo that never reached storage — the page's other failure.
- *
- * The render above calls the verification mail "the one error this page
- * reports", and that was true only because the upload's callback ran its success
- * branch alone: the seller picked an image, watched "تم رفع الصورة" not appear,
- * and could not tell a failed upload from a slow one. Nothing drew this state,
- * so it is composed here directly rather than through [sellerProfile], whose
- * argument list the previews above share.
- */
-@PreviewTest
-@Preview(name = "Seller profile photo upload failed", locale = "ar")
-@Composable
-fun sellerProfilePhotoUploadFailed() {
-    OrderakTheme(darkTheme = false) {
-        Surface {
-            SellerProfileContent(
-                phone = "01000000001",
-                loaded = true,
-                busy = false,
-                savedEmail = "mona@example.com",
-                emailVerificationStatus = null,
-                fullName = "منى عبد الله",
-                email = "mona@example.com",
-                birthYear = "1994",
-                profilePhotoUri = "",
-                photoUploadFailed = true,
-                onFullName = {},
-                onEmail = {},
-                onBirthYear = {},
-                onProfilePhotoUri = {},
-                onPickPhoto = {},
-                onResendVerification = {},
-                onSave = { _, _, _, _, _ -> },
-                onBack = {},
-                onReauthenticate = {},
-            )
-        }
-    }
-}

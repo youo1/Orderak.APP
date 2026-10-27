@@ -1,5 +1,13 @@
 package app.orderak.seller.feature.products
 
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import app.orderak.seller.core.ui.ConfirmSheet
+import app.orderak.seller.core.ui.ConfirmSheetState
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import app.orderak.seller.core.share.shareStoreLink
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -37,12 +45,16 @@ import app.orderak.seller.data.catalog.StuckLegacyProduct
 import kotlinx.coroutines.launch
 
 /** S8 — products list + share + low-stock badges, with all states. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProductsScreen(
     onAdd: () -> Unit,
     onEdit: (Long) -> Unit,
     onLimitReached: (String) -> Unit,
     sellerPhone: String?,
+    onOpenStoreInfo: () -> Unit = {},
+    onOpenCategories: () -> Unit = {},
+    onOpenLanguages: () -> Unit = {},
     viewModel: ProductsViewModel = hiltViewModel(),
     entitlements: EntitlementManager = hiltVm<EntitlementHolderViewModel>().entitlements,
 ) {
@@ -74,130 +86,138 @@ fun ProductsScreen(
     if (showLimitDialog) {
         val upgradeName = planName(quota.upgradePlanKey)
         val limit = quota.limit ?: quota.used
-        AlertDialog(
+        val message = when {
+            quota.used > limit -> stringResource(
+                R.string.products_limit_body_over,
+                formatCount(limit, locale),
+                formatCount(quota.used, locale),
+            )
+            quota.upgradePlanKey != null && purchaseOpen -> stringResource(
+                R.string.products_limit_body,
+                formatCount(limit, locale),
+                upgradeName,
+            )
+            quota.upgradePlanKey != null -> stringResource(
+                R.string.products_limit_body_purchase_closed,
+                formatCount(limit, locale),
+            )
+            else -> stringResource(
+                R.string.products_limit_body_max_plan,
+                formatCount(limit, locale),
+            )
+        }
+        // A higher plan existing is not the same as being able to buy it. Purchase is closed
+        // platform-wide and the acquisition routes answer 403, so the label changes rather than
+        // the destination: the plans page explains what the next plan gives either way, and only
+        // offers to sell when selling is actually open (I-5).
+        val canUpgrade = quota.upgradePlanKey != null
+        ModalBottomSheet(
             onDismissRequest = { showLimitDialog = false },
-            icon = { Icon(Icons.Filled.Lock, contentDescription = null) },
-            title = { Text(stringResource(R.string.products_limit_title)) },
-            text = {
-                val message = when {
-                    quota.used > limit -> stringResource(
-                        R.string.products_limit_body_over,
-                        formatCount(limit, locale),
-                        formatCount(quota.used, locale),
-                    )
-                    quota.upgradePlanKey != null && purchaseOpen -> stringResource(
-                        R.string.products_limit_body,
-                        formatCount(limit, locale),
-                        upgradeName,
-                    )
-                    quota.upgradePlanKey != null -> stringResource(
-                        R.string.products_limit_body_purchase_closed,
-                        formatCount(limit, locale),
-                    )
-                    else -> stringResource(
-                        R.string.products_limit_body_max_plan,
-                        formatCount(limit, locale),
-                    )
-                }
-                Text(message)
-            },
-            confirmButton = {
-                // A higher plan existing is not the same as being able to buy it.
-                // Purchase is closed platform-wide and the acquisition routes
-                // answer 403, so the label changes rather than the destination:
-                // the paywall explains what the next plan gives either way, and
-                // only offers to sell when selling is actually open. Sending a
-                // seller to a purchase control the server refuses is the dead end
-                // this avoids (I-5).
-                if (quota.upgradePlanKey != null) {
-                    TextButton(onClick = {
-                        showLimitDialog = false
-                        onLimitReached(FeatureKeys.MAX_PRODUCTS)
-                    }) {
-                        Text(
-                            stringResource(
-                                if (purchaseOpen) R.string.upgrade_now else R.string.paywall_view_plans,
-                            ),
-                        )
-                    }
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showLimitDialog = false }) {
-                    Text(stringResource(R.string.common_ok))
-                }
-            },
-        )
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = null,
+            shape = RoundedCornerShape(spacing.space0),
+        ) {
+            ConfirmSheet(
+                state = ConfirmSheetState.Regular,
+                title = stringResource(R.string.products_limit_title),
+                message = message,
+                confirmLabel = stringResource(
+                    when {
+                        !canUpgrade -> R.string.common_ok
+                        purchaseOpen -> R.string.upgrade_now
+                        else -> R.string.paywall_view_plans
+                    },
+                ),
+                cancelLabel = if (canUpgrade) stringResource(R.string.common_ok) else null,
+                onConfirm = {
+                    showLimitDialog = false
+                    if (canUpgrade) onLimitReached(FeatureKeys.MAX_PRODUCTS)
+                },
+                onCancel = { showLimitDialog = false },
+            )
+        }
     }
 
     if (showStuckDialog) {
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { showStuckDialog = false },
-            title = { Text(stringResource(R.string.products_stuck_dialog_title)) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(spacing.space3)) {
-                    stuck.forEach { item ->
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                Text(item.name, style = MaterialTheme.typography.bodyLarge)
-                                Text(
-                                    // TERMINAL is the reconciler's own word for
-                                    // "the server said something that will not
-                                    // change by asking again". Anything else —
-                                    // including no answer at all — is still on
-                                    // its way, and saying otherwise would push a
-                                    // seller to delete a product over a bad
-                                    // signal.
-                                    text = if (item.lastError == "TERMINAL") {
-                                        stringResource(R.string.products_stuck_refused)
-                                    } else {
-                                        stringResource(R.string.products_stuck_waiting)
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            TextButton(onClick = { confirmDiscard = item }) {
-                                Text(stringResource(R.string.products_stuck_discard))
-                            }
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = null,
+            shape = RoundedCornerShape(spacing.space0),
+        ) {
+            Column(
+                Modifier.fillMaxWidth().padding(spacing.space4),
+                verticalArrangement = Arrangement.spacedBy(spacing.space3),
+            ) {
+                Text(
+                    stringResource(R.string.products_stuck_dialog_title),
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                stuck.forEach { item ->
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(item.name, style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                // TERMINAL is the reconciler's own word for "the server said
+                                // something that will not change by asking again". Anything else,
+                                // including no answer at all, is still on its way, and saying
+                                // otherwise would push a seller to delete a product over a bad
+                                // signal.
+                                text = if (item.lastError == "TERMINAL") {
+                                    stringResource(R.string.products_stuck_refused)
+                                } else {
+                                    stringResource(R.string.products_stuck_waiting)
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
+                        TextButton(
+                            onClick = {
+                                // The list closes as the confirmation opens: one conversation at a time.
+                                showStuckDialog = false
+                                confirmDiscard = item
+                            },
+                            modifier = Modifier.heightIn(min = spacing.minimumTouchTarget),
+                        ) { Text(stringResource(R.string.products_stuck_discard)) }
                     }
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = { showStuckDialog = false }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            },
-        )
+                TextButton(
+                    onClick = { showStuckDialog = false },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = spacing.minimumTouchTarget),
+                ) { Text(stringResource(R.string.common_cancel)) }
+            }
+        }
     }
 
+    // The row awaiting confirmation, not a boolean: the confirmation names the product, and a
+    // flag would leave the sheet able to delete the wrong one after the list changes.
     confirmDiscard?.let { target ->
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { confirmDiscard = null },
-            title = { Text(stringResource(R.string.products_stuck_discard_title, target.name)) },
-            text = { Text(stringResource(R.string.products_stuck_discard_confirm)) },
-            confirmButton = {
-                TextButton(onClick = {
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = null,
+            shape = RoundedCornerShape(spacing.space0),
+        ) {
+            ConfirmSheet(
+                state = ConfirmSheetState.Destructive,
+                title = stringResource(R.string.products_stuck_discard_title, target.name),
+                message = stringResource(R.string.products_stuck_discard_confirm),
+                confirmLabel = stringResource(R.string.products_stuck_discard),
+                cancelLabel = stringResource(R.string.common_cancel),
+                onConfirm = {
                     viewModel.discardStuck(target.localId)
                     confirmDiscard = null
-                    // Closing the list too: it is about to be one row shorter,
-                    // and a dialog that stays open over a changing list invites
-                    // the second tap to land on something else.
-                    showStuckDialog = false
-                }) {
-                    Text(stringResource(R.string.products_stuck_discard))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmDiscard = null }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            },
-        )
+                },
+                onCancel = { confirmDiscard = null },
+            )
+        }
     }
 
     StoreContent(
@@ -224,6 +244,9 @@ fun ProductsScreen(
             }
         },
         onShowStuck = { showStuckDialog = true },
+        onOpenStoreInfo = onOpenStoreInfo,
+        onOpenCategories = onOpenCategories,
+        onOpenLanguages = onOpenLanguages,
     )
 }
 

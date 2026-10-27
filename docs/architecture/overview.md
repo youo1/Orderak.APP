@@ -173,7 +173,7 @@ interaction.
    while account creation/recovery requests Firebase SMS. A conditional phone
    fallback appears only when Passkeys are unavailable or fail; cancellation
    returns to Welcome. Phone and OTP are inline, the sent-to phone is locked,
-   and explicit Verify is required after manual entry or SMS Autofill. OTP state
+   and the sixth digit, typed or autofilled, verifies by itself (Verify remains as the retry). OTP state
    remains phone-scoped and generation-checked.
 2. Passkey assertions are verified by the Worker against a hash-only,
    single-use five-minute challenge, the deployment's RP ID (`orderak.app` in

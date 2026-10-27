@@ -1,4 +1,23 @@
 package app.orderak.seller.feature.operations
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.text.style.TextDirection
+import app.orderak.seller.core.text.formatAgo
+import app.orderak.seller.core.ui.BottomSheet
+import app.orderak.seller.core.ui.ConfirmSheet
+import app.orderak.seller.core.ui.ConfirmSheetState
+import app.orderak.seller.core.ui.SectionHeader
+import app.orderak.seller.core.ui.SemanticChip
+import app.orderak.seller.core.ui.SemanticRole
+import app.orderak.seller.core.ui.SheetAction
+import app.orderak.seller.core.ui.TextField
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -105,17 +124,9 @@ fun DevicesScreen(
     onBack: () -> Unit,
     onReauthenticate: () -> Unit,
     /**
-     * A plan limit refused something, named by its entitlement key — the same
-     * callback `ProductsScreen` and `CategoriesScreen` already take.
-     *
-     * Closes §4.5's "**The paywall declares an entry with no path.**"
-     * `screen-contracts.mjs` gives `paywall` `entry: [… "devices"]`, and
-     * `DevicesScreen` has no route to `PaywallRoute`; the manifest declares the
-     * same edge (`{ to: "PaywallRoute", trigger: "add device", condition: "at
-     * plan limit" }`). Both described a transition the app did not have: at
-     * `max_concurrent_devices` a seller had nowhere to go from the screen that
-     * counts the devices. Defaulted, like `CategoriesScreen`'s, so a renderer
-     * that is not wired to a graph can still be drawn.
+     * A plan limit refused something, named by its entitlement key: the same callback
+     * `ProductsScreen` and `CategoriesScreen` take, so at `max_concurrent_devices` a seller has
+     * somewhere to go from the screen that counts the devices.
      */
     onLimitReached: (String) -> Unit = {},
     vm: OperationsViewModel = hiltViewModel(),
@@ -126,205 +137,74 @@ fun DevicesScreen(
     val error by vm.error.collectAsStateWithLifecycle()
     val config by vm.entitlements.config.collectAsStateWithLifecycle()
     val activity = LocalContext.current.findActivity()
-    var renameTarget by remember { mutableStateOf<PasskeyDto?>(null) }
-    var deleteTarget by remember { mutableStateOf<PasskeyDto?>(null) }
-    var deviceRevokeTarget by remember { mutableStateOf<Pair<Long, String?>?>(null) }
-    var selectedPasskeyId by rememberSaveable { mutableStateOf<String?>(null) }
-    // This contract declares "device limit usage" among this screen's own data
-    // and its entitlement key is `max_concurrent_devices`, and it drew neither:
-    // the count a seller needs at the moment a second phone cannot sign in was on
-    // the subscription page and nowhere near the control that revokes a device.
-    // The row comes from the shared list, so the same limit reads the same way
-    // here as it does on حسابي and on الاشتراك.
     val deviceLimit = config?.let(::planUsageRows)
         ?.firstOrNull { it.key == FeatureKeys.MAX_CONCURRENT_DEVICES }
     LaunchedEffect(Unit) { vm.loadDevices() }
-    LaunchedEffect(passkeys) {
-        // Only once the list has been read. Running this against null would
-        // clear a restored selection before the passkeys arrive.
-        passkeys?.let { list ->
-            if (list.none { it.id == selectedPasskeyId }) {
-                selectedPasskeyId = list.firstOrNull()?.id
-            }
-        }
-    }
 
     DevicesContent(
         items = items,
         passkeys = passkeys,
         busy = busy,
         error = error,
-        selectedPasskeyId = selectedPasskeyId,
         canAddPasskey = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P,
         onBack = onBack,
         onRetry = vm::loadDevices,
         onReauthenticate = onReauthenticate,
         onAddPasskey = { activity?.let(vm::createPasskey) },
-        onSelectPasskey = { selectedPasskeyId = it },
-        onRename = { renameTarget = it },
-        onRevoke = { deleteTarget = it },
-        onRevokeDevice = { rowId, label -> deviceRevokeTarget = rowId to label },
-        // The allowance, and whether it is spent. Both are read off the same
-        // snapshot row, so the notice cannot disagree with the meter above it.
+        onRenamePasskey = vm::renamePasskey,
+        onDeletePasskey = vm::deletePasskey,
+        onRevokeDevice = vm::revokeDevice,
         deviceLimit = deviceLimit,
-        // The two facts ProductsScreen's limit dialog is decided by, read here
-        // from the same manager: whether anything is for sale right now, and
-        // whether a higher plan exists at all.
         purchaseOpen = vm.entitlements.isPurchaseOpen(),
         limitReached = deviceLimit?.limit?.let { deviceLimit.used >= it } == true,
         upgradeAvailable = vm.entitlements.nextUpgradePlanKey() != null,
-        // The key is named here, by the screen that carries the limit, so the
-        // paywall opens on the limit the seller actually hit.
         onLimitReached = { onLimitReached(FeatureKeys.MAX_CONCURRENT_DEVICES) },
     )
+}
 
-    // Revoking a device ends a session on hardware the seller may not be holding.
-    // It was immediate and unlabelled, one row below a passkey revoke that *is*
-    // confirmed — the same act, two different levels of care, decided by which
-    // list it happened to be drawn in. The name matters here: a seller with three
-    // phones is choosing which one to cut off.
-    deviceRevokeTarget?.let { (rowId, label) ->
-        AlertDialog(
-            onDismissRequest = { deviceRevokeTarget = null },
-            title = {
-                Text(
-                    stringResource(
-                        R.string.device_revoke_title,
-                        label ?: stringResource(R.string.device_unknown),
-                    ),
-                )
-            },
-            text = { Text(stringResource(R.string.device_revoke_confirm)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        vm.revokeDevice(rowId)
-                        deviceRevokeTarget = null
-                    },
-                ) {
-                    Text(stringResource(R.string.device_revoke), color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { deviceRevokeTarget = null }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            },
-        )
-    }
-
-    renameTarget?.let { passkey ->
-        var label by rememberSaveable(passkey.id) { mutableStateOf(passkey.label.orEmpty()) }
-        AlertDialog(
-            onDismissRequest = { renameTarget = null },
-            title = { Text(stringResource(R.string.passkey_rename)) },
-            text = {
-                OutlinedTextField(
-                    value = label,
-                    onValueChange = { label = it.take(60) },
-                    label = { Text(stringResource(R.string.passkey_label)) },
-                    singleLine = true,
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    enabled = label.trim().isNotEmpty(),
-                    onClick = {
-                        vm.renamePasskey(passkey.id, label)
-                        renameTarget = null
-                    },
-                ) { Text(stringResource(R.string.settings_save)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { renameTarget = null }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            },
-        )
-    }
-    deleteTarget?.let { passkey ->
-        AlertDialog(
-            onDismissRequest = { deleteTarget = null },
-            title = { Text(stringResource(R.string.passkey_revoke)) },
-            text = { Text(stringResource(R.string.passkey_revoke_confirm)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        vm.deletePasskey(passkey.id)
-                        deleteTarget = null
-                    },
-                ) {
-                    Text(stringResource(R.string.passkey_revoke), color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { deleteTarget = null }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            },
-        )
-    }
+/** What the page may be asked about one row; the sheet that confirms it is raised here. */
+private sealed interface DeviceSheet {
+    data class Revoke(val rowId: Long, val label: String?) : DeviceSheet
+    data class PasskeyMenu(val id: String) : DeviceSheet
+    data class PasskeyRename(val id: String, val label: String) : DeviceSheet
+    data class PasskeyDelete(val id: String) : DeviceSheet
 }
 
 /**
- * Devices and passkeys, as a function of their state.
+ * Every way into this account, and a way to close any of them.
  *
- * Two lists, so this page is empty only when BOTH have been read and both came
- * back empty. It used to ask `!busy && items.isEmpty() && passkeys.isEmpty()`,
- * which is true before either request starts.
- *
- * [canAddPasskey] is passed in rather than read from Build here, so the render
- * can show both the offered and the withheld control.
- *
- * [deviceLimit] is the plan's device allowance, which this contract declares as
- * this screen's own data ("devices · passkeys · device limit usage") and which
- * nothing drew. It is a [PlanUsageRow] rather than a pair of numbers so the row
- * is the shared renderer's, including the count-against-a-limit marks that keep
- * it in order in Arabic. Null when the snapshot does not carry the figure — the
- * page then says nothing about a limit rather than drawing an assumed one.
- *
- * [limitReached] is whether that allowance is spent, and it is the state that
- * blocked the edge §4.5 recorded as missing — "**The paywall declares an entry
- * with no path.** `screen-contracts.mjs` gives `paywall` `entry: [… "devices"]`,
- * and `DevicesScreen` has no route to `PaywallRoute`." The path is drawn here,
- * where `max_concurrent_devices` actually bites: the next phone that tries to
- * sign in is refused by this cap, so the seller reading this list is the one who
- * needs the way out. [purchaseOpen] and [upgradeAvailable] are what the way out
- * is allowed to say, exactly as on the store's limit dialog — a higher plan
- * existing is not the same as being able to buy it.
+ * A top bar with back; the device meter; الأجهزة (the device, its platform and version, when it
+ * was last used, "هذا الجهاز" on this phone and "تسجيل خروجه" on the others); then مفاتيح المرور
+ * (label, kind and dates, an overflow to rename or remove) with "إنشاء مفتاح مرور" under the
+ * list. Revoking a device and removing a passkey ask first, in sheets, and say what happens.
  */
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DevicesContent(
     items: List<DeviceDto>?,
     passkeys: List<PasskeyDto>?,
     busy: Boolean,
     error: String?,
-    selectedPasskeyId: String?,
     canAddPasskey: Boolean,
     onBack: () -> Unit,
     onRetry: () -> Unit,
     onReauthenticate: () -> Unit,
     onAddPasskey: () -> Unit,
-    onSelectPasskey: (String) -> Unit,
-    onRename: (PasskeyDto) -> Unit,
-    onRevoke: (PasskeyDto) -> Unit,
-    onRevokeDevice: (Long, String?) -> Unit,
+    onRenamePasskey: (String, String) -> Unit,
+    onDeletePasskey: (String) -> Unit,
+    onRevokeDevice: (Long) -> Unit,
     deviceLimit: PlanUsageRow? = null,
     purchaseOpen: Boolean = false,
     limitReached: Boolean = false,
     upgradeAvailable: Boolean = false,
     onLimitReached: () -> Unit = {},
 ) {
-    val layout = LocalOrderakLayout.current
     val spacing = LocalOrderakSpacing.current
     val locale = LocalConfiguration.current.locales[0]
+    var sheet by remember { mutableStateOf<DeviceSheet?>(null) }
     OperationPage(
         title = stringResource(R.string.devices_title),
         onBack = onBack,
-        // Two lists, and this page is empty only when BOTH have been read and
-        // both came back empty. `!busy && items.isEmpty() && passkeys.isEmpty()`
-        // was true before either request started.
         busy = busy || items == null || passkeys == null,
         error = error,
         onRetry = if (error == "recent_auth_required") onReauthenticate else onRetry,
@@ -333,91 +213,11 @@ fun DevicesContent(
             EmptyState(kind = EmptyStateKind.Empty, title = stringResource(R.string.common_empty))
         },
     ) {
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
-            val isListDetail = maxWidth >= layout.wideLayoutMinWidth
-            if (isListDetail) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(spacing.space4),
-                ) {
-                    Column(
-                        modifier = Modifier.weight(0.42f),
-                        verticalArrangement = Arrangement.spacedBy(spacing.space3),
-                    ) {
-                        PasskeyHeader(
-                            canAdd = canAddPasskey,
-                            onAdd = onAddPasskey,
-                        )
-                        passkeys.orEmpty().forEach { passkey ->
-                            Card(
-                                onClick = { onSelectPasskey(passkey.id) },
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Column(Modifier.padding(spacing.space4)) {
-                                    Text(
-                                        passkey.label ?: stringResource(R.string.passkey_unnamed),
-                                        style = MaterialTheme.typography.titleMedium,
-                                    )
-                                    Text(
-                                        passkeyTypeLabel(passkey),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    Column(Modifier.weight(0.58f)) {
-                        passkeys.orEmpty().firstOrNull { it.id == selectedPasskeyId }?.let { passkey ->
-                            PasskeyDetailCard(
-                                passkey = passkey,
-                                onRename = { onRename(passkey) },
-                                onRevoke = { onRevoke(passkey) },
-                            )
-                        } ?: Text(
-                            stringResource(R.string.common_empty),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(spacing.space3)) {
-                    PasskeyHeader(
-                        canAdd = canAddPasskey,
-                        onAdd = onAddPasskey,
-                    )
-                    passkeys.orEmpty().forEach { passkey ->
-                        PasskeyDetailCard(
-                            passkey = passkey,
-                            onRename = { onRename(passkey) },
-                            onRevoke = { onRevoke(passkey) },
-                        )
-                    }
-                }
-            }
-        }
-        Spacer(Modifier.height(spacing.space3))
-        Text(
-            stringResource(R.string.authorized_devices_title),
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.semantics { heading() },
-        )
-        // The allowance the devices below are counted against, before the list
-        // that spends it. This is where a seller looks when the next phone will
-        // not sign in, and until now the only answer was on another screen.
         deviceLimit?.let { row ->
             PlanUsageRowItem(row)
             if (limitReached) {
-                // The path this row was missing. A limit is not a fault, so it
-                // reads as a notice rather than an error — the role the category
-                // limit already uses — and it keeps the list visible underneath,
-                // because revoking a device is the other way out and it is drawn
-                // right below this.
-                Spacer(Modifier.height(spacing.space2))
                 Banner(
                     state = BannerState.LockedByPlan,
-                    // The paywall's own words for this key, not a second sentence
-                    // saying the same thing.
                     title = stringResource(R.string.paywall_limit_devices),
                     message = if (upgradeAvailable) {
                         stringResource(
@@ -426,107 +226,192 @@ fun DevicesContent(
                             formatCount(row.used, locale),
                         )
                     } else {
-                        stringResource(
-                            R.string.devices_limit_body_max_plan,
-                            formatCount(row.limit ?: row.used, locale),
-                        )
+                        stringResource(R.string.devices_limit_body_max_plan, formatCount(row.limit ?: row.used, locale))
                     },
-                    // Same shape as the store's limit dialog: the destination is
-                    // the paywall either way, and only the label changes when
-                    // purchase is closed, because the acquisition routes answer
-                    // 403. With no higher plan there is nothing to offer, so the
-                    // banner carries no action rather than a dead one.
                     actionLabel = if (upgradeAvailable) {
-                        stringResource(
-                            if (purchaseOpen) R.string.upgrade_now else R.string.paywall_view_plans,
-                        )
+                        stringResource(if (purchaseOpen) R.string.upgrade_now else R.string.paywall_view_plans)
                     } else null,
                     onAction = if (upgradeAvailable) onLimitReached else null,
                 )
             }
         }
+
+        SectionHeader(title = stringResource(R.string.devices_section))
         items.orEmpty().forEach { d ->
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(spacing.space4)) {
-                    Text(
-                        d.device_label ?: stringResource(R.string.device_unknown),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        listOfNotNull(d.platform, d.app_version).joinToString(" · "),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    d.last_used_at?.let {
-                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Surface(
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    Modifier.padding(spacing.space3),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(spacing.space3),
+                ) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(spacing.space1)) {
+                        Text(
+                            d.device_label ?: stringResource(R.string.device_unknown),
+                            style = MaterialTheme.typography.titleSmall.copy(textDirection = TextDirection.Content),
+                        )
+                        val detail = listOfNotNull(
+                            d.platform,
+                            d.app_version,
+                            serverMillis(d.last_used_at)?.let { formatAgo(it, System.currentTimeMillis(), locale) },
+                        ).joinToString(" · ")
+                        if (detail.isNotBlank()) {
+                            Text(
+                                detail,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                     if (d.row_id != 0L) {
-                        TextButton(onClick = { onRevokeDevice(d.row_id, d.device_label) }) {
+                        TextButton(
+                            onClick = { sheet = DeviceSheet.Revoke(d.row_id, d.device_label) },
+                            modifier = Modifier.heightIn(min = spacing.minimumTouchTarget),
+                        ) {
                             Text(stringResource(R.string.device_revoke), color = MaterialTheme.colorScheme.error)
                         }
                     } else {
+                        SemanticChip(SemanticRole.Info, stringResource(R.string.device_primary))
+                    }
+                }
+            }
+        }
+
+        SectionHeader(title = stringResource(R.string.passkeys_settings_title))
+        passkeys.orEmpty().forEach { passkey ->
+            Surface(
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    Modifier.padding(start = spacing.space3),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f).padding(vertical = spacing.space3), verticalArrangement = Arrangement.spacedBy(spacing.space1)) {
                         Text(
-                            stringResource(R.string.device_primary),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
+                            passkey.label ?: stringResource(R.string.passkey_unnamed),
+                            style = MaterialTheme.typography.titleSmall.copy(textDirection = TextDirection.Content),
+                        )
+                        val detail = listOfNotNull(
+                            passkeyTypeLabel(passkey),
+                            passkey.last_used_at?.let { serverMillis(it) }?.let { formatAgo(it, System.currentTimeMillis(), locale) },
+                        ).joinToString(" · ")
+                        Text(
+                            detail,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    IconButton(
+                        onClick = { sheet = DeviceSheet.PasskeyMenu(passkey.id) },
+                        modifier = Modifier.size(spacing.minimumTouchTarget),
+                    ) {
+                        Icon(
+                            Icons.Outlined.MoreVert,
+                            contentDescription = stringResource(
+                                R.string.categories_row_more,
+                                passkey.label ?: stringResource(R.string.passkey_unnamed),
+                            ),
                         )
                     }
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun PasskeyHeader(canAdd: Boolean, onAdd: () -> Unit) {
-    Text(
-        stringResource(R.string.passkeys_settings_title),
-        style = MaterialTheme.typography.titleLarge,
-        modifier = Modifier.semantics { heading() },
-    )
-    Text(
-        stringResource(R.string.passkeys_settings_help),
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    Button(
-        onClick = onAdd,
-        enabled = canAdd,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Text(stringResource(R.string.passkeys_add))
-    }
-}
-
-@Composable
-private fun PasskeyDetailCard(
-    passkey: PasskeyDto,
-    onRename: () -> Unit,
-    onRevoke: () -> Unit,
-) {
-    val spacing = LocalOrderakSpacing.current
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(spacing.space4)) {
+        // Drawn only where passkeys work; the help line says what they are for.
+        if (canAddPasskey) {
             Text(
-                passkey.label ?: stringResource(R.string.passkey_unnamed),
-                style = MaterialTheme.typography.titleMedium,
+                stringResource(R.string.passkeys_settings_help),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Text(passkeyTypeLabel(passkey), style = MaterialTheme.typography.bodySmall)
-            passkey.last_used_at?.let {
-                Text(
-                    stringResource(R.string.passkey_last_used, it),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+            OutlinedButton(
+                onClick = onAddPasskey,
+                modifier = Modifier.fillMaxWidth().heightIn(min = spacing.minimumTouchTarget),
+            ) { Text(stringResource(R.string.passkeys_add)) }
+        }
+    }
+
+    val open = sheet
+    if (open != null) {
+        ModalBottomSheet(
+            onDismissRequest = { sheet = null },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = null,
+            shape = RoundedCornerShape(spacing.space0),
+        ) {
+            val passkey = (open as? DeviceSheet.PasskeyMenu)?.id?.let { id -> passkeys?.firstOrNull { it.id == id } }
+            when (open) {
+                is DeviceSheet.Revoke -> ConfirmSheet(
+                    state = ConfirmSheetState.Destructive,
+                    title = stringResource(R.string.device_revoke_title, open.label ?: stringResource(R.string.device_unknown)),
+                    message = stringResource(R.string.device_revoke_confirm),
+                    confirmLabel = stringResource(R.string.device_revoke),
+                    cancelLabel = stringResource(R.string.common_cancel),
+                    onConfirm = { onRevokeDevice(open.rowId); sheet = null },
+                    onCancel = { sheet = null },
                 )
-            }
-            Row {
-                TextButton(onClick = onRename) {
-                    Text(stringResource(R.string.passkey_rename))
-                }
-                TextButton(onClick = onRevoke) {
-                    Text(
-                        stringResource(R.string.passkey_revoke),
-                        color = MaterialTheme.colorScheme.error,
+                is DeviceSheet.PasskeyMenu -> if (passkey == null) {
+                    sheet = null
+                } else {
+                    BottomSheet(
+                        title = passkey.label ?: stringResource(R.string.passkey_unnamed),
+                        actions = listOf(
+                            SheetAction(
+                                stringResource(R.string.passkey_rename),
+                                { sheet = DeviceSheet.PasskeyRename(passkey.id, passkey.label.orEmpty()) },
+                                Icons.Outlined.Edit,
+                            ),
+                            SheetAction(
+                                stringResource(R.string.passkey_revoke),
+                                { sheet = DeviceSheet.PasskeyDelete(passkey.id) },
+                                Icons.Outlined.Delete,
+                            ),
+                        ),
+                        closeLabel = stringResource(R.string.sheet_close),
+                        onClose = { sheet = null },
                     )
                 }
+                is DeviceSheet.PasskeyRename -> {
+                    var label by rememberSaveable(open.id) { mutableStateOf(open.label) }
+                    Column(
+                        Modifier.fillMaxWidth().padding(spacing.space4),
+                        verticalArrangement = Arrangement.spacedBy(spacing.space3),
+                    ) {
+                        Text(
+                            stringResource(R.string.passkey_rename),
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.semantics { heading() },
+                        )
+                        TextField(
+                            value = label,
+                            onValueChange = { label = it.take(60) },
+                            label = stringResource(R.string.passkey_label),
+                        )
+                        Button(
+                            enabled = label.trim().isNotEmpty(),
+                            onClick = { onRenamePasskey(open.id, label); sheet = null },
+                            modifier = Modifier.fillMaxWidth().heightIn(min = spacing.minimumTouchTarget),
+                        ) { Text(stringResource(R.string.product_save_bar)) }
+                        TextButton(
+                            onClick = { sheet = null },
+                            modifier = Modifier.fillMaxWidth().heightIn(min = spacing.minimumTouchTarget),
+                        ) { Text(stringResource(R.string.common_cancel)) }
+                    }
+                }
+                is DeviceSheet.PasskeyDelete -> ConfirmSheet(
+                    state = ConfirmSheetState.Destructive,
+                    title = stringResource(R.string.passkey_revoke),
+                    message = stringResource(R.string.passkey_revoke_confirm),
+                    confirmLabel = stringResource(R.string.common_delete),
+                    cancelLabel = stringResource(R.string.common_cancel),
+                    onConfirm = { onDeletePasskey(open.id); sheet = null },
+                    onCancel = { sheet = null },
+                )
             }
         }
     }
