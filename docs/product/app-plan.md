@@ -608,6 +608,30 @@ write keeps the form and says why in a banner (the plan limit opens the plans); 
 changed by an order while editing opens a sheet with both numbers and chooses for
 neither.
 
+التصنيفات (Phase R6) has the category meter, a row per category with how many products are filed under it
+and an overflow holding rename, the category's link and delete, and one bar, "إضافة تصنيف". Adding and
+renaming are one sheet with one field; deleting names the category and says how many products lose it.
+At the limit the bar opens the plans page, and with none the page says products can be sold without one.
+
+بيانات المتجر (Phase R6) closes with an ✕ and is in sections: the cover and logo, الهوية (name and
+description), رابط متجرك (the link as the code builds it, with only the name editable between the fixed
+country prefix and the permanent code, whose note says old links keep working after a rename, plus its
+availability and copy/share), the activity, and التواصل. The sign-in phone is shown, not editable.
+One bar saves, and it says why it cannot while the link name is not available.
+
+لغات الكتالوج (Phase R6) has a switch for the target language, a summary of how many translations are
+approved, and a row per product with its name, the translation under it and a chip (معتمدة, ترجمة آلية,
+ناقصة). A row opens a sheet with the source above and one button, "حفظ واعتماد".
+
+العملاء (Phase R7) has a large title and a search by name or number (Arabic-Indic digits find Latin ones). A
+row has the customer's initials, the name or, with none, the number, "number · n orders" and what they have
+spent; with orders in more than one currency the row says «عملات مختلفة» instead of a total that would be
+wrong. With no customer the page says they appear after the first order, and offers neither a search nor a
+button. The customer page has a header (large avatar, name, number always left to right, «تواصل»), three
+figures (orders, total spent, last order), «عن العميل» with the other contact and the note and «تعديل», and the
+customer's orders, newest first. Editing is one sheet that also says the number is the customer's identity and
+does not change; where the plan does not open it the card is read-only and a notice says so.
+
 اليوم (Phase R4, proposal T1) shows what waits for the seller: three tiles in the
 order an order moves through the shop (new, unpaid, ready to ship), each opening
 the orders it counts; the two newest orders that are not finished, as rows that

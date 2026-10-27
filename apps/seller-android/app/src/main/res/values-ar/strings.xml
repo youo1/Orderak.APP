@@ -178,12 +178,12 @@
     <string name="customer_edit_locked">تعديل بيانات العملاء متاح في الباقات المدفوعة</string>
     <string name="customer_orders_heading">الأوردرات</string>
     <plurals name="customer_orders_count">
-        <item quantity="zero">مفيش أوردرات</item>
-        <item quantity="one">أوردر واحد</item>
-        <item quantity="two">أوردرين</item>
-        <item quantity="few">%s أوردرات</item>
-        <item quantity="many">%s أوردر</item>
-        <item quantity="other">%s أوردر</item>
+        <item quantity="zero">لا طلبات</item>
+        <item quantity="one">طلب واحد</item>
+        <item quantity="two">طلبان</item>
+        <item quantity="few">%s طلبات</item>
+        <item quantity="many">%s طلبًا</item>
+        <item quantity="other">%s طلب</item>
     </plurals>
 
     <!-- S13 Settings -->
@@ -785,4 +785,47 @@
     <string name="product_stock_conflict_message">أدخلتَ %1$s، والمخزون الآن %2$s. لم يُحفظ شيء بعد.</string>
     <string name="product_stock_conflict_take_shop">اعتماد رقم المتجر (%1$s)</string>
     <string name="product_stock_conflict_save_mine">حفظ رقمي (%1$s)</string>
+    <string name="categories_add_bar">إضافة تصنيف</string>
+    <string name="categories_sheet_add_title">تصنيف جديد</string>
+    <string name="categories_sheet_rename_title">تغيير اسم التصنيف</string>
+    <string name="categories_field">اسم التصنيف</string>
+    <string name="categories_empty_title">لا توجد تصنيفات</string>
+    <string name="categories_empty_body">يمكن بيع المنتجات دون تصنيف.</string>
+    <string name="categories_delete_title">حذف «%1$s»؟</string>
+    <string name="categories_row_more">خيارات %1$s</string>
+    <plurals name="categories_delete_body">
+        <item quantity="zero">لن يتأثر أي منتج.</item>
+        <item quantity="one">سيصبح منتج واحد بلا تصنيف.</item>
+        <item quantity="two">سيصبح منتجان بلا تصنيف.</item>
+        <item quantity="few">ستصبح %1$s منتجات بلا تصنيف.</item>
+        <item quantity="many">ستصبح %1$s منتجًا بلا تصنيف.</item>
+        <item quantity="other">ستصبح %1$s منتج بلا تصنيف.</item>
+    </plurals>
+    <string name="store_info_cover_add">إضافة صورة غلاف</string>
+    <string name="store_info_change">تغيير</string>
+    <string name="store_info_section_identity">الهوية</string>
+    <string name="store_info_section_link">رابط متجرك</string>
+    <string name="store_info_section_activity">النشاط</string>
+    <string name="store_info_section_contact">التواصل</string>
+    <string name="store_info_slug_note">الرمز في نهاية الرابط ثابت لا يتغير، فتبقى الروابط القديمة صالحة بعد تغيير الاسم.</string>
+    <string name="store_info_bar_reason">اختر اسمًا متاحًا للرابط</string>
+    <string name="catalog_languages_error">تعذّرت قراءة الترجمات</string>
+    <string name="catalog_languages_empty">تُنشأ الترجمات بعد إضافة المنتجات</string>
+    <string name="catalog_languages_summary">المعتمد: %1$s من %2$s</string>
+    <string name="translation_status_reviewed">معتمدة</string>
+    <string name="translation_status_machine">ترجمة آلية</string>
+    <string name="translation_status_missing">ناقصة</string>
+    <string name="translation_save_approve">حفظ واعتماد</string>
+    <string name="customers_empty_title">يظهر العملاء هنا تلقائيًا</string>
+    <string name="customers_empty_body">بعد أول طلب.</string>
+    <string name="customers_row_detail">%1$s · %2$s</string>
+    <string name="customers_mixed_currencies">عملات مختلفة</string>
+    <string name="customer_about">عن العميل</string>
+    <string name="customer_edit">تعديل</string>
+    <string name="customer_edit_title">تعديل العميل</string>
+    <string name="customer_none">غير مضاف</string>
+    <string name="customer_figure_orders">الطلبات</string>
+    <string name="customer_figure_spent">إجمالي المشتريات</string>
+    <string name="customer_figure_last">آخر طلب</string>
+    <string name="customer_phone_is_identity_sheet">الرقم %1$s هو هوية العميل ولا يتغير.</string>
 </resources>
