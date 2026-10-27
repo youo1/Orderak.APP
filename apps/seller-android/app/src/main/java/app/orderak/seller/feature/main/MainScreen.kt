@@ -475,7 +475,6 @@ private fun DashboardTab(
                 latestOrders = latestOrders,
                 monthSales = monthSales?.let { Money(it.totalMinor, it.currency) },
                 storeUrl = storeUrl,
-                planError = entitlementState.error,
             ),
             onOpenCounter = onOpenCounter,
             onOpenOrder = onOpenOrder,

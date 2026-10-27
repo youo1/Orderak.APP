@@ -651,6 +651,15 @@ legal check). الأجهزة lists the devices («هذا الجهاز» on this 
 (overflow: rename, remove) with sheets that ask first. المساعد has an overflow with «بدء محادثة جديدة» (asks first),
 the disclosure banner, the quota meter, bubbles, a typing bubble and the composer.
 
+الاشتراك (Phase R9) has a plan card in commerce colours (the plan, its status, the renewal or the pending change), all five
+meters, a notice while purchase is closed, «مقارنة الخطط» as a tonal button and «استعادة المشتريات» as a text button.
+When the plan refresh failed it shows a banner with «إعادة المحاولة» over the last saved figures, dated; offline it
+says when the figures are from. الخطط has one tab per plan with the seller's own marked «خطتك», and for the chosen
+plan its limits as rows with the difference from the current plan, then the features it includes; nothing is sold
+while purchase is closed. The limit page (بلوغ الحد) has a close at the top, a commerce icon, the headline, the full
+meter with the server's numbers, what the next plan gives for that limit, a note while purchase is closed, «عرض
+الخطط» and «رجوع».
+
 اليوم (Phase R4, proposal T1) shows what waits for the seller: three tiles in the
 order an order moves through the shop (new, unpaid, ready to ship), each opening
 the orders it counts; the two newest orders that are not finished, as rows that
@@ -662,8 +671,7 @@ surface is one invitation to add the first and the checklist setup left, and the
 new-order button is not offered. The bell opens the announcements and carries a
 dot while one is unread. The plan appears only when it needs the seller: a
 monthly limit at 90% or more, or a billing notice that asks for action; the rest
-of it is on the subscription screen. A failed plan refresh keeps its banner here
-until that screen takes it (R9).
+of it is on the subscription screen. A failed plan refresh is shown on the subscription page (R9), with its retry, over the last saved figures.
 
 The restricted-account page (Phase R3, proposal R1) tells the seller which of two
 things happened, from the status the server sends. A suspension ends: the page
