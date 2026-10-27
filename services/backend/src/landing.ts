@@ -19,10 +19,10 @@ export function landingPageHtml(t: Theme, generatedCss = "", fontPreload = ""): 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>أوردرك Orderak — استقبل طلبات عملائك بسهولة</title>
-<meta name="description" content="أوردرك: طبّق ولينك بسيط يخلّي عملاءك يطلبوا منتجاتك ويدفعوا فودافون كاش أو انستاباي — من غير عمولة على الطلب. جرّبه مجانًا.">
+<meta name="description" content="أوردرك: تطبيق ورابط بسيط يتيح لعملائك طلب منتجاتك واختيار طريقة الدفع. جرّبه مجانًا.">
 <meta name="theme-color" content="${t.primary}">
 <meta property="og:title" content="أوردرك Orderak">
-<meta property="og:description" content="استقبل طلبات عملائك وادفع أونلاين بسهولة — من غير موقع ولا مصاريف.">
+<meta property="og:description" content="استقبل طلبات عملائك عبر الإنترنت بسهولة، دون موقع إلكتروني.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://orderak.app/">
 ${fontPreload}
@@ -110,8 +110,8 @@ ${fontPreload}
 		<a href="#top" class="logo">🛍️ أوردرك</a>
 		<div class="nav-links">
 			<a href="#features">المميزات</a>
-			<a href="#how">إزاي يشتغل</a>
-			<a href="#pricing">الأسعار</a>
+			<a href="#how">طريقة العمل</a>
+			<a href="#pricing">الباقات</a>
 			<a href="#download" class="btn">حمّل التطبيق</a>
 		</div>
 	</nav>
@@ -122,12 +122,12 @@ ${fontPreload}
 	<!-- Hero -->
 	<div class="wrap">
 		<section class="hero">
-			<span class="badge">🚀 مجاني تمامًا للبداية</span>
-			<h1>استقبل <span>طلبات عملائك</span> واقبض أونلاين<br>من غير موقع ولا تعب</h1>
-			<p>أوردرك بيديك لينك بسيط تبعته لعملائك، يختاروا منتجاتهم ويدفعوا فودافون كاش أو انستاباي — والطلب يوصلك على طول على تطبيقك.</p>
+			<span class="badge">🚀 ابدأ مجانًا</span>
+			<h1>استقبل <span>طلبات عملائك</span> عبر الإنترنت<br>دون موقع إلكتروني ودون عناء</h1>
+			<p>يمنحك أوردرك رابطًا بسيطًا ترسله إلى عملائك، فيختارون منتجاتهم ويحددون طريقة الدفع، ويصلك الطلب مباشرةً على تطبيقك.</p>
 			<div class="hero-actions">
-				<a href="#download" class="btn">ابدأ مجانًا دلوقتي</a>
-				<a href="#how" class="btn ghost">شوف إزاي يشتغل</a>
+				<a href="#download" class="btn">ابدأ مجانًا الآن</a>
+				<a href="#how" class="btn ghost">تعرّف على طريقة العمل</a>
 			</div>
 		</section>
 	</div>
@@ -135,15 +135,15 @@ ${fontPreload}
 	<!-- Features -->
 	<div class="wrap">
 		<section id="features">
-			<h2 class="sec-title">كل اللي محتاجه لمتجرك</h2>
-			<p class="sec-sub">أدوات بسيطة تخلّي بيعك أونلاين أسهل، من غير أي خبرة تقنية.</p>
+			<h2 class="sec-title">كل ما يحتاجه متجرك</h2>
+			<p class="sec-sub">أدوات بسيطة تجعل البيع عبر الإنترنت أسهل، دون أي خبرة تقنية.</p>
 			<div class="grid">
-				<div class="feature"><div class="ico">🔗</div><h3>لينك متجر جاهز</h3><p>صفحة منتجات أنيقة بالعربي على لينك خاص بيك، تشاركها في أي مكان.</p></div>
-				<div class="feature"><div class="ico">💳</div><h3>دفع محلي</h3><p>فودافون كاش، انستاباي، فوري، أو كاش عند الاستلام — زي ما عميلك بيحب.</p></div>
-				<div class="feature"><div class="ico">📱</div><h3>تطبيق أندرويد</h3><p>الطلبات توصلك لحظيًا على تليفونك مع كل تفاصيل العميل والمنتجات.</p></div>
-				<div class="feature"><div class="ico">📦</div><h3>إدارة المخزون</h3><p>الكميات بتتحدّث تلقائيًا مع كل طلب، فمفيش بيع لمنتج خلص.</p></div>
-				<div class="feature"><div class="ico">🎁</div><h3>كوبونات وإحالات</h3><p>اعمل خصومات لعملائك واكسب من نظام دعوة الأصدقاء.</p></div>
-				<div class="feature"><div class="ico">🤖</div><h3>مساعد ذكي</h3><p>ذكاء اصطناعي يساعدك في الردود وترتيب الطلبات وتوصيات المنيو.</p></div>
+				<div class="feature"><div class="ico">🔗</div><h3>رابط متجر جاهز</h3><p>صفحة منتجات أنيقة بالعربية على رابط خاص بك، تشاركه في أي مكان.</p></div>
+				<div class="feature"><div class="ico">💳</div><h3>دفع محلي</h3><p>نقدًا عند الاستلام أو عبر إنستاباي أو محفظة إلكترونية، بحسب ما يفضّله عميلك.</p></div>
+				<div class="feature"><div class="ico">📱</div><h3>تطبيق أندرويد</h3><p>تصلك الطلبات لحظيًا على هاتفك مع تفاصيل العميل والمنتجات.</p></div>
+				<div class="feature"><div class="ico">📦</div><h3>إدارة المخزون</h3><p>تتحدّث الكميات تلقائيًا مع كل طلب، فلا يُباع منتج نفد من المخزون.</p></div>
+				<div class="feature"><div class="ico">🎁</div><h3>كوبونات وإحالات</h3><p>قدّم خصومات لعملائك واستفد من نظام دعوة الأصدقاء.</p></div>
+				<div class="feature"><div class="ico">🤖</div><h3>مساعد ذكي</h3><p>ذكاء اصطناعي يساعدك في الردود وترتيب الطلبات واقتراحات القائمة.</p></div>
 			</div>
 		</section>
 	</div>
@@ -151,12 +151,12 @@ ${fontPreload}
 	<!-- How it works -->
 	<div class="wrap">
 		<section id="how">
-			<h2 class="sec-title">ابدأ في 3 خطوات</h2>
-			<p class="sec-sub">من التسجيل لأول طلب في أقل من 5 دقائق.</p>
+			<h2 class="sec-title">ابدأ في ثلاث خطوات</h2>
+			<p class="sec-sub">من التسجيل حتى أول طلب في دقائق معدودة.</p>
 			<div class="steps">
-				<div class="step"><h3>سجّل متجرك</h3><p>نزّل التطبيق، أدخل رقمك واسم متجرك — وخلاص عندك لينك.</p></div>
-				<div class="step"><h3>ضيف منتجاتك</h3><p>أضف الأصناف والأسعار والكميات، وابعت اللينك لعملائك.</p></div>
-				<div class="step"><h3>استقبل واقبض</h3><p>العميل يطلب ويدفع، والطلب يوصلك فورًا جاهز للتحضير.</p></div>
+				<div class="step"><h3>سجّل متجرك</h3><p>حمّل التطبيق وأدخل رقم هاتفك واسم متجرك، فيصبح رابطك جاهزًا.</p></div>
+				<div class="step"><h3>أضف منتجاتك</h3><p>أضف الأصناف والأسعار والكميات، ثم أرسل الرابط إلى عملائك.</p></div>
+				<div class="step"><h3>استقبل واقبض</h3><p>يطلب العميل ويحدد طريقة الدفع، ويصلك الطلب فورًا جاهزًا للتحضير.</p></div>
 			</div>
 		</section>
 	</div>
@@ -164,41 +164,18 @@ ${fontPreload}
 	<!-- Pricing -->
 	<div class="wrap">
 		<section id="pricing">
-			<h2 class="sec-title">أسعار بسيطة وواضحة</h2>
-			<p class="sec-sub">ابدأ ببلاش، وطوّر لما بيزنسك يكبر.</p>
+			<h2 class="sec-title">ابدأ مجانًا</h2>
+			<p class="sec-sub">تبدأ بباقة مجانية، وتجد في التطبيق الباقات المتاحة وما تضيفه كل باقة.</p>
 			<div class="pricing">
-				<div class="plan">
-					<h3>مجاني</h3>
-					<div class="price">0 <small>ج.م / شهر</small></div>
-					<ul>
-						<li>لينك متجر واحد</li>
-						<li>عدد منتجات محدود</li>
-						<li>استقبال الطلبات</li>
-						<li>دفع محلي كامل</li>
-					</ul>
-					<a href="#download" class="btn ghost">ابدأ مجانًا</a>
-				</div>
 				<div class="plan pop">
-					<h3>Starter</h3>
-					<div class="price">99 <small>ج.م / شهر</small></div>
+					<h3>مجانًا</h3>
 					<ul>
-						<li>منتجات غير محدودة</li>
-						<li>كوبونات خصم</li>
-						<li>نظام الإحالات</li>
-						<li>بدون إعلانات</li>
+						<li>رابط متجر خاص بك</li>
+						<li>استقبال الطلبات</li>
+						<li>النقد عند الاستلام وإنستاباي والمحافظ الإلكترونية</li>
+						<li>الباقات الأعلى تُعرض داخل التطبيق</li>
 					</ul>
-					<a href="#download" class="btn">اختر الباقة</a>
-				</div>
-				<div class="plan">
-					<h3>Professional</h3>
-					<div class="price">249 <small>ج.م / شهر</small></div>
-					<ul>
-						<li>كل مميزات Starter</li>
-						<li>تقارير ومبيعات مفصّلة</li>
-						<li>مساعد ذكاء اصطناعي كامل</li>
-						<li>دعم أولوية</li>
-					</ul>
-					<a href="#download" class="btn ghost">اختر الباقة</a>
+					<a href="#download" class="btn">ابدأ مجانًا</a>
 				</div>
 			</div>
 		</section>
@@ -208,8 +185,8 @@ ${fontPreload}
 	<div class="wrap">
 		<section id="download">
 			<div class="cta">
-				<h2>جاهز تبدأ تبيع أونلاين؟</h2>
-				<p>حمّل تطبيق أوردرك دلوقتي واستقبل أول طلب النهارده.</p>
+				<h2>هل أنت مستعد للبيع عبر الإنترنت؟</h2>
+				<p>حمّل تطبيق أوردرك الآن واستقبل أول طلب اليوم.</p>
 				<a href="https://api.orderak.app/health" class="btn">حمّل تطبيق أندرويد 📲</a>
 			</div>
 		</section>
@@ -221,11 +198,11 @@ ${fontPreload}
 	<div class="wrap">
 		<div class="foot-links">
 			<a href="#features">المميزات</a>
-			<a href="#pricing">الأسعار</a>
-			<a href="#how">إزاي يشتغل</a>
+			<a href="#pricing">الباقات</a>
+			<a href="#how">طريقة العمل</a>
 			<a href="https://api.orderak.app/admin">لوحة التحكم</a>
 		</div>
-		<div>© 2026 أوردرك Orderak — كل الحقوق محفوظة.</div>
+		<div>© 2026 أوردرك Orderak — جميع الحقوق محفوظة.</div>
 	</div>
 </footer>
 
