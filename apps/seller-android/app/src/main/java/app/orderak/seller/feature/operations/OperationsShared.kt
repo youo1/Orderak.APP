@@ -384,11 +384,16 @@ internal fun OperationPage(
     }
 }
 
-/** The server's timestamps are SQLite `YYYY-MM-DD HH:MM:SS` (UTC) or ISO; both parse, and absent is null. */
+/**
+ * The server's timestamps are SQLite `YYYY-MM-DD HH:MM:SS` (UTC) or ISO; both parse, and absent is
+ * null. Only the first 19 characters are read: the seconds are as fine as any screen needs.
+ */
 internal fun serverMillis(raw: String?): Long? {
-    if (raw.isNullOrBlank()) return null
+    if (raw == null || raw.length < 19) return null
     return runCatching {
-        java.time.Instant.parse(if ('T' in raw) raw else raw.replace(' ', 'T') + "Z").toEpochMilli()
+        val format = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+        format.timeZone = java.util.TimeZone.getTimeZone("UTC")
+        format.parse(raw.substring(0, 19).replace('T', ' '))?.time
     }.getOrNull()
 }
 
