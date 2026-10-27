@@ -35,7 +35,8 @@ cross-platform-readiness and D-13 age-evidence migrations.
   confirmation (`age_confirmed: true`) and records the exact canonical Arabic
   statement `عمري ١٨ عامًا أو أكثر`, source `android_onboarding_v2`, a Worker
   timestamp, and the accepted Terms version as confidential evidence on
-  `legal_acceptances`. Installed clients may still send `birth_year`; the Worker
+  `legal_acceptances`. The current Android client sends `age_confirmed: true` from its one-step
+store setup (plan item R3); installed clients may still send `birth_year`; the Worker
   accepts a valid legacy year only when `age_confirmed` is absent, records source
   `android_onboarding_v2_legacy_birth_year` with NULL statement text, and does
   not store the submitted year in `onboarding_sessions` or `seller_profiles`.

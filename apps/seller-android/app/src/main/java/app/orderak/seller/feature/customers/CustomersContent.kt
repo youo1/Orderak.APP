@@ -1,5 +1,24 @@
 package app.orderak.seller.feature.customers
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.text.style.TextDirection
+import app.orderak.seller.core.money.formatAmountLabel
+import app.orderak.seller.core.text.formatCount
+import app.orderak.seller.core.ui.Avatar
+import app.orderak.seller.core.ui.TopBar
+import app.orderak.seller.core.ui.isolated
+import java.util.Locale
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -49,68 +68,119 @@ fun CustomersContent(
     modifier: Modifier = Modifier,
 ) {
     val spacing = LocalOrderakSpacing.current
-    val list = state.customers
-
-    // No action offered on the empty state: a customer record is created by an
-    // order arriving, so there is nothing here for a seller to press until one
-    // does. A button that does not help is worse than no button. Rows
-    // themselves are pressable — they open the editor.
-    //
-    // Checked before the search box is drawn, so a seller with no customers is
-    // not handed something to search through nothing with.
-    if (state.loadError) {
-        // The one case `list == null` cannot distinguish on its own: a Room
-        // read that actually threw, rather than one still in flight. This is the
-        // failure state, so it is the one that does carry an action: the read can
-        // be run again, and before this it could not.
-        ErrorState(
-            // The local read failed, not the service, so the title names what
-            // could not be read rather than the service's own cause.
-            kind = ErrorStateKind.ServiceUnavailable,
-            title = stringResource(R.string.error_state_customers_load_title),
-            message = stringResource(R.string.error_unknown),
-            onRetry = onRetry,
-            modifier = modifier,
-        )
-        return
-    }
-    if (list == null) {
-        Skeleton(SkeletonVariant.ListRows, modifier.padding(LocalOrderakSpacing.current.space4))
-        return
-    }
-    if (list.isEmpty()) {
-        EmptyState(kind = EmptyStateKind.Empty, title = stringResource(R.string.customers_empty), modifier = modifier)
-        return
-    }
-
-    // Filtered here rather than in a query: the list is already in memory, so
-    // this works with the network off, which is the state a seller at a stall is
-    // most often in. Phone as well as name — the phone IS the customer's
-    // identity, and Arabic-Indic digits fold to Latin so ٠١٠ finds 010.
-    val visible = list.filter { SearchText.matches(query, it.name, it.phone) }
     val locale = LocalConfiguration.current.locales[0]
-
+    val list = state.customers
     Column(modifier.fillMaxSize()) {
-        SearchField(
-            query = query,
-            onQueryChange = onQueryChange,
-            placeholder = stringResource(R.string.customers_search_hint),
-            modifier = Modifier.padding(horizontal = spacing.space4, vertical = spacing.space2),
-        )
-
-        // A search that matches nothing is not an empty customer list, and
-        // saying so with the same sentence would read as "your customers are
-        // gone". It names the query and offers the way back.
-        if (visible.isEmpty()) {
-            EmptyState(
-                kind = EmptyStateKind.FilteredToNothing,
-                title = stringResource(R.string.customers_search_empty, query),
-                actionLabel = stringResource(R.string.search_clear_action),
-                onAction = { onQueryChange("") },
+        TopBar(title = stringResource(R.string.nav_customers), large = true)
+        when {
+            // The one case `list == null` cannot distinguish on its own: a Room read that
+            // actually threw, rather than one still in flight. It carries an action because
+            // the read can be run again.
+            state.loadError -> ErrorState(
+                kind = ErrorStateKind.ServiceUnavailable,
+                title = stringResource(R.string.error_state_customers_load_title),
+                message = stringResource(R.string.error_unknown),
+                onRetry = onRetry,
             )
-            return@Column
+            list == null -> Skeleton(SkeletonVariant.ListRows, Modifier.padding(spacing.space4))
+            // A customer record is created by an order arriving, so there is nothing here for
+            // a seller to press until one does: no action, and no search over nothing.
+            list.isEmpty() -> EmptyState(
+                kind = EmptyStateKind.Empty,
+                title = stringResource(R.string.customers_empty_title),
+                message = stringResource(R.string.customers_empty_body),
+            )
+            else -> {
+                // Filtered here rather than in a query: the list is in memory, so this works
+                // with the network off. The phone as well as the name, since the phone IS the
+                // customer's identity, and Arabic-Indic digits fold to Latin.
+                val visible = list.filter { SearchText.matches(query, it.name, it.phone) }
+                SearchField(
+                    query = query,
+                    onQueryChange = onQueryChange,
+                    placeholder = stringResource(R.string.customers_search_hint),
+                    modifier = Modifier.padding(horizontal = spacing.space4, vertical = spacing.space2),
+                )
+                // A search with no match is not an empty customer list, and one sentence for
+                // both would read as "your customers are gone".
+                if (visible.isEmpty()) {
+                    EmptyState(
+                        kind = EmptyStateKind.FilteredToNothing,
+                        title = stringResource(R.string.customers_search_empty, query),
+                        actionLabel = stringResource(R.string.search_clear_action),
+                        onAction = { onQueryChange("") },
+                    )
+                } else {
+                    LazyColumn(
+                        contentPadding = PaddingValues(spacing.space4),
+                        verticalArrangement = Arrangement.spacedBy(spacing.space2),
+                    ) {
+                        items(visible, key = { it.customerKey }) { c -> CustomerRow(c, locale, onOpen) }
+                    }
+                }
+            }
         }
+    }
+}
 
-        CustomerList(visible, locale, onOpen)
+/**
+ * One customer: initials, the name (or the number when there is no name), "number · n orders",
+ * and what they have spent at the end. With orders in more than one currency there is no total
+ * that would be right, so the row says the currencies differ instead of adding unlike things.
+ */
+@Composable
+private fun CustomerRow(customer: CustomerSummary, locale: Locale, onOpen: (String) -> Unit) {
+    val spacing = LocalOrderakSpacing.current
+    val orders = pluralStringResource(
+        R.plurals.customer_orders_count,
+        customer.ordersCount,
+        formatCount(customer.ordersCount, locale),
+    )
+    Surface(
+        onClick = { onOpen(customer.customerKey) },
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+    ) {
+        Row(
+            modifier = Modifier
+                .defaultMinSize(minHeight = spacing.minimumTouchTarget)
+                .padding(spacing.space3),
+            horizontalArrangement = Arrangement.spacedBy(spacing.space3),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Avatar(name = customer.name ?: customer.phone)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(spacing.space1)) {
+                if (customer.name != null) {
+                    Text(
+                        customer.name,
+                        style = MaterialTheme.typography.titleSmall.copy(textDirection = TextDirection.Content),
+                    )
+                    Text(
+                        stringResource(R.string.customers_row_detail, isolated(customer.phone), orders),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    Text(isolated(customer.phone), style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        orders,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            when {
+                customer.currencyCount > 1 -> Text(
+                    stringResource(R.string.customers_mixed_currencies),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                customer.currency != null -> Text(
+                    formatAmountLabel(customer.totalMinor, customer.currency, locale),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
+        }
     }
 }

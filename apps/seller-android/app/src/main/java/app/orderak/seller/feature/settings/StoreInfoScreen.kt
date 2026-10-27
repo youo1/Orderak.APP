@@ -4,6 +4,26 @@ import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.layout.ContentScale
+import app.orderak.seller.core.ui.BottomActionBar
+import app.orderak.seller.core.ui.ImagePickerState
+import app.orderak.seller.core.ui.ImagePickerTile
+import app.orderak.seller.core.ui.KeyValueRow
+import app.orderak.seller.core.ui.PickerOption
+import app.orderak.seller.core.ui.PickerSheet
+import app.orderak.seller.core.ui.PickerSheetMode
+import app.orderak.seller.core.ui.SectionHeader
+import app.orderak.seller.core.ui.SelectField
+import app.orderak.seller.core.ui.TextField
+import app.orderak.seller.core.ui.Thumbnail
+import app.orderak.seller.core.ui.TopBar
+import coil3.compose.AsyncImage
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -316,7 +336,6 @@ fun StoreInfoScreen(
     var businessSubcategoryId by rememberSaveable(loaded) {
         mutableStateOf(store?.business_subcategory_id)
     }
-    var businessSubcategoryExpanded by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(slug) { viewModel.checkSlug(slug) }
     LaunchedEffect(store?.business_category_id, appLanguage) {
@@ -367,8 +386,6 @@ fun StoreInfoScreen(
         country = country,
         publicIdentifier = publicIdentifier,
         businessSubcategories = businessSubcategories,
-        businessSubcategoryExpanded = businessSubcategoryExpanded,
-        onSubcategoryExpanded = { businessSubcategoryExpanded = it },
         onSave = { req, onDone -> viewModel.save(req, onDone) },
         onPickLogo = { pickLogo.launch("image/*") },
         onPickCover = { pickCover.launch("image/*") },
@@ -424,14 +441,9 @@ fun StoreInfoContent(
      * The store's public identifier (`EG-store-A1B2C3`), or null before the server
      * has issued one. Read by the identity card's own "Public identifier" row, which
      * used to print the store link instead.
-     *
-     * Defaulted so the screenshot fixtures that predate the row keep compiling; the
-     * screen always passes it.
      */
     publicIdentifier: String? = null,
     businessSubcategories: List<BusinessSubcategoryDto>,
-    businessSubcategoryExpanded: Boolean,
-    onSubcategoryExpanded: (Boolean) -> Unit,
     onSave: (StoreUpdateReq, (() -> Unit)) -> Unit,
     /** A stable backend code for the last refused save, or null. */
     saveError: String? = null,
@@ -443,163 +455,74 @@ fun StoreInfoContent(
     onShareLink: (String) -> Unit,
     onBack: () -> Unit,
 ) {
+    val spacing = LocalOrderakSpacing.current
+    var subcategorySheet by rememberSaveable { mutableStateOf(false) }
+    val slugOk = slugState == "available" || draft.slug == store?.slug
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.store_info_title), modifier = Modifier.semantics { heading() }) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
+            TopBar(
+                title = stringResource(R.string.store_info_title),
+                onBack = onBack,
+                backDescription = stringResource(R.string.sheet_close),
+                closeIcon = true,
             )
-        }
+        },
+        bottomBar = {
+            if (store != null) {
+                BottomActionBar(
+                    primaryLabel = stringResource(R.string.product_save_bar),
+                    onPrimary = {
+                        onSave(
+                            StoreUpdateReq(
+                                store_name = draft.name.trim(),
+                                slug = draft.slug.trim().ifBlank { null },
+                                description = draft.description.trim(),
+                                whatsapp = draft.whatsapp.trim(),
+                                email = draft.email.trim(),
+                                website = draft.website.trim(),
+                                address = draft.address.trim(),
+                                logo_url = draft.logoUrl.ifBlank { null },
+                                cover_url = draft.coverUrl.ifBlank { null },
+                                business_category_id = store.business_category_id,
+                                business_subcategory_id = draft.businessSubcategoryId,
+                            ),
+                            onBack,
+                        )
+                    },
+                    primaryEnabled = !busy && slugOk && draft.name.isNotBlank(),
+                    disabledReason = if (!busy && !slugOk) stringResource(R.string.store_info_bar_reason) else null,
+                )
+            }
+        },
     ) { padding ->
-        // Ten fields above are `rememberSaveable(store)` — KEYED on the loaded
-        // store — so every change to it re-seeds them. Rendering the form before
-        // the store arrived meant a seller could start typing their shop name
-        // into an empty field and have the whole form reset under them the
-        // moment the network answered. Waiting here closes that window: the form
-        // is composed once, with the values already in hand.
-        val spacing = LocalOrderakSpacing.current
+        // The draft fields are keyed on the loaded store, so rendering the form before it
+        // arrived let a seller start typing their shop name into an empty field and have
+        // the whole form reset under them when the network answered. Waiting here composes
+        // the form once, with the values already in hand.
         if (store == null) {
-            Skeleton(SkeletonVariant.DetailBlock, Modifier.padding(padding).padding(LocalOrderakSpacing.current.space4))
+            Skeleton(SkeletonVariant.DetailBlock, Modifier.padding(padding).padding(spacing.space4))
             return@Scaffold
         }
         Column(
-            Modifier.fillMaxSize().padding(padding).padding(spacing.space4).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(spacing.space3)
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .imePadding()
+                .verticalScroll(rememberScrollState())
+                .padding(spacing.space4),
+            verticalArrangement = Arrangement.spacedBy(spacing.space3),
         ) {
-            // ---- Read-only identity block ----
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(spacing.space4), verticalArrangement = Arrangement.spacedBy(spacing.space1)) {
-                    ReadOnlyRow(stringResource(R.string.store_info_country), country.orEmpty())
-                    ReadOnlyRow(stringResource(R.string.store_info_code), storeCode.orEmpty())
-                    // The row this label names, drawn once, with the value it names.
-                    //
-                    // `store_info_public_id` is "المعرّف العام" / "Public identifier",
-                    // and the row carrying it printed the store URL — then the same URL
-                    // again on the line beneath it. Two defects in two lines: a label
-                    // that named one value and a row that showed another, and one value
-                    // drawn twice. The identifier is a different value (`EG-store-A1B2C3`,
-                    // what the storefront and the category links are addressed by), and
-                    // `StoreInfoViewModel.publicIdentifier` has exposed it all along with
-                    // nothing reading it. The published link still renders — once, under
-                    // the name the account surface already gives it — with the copy and
-                    // share controls beside it, and the pending sentence when it has not
-                    // been issued.
-                    publicIdentifier?.takeIf { it.isNotBlank() }?.let {
-                        ReadOnlyRow(stringResource(R.string.store_info_public_id), it)
-                    }
-                    storeUrl?.let { url ->
-                        ReadOnlyRow(stringResource(R.string.settings_link_title), url)
-                        Row(horizontalArrangement = Arrangement.spacedBy(spacing.space2)) {
-                            OutlinedButton(onClick = { onCopyLink(url) }) {
-                                Icon(Icons.Outlined.ContentCopy, contentDescription = null)
-                                Text(stringResource(R.string.action_copy_url), Modifier.padding(start = spacing.space1))
-                            }
-                            OutlinedButton(onClick = { onShareLink(url) }) {
-                                Icon(Icons.Outlined.Share, contentDescription = null)
-                                Text(stringResource(R.string.action_share_store), Modifier.padding(start = spacing.space1))
-                            }
-                        }
-                    } ?: run {
-                        Text(stringResource(R.string.settings_link_pending), style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-
-            // ---- The store's own fields, and no second title ----
-            //
-            // A heading stood here printing `store_info_title`, the same string the
-            // bar above the whole screen already carries: the screen named itself
-            // twice, and the second naming told the seller nothing the bar had not
-            // (the fields label themselves, and the card above is what separates
-            // them from the read-only identity block). Every replacement was either
-            // those same words again or false of a row beneath it — the verified
-            // phone number cannot be changed here — so the block carries no heading,
-            // as the sibling pushed form route `SellerProfileScreen` already does.
-            Field(draft.name, { onDraft(draft.copy(name = it.take(60))) }, R.string.store_info_name)
-            OutlinedTextField(
-                value = draft.slug,
-                onValueChange = { v ->
-                    onDraft(draft.copy(slug = v.lowercase(Locale.ROOT).filter { it.isLetterOrDigit() || it == '-' }.take(40)))
-                },
-                label = { Text(stringResource(R.string.store_info_slug)) },
-                supportingText = { slugState?.let { Text(stringResource(when(it){"loading"->R.string.slug_loading;"available"->R.string.slug_available;"taken"->R.string.slug_taken;"reserved"->R.string.slug_reserved;"network"->R.string.slug_network;else->R.string.slug_invalid})) } },
-                singleLine = true, modifier = Modifier.fillMaxWidth()
-            )
-            Field(draft.description, { onDraft(draft.copy(description = it.take(300))) }, R.string.store_info_description)
-            OutlinedTextField(
-                value = phone,
-                onValueChange = {},
-                readOnly = true,
-                label = { Text(stringResource(R.string.store_info_phone)) },
-                supportingText = { Text(stringResource(R.string.store_info_phone_verified_help)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Field(draft.whatsapp, { onDraft(draft.copy(whatsapp = it.take(20))) }, R.string.store_info_whatsapp)
-            Field(draft.email, { onDraft(draft.copy(email = it.take(80))) }, R.string.store_info_email)
-            Field(draft.website, { onDraft(draft.copy(website = it.take(120))) }, R.string.store_info_website)
-            Field(draft.address, { onDraft(draft.copy(address = it.take(200))) }, R.string.store_info_address)
-
-            ExposedDropdownMenuBox(
-                expanded = businessSubcategoryExpanded,
-                onExpandedChange = {
-                    if (!store?.business_category_id.isNullOrBlank()) {
-                        onSubcategoryExpanded(it)
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                val selectedName = businessSubcategories
-                    .firstOrNull { it.id == draft.businessSubcategoryId }
-                    ?.name
-                    .orEmpty()
-                OutlinedTextField(
-                    value = selectedName,
-                    onValueChange = {},
-                    readOnly = true,
-                    enabled = !store?.business_category_id.isNullOrBlank(),
-                    label = { Text(stringResource(R.string.setup_subcategory_label)) },
-                    placeholder = { Text(stringResource(R.string.setup_subcategory_placeholder)) },
-                    trailingIcon = {
-                        ExposedDropdownMenuDefaults.TrailingIcon(
-                            expanded = businessSubcategoryExpanded,
-                        )
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor(MenuAnchorType.PrimaryNotEditable, true),
+            if (saveError != null) {
+                // The answer to the press that is about to be repeated, at the top where the
+                // seller is looking; the form below is kept as typed.
+                Banner(
+                    state = BannerState.Error,
+                    title = stringResource(R.string.store_info_save_failed),
+                    message = stringResource(backendErrorResource(saveError)),
                 )
-                ExposedDropdownMenu(
-                    expanded = businessSubcategoryExpanded,
-                    onDismissRequest = { onSubcategoryExpanded(false) },
-                    modifier = Modifier.heightIn(max = 360.dp),
-                ) {
-                    businessSubcategories.forEach { subcategory ->
-                        DropdownMenuItem(
-                            text = { Text(subcategory.name) },
-                            onClick = {
-                                onDraft(draft.copy(businessSubcategoryId = subcategory.id))
-                                onSubcategoryExpanded(false)
-                            },
-                            contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
-                        )
-                    }
-                }
             }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(spacing.space2)) {
-                OutlinedButton(onClick = { onPickLogo() }) { Text(stringResource(R.string.store_info_logo)) }
-                OutlinedButton(onClick = { onPickCover() }) { Text(stringResource(R.string.store_info_cover)) }
-            }
-
             if (uploadFailed) {
-                // Beside the two buttons that caused it, not at the bottom of the
-                // form: the remedy is to pick again, and that control is here.
+                // Beside the pickers that caused it: the remedy is to pick again.
                 Banner(
                     state = BannerState.Error,
                     title = stringResource(R.string.store_info_upload_failed),
@@ -607,57 +530,183 @@ fun StoreInfoContent(
                 )
             }
 
-            Spacer(Modifier.height(spacing.space2))
-            if (saveError != null) {
-                // Above the button, not below it: this is the answer to the press
-                // that is about to be repeated, and on a form this long the button
-                // is at the bottom of the scroll.
-                Banner(
-                    state = BannerState.Error,
-                    title = stringResource(R.string.store_info_save_failed),
-                    message = stringResource(backendErrorResource(saveError)),
+            // The cover, with the logo under it: how the store looks.
+            ImagePickerTile(
+                state = if (draft.coverUrl.isBlank()) ImagePickerState.Placeholder else ImagePickerState.Preview,
+                label = stringResource(R.string.store_info_cover),
+                addLabel = stringResource(R.string.store_info_cover_add),
+                onPick = onPickCover,
+            ) {
+                AsyncImage(
+                    model = draft.coverUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
                 )
-                Spacer(Modifier.height(spacing.space2))
             }
-            Button(
-                onClick = {
-                    onSave(
-                        StoreUpdateReq(
-                            store_name = draft.name.trim(),
-                            slug = draft.slug.trim().ifBlank { null },
-                            description = draft.description.trim(),
-                            whatsapp = draft.whatsapp.trim(),
-                            email = draft.email.trim(),
-                            website = draft.website.trim(),
-                            address = draft.address.trim(),
-                            logo_url = draft.logoUrl.ifBlank { null },
-                            cover_url = draft.coverUrl.ifBlank { null },
-                            business_category_id = store?.business_category_id,
-                            business_subcategory_id = draft.businessSubcategoryId,
-                        ),
-                        onBack,
-                    )
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(spacing.space3),
+            ) {
+                Thumbnail(size = spacing.space16) {
+                    if (draft.logoUrl.isNotBlank()) {
+                        AsyncImage(
+                            model = draft.logoUrl,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
+                Text(
+                    stringResource(R.string.store_info_logo),
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = onPickLogo, modifier = Modifier.heightIn(min = spacing.minimumTouchTarget)) {
+                    Text(stringResource(R.string.store_info_change))
+                }
+            }
+
+            SectionHeader(title = stringResource(R.string.store_info_section_identity))
+            TextField(
+                value = draft.name,
+                onValueChange = { onDraft(draft.copy(name = it.take(60))) },
+                label = stringResource(R.string.store_info_name),
+                required = true,
+                enabled = !busy,
+            )
+            TextField(
+                value = draft.description,
+                onValueChange = { onDraft(draft.copy(description = it.take(300))) },
+                label = stringResource(R.string.store_info_description),
+                singleLine = false,
+                enabled = !busy,
+            )
+
+            // The link as the code builds it: only the middle is the seller's. The permanent
+            // code at the end never changes, so old links keep working after a rename.
+            SectionHeader(title = stringResource(R.string.store_info_section_link))
+            TextField(
+                value = draft.slug,
+                onValueChange = { v ->
+                    onDraft(draft.copy(slug = v.lowercase(Locale.ROOT).filter { it.isLetterOrDigit() || it == '-' }.take(40)))
                 },
-                enabled = !busy && (slugState == "available" || draft.slug == store?.slug),
-                modifier = Modifier.fillMaxWidth()
-            ) { Text(stringResource(R.string.settings_save)) }
+                label = stringResource(R.string.store_info_slug),
+                prefix = "orderak.app/" + country.orEmpty() + "-",
+                suffix = storeCode?.takeIf { it.isNotBlank() }?.let { "-$it" },
+                helper = when (slugState) {
+                    "loading" -> stringResource(R.string.slug_loading)
+                    "available" -> stringResource(R.string.slug_available)
+                    else -> stringResource(R.string.store_info_slug_note)
+                },
+                error = when (slugState) {
+                    "taken" -> stringResource(R.string.slug_taken)
+                    "reserved" -> stringResource(R.string.slug_reserved)
+                    "network" -> stringResource(R.string.slug_network)
+                    "invalid" -> stringResource(R.string.slug_invalid)
+                    else -> null
+                },
+                enabled = !busy,
+            )
+            if (storeUrl != null) {
+                Row(horizontalArrangement = Arrangement.spacedBy(spacing.space2)) {
+                    OutlinedButton(
+                        onClick = { onCopyLink(storeUrl) },
+                        modifier = Modifier.heightIn(min = spacing.minimumTouchTarget),
+                    ) {
+                        Icon(Icons.Outlined.ContentCopy, contentDescription = null)
+                        Text(stringResource(R.string.action_copy_url), Modifier.padding(start = spacing.space1))
+                    }
+                    OutlinedButton(
+                        onClick = { onShareLink(storeUrl) },
+                        modifier = Modifier.heightIn(min = spacing.minimumTouchTarget),
+                    ) {
+                        Icon(Icons.Outlined.Share, contentDescription = null)
+                        Text(stringResource(R.string.action_share_store), Modifier.padding(start = spacing.space1))
+                    }
+                }
+            } else {
+                Text(
+                    stringResource(R.string.settings_link_pending),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            if (!store.business_category_id.isNullOrBlank()) {
+                SectionHeader(title = stringResource(R.string.store_info_section_activity))
+                SelectField(
+                    label = stringResource(R.string.setup_subcategory_label),
+                    value = businessSubcategories.firstOrNull { it.id == draft.businessSubcategoryId }?.name.orEmpty(),
+                    onClick = { subcategorySheet = true },
+                    enabled = !busy,
+                )
+            }
+
+            SectionHeader(title = stringResource(R.string.store_info_section_contact))
+            // The verified sign-in number: shown, not editable. Changing it needs a new
+            // confirmation, which is not this page.
+            TextField(
+                value = phone,
+                onValueChange = {},
+                label = stringResource(R.string.store_info_phone),
+                helper = stringResource(R.string.store_info_phone_verified_help),
+                enabled = false,
+            )
+            TextField(
+                value = draft.whatsapp,
+                onValueChange = { onDraft(draft.copy(whatsapp = it.take(20))) },
+                label = stringResource(R.string.store_info_whatsapp),
+                enabled = !busy,
+            )
+            TextField(
+                value = draft.email,
+                onValueChange = { onDraft(draft.copy(email = it.take(80))) },
+                label = stringResource(R.string.store_info_email),
+                enabled = !busy,
+            )
+            TextField(
+                value = draft.website,
+                onValueChange = { onDraft(draft.copy(website = it.take(120))) },
+                label = stringResource(R.string.store_info_website),
+                enabled = !busy,
+            )
+            TextField(
+                value = draft.address,
+                onValueChange = { onDraft(draft.copy(address = it.take(200))) },
+                label = stringResource(R.string.store_info_address),
+                enabled = !busy,
+            )
+
+            // What identifies the store and cannot be changed here.
+            publicIdentifier?.takeIf { it.isNotBlank() }?.let {
+                KeyValueRow(label = stringResource(R.string.store_info_public_id), value = it)
+            }
         }
     }
-}
 
-@Composable
-private fun Field(value: String, onValueChange: (String) -> Unit, labelRes: Int) {
-    OutlinedTextField(
-        value = value, onValueChange = onValueChange,
-        label = { Text(stringResource(labelRes)) },
-        singleLine = true, modifier = Modifier.fillMaxWidth()
-    )
-}
-
-@Composable
-private fun ReadOnlyRow(label: String, value: String) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.bodyMedium)
+    if (subcategorySheet) {
+        ModalBottomSheet(
+            onDismissRequest = { subcategorySheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = null,
+            shape = RoundedCornerShape(spacing.space0),
+        ) {
+            PickerSheet(
+                mode = PickerSheetMode.SingleChoice,
+                title = stringResource(R.string.setup_subcategory_label),
+                options = businessSubcategories.map { PickerOption(it.id, it.name) },
+                selectedKey = draft.businessSubcategoryId,
+                onSelect = { option ->
+                    subcategorySheet = false
+                    onDraft(draft.copy(businessSubcategoryId = option.key))
+                },
+                closeLabel = stringResource(R.string.sheet_close),
+                onClose = { subcategorySheet = false },
+            )
+        }
     }
 }

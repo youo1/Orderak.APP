@@ -1,5 +1,6 @@
 package app.orderak.seller.feature.auth
 
+import app.orderak.seller.core.ui.PhoneField
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -101,65 +102,31 @@ fun AuthPhoneForm(
         },
     )
 
-    val focusRequester = remember { FocusRequester() }
-
     Column(modifier = modifier) {
         // ── 1. Phone field ─────────────────────────────────────────
-        AndroidViewLayoutDirectionReset {
-            OutlinedTextField(
-                value = phone,
-                onValueChange = {
-                    if (enabled && !isSending) {
-                        phoneHintFailed = false
-                        onPhoneChanged(it)
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(focusRequester),
-                label = { Text(stringResource(R.string.auth_phone_label)) },
-                placeholder = { Text(stringResource(R.string.auth_phone_hint)) },
-                enabled = enabled && !isSending,
-                leadingIcon = {
-                    CountryCodeChip(
-                        country = country,
-                        enabled = enabled && !isSending,
-                        onClick = onShowCountryPicker,
-                    )
-                },
-                trailingIcon = {
-                    AnimatedVisibility(
-                        visible = isValid && error == null,
-                        enter = fadeIn(tween(LocalOrderakMotion.current.short)) + expandVertically(),
-                        exit = fadeOut(tween(LocalOrderakMotion.current.short)) + shrinkVertically(),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
-                            contentDescription = stringResource(R.string.cd_valid_number),
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                },
-                isError = error != null,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                visualTransformation = remember(country.iso) {
-                    phoneNumberVisualTransformation(country.iso)
-                },
-                singleLine = true,
-                shape = MaterialTheme.shapes.extraLarge,
-                colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    errorContainerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.05f),
-                    errorBorderColor = MaterialTheme.colorScheme.error,
-                ),
-            )
-        }
-
-        // ── 2. Inline error ───────────────────────────────────────
-        AuthErrorText(error = error)
+        // The kit's phone field: the country's flag and dialling code as a button, the digits
+        // grouped as the country writes them, a check once the number is complete, and the error
+        // under it. It is disabled, not editable, while the code is being sent or the phone is
+        // locked behind the OTP stage.
+        val validNumber = stringResource(R.string.cd_valid_number)
+        PhoneField(
+            dialCode = "+${country.dialCode}",
+            countryDescription = country.name,
+            number = phone,
+            onNumberChange = {
+                if (enabled && !isSending) {
+                    phoneHintFailed = false
+                    onPhoneChanged(it)
+                }
+            },
+            onPickCountry = onShowCountryPicker,
+            label = stringResource(R.string.auth_phone_label),
+            error = error?.let { authErrorText(it) },
+            enabled = enabled && !isSending,
+            flag = country.flag,
+            visualTransformation = remember(country.iso) { phoneNumberVisualTransformation(country.iso) },
+            validDescription = validNumber.takeIf { isValid && error == null },
+        )
 
         if (enabled) {
             Spacer(Modifier.height(spacing.space6))
@@ -247,43 +214,6 @@ private fun phoneNumberVisualTransformation(regionIso: String) = VisualTransform
 }
 
 @Composable
-private fun CountryCodeChip(
-    country: Country,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    val spacing = LocalOrderakSpacing.current
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .padding(start = spacing.space2, end = spacing.space2)
-            .clip(MaterialTheme.shapes.large)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f))
-            .clickable(enabled = enabled) { onClick() }
-            // The system's own floor, not a literal: `docs/domains/design-system-reference.md`
-            // says "48dp minimum touch target everywhere", and this chip is the
-            // control that opens the country picker — the only target on the phone
-            // stage that sat below it. 44dp is `iconHero`, the size of a glyph,
-            // which is the wrong number to have borrowed for a tap.
-            .sizeIn(minHeight = spacing.minimumTouchTarget)
-            .padding(horizontal = spacing.space3, vertical = spacing.space2),
-    ) {
-        Text(
-            text = "${country.flag} +${country.dialCode}",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Spacer(Modifier.width(spacing.space1))
-        Icon(
-            imageVector = Icons.Default.ArrowDropDown,
-            contentDescription = null,
-            modifier = Modifier.size(spacing.iconMedium),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
 private fun MarketingOptInSwitch(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
@@ -319,12 +249,4 @@ private fun MarketingOptInSwitch(
             ),
         )
     }
-}
-
-@Composable
-private fun AndroidViewLayoutDirectionReset(content: @Composable () -> Unit) {
-    CompositionLocalProvider(
-        LocalLayoutDirection provides LayoutDirection.Ltr,
-        content = content,
-    )
 }

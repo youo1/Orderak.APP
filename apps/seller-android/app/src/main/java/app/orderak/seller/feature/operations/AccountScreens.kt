@@ -1,4 +1,24 @@
 package app.orderak.seller.feature.operations
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.foundation.layout.heightIn
+import app.orderak.seller.core.ui.SemanticRole
+import app.orderak.seller.core.ui.colors
+import app.orderak.seller.data.billing.EntitlementFreshness
+import java.text.DateFormat
+import java.util.Date
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
+import androidx.compose.material3.rememberModalBottomSheetState
+import app.orderak.seller.core.ui.ChatBubble
+import app.orderak.seller.core.ui.Composer
+import app.orderak.seller.core.ui.ConfirmSheet
+import app.orderak.seller.core.ui.ConfirmSheetState
+import app.orderak.seller.core.ui.EmptyState
+import app.orderak.seller.core.ui.EmptyStateKind
+import app.orderak.seller.core.ui.SectionHeader
+import app.orderak.seller.core.ui.StepItem
+import app.orderak.seller.core.ui.StepList
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -109,6 +129,7 @@ fun SubscriptionScreen(
 ) {
     val config by vm.entitlements.config.collectAsStateWithLifecycle()
     val billingState by vm.billingManager.state.collectAsStateWithLifecycle()
+    val sync by vm.planSync.collectAsStateWithLifecycle()
     SubscriptionContent(
         planName = config?.plan_name,
         subscriptionStatus = config?.subscription_status,
@@ -120,19 +141,27 @@ fun SubscriptionScreen(
         onBack = onBack,
         onViewPlans = onViewPlans,
         onRecoverPurchases = vm.billingManager::recoverPurchases,
+        planError = sync.error,
+        offline = sync.freshness == EntitlementFreshness.OFFLINE,
+        figuresAt = sync.lastUpdatedEpochMs,
+        onRetryPlan = vm::retryPlan,
     )
 }
 
 /**
  * The subscription page, as a function of its state.
  *
- * [planName] is nullable and NOT defaulted to "Free" here. The screen read
- * `config?.plan_name ?: "Free"` with no loading state at all, so every paying
- * seller opening it was told they were on the free plan until entitlements
- * arrived — the same defect حسابي had, on the one page whose entire subject is
- * what the seller is paying for.
+ * Which plan the seller is on and how much of it they use, including while nothing can be
+ * bought: a plan card in commerce colours (name, status, renewal or the pending change), all
+ * five meters, a notice while purchase is closed, «مقارنة الخطط» as a tonal button and
+ * «استعادة المشتريات» as a text button. When the plan refresh failed, a banner with
+ * «إعادة المحاولة» sits over the last saved figures, dated; offline, the page says when the
+ * figures are from.
+ *
+ * [planName] is nullable and NOT defaulted to "Free": the page read `plan_name ?: "Free"` with no
+ * loading state, so every paying seller opening it was told they were on the free plan until
+ * entitlements arrived, on the one page whose subject is what the seller is paying for.
  */
-
 @Composable
 fun SubscriptionContent(
     planName: String?,
@@ -145,35 +174,66 @@ fun SubscriptionContent(
     onBack: () -> Unit,
     onViewPlans: () -> Unit,
     onRecoverPurchases: () -> Unit,
+    /** The plan refresh failed: the message, shown over the last saved figures. */
+    planError: String? = null,
+    offline: Boolean = false,
+    /** When the figures on screen were read, if known. */
+    figuresAt: Long? = null,
+    onRetryPlan: () -> Unit = {},
 ) {
+    val spacing = LocalOrderakSpacing.current
+    val locale = LocalConfiguration.current.locales[0]
+    val colors = SemanticRole.Commerce.colors()
+    val figuresDate = figuresAt?.let { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT, locale).format(Date(it)) }
     OperationPage(
         title = stringResource(R.string.subscription_title),
         onBack = onBack,
-        // Loading until entitlements answer. There is nothing on this page that
-        // can be said truthfully without them.
+        // Loading until entitlements answer. There is nothing on this page that can be said
+        // truthfully without them.
         busy = planName == null,
         loading = SkeletonVariant.DetailBlock,
     ) {
-        Text(
-            // Not null here: the page is busy until it is.
-            stringResource(R.string.settings_current_plan, planName.orEmpty()),
-            style = MaterialTheme.typography.titleLarge,
-        )
-        Text(
-            // A missing status is a display gap, not a claim about money, so it
-            // keeps the old fallback where plan_name deliberately does not.
-            stringResource(R.string.subscription_status, subscriptionStatus ?: "active"),
-            style = MaterialTheme.typography.bodyLarge,
-        )
-        currentPeriodEnd?.let {
-            Text(stringResource(R.string.subscription_period_end, it))
+        if (planError != null) {
+            Banner(
+                state = BannerState.Error,
+                title = stringResource(R.string.subscription_refresh_failed),
+                message = figuresDate?.let { stringResource(R.string.subscription_figures_from, it) } ?: planError,
+                actionLabel = stringResource(R.string.common_retry),
+                onAction = onRetryPlan,
+            )
+        } else if (offline) {
+            Banner(
+                state = BannerState.Information,
+                title = stringResource(R.string.plan_using_offline_settings),
+                message = figuresDate?.let { stringResource(R.string.subscription_figures_from, it) },
+            )
         }
-        pendingEffectiveAt?.let {
-            Text(stringResource(R.string.plan_change_pending, it))
+
+        Surface(
+            shape = MaterialTheme.shapes.large,
+            color = colors.container,
+            contentColor = colors.onContainer,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(Modifier.padding(spacing.space4), verticalArrangement = Arrangement.spacedBy(spacing.space1)) {
+                // Not null here: the page is busy until it is.
+                Text(
+                    stringResource(R.string.settings_current_plan, planName.orEmpty()),
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                // A missing status is a display gap, not a claim about money, so it keeps the old
+                // fallback where plan_name deliberately does not.
+                Text(
+                    stringResource(R.string.subscription_status, subscriptionStatus ?: "active"),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                currentPeriodEnd?.let { Text(stringResource(R.string.subscription_period_end, it), style = MaterialTheme.typography.bodyMedium) }
+                pendingEffectiveAt?.let { Text(stringResource(R.string.plan_change_pending, it), style = MaterialTheme.typography.bodyMedium) }
+            }
         }
         when (billingState) {
             is BillingState.VerificationPending, BillingState.Verifying ->
-                Text(stringResource(R.string.subscription_verification_pending))
+                Banner(state = BannerState.SyncInProgress, title = stringResource(R.string.subscription_verification_pending))
             is BillingState.Error ->
                 Banner(
                     state = BannerState.Error,
@@ -183,80 +243,42 @@ fun SubscriptionContent(
             else -> Unit
         }
 
-        // What the seller actually came here to see. The screen showed a plan
-        // name, a status string and a recovery button, and never once said how
-        // much of the plan was used — so "am I close to a limit?" could only be
-        // answered by hitting one.
-        //
-        // The rows come from core/ui/PlanUsage.kt, shared with the dashboard
-        // card. This screen used to build its own and drop every unlimited
-        // entitlement — `if (limit == null) null` — while the dashboard drew it
-        // as a count, so a seller on a plan with an unlimited allowance saw it in
-        // one place and not the other.
-        // usage rows are passed in, already resolved from the config
-
+        // What the seller actually came here to see: how much of the plan is used. The rows come
+        // from core/ui/PlanUsage.kt, shared with the account card.
         if (usage.isNotEmpty()) {
-            Text(
-                stringResource(R.string.plan_usage_title),
-                style = MaterialTheme.typography.titleMedium,
-            )
+            SectionHeader(title = stringResource(R.string.plan_usage_title))
             usage.forEach { row -> PlanUsageRowItem(row) }
         }
 
-        // Say the true thing, and then stop offering the thing. The banner used
-        // to sit ABOVE a Play guidance line and a recover-purchases button that
-        // both rendered unconditionally, so the screen told a seller purchasing
-        // was closed and then showed them two ways to try it — advisory, not a
-        // gate. The *banner* is gated now, and it is the same decision every other
+        // Say the true thing, and then stop offering the thing: the same decision every other
         // buying affordance in the app reads (I-5).
         if (!purchaseOpen) {
             Banner(
                 state = BannerState.LockedByPlan,
                 title = stringResource(R.string.subscription_purchase_closed_title),
                 message = stringResource(R.string.subscription_purchase_closed_body),
-                // The banner said purchasing was closed and offered nothing,
-                // while PlansScreen exists precisely to be READ while it is —
-                // "للعرض طول ما الشراء مقفول". This screen declared PlansRoute as
-                // an exit and had no control that reached it, so the one useful
-                // thing a seller could still do here was unreachable from here.
-                actionLabel = stringResource(R.string.paywall_view_plans),
-                onAction = onViewPlans,
             )
         }
 
-        // Recovery is NOT gated by `purchaseOpen`, and that is the point.
-        //
-        // `purchaseOpen` answers "may this seller buy?" — it is the backend's
-        // `BILLING_ENABLED` launch gate. Recovering a purchase the seller has
-        // already made is not buying: it re-queries Play and re-verifies through
-        // `/api/v1/billing/google/verify`, which is absent from
-        // `BILLING_ACQUISITION_ROUTES` and therefore served while that flag is off.
-        // Play itself connects on `GOOGLE_PLAY_LIFECYCLE_ENABLED`, a separate flag,
-        // so the machinery can be running while purchase is closed.
-        //
-        // Hiding it was indefensible on this screen's own copy: the closed banner
-        // promises "Nothing you have changes", and the guidance line below tells
-        // the seller to "Use purchase recovery after reinstalling or changing
-        // devices". They read both and had no control to press, so a paying seller
-        // who reinstalled while the launch flag was off could not get their plan
-        // back — the exact case `recoverPurchases` exists for.
-        Text(stringResource(R.string.subscription_play_guidance))
-        OutlinedButton(
+        FilledTonalButton(
+            onClick = onViewPlans,
+            modifier = Modifier.fillMaxWidth().heightIn(min = spacing.minimumTouchTarget),
+        ) { Text(stringResource(R.string.subscription_compare)) }
+
+        // Recovery is NOT gated by `purchaseOpen`: that answers "may this seller buy?", and
+        // recovering a purchase already made is not buying. It re-queries Play and re-verifies
+        // through a route that is served while the launch flag is off, so a paying seller who
+        // reinstalled can always get their plan back.
+        Text(
+            stringResource(R.string.subscription_play_guidance),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        TextButton(
             onClick = onRecoverPurchases,
             enabled = billingState == BillingState.Ready,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().heightIn(min = spacing.minimumTouchTarget),
         ) { Text(stringResource(R.string.subscription_recover)) }
-
-        // Offered in both purchase states, for the reason the categories banner
-        // already gives: what the next plan includes is worth reading whether or
-        // not anything is for sale. With purchase closed the banner above is
-        // already the way there, so this button only exists to be the way there
-        // when it is open.
-        if (purchaseOpen) {
-            TextButton(onClick = onViewPlans, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.paywall_view_plans))
-            }
-        }
     }
 }
 
@@ -267,7 +289,6 @@ fun AiAssistantScreen(onBack: () -> Unit, vm: OperationsViewModel = hiltViewMode
     val error by vm.error.collectAsStateWithLifecycle()
     val config by vm.entitlements.config.collectAsStateWithLifecycle()
     var input by rememberSaveable { mutableStateOf("") }
-    var confirmingReset by remember { mutableStateOf(false) }
 
     AiAssistantContent(
         messages = messages,
@@ -279,48 +300,24 @@ fun AiAssistantScreen(onBack: () -> Unit, vm: OperationsViewModel = hiltViewMode
         onBack = onBack,
         onSend = { vm.sendChat(input); input = "" },
         onRetry = vm::retryChat,
-        onReset = { confirmingReset = true },
+        // Clearing the conversation is irreversible and local, so it is confirmed in a sheet the
+        // page raises; this runs after the confirmation.
+        onReset = vm::resetChat,
     )
-
-    // Clearing the conversation is irreversible and local, so it is confirmed
-    // rather than immediate. It used to happen on the first tap, on a control
-    // that sat next to the question box.
-    if (confirmingReset) {
-        AlertDialog(
-            onDismissRequest = { confirmingReset = false },
-            title = { Text(stringResource(R.string.ai_reset)) },
-            text = { Text(stringResource(R.string.ai_reset_confirm)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        vm.resetChat()
-                        confirmingReset = false
-                    },
-                ) {
-                    Text(stringResource(R.string.ai_reset), color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmingReset = false }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            },
-        )
-    }
 }
 
 /**
  * The assistant, as a function of its state.
  *
- * Unlike the other pages in this file, an empty list here is the truth on
- * arrival: nothing loads on entry, so a chat with no messages is a chat nobody
- * has started. That is why this screen is the reason `_busy` could not simply
- * seed true for all six — it would have spun here forever.
+ * A top bar whose overflow holds "بدء محادثة جديدة" (which asks first), an information banner
+ * saying answers are generated and can be wrong, the quota meter, the conversation as bubbles
+ * and the composer at the bottom. While an answer is being written a typing bubble stands in the
+ * conversation; the chat stays on screen and the send button waits.
  *
- * Its contract declares an empty state and it had none, drawing the disclosure
- * over blank space. It now says what the box is for.
+ * Unlike the other pages here, an empty list is the truth on arrival: nothing loads on entry, so
+ * a chat with no messages is a chat nobody has started, and the page says what the box is for.
  */
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AiAssistantContent(
     messages: List<Pair<Boolean, String>>,
@@ -336,36 +333,32 @@ fun AiAssistantContent(
 ) {
     val spacing = LocalOrderakSpacing.current
     val locale = LocalConfiguration.current.locales[0]
-    // `busy` is only ever true while a question is sending: nothing loads on
-    // entry. It is not passed to OperationPage, which would replace the whole
-    // conversation with a loading placeholder; the chat stays on screen with a
-    // progress bar above the box, and the send button waits.
+    var confirmingReset by rememberSaveable { mutableStateOf(false) }
     OperationPage(
         title = stringResource(R.string.ai_assistant_title),
         onBack = onBack,
+        // `busy` is not passed: it would replace the whole conversation with a loading placeholder.
         error = error,
         onRetry = onRetry,
+        onOverflow = { confirmingReset = true },
+        overflowDescription = stringResource(R.string.ai_reset),
+        bottomBar = {
+            Composer(
+                value = input,
+                onValueChange = { onInputChange(it.take(2000)) },
+                onSend = { if (input.isNotBlank() && !busy) onSend() },
+                placeholder = stringResource(R.string.ai_message),
+                sendDescription = stringResource(R.string.common_send),
+            )
+        },
     ) {
-        Text(stringResource(R.string.ai_disclosure), style = MaterialTheme.typography.bodySmall)
-        // The quota, as a count against a limit that is drawn the one way this app
-        // draws one. It was the last place that built the pair itself — two
-        // `formatCount` values inside `usage_value` ("%1$s / %2$s") — and that is
-        // the shape `core/text/Counts.kt` exists to replace: an Arabic-Indic digit
-        // is bidi class AN, so a count and a ceiling joined by a plain separator
-        // reorder inside an Arabic paragraph and "٣ / ٢٠" renders as twenty of
-        // three. `formatCountOfLimit` is where those marks live and why — and
-        // `UsageMeter` reads it for the same reason.
-        //
-        // The ceiling follows the same reading the shared usage rows use: mode
-        // "unlimited" — or a value the snapshot does not carry — is a count
-        // without a ceiling, never an assumed zero.
+        Banner(state = BannerState.Information, title = stringResource(R.string.ai_disclosure))
+        // The quota as a count against a limit, drawn the one way this app draws one:
+        // `formatCountOfLimit` keeps an Arabic-Indic count and its ceiling from reordering. A mode
+        // "unlimited", or a value the snapshot does not carry, is a count without a ceiling.
         entitlements?.get(FeatureKeys.MAX_AI_REQUESTS_PER_MONTH)?.let { quota ->
             quota.used?.let { used ->
-                val limit = if (quota.mode == "unlimited") {
-                    null
-                } else {
-                    (quota.value as? JsonPrimitive)?.intOrNull
-                }
+                val limit = if (quota.mode == "unlimited") null else (quota.value as? JsonPrimitive)?.intOrNull
                 Text(
                     stringResource(R.string.usage_ai_requests) + ": " +
                         if (limit == null) {
@@ -378,54 +371,38 @@ fun AiAssistantContent(
             }
         }
         if (messages.isEmpty()) {
-            // The declared empty state, which this screen did not have: it drew
-            // the disclosure and the quota over blank space. The input box stays
-            // — a chat with nothing in it is waiting, not broken — so this is a
-            // line rather than an EmptyState.
             Text(
                 stringResource(R.string.ai_empty_hint),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        messages.forEach { (seller, text) ->
-            val isSeller = seller
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = if (isSeller) {
-                    androidx.compose.material3.CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    )
-                } else {
-                    androidx.compose.material3.CardDefaults.cardColors()
-                },
-            ) {
-                Column(Modifier.padding(spacing.space3)) {
-                    Text(
-                        if (isSeller) stringResource(R.string.ai_you) else stringResource(R.string.ai_assistant_title),
-                        style = MaterialTheme.typography.labelMedium,
-                    )
-                    Text(text, style = MaterialTheme.typography.bodyMedium)
-                }
-            }
-        }
+        messages.forEach { (seller, text) -> ChatBubble(text = text, mine = seller) }
         if (busy) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            ChatBubble(text = stringResource(R.string.ai_typing), mine = false)
         }
-        OutlinedTextField(
-            value = input,
-            onValueChange = { onInputChange(it.take(2000)) },
-            label = { Text(stringResource(R.string.ai_message)) },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Button(
-            enabled = input.isNotBlank() && !busy,
-            onClick = { onSend() },
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text(stringResource(R.string.common_send)) }
-        // Not while a question is sending: the reply would land in a cleared
-        // chat as an answer with no question before it.
-        TextButton(onClick = onReset, enabled = !busy) { Text(stringResource(R.string.ai_reset)) }
+    }
+
+    if (confirmingReset) {
+        ModalBottomSheet(
+            onDismissRequest = { confirmingReset = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = null,
+            shape = RoundedCornerShape(spacing.space0),
+        ) {
+            ConfirmSheet(
+                // Not while a question is sending: the reply would land in a cleared chat as an
+                // answer with no question before it.
+                state = if (busy) ConfirmSheetState.InProgress else ConfirmSheetState.Destructive,
+                title = stringResource(R.string.ai_reset_title),
+                message = stringResource(R.string.ai_reset_body),
+                confirmLabel = stringResource(R.string.ai_reset),
+                cancelLabel = stringResource(R.string.common_cancel),
+                onConfirm = { confirmingReset = false; onReset() },
+                onCancel = { confirmingReset = false },
+            )
+        }
     }
 }
 
@@ -455,12 +432,16 @@ fun DeletionStatusScreen(onBack: () -> Unit, vm: OperationsViewModel = hiltViewM
 /**
  * The account-deletion status, as a function of its state.
  *
- * [loaded] is separate from [request] because null is a real answer here — "you
- * have no deletion request" — and it is also the seed. Without the flag this
- * page told a seller with a pending request that they had none, for as long as
- * the call took, which on this particular page is the worst thing it could say.
+ * Read-only: it makes the right to deletion visible, with dates attached. A card with a
+ * three-step timeline (submitted, verified, completes by the deadline), then what is deleted and
+ * what the law may keep, in plain words. Requesting and cancelling are not here; the request
+ * lives in حسابي, and with none this page says so and points there.
+ *
+ * [loaded] is separate from [request] because null is a real answer here ("you have no deletion
+ * request") and it is also the seed. Without the flag this page told a seller with a pending
+ * request that they had none for as long as the call took, which on this page is the worst thing
+ * it could say.
  */
-
 @Composable
 fun DeletionStatusContent(
     request: DeletionRequestDto?,
@@ -471,6 +452,7 @@ fun DeletionStatusContent(
     onRetry: () -> Unit,
 ) {
     val spacing = LocalOrderakSpacing.current
+    val locale = LocalConfiguration.current.locales[0]
     OperationPage(
         title = stringResource(R.string.deletion_status_title),
         onBack = onBack,
@@ -480,24 +462,49 @@ fun DeletionStatusContent(
         loading = SkeletonVariant.DetailBlock,
     ) {
         if (request == null) {
-            Text(
-                stringResource(R.string.deletion_status_none),
-                style = MaterialTheme.typography.titleLarge,
+            EmptyState(
+                kind = EmptyStateKind.Empty,
+                title = stringResource(R.string.deletion_status_none),
+                message = stringResource(R.string.deletion_none_pointer),
+                icon = Icons.Outlined.Inbox,
             )
         } else {
-            Text(
-                stringResource(R.string.deletion_status_label, request.status),
-                style = MaterialTheme.typography.titleLarge,
-            )
-            request.requested_at?.let { Text(stringResource(R.string.deletion_requested_at, it)) }
-            request.deadline_at?.let { Text(stringResource(R.string.deletion_deadline_at, it)) }
-            request.verified_at?.let { Text(stringResource(R.string.deletion_verified_at, it)) }
-            request.completed_at?.let { Text(stringResource(R.string.deletion_completed_at, it)) }
+            val pending = stringResource(R.string.deletion_step_pending)
+            Surface(
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                StepList(
+                    steps = listOf(
+                        StepItem(
+                            stringResource(R.string.deletion_step_submitted),
+                            formatServerDate(request.requested_at, locale) ?: pending,
+                            done = request.requested_at != null,
+                        ),
+                        StepItem(
+                            stringResource(R.string.deletion_step_verified),
+                            formatServerDate(request.verified_at, locale) ?: pending,
+                            done = request.verified_at != null,
+                        ),
+                        StepItem(
+                            stringResource(R.string.deletion_step_completes),
+                            formatServerDate(request.completed_at, locale)
+                                ?: formatServerDate(request.deadline_at, locale)?.let { stringResource(R.string.deletion_step_by, it) }
+                                ?: pending,
+                            done = request.completed_at != null,
+                        ),
+                    ),
+                    modifier = Modifier.padding(spacing.space4),
+                )
+            }
             request.notes?.takeIf { it.isNotBlank() }?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        Spacer(Modifier.height(spacing.space2))
-        Text(stringResource(R.string.deletion_status_help), style = MaterialTheme.typography.bodySmall)
+        SectionHeader(title = stringResource(R.string.deletion_deleted_title))
+        Text(stringResource(R.string.deletion_deleted_body), style = MaterialTheme.typography.bodyMedium)
+        SectionHeader(title = stringResource(R.string.deletion_kept_title))
+        Text(stringResource(R.string.deletion_kept_body), style = MaterialTheme.typography.bodyMedium)
     }
 }

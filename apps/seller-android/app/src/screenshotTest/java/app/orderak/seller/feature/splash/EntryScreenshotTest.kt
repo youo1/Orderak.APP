@@ -61,30 +61,47 @@ fun splashErrorDark() {
 // ================= restricted account =================
 
 /**
- * Three ways out, and none of them is "try signing in again".
+ * Two pages for two things.
  *
- * Retry rechecks the restriction, contact opens mail, sign-out leaves. The
- * contract declares only `content` for this screen and that is right: there is
- * nothing here to load.
+ * A suspension ends, so its page offers support first and a way to check the
+ * status. A ban does not, so its page offers a review of the decision and the
+ * deletion of the seller's own data, and no "check the status": nothing would
+ * change. Sign-out is on both, and asks first (that sheet is the kit's
+ * `confirmSheetDestructive`; a modal window is not captured by the harness).
+ * The contract declares only `content` for this screen and that is right:
+ * there is nothing here to load.
  */
-@PreviewTest
-@Preview(name = "Restricted account light", locale = "ar")
 @Composable
-fun restrictedAccountLight() {
-    OrderakTheme(darkTheme = false) {
+private fun restricted(status: String, dark: Boolean) {
+    OrderakTheme(darkTheme = dark) {
         Surface {
-            RestrictedAccountContent(onCheckAgain = {}, onContactSupport = {}, onLogout = {})
+            RestrictedAccountContent(
+                status = status,
+                onCheckAgain = {},
+                onContactSupport = {},
+                onRequestDeletion = {},
+                onLogout = {},
+            )
         }
     }
 }
 
 @PreviewTest
+@Preview(name = "Restricted account light", locale = "ar")
+@Composable
+fun restrictedAccountLight() = restricted("suspended", dark = false)
+
+@PreviewTest
 @Preview(name = "Restricted account dark", locale = "ar")
 @Composable
-fun restrictedAccountDark() {
-    OrderakTheme(darkTheme = true) {
-        Surface {
-            RestrictedAccountContent(onCheckAgain = {}, onContactSupport = {}, onLogout = {})
-        }
-    }
-}
+fun restrictedAccountDark() = restricted("suspended", dark = true)
+
+@PreviewTest
+@Preview(name = "Restricted banned light", locale = "ar")
+@Composable
+fun restrictedBannedLight() = restricted("banned", dark = false)
+
+@PreviewTest
+@Preview(name = "Restricted banned dark", locale = "ar")
+@Composable
+fun restrictedBannedDark() = restricted("banned", dark = true)

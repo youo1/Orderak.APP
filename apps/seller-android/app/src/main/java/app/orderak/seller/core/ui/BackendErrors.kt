@@ -216,6 +216,9 @@ val INTENTIONALLY_GENERIC: Set<String> = setOf(
     // name for a problem the name had nothing to do with; the honest answer is
     // that something went wrong and the attempt can be repeated.
     "store_update_failed",
+    // An installed build still offering the seller photo: the upload is refused because the
+    // photo is no longer collected, and the current app has no control that can send it.
+    "profile_photo_not_accepted",
     // Admin-surface only: never reachable from a seller credential.
     "invalid_content_config", "admin_key_required", "forbidden",
     // Machine-to-machine surfaces. The integrations API answers Google Play and

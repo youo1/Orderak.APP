@@ -117,21 +117,21 @@ desktop.
   Passkey sign-in directly; account creation and recovery use Firebase Phone OTP
   (SMS), with OTP fallback shown only when applicable. Welcome includes the
   existing explicit العربية/English/Français language sheet.
-- **Account setup (step 1/2)** — full name, affirmative confirmation of the
-  canonical statement `عمري ١٨ عامًا أو أكثر`, optional private email, and
-  versioned Terms/Privacy acceptance after phone verification. No birth year is
-  collected.
-- **Store setup (step 2/2)** — store name and owner; a read-only preview of the
-  unchanged canonical URL is shown. Business category and city are optional at
-  setup and can be completed later through the onboarding checklist and Store
-  Information, with the same validation when supplied. Country, subcategory, and
-  logo are not requested here; subcategory and logo remain editable later in
-  Store Information/Profile Settings.
-- **Transition until plan item R3.** The two steps above describe the setup the
-  backend now accepts (R3a). The Android setup screens change in R3; until then
-  the installed app still asks for a birth year, a business category and a city,
-  and sends them. The Worker accepts that request as legacy age evidence, never
-  stores the birth year, and records NULL statement text for it.
+- **Store setup (one step, then a ready screen)** — "لنجهّز متجرك", one line (the rest can
+  wait), the store name with a preview of the link (`orderak.app/EG-name-········`, noting a permanent
+  code is added on creation), the full name (not shown to buyers), the affirmation
+  `عمري ١٨ عامًا أو أكثر` in place of a birth year, the country as a line of text taken from the phone, and
+  the Terms and Privacy documents as two controls of their own. The bar "إنشاء المتجر" saves the account
+  step and then creates the store on one tap; creating covers the page with "جارٍ إنشاء متجرك…", and a
+  failure keeps everything typed, in a banner with a retry. There is no "name taken" outcome: the server
+  derives a unique link from the name and the store's permanent code. The business category, the city, a
+  first product and a payment method are no longer asked at setup.
+- **Ready screen** — "متجرك جاهز", the full link with share and copy, and the checklist "أكمل متجرك ·
+  ١ من ٤" (the store is created; add a first product; add a payment method; set the city and business
+  type). The bar offers "إضافة أول منتج" (opens the product form) and "لاحقًا". The passkey invitation,
+  where offered, appears as a sheet over this screen.
+- **Transition.** The Worker still accepts the legacy birth year from installed clients, as legacy age
+  evidence with NULL statement text; the current Android client sends `age_confirmed: true`.
 - **Main shell** with tabs:
   - **Dashboard** — today / unpaid / to-ship counts + "share catalog" link.
   - **Orders** — list + order details, status updates.
@@ -552,6 +552,144 @@ update, emergency-denial, and maintenance states. Blocking state is accepted
 only from a current response; stale/offline blocking policy becomes a visible
 warning so an unavailable network cannot permanently lock out the seller.
 `MainRoute#version-governance` is included in the screen manifest.
+
+The order page (Phase R5, details) is titled by the order's number with the time under
+it. It shows where the order stands: the status chip and the five steps it moves
+through (a cancelled order replaces them with a notice). The customer is a row that
+opens their page; the products come with their line totals and the total as the
+largest figure; the payment section names the method, offers the manual payment
+and the receipt check only until the order is paid, and lists what has been
+recorded. The one bar at the bottom holds the next step, named for what happens
+("تأكيد الطلب", "تم الدفع", "تم الشحن", "إكمال الطلب"), and cancelling in its secondary
+slot while it is allowed; a finished or cancelled order has no bar. An order not
+yet on the account disables the step and says why on screen. Cancelling asks in a
+sheet that states the consequence (the products return to stock and a cancelled
+order cannot be restored) and puts the verb on the button.
+
+الطلبات (Phase R5, list) has a large title and a pinned row of filters: all, unpaid,
+ready to ship, today, and one chip, الحالة, that opens a sheet with the six exact
+statuses and names the one chosen. The orders that still need the seller come
+first, with their count, then the finished ones. A row says which order, how many
+lines and how long ago ("#١٠٤٢ · ٣ منتجات · قبل ساعة"; after a week a date): the
+number is the server's when the order has one and this phone's otherwise, and is
+written without grouping because it is a name. A banner appears only while a
+manual order is still only on this phone, or the server refused one. With no
+order at all the page explains that link orders arrive by themselves and offers a
+manual one; a filter with no match keeps the chips and offers all orders.
+
+طلب جديد (Phase R5, manual order) is a form that closes with an ✕, and closing it
+asks first when anything was entered. It has three parts in the order a sale is
+told: the customer (a phone number with its country, chosen from a searchable
+list, and an optional name), the products (only those chosen are listed, each with
+a stepper that stops at the stock; a button opens a searchable picker that shows
+the stock on every row, and a line over stock says how many are available), and
+how it is paid (only the methods this store accepts: نقدًا, إنستاباي, محفظة
+إلكترونية). A note is behind a button. The bar holds the total and
+«تسجيل الطلب»; while the order cannot be recorded it says what is missing, and a
+basket in two currencies has no total and cannot be recorded. A write that fails
+keeps the draft and says so.
+
+المتجر (Phase R6, store) has a large title and, under it in every state, three tonal
+chips that open the store's pages: بيانات المتجر, التصنيفات and اللغات. The product meter
+stays here, because this is where the limited thing is created, then the search and a
+row per product: thumbnail, name, "price · المتبقي n", and a chip only when it matters
+(نفد in warning, مخفي in neutral). The one floating button is "إضافة منتج", and at the
+plan limit it says so and opens the limit. With no product the page says «متجرك فارغ»
+and offers the first product in place of the button; a search with no match names the
+query and offers to clear it; products saved only on the phone get a warning above the
+meter; a failed read offers a retry. Sharing the catalogue is in the bar.
+
+The product form (Phase R6, product editor) closes with an ✕. The image comes first,
+then name, price in the product's own currency, stock as a stepper, "ظاهر في المتجر"
+as a switch, and the category as a field that opens a list (with "no category"). The
+description is behind "تفاصيل إضافية". The bar holds "حفظ" and says what is missing
+while it cannot be pressed. Delete is in the overflow and asks in a sheet. A failed
+write keeps the form and says why in a banner (the plan limit opens the plans); a stock
+changed by an order while editing opens a sheet with both numbers and chooses for
+neither.
+
+التصنيفات (Phase R6) has the category meter, a row per category with how many products are filed under it
+and an overflow holding rename, the category's link and delete, and one bar, "إضافة تصنيف". Adding and
+renaming are one sheet with one field; deleting names the category and says how many products lose it.
+At the limit the bar opens the plans page, and with none the page says products can be sold without one.
+
+بيانات المتجر (Phase R6) closes with an ✕ and is in sections: the cover and logo, الهوية (name and
+description), رابط متجرك (the link as the code builds it, with only the name editable between the fixed
+country prefix and the permanent code, whose note says old links keep working after a rename, plus its
+availability and copy/share), the activity, and التواصل. The sign-in phone is shown, not editable.
+One bar saves, and it says why it cannot while the link name is not available.
+
+لغات الكتالوج (Phase R6) has a switch for the target language, a summary of how many translations are
+approved, and a row per product with its name, the translation under it and a chip (معتمدة, ترجمة آلية,
+ناقصة). A row opens a sheet with the source above and one button, "حفظ واعتماد".
+
+العملاء (Phase R7) has a large title and a search by name or number (Arabic-Indic digits find Latin ones). A
+row has the customer's initials, the name or, with none, the number, "number · n orders" and what they have
+spent; with orders in more than one currency the row says «عملات مختلفة» instead of a total that would be
+wrong. With no customer the page says they appear after the first order, and offers neither a search nor a
+button. The customer page has a header (large avatar, name, number always left to right, «تواصل»), three
+figures (orders, total spent, last order), «عن العميل» with the other contact and the note and «تعديل», and the
+customer's orders, newest first. Editing is one sheet that also says the number is the customer's identity and
+does not change; where the plan does not open it the card is read-only and a notice says so.
+
+حسابي (Phase R8) has a large title, the person and the shop, and the plan card in commerce colours: the plan, its
+two meters closest to their limits, and «التفاصيل» into the subscription page; until entitlements answer the card holds
+placeholders and never says «الخطة المجانية» as a guess. Rows are grouped by what the seller is doing: متجرك (store
+information, التصنيفات, catalogue languages, and the real store link, which a tap copies), المدفوعات والأمان (payment
+methods, showing which of نقدًا · إنستاباي · محفظة إلكترونية are on; devices and passkeys; «ترقية الخطة» only while
+purchase is open), المساعدة (support; announcements with the unread count; the assistant, or a notice that the plan
+does not include it), أنت (personal details, language) and الحساب (deletion status, delete account, sign out).
+Payment details, the plans to buy, deleting the account and signing out are sheets; deleting and signing out state
+their consequence. بياناتك الشخصية asks for the full name (and says where it appears), shows the sign-in number as
+verified, and keeps the email optional; changing the email says the old one stays in use until the new one is
+confirmed. It no longer asks for a photo or a birth year; what is stored is carried through unchanged on save.
+الدعم lists tickets with a number and an open/closed chip and one bar «تذكرة جديدة» (a sheet); a ticket is a
+conversation of bubbles with a composer, replaced on a closed ticket by the sentence that says so. إعلانات Orderak
+puts unread items first with a dot; tapping one opens it in place and marks it read. حذف الحساب (status) is a
+three-step timeline with dates, then what is deleted and what the law may keep (the wording of the last line needs a
+legal check). الأجهزة lists the devices («هذا الجهاز» on this phone, «تسجيل خروجه» on the others) and the passkeys
+(overflow: rename, remove) with sheets that ask first. المساعد has an overflow with «بدء محادثة جديدة» (asks first),
+the disclosure banner, the quota meter, bubbles, a typing bubble and the composer.
+
+الاشتراك (Phase R9) has a plan card in commerce colours (the plan, its status, the renewal or the pending change), all five
+meters, a notice while purchase is closed, «مقارنة الخطط» as a tonal button and «استعادة المشتريات» as a text button.
+When the plan refresh failed it shows a banner with «إعادة المحاولة» over the last saved figures, dated; offline it
+says when the figures are from. الخطط has one tab per plan with the seller's own marked «خطتك», and for the chosen
+plan its limits as rows with the difference from the current plan, then the features it includes; nothing is sold
+while purchase is closed. The limit page (بلوغ الحد) has a close at the top, a commerce icon, the headline, the full
+meter with the server's numbers, what the next plan gives for that limit, a note while purchase is closed, «عرض
+الخطط» and «رجوع».
+
+اليوم (Phase R4, proposal T1) shows what waits for the seller: three tiles in the
+order an order moves through the shop (new, unpaid, ready to ship), each opening
+the orders it counts; the two newest orders that are not finished, as rows that
+open the order; the day so far (today's orders and this month's sales in one
+currency, none when there is no order this month); the store link with its share
+button; and the ad last. A count not read yet is a placeholder and a count that
+could not be read is a dash with a retry, never a zero. With no products the
+surface is one invitation to add the first and the checklist setup left, and the
+new-order button is not offered. The bell opens the announcements and carries a
+dot while one is unread. The plan appears only when it needs the seller: a
+monthly limit at 90% or more, or a billing notice that asks for action; the rest
+of it is on the subscription screen. A failed plan refresh is shown on the subscription page (R9), with its retry, over the last saved figures.
+
+The restricted-account page (Phase R3, proposal R1) tells the seller which of two
+things happened, from the status the server sends. A suspension ends: the page
+is in warning colours, offers support first and a way to check the status, and
+signs out. A ban does not: the page is in error colours, names the reason class,
+offers a review of the decision and the deletion of the seller's own data (both
+by mail to support, with the status in the subject) and signs out, and has no
+status check, because checking would change nothing. Signing out asks first and
+states that the local business data on the device is removed.
+
+The main shell (Phase R2) draws the five surfaces with the shared bottom bar:
+labels always shown, a filled icon on the chosen surface, the number of unpaid
+orders on الطلبات (nothing is drawn for a count not read yet or for zero) and a
+dot on حسابي while an announcement is unread. A version warning is a banner above
+every surface, with an "update" action, and cannot be dismissed. Force update
+replaces the shell with one screen whose only button is the store link; blocked
+and maintenance are waits, so they have no button and look again by themselves
+every minute.
 
 ## Rules (from AGENTS.md)
 

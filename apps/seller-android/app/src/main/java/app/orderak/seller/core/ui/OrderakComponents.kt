@@ -153,6 +153,8 @@ fun PriorityListRow(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     needsAction: Boolean = false,
+    /** A finished row: its title steps back to the quieter colour, the rail is already hollow. */
+    dimmed: Boolean = false,
     trailing: @Composable (() -> Unit)? = null,
 ) {
     val spacing = LocalOrderakSpacing.current
@@ -186,7 +188,11 @@ fun PriorityListRow(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(spacing.space1),
             ) {
-                Text(text = title, style = MaterialTheme.typography.titleSmall)
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = if (dimmed) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                )
                 if (subtitle != null) {
                     Text(
                         text = subtitle,

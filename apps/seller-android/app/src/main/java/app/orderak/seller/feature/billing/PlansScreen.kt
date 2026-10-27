@@ -1,5 +1,16 @@
 package app.orderak.seller.feature.billing
 
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalConfiguration
+import app.orderak.seller.core.text.formatNumber
+import app.orderak.seller.core.ui.EmptyState
+import app.orderak.seller.core.ui.EmptyStateKind
+import app.orderak.seller.core.ui.KeyValueRow
+import app.orderak.seller.core.ui.SectionHeader
+import app.orderak.seller.core.ui.SegmentedChoice
+import app.orderak.seller.core.ui.TopBar
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -117,13 +128,10 @@ fun PlansScreen(
 /**
  * The plan comparison, as a function of its state.
  *
- * Split from [PlansScreen] only so its four branches can be rendered. This
- * screen was already honest — [PlansUiState] seeds `loading = true`, so it never
- * claimed an empty plan list it had not fetched — and it is the page a seller is
- * sent to while buying is closed, so what it says in each branch is worth
- * looking at.
+ * A top bar with back, the purchase-closed notice, a choice with one tab per plan (the current
+ * one marked «خطتك»), and for the chosen plan its limits as rows, each with its difference from the
+ * current plan, then the features it includes. No buy control while purchase is closed.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlansContent(
     state: PlansUiState,
@@ -133,20 +141,17 @@ fun PlansContent(
     val spacing = LocalOrderakSpacing.current
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.plans_title), modifier = Modifier.semantics { heading() }) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
+            TopBar(
+                title = stringResource(R.string.plans_title),
+                onBack = onBack,
+                backDescription = stringResource(R.string.common_back),
             )
         },
     ) { padding ->
         when {
             state.loading -> Skeleton(
                 variant = SkeletonVariant.DetailBlock,
-                modifier = Modifier.padding(padding).padding(LocalOrderakSpacing.current.space4),
+                modifier = Modifier.padding(padding).padding(spacing.space4),
             )
             state.error != null -> {
                 val text = errorStateText(state.error)
@@ -158,13 +163,11 @@ fun PlansContent(
                     onRetry = onRetry,
                 )
             }
-            state.plans.isEmpty() -> Column(
-                Modifier.fillMaxSize().padding(padding).padding(spacing.space8),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(stringResource(R.string.plans_unavailable), style = MaterialTheme.typography.bodyLarge)
-            }
+            state.plans.isEmpty() -> EmptyState(
+                kind = EmptyStateKind.Empty,
+                title = stringResource(R.string.plans_unavailable),
+                modifier = Modifier.padding(padding),
+            )
             else -> PlanComparison(state, padding)
         }
     }
@@ -173,27 +176,25 @@ fun PlansContent(
 @Composable
 private fun PlanComparison(state: PlansUiState, padding: PaddingValues) {
     val spacing = LocalOrderakSpacing.current
-    val columnScroll = rememberScrollState()
+    // The tab opens on the seller's own plan: that is the one they compare the others against.
+    var selected by rememberSaveable(state.currentPlanKey) {
+        mutableStateOf(state.plans.indexOfFirst { it.plan_key == state.currentPlanKey }.coerceAtLeast(0))
+    }
+    val plan = state.plans[selected.coerceIn(0, state.plans.lastIndex)]
+    val dash = "—"
+    val limits = state.comparison.filter { it.value_type != "boolean" }
+    val features = state.comparison.filter {
+        it.value_type == "boolean" && it.values[plan.plan_key].equals("true", ignoreCase = true)
+    }
     LazyColumn(
-        Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(
-            start = 16.dp, end = 16.dp, bottom = 16.dp,
-            top = padding.calculateTopPadding() + 8.dp,
-        ),
+        Modifier.fillMaxSize().padding(padding),
+        contentPadding = PaddingValues(spacing.space4),
         verticalArrangement = Arrangement.spacedBy(spacing.space2),
     ) {
-        item {
-            // Said once, at the top, rather than as a disabled button beside
-            // every plan. While billing is closed there is nothing to buy, and
-            // the honest thing is to say so rather than imply it.
-            //
-            // Said through the shared notice, in the role the semantic layer
-            // keeps for anything monetary — the same role, and the same
-            // component, that the categories limit and the subscription page
-            // already use for this exact fact. The row this replaces borrowed
-            // the Info glyph and drew it in the neutral tone: one meaning with
-            // two roles, in no container at all.
-            if (!state.purchaseOpen) {
+        if (!state.purchaseOpen) {
+            item {
+                // Said once, at the top, in the role the semantic layer keeps for anything
+                // monetary, rather than as a disabled button beside every plan.
                 Banner(
                     state = BannerState.LockedByPlan,
                     title = stringResource(R.string.plans_purchase_closed),
@@ -201,73 +202,39 @@ private fun PlanComparison(state: PlansUiState, padding: PaddingValues) {
                 )
             }
         }
-
         item {
-            Row(Modifier.horizontalScroll(columnScroll)) {
-                Text(
-                    stringResource(R.string.plans_feature_column),
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.width(160.dp).padding(vertical = spacing.space2),
-                )
-                state.plans.forEach { plan ->
-                    Text(
-                        // The plan the seller is on is named, not weighted. This
-                        // column carried `FontWeight.Bold` against `labelLarge`'s
-                        // own medium — and the design system states the scale
-                        // plainly: "Weight is 400 or 500 — there is no bold
-                        // display type in this product." 700 was not a role, and
-                        // the "current plan" the contract declares as this
-                        // screen's own data was resting on it.
-                        //
-                        // A word carries it instead, which is how the account
-                        // surface already names the same fact, so nothing the
-                        // contract declares stops being readable — and the name
-                        // is drawn at the one weight its role has.
-                        text = if (plan.plan_key == state.currentPlanKey) {
-                            stringResource(R.string.plans_current_plan_marked, plan.name)
-                        } else {
-                            plan.name
-                        },
-                        style = MaterialTheme.typography.labelLarge,
-                        modifier = Modifier.width(110.dp).padding(vertical = spacing.space2),
-                    )
-                }
-            }
-            HorizontalDivider()
+            SegmentedChoice(
+                options = state.plans.map {
+                    if (it.plan_key == state.currentPlanKey) stringResource(R.string.plans_current_plan_marked, it.name) else it.name
+                },
+                selectedIndex = selected,
+                onSelect = { selected = it },
+            )
         }
-
-        items(state.comparison, key = { it.entitlement_key }) { row ->
-            Row(Modifier.horizontalScroll(columnScroll)) {
+        item { SectionHeader(title = stringResource(R.string.plans_limits_title)) }
+        items(limits, key = { it.entitlement_key }) { row ->
+            val value = row.values[plan.plan_key]
+            val current = state.currentPlanKey?.let { row.values[it] }
+            val diff = limitDifference(value, current)
+            KeyValueRow(
+                label = row.name,
+                // An em dash is the catalogue's own "not included"; a blank would read as missing.
+                value = (value ?: dash) + (diff?.let { "  ($it)" } ?: ""),
+            )
+        }
+        item { SectionHeader(title = stringResource(R.string.plans_features_title)) }
+        if (features.isEmpty()) {
+            item {
                 Text(
-                    row.name,
+                    dash,
                     style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.width(160.dp).padding(vertical = spacing.space2),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                state.plans.forEach { plan ->
-                    val raw = row.values[plan.plan_key]
-                    Text(
-                        // An em dash is the catalogue's own "not included". A
-                        // blank cell would read as missing data.
-                        //
-                        // A boolean row carried the backend's own literal, so an
-                        // Arabic comparison table printed "true" and "false" in
-                        // the cells whose entire job is to be read at a glance.
-                        // True becomes the word; false becomes the same em dash
-                        // every other "not included" cell already uses.
-                        text = when {
-                            raw == null -> "—"
-                            row.value_type != "boolean" -> raw
-                            raw.equals("true", ignoreCase = true) ->
-                                stringResource(R.string.plans_included)
-                            else -> "—"
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.width(110.dp).padding(vertical = spacing.space2),
-                    )
-                }
             }
         }
-
+        items(features, key = { "f-" + it.entitlement_key }) { row ->
+            Text(row.name, style = MaterialTheme.typography.bodyMedium)
+        }
         item {
             Text(
                 stringResource(R.string.plans_price_note),
@@ -278,3 +245,16 @@ private fun PlanComparison(state: PlansUiState, padding: PaddingValues) {
         }
     }
 }
+
+/** "+٢٠٠" or "−١٠" against the seller's own plan, or null when either side is not a number. */
+@Composable
+private fun limitDifference(chosen: String?, current: String?): String? {
+    val a = chosen?.toLongOrNull() ?: return null
+    val b = current?.toLongOrNull() ?: return null
+    val d = a - b
+    if (d == 0L) return null
+    val locale = LocalConfiguration.current.locales[0]
+    val digits = formatNumber(kotlin.math.abs(d), locale)
+    return (if (d > 0) "+" else "−") + digits
+}
+

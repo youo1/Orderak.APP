@@ -8,27 +8,23 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -57,11 +53,17 @@ import androidx.navigation.compose.rememberNavController
 import app.orderak.seller.R
 import app.orderak.seller.app.navigation.SellerSurface
 import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
+import app.orderak.seller.domain.OrderStatus
 import app.orderak.seller.feature.orders.OrdersFilter
 import app.orderak.seller.feature.today.TodayCounter
 import app.orderak.seller.feature.today.TodayScreen
 import app.orderak.seller.feature.today.TodayUiState
+import app.orderak.seller.core.money.Money
 import app.orderak.seller.core.ui.Banner
+import app.orderak.seller.core.ui.BottomNav
+import app.orderak.seller.core.ui.Fab
+import app.orderak.seller.core.ui.NavItem
+import app.orderak.seller.core.ui.TopBar
 import app.orderak.seller.core.ui.BannerState
 import app.orderak.seller.core.ui.PlanUsageRowItem
 import app.orderak.seller.core.ui.planUsageRows
@@ -78,7 +80,8 @@ import app.orderak.seller.data.billing.EntitlementRefreshResult
 import app.orderak.seller.data.billing.EntitlementSyncState
 import app.orderak.seller.core.share.shareStoreLink
 import app.orderak.seller.feature.products.shareCatalogText
-import app.orderak.seller.feature.operations.AnnouncementsDashboardIndicator
+import app.orderak.seller.feature.operations.OperationsViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 
@@ -129,6 +132,7 @@ fun MainScreen(
     viewModel: MainViewModel = hiltViewModel()
 ) {
     val shopName by viewModel.shopName.collectAsStateWithLifecycle()
+    val hasProducts by viewModel.hasProducts.collectAsStateWithLifecycle()
     val storeUrl by viewModel.storeUrl.collectAsStateWithLifecycle()
     val sellerPhone by viewModel.sellerPhone.collectAsStateWithLifecycle()
     val entitlementState by viewModel.entitlementState.collectAsStateWithLifecycle()
@@ -139,6 +143,21 @@ fun MainScreen(
     val versionPolicy = entitlementState.config?.governance?.version
     val configAge = entitlementState.lastUpdatedEpochMs?.let { System.currentTimeMillis() - it }
     val versionMode = versionUiMode(versionPolicy, configAge)
+    val unpaidOrders by viewModel.unpaidCount.collectAsStateWithLifecycle()
+    // The dot on حسابي says something there has not been read: an announcement.
+    // A list that has not loaded is not "no unread", so it draws no dot.
+    val operations: OperationsViewModel = hiltViewModel()
+    val announcements by operations.announcements.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { operations.loadAnnouncements() }
+    val hasUnreadAnnouncements = announcements?.any { !it.is_read } == true
+    val uriHandler = LocalUriHandler.current
+    val warning = versionMode == VersionUiMode.WARNING || versionMode == VersionUiMode.STALE_WARNING
+    val versionWarningText = if (warning) {
+        localizedVersionMessage(versionPolicy, blocking = false)
+            ?: stringResource(if (versionMode == VersionUiMode.STALE_WARNING) R.string.app_version_stale_warning else R.string.app_version_warning)
+    } else {
+        null
+    }
 
     if (versionMode in setOf(VersionUiMode.FORCE_UPDATE, VersionUiMode.BLOCKED, VersionUiMode.MAINTENANCE)) {
         VersionBlockingScreen(versionMode, versionPolicy ?: AppVersionPolicy(), viewModel::refreshPlanSettings)
@@ -186,6 +205,14 @@ fun MainScreen(
         surface = surface,
         onSurface = surfaceNav::navigateToSurface,
         onNewOrder = onNewOrder,
+        // A count not read yet draws no badge: it is not a claim of zero.
+        unpaidOrders = unpaidOrders ?: 0,
+        hasUnreadAnnouncements = hasUnreadAnnouncements,
+        canCreateOrder = hasProducts != false,
+        versionWarning = versionWarningText,
+        onUpdateVersion = versionPolicy?.store_url?.takeIf { it.isNotBlank() }?.let { url ->
+            { runCatching { uriHandler.openUri(url) } }
+        },
         snackbarHostState = snackbarHostState,
     ) {
         NavHost(navController = surfaceNav, startDestination = SellerSurface.Default.name) {
@@ -196,8 +223,10 @@ fun MainScreen(
                     storeUrl = storeUrl,
                     entitlementState = entitlementState,
                     syncStatus = syncStatus,
-                    versionMode = versionMode,
-                    versionPolicy = versionPolicy,
+                    unreadAnnouncements = announcements?.count { !it.is_read } ?: 0,
+                    onOpenOrder = onOpenOrder,
+                    onAddProduct = onAddProduct,
+                    onOpenSubscription = onOpenSubscription,
                     onRetrySync = { RefreshScheduler.refreshNow(appContext) },
                     onRefresh = { RefreshScheduler.refreshNow(appContext); viewModel.refreshPlanSettings() },
                     // Each counter carries the question it counts, so the list it
@@ -205,6 +234,7 @@ fun MainScreen(
                     // the seller to the same unfiltered page.
                     onOpenCounter = { counter ->
                         requestedOrdersFilter = when (counter) {
+                            TodayCounter.New -> OrdersFilter.Status(OrderStatus.NEW)
                             TodayCounter.Today -> OrdersFilter.Today
                             TodayCounter.Unpaid -> OrdersFilter.Unpaid
                             TodayCounter.ToShip -> OrdersFilter.ToShip
@@ -233,6 +263,9 @@ fun MainScreen(
                     onEdit = onEditProduct,
                     onLimitReached = onLimitReached,
                     sellerPhone = sellerPhone,
+                    onOpenStoreInfo = onOpenStoreInfo,
+                    onOpenCategories = onOpenCategories,
+                    onOpenLanguages = onOpenCatalogLanguages,
                 )
             }
 
@@ -255,6 +288,7 @@ fun MainScreen(
                     onOpenSubscription = onOpenSubscription,
                     onOpenAiAssistant = onOpenAiAssistant,
                     onOpenSellerProfile = onOpenSellerProfile,
+                    unreadAnnouncements = announcements?.count { !it.is_read } ?: 0,
                 )
             }
         }
@@ -300,64 +334,87 @@ private fun NavHostController.navigateToSurface(target: SellerSurface) {
     }
 }
 
+/** The surfaces that draw their own large title, so the shell does not draw its bar over it. */
+private val SURFACES_WITH_OWN_BAR = setOf(SellerSurface.Today, SellerSurface.Orders, SellerSurface.Store, SellerSurface.Customers, SellerSurface.Account)
+
 /**
  * The five-surface shell: what stays on screen whichever surface is showing.
  *
- * A top bar carrying the shop name, a FAB that belongs to اليوم alone, and the
- * navigation bar. The surface itself is a slot, so this composable is the whole
- * of what the `main-shell` contract means by content — and the only part of
- * MainScreen that does not need a Hilt graph to draw.
+ * A top bar carrying the shop name, the version warning when governance asks for
+ * one, a FAB that belongs to اليوم alone, and the bottom bar. The surface itself
+ * is a slot, so this composable is the whole of what the `main-shell` contract
+ * means by content, and the only part of MainScreen that does not need a Hilt
+ * graph to draw.
+ *
+ * The bottom bar carries the unpaid count on الطلبات and a dot on حسابي when an
+ * announcement is unread. The version warning is a banner above every surface
+ * and cannot be dismissed: it stays until the seller updates.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainShellContent(
     shopName: String?,
     surface: SellerSurface,
     onSurface: (SellerSurface) -> Unit,
     onNewOrder: () -> Unit,
+    unpaidOrders: Int = 0,
+    hasUnreadAnnouncements: Boolean = false,
+    versionWarning: String? = null,
+    onUpdateVersion: (() -> Unit)? = null,
+    /** An order needs a product, so with none the FAB is not offered. */
+    canCreateOrder: Boolean = true,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     content: @Composable () -> Unit,
 ) {
+    val spacing = LocalOrderakSpacing.current
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                // The app name until the shop's own arrives. Not a blank bar,
-                // and not a guess at the shop's name.
-                title = { Text(shopName ?: stringResource(R.string.app_name), modifier = Modifier.semantics { heading() }) },
-            )
+            // اليوم draws its own large title and its bell; the other surfaces keep the
+            // shop's name here until each brings its own bar (R5 to R8). The app name
+            // until the shop's own arrives: not a blank bar, and not a guess.
+            if (surface !in SURFACES_WITH_OWN_BAR) {
+                TopBar(title = shopName ?: stringResource(R.string.app_name))
+            }
         },
         floatingActionButton = {
             // اليوم only: on every other surface the primary action is that
             // surface's own, and two would compete.
-            if (surface == SellerSurface.Today) {
-                FloatingActionButton(onClick = onNewOrder) {
-                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.order_new_title))
-                }
+            if (surface == SellerSurface.Today && canCreateOrder) {
+                Fab(
+                    label = stringResource(R.string.order_new_title),
+                    icon = Icons.Outlined.Add,
+                    onClick = onNewOrder,
+                )
             }
         },
         bottomBar = {
-            NavigationBar {
-                SellerSurface.entries.forEach { item ->
-                    val label = stringResource(item.labelRes)
-                    NavigationBarItem(
-                        selected = surface == item,
-                        onClick = { onSurface(item) },
-                        icon = { Icon(item.icon, contentDescription = label) },
-                        label = { Text(label) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            selectedTextColor = MaterialTheme.colorScheme.onSurface,
-                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        ),
+            BottomNav(
+                items = SellerSurface.entries.map { item ->
+                    NavItem(
+                        label = stringResource(item.labelRes),
+                        icon = item.icon,
+                        selectedIcon = item.selectedIcon,
+                        badge = if (item == SellerSurface.Orders) unpaidOrders else 0,
+                        dot = item == SellerSurface.Account && hasUnreadAnnouncements,
                     )
-                }
-            }
+                },
+                selectedIndex = SellerSurface.entries.indexOf(surface),
+                onSelect = { onSurface(SellerSurface.entries[it]) },
+            )
         },
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) { content() }
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            if (versionWarning != null) {
+                Banner(
+                    state = BannerState.Warning,
+                    title = versionWarning,
+                    modifier = Modifier.padding(horizontal = spacing.space4, vertical = spacing.space2),
+                    actionLabel = onUpdateVersion?.let { stringResource(R.string.app_version_banner_action) },
+                    onAction = onUpdateVersion,
+                )
+            }
+            Box(Modifier.weight(1f).fillMaxWidth()) { content() }
+        }
     }
 }
 
@@ -370,8 +427,10 @@ private fun DashboardTab(
     storeUrl: String?,
     entitlementState: EntitlementSyncState,
     syncStatus: String?,
-    versionMode: VersionUiMode,
-    versionPolicy: AppVersionPolicy?,
+    unreadAnnouncements: Int,
+    onOpenOrder: (Long) -> Unit,
+    onAddProduct: () -> Unit,
+    onOpenSubscription: () -> Unit,
     onRetrySync: () -> Unit,
     onRefresh: () -> Unit,
     onOpenCounter: (TodayCounter) -> Unit,
@@ -380,8 +439,12 @@ private fun DashboardTab(
     val adManager = LocalAdManager.current
     val shopName by viewModel.shopName.collectAsStateWithLifecycle()
     val today by viewModel.todayCount.collectAsStateWithLifecycle()
+    val newOrders by viewModel.newCount.collectAsStateWithLifecycle()
     val unpaid by viewModel.unpaidCount.collectAsStateWithLifecycle()
     val toShip by viewModel.toShipCount.collectAsStateWithLifecycle()
+    val latestOrders by viewModel.latestOpenOrders.collectAsStateWithLifecycle()
+    val monthSales by viewModel.monthSales.collectAsStateWithLifecycle()
+    val summaryFailed by viewModel.summaryFailed.collectAsStateWithLifecycle()
 
     // Lightweight COUNT(*) instead of collecting the full product list here.
     val hasProducts by viewModel.hasProducts.collectAsStateWithLifecycle()
@@ -402,15 +465,20 @@ private fun DashboardTab(
         TodayScreen(
             state = TodayUiState(
                 shopName = shopName,
+                newCount = newOrders,
                 todayCount = today,
                 unpaidCount = unpaid,
                 toShipCount = toShip,
                 hasProducts = hasProducts,
-                planError = entitlementState.error,
-                hasPlanSnapshot = entitlementState.config != null,
-                usingOfflinePlan = entitlementState.freshness == EntitlementFreshness.OFFLINE,
+                summaryFailed = summaryFailed,
+                unreadAnnouncements = unreadAnnouncements,
+                latestOrders = latestOrders,
+                monthSales = monthSales?.let { Money(it.totalMinor, it.currency) },
+                storeUrl = storeUrl,
             ),
             onOpenCounter = onOpenCounter,
+            onOpenOrder = onOpenOrder,
+            onAddProduct = onAddProduct,
             onShareCatalog = {
                 scope.launch {
                     val url = storeUrl
@@ -419,12 +487,16 @@ private fun DashboardTab(
                 }
             },
             onOpenAnnouncements = onOpenAnnouncements,
-            onRetry = onRetrySync,
+            onRetry = {
+                // One retry for both things that can be behind: the sync, and a summary
+                // the device could not read.
+                viewModel.retrySummary()
+                onRetrySync()
+            },
             modifier = Modifier.fillMaxSize(),
             planNotices = {
                 Column(verticalArrangement = Arrangement.spacedBy(LocalOrderakSpacing.current.space2)) {
-                    PlanStatusBanners(entitlementState, versionMode, versionPolicy)
-                    AnnouncementsDashboardIndicator(onOpenAnnouncements)
+                    PlanStatusBanners(entitlementState)
                     if (syncStatus == "running" || syncStatus == "pending" || syncStatus == "failed") {
                         val failed = syncStatus == "failed"
                         Banner(
@@ -436,25 +508,18 @@ private fun DashboardTab(
                     }
                 }
             },
-            planUsage = { entitlementState.config?.let { config -> PlanUsageCard(config) } },
+            planUsage = { entitlementState.config?.let { config -> PlanUsageCard(config, onOpenSubscription) } },
             footer = { adManager.Banner(Modifier.fillMaxWidth()) },
         )
     }
 }
 
 @Composable
-private fun PlanStatusBanners(state: EntitlementSyncState, versionMode: VersionUiMode, versionPolicy: AppVersionPolicy?) {
+private fun PlanStatusBanners(state: EntitlementSyncState) {
     val spacing = LocalOrderakSpacing.current
     val config = state.config
     var dismissedPending by rememberSaveable(config?.pending_revision_id) { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(spacing.space2)) {
-        if (versionMode == VersionUiMode.WARNING || versionMode == VersionUiMode.STALE_WARNING) {
-            PlanNotice(
-                text = localizedVersionMessage(versionPolicy, blocking = false)
-                    ?: stringResource(if (versionMode == VersionUiMode.STALE_WARNING) R.string.app_version_stale_warning else R.string.app_version_warning),
-                dismissible = false,
-            )
-        }
         if (state.freshness == EntitlementFreshness.OFFLINE) {
             // Was a hand-rolled surface on secondaryContainer — the orange this
             // system reserves for nothing in particular. The shared banner makes
@@ -483,9 +548,11 @@ private fun PlanStatusBanners(state: EntitlementSyncState, versionMode: VersionU
 /**
  * The app held shut by governance.
  *
- * Three modes and one shape: an update the seller must take, a build the server
- * refuses, and a maintenance window. Only FORCE_UPDATE offers a store link,
- * because it is the only one the seller can act on — the other two are waits.
+ * Three modes and one frame: an update the seller must take, a build the server
+ * refuses, and a maintenance window. Only FORCE_UPDATE offers a button, and the
+ * button is the way out: the other two are waits, and a button that cannot help
+ * is worse than none. A wait looks again every [WAIT_RECHECK_MS], so it ends by
+ * itself when the server lets the seller back in.
  */
 @Composable
 internal fun VersionBlockingScreen(mode: VersionUiMode, policy: AppVersionPolicy, onRetry: () -> Unit) {
@@ -501,24 +568,37 @@ internal fun VersionBlockingScreen(mode: VersionUiMode, policy: AppVersionPolicy
         VersionUiMode.BLOCKED -> stringResource(R.string.app_version_blocked_body)
         else -> stringResource(R.string.app_version_update_body)
     }
+    val isWait = mode != VersionUiMode.FORCE_UPDATE
+    if (isWait) {
+        LaunchedEffect(mode) {
+            while (true) {
+                delay(WAIT_RECHECK_MS)
+                onRetry()
+            }
+        }
+    }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
             Modifier.fillMaxSize().padding(spacing.space8),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(title, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center)
+            Text(title, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center, modifier = Modifier.semantics { heading() })
             Spacer(Modifier.height(spacing.space3))
             Text(localizedVersionMessage(policy, blocking = true) ?: fallback, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(spacing.space6))
             if (mode == VersionUiMode.FORCE_UPDATE && !policy.store_url.isNullOrBlank()) {
-                Button(onClick = { runCatching { uriHandler.openUri(policy.store_url) } }) { Text(stringResource(R.string.app_version_update_action)) }
-                Spacer(Modifier.height(spacing.space2))
+                Spacer(Modifier.height(spacing.space6))
+                Button(
+                    onClick = { runCatching { uriHandler.openUri(policy.store_url) } },
+                    modifier = Modifier.heightIn(min = spacing.minimumTouchTarget),
+                ) { Text(stringResource(R.string.app_version_update_action)) }
             }
-            TextButton(onClick = onRetry) { Text(stringResource(R.string.common_retry)) }
         }
     }
 }
+
+/** How often a blocked or maintenance screen asks the server whether the seller may come back. */
+internal const val WAIT_RECHECK_MS = 60_000L
 
 @Composable
 private fun localizedVersionMessage(policy: AppVersionPolicy?, blocking: Boolean): String? {
@@ -549,20 +629,31 @@ private fun PlanNotice(text: String, dismissible: Boolean, onDismiss: () -> Unit
     }
 }
 
+/** From this share of a limit used, the plan is worth the seller's attention on اليوم. */
+private const val PLAN_ATTENTION_AT = 0.9f
+
+/**
+ * The plan, on اليوم, only when it needs the seller.
+ *
+ * Where limits are enforced, a buyer's order from the link is refused once the
+ * monthly limit is reached, and the seller would not otherwise know. Below 90%
+ * the plan is on its own screen, حسابي › الاشتراك, not here.
+ */
 @Composable
-private fun PlanUsageCard(config: BackendConfig) {
+private fun PlanUsageCard(config: BackendConfig, onOpenSubscription: () -> Unit) {
     val spacing = LocalOrderakSpacing.current
     // Rows, order and unlimited handling all come from core/ui/PlanUsage.kt, so
-    // this card and the subscription screen cannot drift apart again. It used to
-    // keep its own list and its own filter, and the two screens disagreed about
-    // what an unlimited plan looks like.
-    val rows = planUsageRows(config)
+    // this card and the subscription screen cannot drift apart again.
+    val rows = planUsageRows(config).filter { it.limit != null && it.limit > 0 && it.used.toFloat() / it.limit >= PLAN_ATTENTION_AT }
     if (rows.isEmpty()) return
 
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth().padding(spacing.space4), verticalArrangement = Arrangement.spacedBy(spacing.space3)) {
             Text(stringResource(R.string.plan_usage_title), style = MaterialTheme.typography.titleMedium)
             rows.forEach { row -> PlanUsageRowItem(row) }
+            TextButton(onClick = onOpenSubscription, modifier = Modifier.heightIn(min = spacing.minimumTouchTarget)) {
+                Text(stringResource(R.string.today_plan_details))
+            }
         }
     }
 }

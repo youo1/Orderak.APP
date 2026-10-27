@@ -20,14 +20,17 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 import app.orderak.seller.R
+import androidx.compose.ui.res.pluralStringResource
 import app.orderak.seller.core.money.formatAmountLabel
+import app.orderak.seller.core.text.formatAgo
+import app.orderak.seller.core.text.formatCount
+import app.orderak.seller.core.text.formatNumber
+import app.orderak.seller.core.ui.isolated
 import app.orderak.seller.core.ui.PriorityListRow
 import app.orderak.seller.core.ui.SemanticChip
 import app.orderak.seller.core.ui.SemanticRole
 import app.orderak.seller.data.db.OrderEntity
 import app.orderak.seller.domain.OrderStatus
-import java.text.DateFormat
-import java.util.Date
 
 /** S5 — pipeline list with status filter chips. */
 @Composable
@@ -53,9 +56,16 @@ fun OrdersScreen(
     val filter by viewModel.filter.collectAsStateWithLifecycle()
     val refusedPushes by viewModel.refusedPushes.collectAsStateWithLifecycle()
     val loadError by viewModel.loadError.collectAsStateWithLifecycle()
+    val itemCounts by viewModel.itemCounts.collectAsStateWithLifecycle()
 
     OrdersContent(
-        state = OrdersUiState(orders = orders, filter = filter, refusedPushes = refusedPushes, loadError = loadError),
+        state = OrdersUiState(
+            orders = orders,
+            filter = filter,
+            refusedPushes = refusedPushes,
+            loadError = loadError,
+            itemCounts = itemCounts,
+        ),
         onOpen = onOpen,
         onNew = onNew,
         // The view model still keeps a status-shaped setter for the chips that
@@ -66,32 +76,40 @@ fun OrdersScreen(
 }
 
 @Composable
-fun OrderCard(o: OrderEntity, refused: Boolean = false, onClick: () -> Unit) {
+fun OrderCard(
+    o: OrderEntity,
+    refused: Boolean = false,
+    /** How many lines the order has, or null when that has not been read. */
+    itemCount: Int? = null,
+    onClick: () -> Unit,
+) {
     val spacing = LocalOrderakSpacing.current
-    // Key the formatter by the current app locale. A global formatter would
-    // keep displaying the previous language after an in-app locale switch.
+    // Key the formatters by the current app locale. A global one would keep
+    // displaying the previous language after an in-app locale switch.
     val locale = LocalConfiguration.current.locales[0]
-    val dateFormatter = remember(locale) {
-        DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, locale)
-    }
-    val dateText = remember(o.createdAt, dateFormatter) {
-        dateFormatter.format(Date(o.createdAt))
-    }
     val status = remember(o.status) {
         runCatching { OrderStatus.valueOf(o.status) }.getOrDefault(OrderStatus.NEW)
     }
+    // "#1042 · 3 items · 1 hour ago": which order, how big, how long it has waited.
+    // The number is the server's when the order has one, this phone's own otherwise,
+    // and is isolated so its digits never reorder inside an Arabic line.
+    val number = isolated("#" + formatNumber(o.remoteId ?: o.id, locale))
+    val items = itemCount?.let { pluralStringResource(R.plurals.orders_item_count, it, formatCount(it, locale)) }
+    val ago = remember(o.createdAt, locale) { formatAgo(o.createdAt, System.currentTimeMillis(), locale) }
+    val subtitle = listOfNotNull(number, items, ago).joinToString(" · ")
     // The list's job is "which of these still need me?", not "what stage is
     // each one at". The rail answers that by shape, so the sort survives
     // greyscale, colour blindness and a phone in the sun; the chip repeats it.
     PriorityListRow(
         title = o.buyerName ?: o.buyerPhone,
-        subtitle = dateText,
+        subtitle = subtitle,
         needsAction = status.needsSeller,
+        dimmed = !status.needsSeller,
         modifier = Modifier.clickable(onClick = onClick).semantics(mergeDescendants = true) {},
         trailing = {
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    // Same locale the date above uses. Reading the ambient default
+                    // Same locale the time above uses. Reading the ambient default
                     // here would let money keep Latin digits on a screen whose
                     // dates have already switched to Arabic-Indic.
                     formatAmountLabel(o.totalMinor, o.currency, locale),

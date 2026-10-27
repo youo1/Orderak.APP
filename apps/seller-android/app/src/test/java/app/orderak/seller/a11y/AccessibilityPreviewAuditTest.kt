@@ -15,6 +15,8 @@ package app.orderak.seller.a11y
 import android.app.Application
 import android.content.Context
 import android.content.res.Configuration
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.view.View
 import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
@@ -31,6 +33,7 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.node.LayoutNode
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -39,6 +42,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.ComposeTestRule
@@ -56,6 +60,7 @@ import com.google.android.apps.common.testing.accessibility.framework.utils.cont
 import com.google.android.apps.common.testing.accessibility.framework.utils.contrast.ContrastSwatch
 import java.io.File
 import java.util.Locale
+import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
 import org.junit.Assert.assertEquals
@@ -262,137 +267,14 @@ private data class KnownFinding(
 }
 private data class KnownKind(val reason: String, val plan: String)
 private val KNOWN_KINDS: Map<String, KnownKind> = mapOf(
-    "TS" to KnownKind("Touch target is below the 48dp minimum", "B5: enlarge the kit control to a 48dp target"),
     "CF" to KnownKind("Field label colour is below the 4.5:1 threshold", "R1: use the accessible onSurfaceVariant token"),
-    "CD" to KnownKind("Dialog window not captured under Robolectric", "R1: audit dialog window capture and colour tokens"),
     "CG" to KnownKind("Text colour is below the WCAG threshold", "R1: use the accessible design-system colour token"),
-    "CO" to KnownKind("Text crop is outside the captured frame in this preview", "R1: keep the audited text node inside the visible frame"),
     "IL" to KnownKind(
         "Inline text link has no semantics label of its own",
         "R3: present the terms and privacy links as their own controls in the redesigned setup",
     ),
 )
 private val KNOWN_FINDINGS: List<KnownFinding> = """
-        CD|ProductEditScreenshotTestKt.productEditConfirmDelete|Contrast|text "إلغاء"
-        CD|ProductEditScreenshotTestKt.productEditConfirmDelete|Contrast|text "امسح المنتج"
-        CD|ProductEditScreenshotTestKt.productEditConfirmDelete|Contrast|text "تحذف المنتج؟ مش هينفع ترجّعه بعد كده."
-        CD|ProductEditScreenshotTestKt.productEditConfirmDelete|Contrast|text "حذف"
-        CD|ProductEditScreenshotTestKt.productEditStockConflictDark|Contrast|text "اكتب ١٢ برضه"
-        CD|ProductEditScreenshotTestKt.productEditStockConflictDark|Contrast|text "انت كتبت ١٢، والمحل دلوقتي عنده ٩ — جه طلب وانت بتعدّل. باقي تعديلاتك اتحفظت."
-        CD|ProductEditScreenshotTestKt.productEditStockConflictDark|Contrast|text "خليها ٩"
-        CD|ProductEditScreenshotTestKt.productEditStockConflict|Contrast|text "اكتب ١٢ برضه"
-        CD|ProductEditScreenshotTestKt.productEditStockConflict|Contrast|text "انت كتبت ١٢، والمحل دلوقتي عنده ٩ — جه طلب وانت بتعدّل. باقي تعديلاتك اتحفظت."
-        CD|ProductEditScreenshotTestKt.productEditStockConflict|Contrast|text "خليها ٩"
-        CF|AccountScreenshotTestKt.accountContentLight|Contrast|text "رقم فودافون كاش"
-        CF|AccountScreenshotTestKt.accountLoadingLight|Contrast|text "رقم فودافون كاش"
-        TS|OrdersScreenshotTestKt.ordersBothGroupsDark|Target|touch target
-        TS|OrdersScreenshotTestKt.ordersBothGroupsLight|Target|touch target
-        TS|OrdersScreenshotTestKt.ordersContentDark|Target|touch target
-        TS|OrdersScreenshotTestKt.ordersContentLight|Target|touch target
-        TS|OrdersScreenshotTestKt.ordersErrorDark|Target|touch target
-        TS|OrdersScreenshotTestKt.ordersErrorLight|Target|touch target
-        TS|OrdersScreenshotTestKt.ordersFilteredToNone|Target|touch target
-        TS|OrdersScreenshotTestKt.ordersFilteredUnpaid|Target|touch target
-        CO|AccountScreenshotTestKt.accountContentDark|Contrast|text "إجراءات الحساب" at
-        CO|AccountScreenshotTestKt.accountContentDark|Contrast|text "احفظ" at
-        CO|AccountScreenshotTestKt.accountContentDark|Contrast|text "تسجيل خروج" at
-        CO|AccountScreenshotTestKt.accountContentDark|Contrast|text "حالة طلب الحذف" at
-        CO|AccountScreenshotTestKt.accountContentDark|Contrast|text "طلب حذف الحساب" at
-        CO|AccountScreenshotTestKt.accountContentDark|Contrast|text "لغة التطبيق" at
-        CO|AccountScreenshotTestKt.accountContentLight|Contrast|text "إجراءات الحساب" at
-        CO|AccountScreenshotTestKt.accountContentLight|Contrast|text "احفظ" at
-        CO|AccountScreenshotTestKt.accountContentLight|Contrast|text "تسجيل خروج" at
-        CO|AccountScreenshotTestKt.accountContentLight|Contrast|text "حالة طلب الحذف" at
-        CO|AccountScreenshotTestKt.accountContentLight|Contrast|text "طلب حذف الحساب" at
-        CO|AccountScreenshotTestKt.accountContentLight|Contrast|text "لغة التطبيق" at
-        CO|AccountScreenshotTestKt.accountFreePlan|Contrast|text "إجراءات الحساب" at
-        CO|AccountScreenshotTestKt.accountFreePlan|Contrast|text "احفظ" at
-        CO|AccountScreenshotTestKt.accountFreePlan|Contrast|text "تسجيل خروج" at
-        CO|AccountScreenshotTestKt.accountFreePlan|Contrast|text "حالة طلب الحذف" at
-        CO|AccountScreenshotTestKt.accountFreePlan|Contrast|text "رقم فودافون كاش" at
-        CO|AccountScreenshotTestKt.accountFreePlan|Contrast|text "طلب حذف الحساب" at
-        CO|AccountScreenshotTestKt.accountFreePlan|Contrast|text "لغة التطبيق" at
-        CO|AccountScreenshotTestKt.accountFreePlanUpgradable|Contrast|text "إجراءات الحساب" at
-        CO|AccountScreenshotTestKt.accountFreePlanUpgradable|Contrast|text "احفظ" at
-        CO|AccountScreenshotTestKt.accountFreePlanUpgradable|Contrast|text "تسجيل خروج" at
-        CO|AccountScreenshotTestKt.accountFreePlanUpgradable|Contrast|text "حالة طلب الحذف" at
-        CO|AccountScreenshotTestKt.accountFreePlanUpgradable|Contrast|text "رقم فودافون كاش" at
-        CO|AccountScreenshotTestKt.accountFreePlanUpgradable|Contrast|text "طلب حذف الحساب" at
-        CO|AccountScreenshotTestKt.accountFreePlanUpgradable|Contrast|text "لغة التطبيق" at
-        CO|AccountScreenshotTestKt.accountLinkPending|Contrast|text "إجراءات الحساب" at
-        CO|AccountScreenshotTestKt.accountLinkPending|Contrast|text "احفظ" at
-        CO|AccountScreenshotTestKt.accountLinkPending|Contrast|text "تسجيل خروج" at
-        CO|AccountScreenshotTestKt.accountLinkPending|Contrast|text "حالة طلب الحذف" at
-        CO|AccountScreenshotTestKt.accountLinkPending|Contrast|text "رقم فودافون كاش" at
-        CO|AccountScreenshotTestKt.accountLinkPending|Contrast|text "طلب حذف الحساب" at
-        CO|AccountScreenshotTestKt.accountLinkPending|Contrast|text "لغة التطبيق" at
-        CO|AccountScreenshotTestKt.accountLoadingDark|Contrast|text "إجراءات الحساب" at
-        CO|AccountScreenshotTestKt.accountLoadingDark|Contrast|text "احفظ" at
-        CO|AccountScreenshotTestKt.accountLoadingDark|Contrast|text "تسجيل خروج" at
-        CO|AccountScreenshotTestKt.accountLoadingDark|Contrast|text "حالة طلب الحذف" at
-        CO|AccountScreenshotTestKt.accountLoadingDark|Contrast|text "طلب حذف الحساب" at
-        CO|AccountScreenshotTestKt.accountLoadingDark|Contrast|text "لغة التطبيق" at
-        CO|AccountScreenshotTestKt.accountLoadingLight|Contrast|text "إجراءات الحساب" at
-        CO|AccountScreenshotTestKt.accountLoadingLight|Contrast|text "احفظ" at
-        CO|AccountScreenshotTestKt.accountLoadingLight|Contrast|text "تسجيل خروج" at
-        CO|AccountScreenshotTestKt.accountLoadingLight|Contrast|text "حالة طلب الحذف" at
-        CO|AccountScreenshotTestKt.accountLoadingLight|Contrast|text "طلب حذف الحساب" at
-        CO|AccountScreenshotTestKt.accountLoadingLight|Contrast|text "لغة التطبيق" at
-        CO|AuthScreenshotTestKt.authCountryPicker|Contrast|text "+372" at
-        CO|AuthScreenshotTestKt.authCountryPicker|Contrast|text "🇪🇪  إستونيا" at
-        CO|AuthScreenshotTestKt.authCountryPickerDark|Contrast|text "+372" at
-        CO|AuthScreenshotTestKt.authCountryPickerDark|Contrast|text "🇪🇪  إستونيا" at
-        CO|AuthScreenshotTestKt.authCountryPickerSearch|Contrast|text "+213" at
-        CO|AuthScreenshotTestKt.authCountryPickerSearch|Contrast|text "🇩🇿  الجزائر" at
-        CO|BillingScreenshotTestKt.plansContentDark|Contrast|text "برو" at
-        CO|BillingScreenshotTestKt.plansContentDark|Contrast|text "غير محدود" at
-        CO|BillingScreenshotTestKt.plansContentDark|Contrast|text "غير محدود" at
-        CO|BillingScreenshotTestKt.plansContentDark|Contrast|text "متاح" at
-        CO|BillingScreenshotTestKt.plansContentLight|Contrast|text "برو" at
-        CO|BillingScreenshotTestKt.plansContentLight|Contrast|text "غير محدود" at
-        CO|BillingScreenshotTestKt.plansContentLight|Contrast|text "غير محدود" at
-        CO|BillingScreenshotTestKt.plansContentLight|Contrast|text "متاح" at
-        CO|BillingScreenshotTestKt.plansPurchaseOpen|Contrast|text "برو" at
-        CO|BillingScreenshotTestKt.plansPurchaseOpen|Contrast|text "غير محدود" at
-        CO|BillingScreenshotTestKt.plansPurchaseOpen|Contrast|text "غير محدود" at
-        CO|BillingScreenshotTestKt.plansPurchaseOpen|Contrast|text "متاح" at
-        CO|OrdersScreenshotTestKt.ordersBothGroupsDark|Contrast|text "جديد" at
-        CO|OrdersScreenshotTestKt.ordersBothGroupsLight|Contrast|text "جديد" at
-        CO|OrdersScreenshotTestKt.ordersContentDark|Contrast|text "جديد" at
-        CO|OrdersScreenshotTestKt.ordersContentLight|Contrast|text "جديد" at
-        CO|OrdersScreenshotTestKt.ordersErrorDark|Contrast|text "جديد" at
-        CO|OrdersScreenshotTestKt.ordersErrorLight|Contrast|text "جديد" at
-        CO|OrdersScreenshotTestKt.ordersFilteredToNone|Contrast|text "جديد" at
-        CO|OrdersScreenshotTestKt.ordersFilteredUnpaid|Contrast|text "جديد" at
-        CO|StoreGroupScreenshotTestKt.storeInfoContentDark|Contrast|text "احفظ" at
-        CO|StoreGroupScreenshotTestKt.storeInfoContentDark|Contrast|text "التصنيف الفرعي" at
-        CO|StoreGroupScreenshotTestKt.storeInfoContentDark|Contrast|text "الشعار" at
-        CO|StoreGroupScreenshotTestKt.storeInfoContentDark|Contrast|text "صورة الغلاف" at
-        CO|StoreGroupScreenshotTestKt.storeInfoContentLight|Contrast|text "احفظ" at
-        CO|StoreGroupScreenshotTestKt.storeInfoContentLight|Contrast|text "التصنيف الفرعي" at
-        CO|StoreGroupScreenshotTestKt.storeInfoContentLight|Contrast|text "الشعار" at
-        CO|StoreGroupScreenshotTestKt.storeInfoContentLight|Contrast|text "صورة الغلاف" at
-        CO|StoreGroupScreenshotTestKt.storeInfoIdentityLight|Contrast|text "احفظ" at
-        CO|StoreGroupScreenshotTestKt.storeInfoIdentityLight|Contrast|text "التصنيف الفرعي" at
-        CO|StoreGroupScreenshotTestKt.storeInfoIdentityLight|Contrast|text "الشعار" at
-        CO|StoreGroupScreenshotTestKt.storeInfoIdentityLight|Contrast|text "صورة الغلاف" at
-        CO|StoreGroupScreenshotTestKt.storeInfoSaving|Contrast|text "التصنيف الفرعي" at
-        CO|StoreGroupScreenshotTestKt.storeInfoSaving|Contrast|text "الشعار" at
-        CO|StoreGroupScreenshotTestKt.storeInfoSaving|Contrast|text "صورة الغلاف" at
-        CO|StoreGroupScreenshotTestKt.storeInfoSlugTaken|Contrast|text "احفظ" at
-        CO|StoreGroupScreenshotTestKt.storeInfoSlugTaken|Contrast|text "التصنيف الفرعي" at
-        CO|StoreGroupScreenshotTestKt.storeInfoSlugTaken|Contrast|text "الشعار" at
-        CO|StoreGroupScreenshotTestKt.storeInfoSlugTaken|Contrast|text "صورة الغلاف" at
-        IL|ShopSetupScreenshotTestKt.setupAccountDark|Label|has no ContentDescription or Text
-        IL|ShopSetupScreenshotTestKt.setupAccountDark|Label|has no ContentDescription or Text
-        IL|ShopSetupScreenshotTestKt.setupAccountEmpty|Label|has no ContentDescription or Text
-        IL|ShopSetupScreenshotTestKt.setupAccountEmpty|Label|has no ContentDescription or Text
-        IL|ShopSetupScreenshotTestKt.setupAccountInvalidEmail|Label|has no ContentDescription or Text
-        IL|ShopSetupScreenshotTestKt.setupAccountInvalidEmail|Label|has no ContentDescription or Text
-        IL|ShopSetupScreenshotTestKt.setupAccountLight|Label|has no ContentDescription or Text
-        IL|ShopSetupScreenshotTestKt.setupAccountLight|Label|has no ContentDescription or Text
-        IL|ShopSetupScreenshotTestKt.setupAccountSaving|Label|has no ContentDescription or Text
-        IL|ShopSetupScreenshotTestKt.setupAccountSaving|Label|has no ContentDescription or Text
 """.trimIndent().lines().filter { it.isNotBlank() }.map { line ->
     val parts = line.split("|", limit = 4)
     val kind = KNOWN_KINDS.getValue(parts[0])
@@ -404,7 +286,20 @@ private val KNOWN_FINDINGS: List<KnownFinding> = """
         plan = kind.plan,
     )
 }
-fun auditAccessibility(rule: ComposeTestRule, preview: String): List<String> {
+/**
+ * Audits every active Compose root, which includes the roots of dialog and
+ * popup windows: each root is its own window with its own semantics and its own
+ * pixels, and its bounds are relative to that window.
+ *
+ * [capture] returns the pixels of one root, or null when they cannot be read.
+ * A root that has text but no pixels is reported, never passed: an unread
+ * window proves nothing about contrast.
+ */
+fun auditAccessibility(
+    rule: ComposeTestRule,
+    preview: String,
+    capture: (SemanticsNodeInteraction) -> Bitmap? = ::captureWindow,
+): List<String> {
     val diagnostics = mutableListOf<String>()
     // The content's locale is only visible on the audited nodes themselves, so
     // each diagnostic reads it from the node it is about. The preview harness
@@ -454,17 +349,20 @@ fun auditAccessibility(rule: ComposeTestRule, preview: String): List<String> {
             for (second in first + 1 until actionable.size) {
                 val a = actionable[first]
                 val b = actionable[second]
-                if (a.touchBoundsInRoot.width <= 0f || a.touchBoundsInRoot.height <= 0f ||
-                    b.touchBoundsInRoot.width <= 0f || b.touchBoundsInRoot.height <= 0f
-                ) {
+                val touchA = reachableTouchBounds(a)
+                val touchB = reachableTouchBounds(b)
+                if (touchA.width <= 0f || touchA.height <= 0f || touchB.width <= 0f || touchB.height <= 0f) {
                     continue
                 }
-                if (a.touchBoundsInRoot.overlaps(b.touchBoundsInRoot) &&
-                    !isAncestor(a, b) &&
-                    !isAncestor(b, a)
-                ) {
-                    diagnostics += "${previewLabel(a, preview)} Target: " +
-                        "${a.touchBoundsInRoot} overlaps ${b.touchBoundsInRoot}"
+                // A modal sheet's scrim is one target the size of the window that dismisses
+                // the sheet; everything under it is blocked by design, so it is a barrier and
+                // not a competing target.
+                val rootBounds = mergedRoot.boundsInRoot
+                fun spansWindow(r: androidx.compose.ui.geometry.Rect) =
+                    r.width >= rootBounds.width - 1f && r.height >= rootBounds.height - 1f
+                if (spansWindow(touchA) != spansWindow(touchB)) continue
+                if (touchA.overlaps(touchB) && !isAncestor(a, b) && !isAncestor(b, a)) {
+                    diagnostics += "${previewLabel(a, preview)} Target: $touchA overlaps $touchB"
                 }
             }
         }
@@ -472,8 +370,8 @@ fun auditAccessibility(rule: ComposeTestRule, preview: String): List<String> {
     val unmergedRoots = rule.onAllNodes(isRoot(), useUnmergedTree = true)
     val unmergedNodes = unmergedRoots.fetchSemanticsNodes()
     for (index in unmergedNodes.indices) {
-        val bitmap = unmergedRoots[index].captureToImage().asAndroidBitmap()
-        val atfImage = BitmapImage(bitmap)
+        var bitmap = capture(unmergedRoots[index])
+        var atfImage = bitmap?.let { BitmapImage(it) }
         fun visitUnmerged(node: SemanticsNode) {
             val disabled = isDisabled(node)
             if (disabled) skippedDisabled++
@@ -483,34 +381,73 @@ fun auditAccessibility(rule: ComposeTestRule, preview: String): List<String> {
                     .orEmpty()
                     .joinToString(" ") { it.text }
                     .trim()
-                if (content.isNotEmpty()) {
+                if (content.isNotEmpty() && bitmap == null) {
+                    diagnostics += "${previewLabel(node, preview)} Contrast: text \"$content\" at " +
+                        "${node.boundsInRoot} is in a window that was not captured"
+                } else if (content.isNotEmpty() && bitmap != null && atfImage != null) {
                     val bounds = node.boundsInRoot
-                    val left = floor(bounds.left).toInt().coerceAtLeast(0)
-                    val top = floor(bounds.top).toInt().coerceAtLeast(0)
-                    val right = ceil(bounds.right).toInt().coerceAtMost(bitmap.width)
-                    val bottom = ceil(bounds.bottom).toInt().coerceAtMost(bitmap.height)
-                    if (right <= left || bottom <= top) {
+                    var window: Bitmap = bitmap!!
+                    var windowImage: BitmapImage = atfImage!!
+                    var region = visibleRegion(node.boundsInRoot, window)
+                    // Text that is not wholly in the frame is measured where a seller
+                    // would read it: the scroll container brings it fully into view, the
+                    // frame is captured again, and the container goes back to where it
+                    // was. A sliver of a label is not a measurement of the label.
+                    var restoreTo: Pair<Float, Float>? = null
+                    var recaptured = true
+                    if (region == null || !isWhollyVisible(node, region)) {
+                        restoreTo = scrollIntoView(rule, node, window)
+                        if (restoreTo != null) {
+                            val fresh = capture(unmergedRoots[index])
+                            if (fresh == null) {
+                                recaptured = false
+                            } else {
+                                window = fresh
+                                windowImage = BitmapImage(fresh)
+                                region = visibleRegion(node.boundsInRoot, window)
+                            }
+                        }
+                    }
+                    if (!recaptured) {
+                        diagnostics += "${previewLabel(node, preview)} Contrast: text \"$content\" at $bounds " +
+                            "is in a window that was not captured after scrolling"
+                    } else if (region == null) {
                         diagnostics += "${previewLabel(node, preview)} Contrast: text \"$content\" at $bounds " +
                             "is outside the captured image"
                     } else {
+                        val (left, top, right, bottom) = region
+                        val measuredAt = node.boundsInRoot
                         val ratio = try {
-                            val crop = atfImage.crop(left, top, right - left, bottom - top)
+                            val crop = windowImage.crop(left, top, right - left, bottom - top)
                             ContrastSwatch(crop, false).contrastRatios.minOrNull()
                                 ?: throw IllegalStateException("ATF returned no contrast ratio")
                         } catch (error: Throwable) {
                             throw AssertionError(
                                 "${previewLabel(node, preview)} Contrast: failed to measure " +
-                                    "text \"$content\" at $bounds",
+                                    "text \"$content\" at $measuredAt",
                                 error,
                             )
                         }
                         val threshold = if (isLargeText(node, density)) 3.0 else 4.5
                         if (ratio <= 1.0) {
-                            diagnostics += "${previewLabel(node, preview)} Contrast: text \"$content\" at $bounds " +
+                            diagnostics += "${previewLabel(node, preview)} Contrast: text \"$content\" at $measuredAt " +
                                 "is not measurable (single-colour crop)"
                         } else if (ratio < threshold) {
-                            diagnostics += "${previewLabel(node, preview)} Contrast: text \"$content\" at $bounds " +
+                            diagnostics += "${previewLabel(node, preview)} Contrast: text \"$content\" at $measuredAt " +
                                 "measured ${formatRatio(ratio)}:1, below ${formatRatio(threshold)}:1"
+                        }
+                    }
+                    if (restoreTo != null) {
+                        val container = scrollContainerOf(node)
+                        val restored = container != null && restoreScroll(rule, container, restoreTo)
+                        if (!restored) {
+                            // The frame the later nodes are measured on must match the
+                            // screen, whatever happened to the scroll position.
+                            val fresh = capture(unmergedRoots[index])
+                            bitmap = fresh
+                            atfImage = fresh?.let { BitmapImage(it) }
+                            diagnostics += "${previewLabel(node, preview)} Contrast: the scroll container of " +
+                                "text \"$content\" did not return to its position after measuring"
                         }
                     }
                 }
@@ -525,6 +462,142 @@ fun auditAccessibility(rule: ComposeTestRule, preview: String): List<String> {
     )
     return diagnostics
 }
+/**
+ * The pixels of one root. The activity's own root is read the way the harness
+ * always has. A dialog or popup root is drawn from its own view, because a
+ * window copy of the activity returns the activity's surface, not the dialog's.
+ * Pixels the dialog leaves transparent stay transparent; a dialog's text sits on
+ * the dialog's own surface, which is what is measured.
+ */
+private fun captureWindow(interaction: SemanticsNodeInteraction): Bitmap? {
+    val node = interaction.fetchSemanticsNode()
+    if (!isOverlayWindow(node)) return interaction.captureToImage().asAndroidBitmap()
+    val view = (node.root as? ViewRootForTest)?.view ?: return null
+    if (view.width <= 0 || view.height <= 0) return null
+    val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+    view.draw(Canvas(bitmap))
+    return bitmap
+}
+
+/** The part of [bounds] inside [window], as left, top, right, bottom pixels; null when none is. */
+private fun visibleRegion(bounds: androidx.compose.ui.geometry.Rect, window: Bitmap): IntArray? {
+    val left = floor(bounds.left).toInt().coerceAtLeast(0)
+    val top = floor(bounds.top).toInt().coerceAtLeast(0)
+    val right = ceil(bounds.right).toInt().coerceAtMost(window.width)
+    val bottom = ceil(bounds.bottom).toInt().coerceAtMost(window.height)
+    return if (right <= left || bottom <= top) null else intArrayOf(left, top, right, bottom)
+}
+
+private fun scrollContainerOf(node: SemanticsNode): SemanticsNode? =
+    generateSequence(node.parent) { it.parent }
+        .firstOrNull { it.config.getOrNull(SemanticsActions.ScrollBy) != null }
+
+/** The text is inside the frame in full, not only a part of it. */
+private fun isWhollyVisible(node: SemanticsNode, region: IntArray): Boolean =
+    region[2] - region[0] >= node.size.width - 1 && region[3] - region[1] >= node.size.height - 1
+
+/** Where a scroll container is now: horizontal, then vertical, as its own scroll values read. */
+private fun scrollValues(container: SemanticsNode): Pair<Float, Float> {
+    val horizontal = container.config.getOrNull(SemanticsProperties.HorizontalScrollAxisRange)
+    val vertical = container.config.getOrNull(SemanticsProperties.VerticalScrollAxisRange)
+    return (horizontal?.value?.invoke() ?: 0f) to (vertical?.value?.invoke() ?: 0f)
+}
+
+/**
+ * Puts a scroll container back to [saved], read from the container itself. A
+ * scroll stops at the ends of its content, so reversing the amount asked for is
+ * not the same as going back; and a horizontal container may run against the
+ * layout direction, which shows as the error growing, so the sign is flipped.
+ */
+private fun restoreScroll(rule: ComposeTestRule, container: SemanticsNode, saved: Pair<Float, Float>): Boolean {
+    val action = container.config.getOrNull(SemanticsActions.ScrollBy)?.action ?: return false
+    var flipX = false
+    repeat(6) {
+        val now = scrollValues(container)
+        val dx = saved.first - now.first
+        val dy = saved.second - now.second
+        if (abs(dx) < 0.5f && abs(dy) < 0.5f) return true
+        rule.runOnUiThread { action(if (flipX) -dx else dx, dy) }
+        rule.waitForIdle()
+        val after = scrollValues(container)
+        if (abs(saved.first - after.first) > abs(dx) + 0.5f) flipX = !flipX
+    }
+    val last = scrollValues(container)
+    return abs(saved.first - last.first) < 0.5f && abs(saved.second - last.second) < 0.5f
+}
+
+/**
+ * Scrolls the nearest scroll container just far enough to bring [node] wholly
+ * into the part of [window] that container shows. Returns where the container
+ * was before, to restore it; null when the node is in no scroll container or
+ * scrolling does not bring it into view (the container is then put back).
+ *
+ * `boundsInRoot` is clipped to the node's ancestors, so a node below the fold has
+ * empty bounds; where it really is comes from its position and size. A
+ * horizontal container may run against the layout direction, so the other
+ * direction is tried when the first does not reveal the node.
+ */
+private fun scrollIntoView(
+    rule: ComposeTestRule,
+    node: SemanticsNode,
+    window: Bitmap,
+): Pair<Float, Float>? {
+    val container = scrollContainerOf(node) ?: return null
+    val action = container.config[SemanticsActions.ScrollBy].action ?: return null
+    val saved = scrollValues(container)
+    val viewport = container.boundsInRoot
+    val at = node.positionInRoot
+    val left = at.x
+    val top = at.y
+    val right = at.x + node.size.width
+    val bottom = at.y + node.size.height
+    val bottomEdge = minOf(viewport.bottom, window.height.toFloat())
+    val rightEdge = minOf(viewport.right, window.width.toFloat())
+    val dy = when {
+        bottom > bottomEdge -> bottom - bottomEdge
+        top < viewport.top -> top - viewport.top
+        else -> 0f
+    }
+    val dx = when {
+        right > rightEdge -> right - rightEdge
+        left < viewport.left -> left - viewport.left
+        else -> 0f
+    }
+    if (dx == 0f && dy == 0f) return null
+    for (candidate in listOf(dx to dy, -dx to dy)) {
+        rule.runOnUiThread { action(candidate.first, candidate.second) }
+        rule.waitForIdle()
+        val region = visibleRegion(node.boundsInRoot, window)
+        if (region != null && isWhollyVisible(node, region)) return saved
+        restoreScroll(rule, container, saved)
+        if (dx == 0f) break
+    }
+    return null
+}
+
+/**
+ * The part of a target's touch bounds a finger can reach: a scroll container
+ * clips its content, so a row half scrolled out of view cannot be touched where
+ * it runs under whatever is pinned beside the container.
+ */
+private fun reachableTouchBounds(node: SemanticsNode): androidx.compose.ui.geometry.Rect {
+    var reachable = node.touchBoundsInRoot
+    var ancestor = node.parent
+    while (ancestor != null) {
+        if (ancestor.config.getOrNull(SemanticsActions.ScrollBy) != null) {
+            reachable = reachable.intersect(ancestor.boundsInRoot)
+        }
+        ancestor = ancestor.parent
+    }
+    return reachable
+}
+
+/** A dialog or popup marks a node below its root, not the root itself. */
+private fun isOverlayWindow(node: SemanticsNode): Boolean =
+    node.config.getOrNull(SemanticsProperties.IsDialog) != null ||
+        node.config.getOrNull(SemanticsProperties.IsPopup) != null ||
+        node.children.any { isOverlayWindow(it) }
+
 private fun previewLabel(node: SemanticsNode, preview: String): String {
     if (LOCALE_SUFFIX.containsMatchIn(preview)) return preview
     val layoutNode = node.layoutInfo as? LayoutNode
