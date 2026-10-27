@@ -234,8 +234,8 @@ export const CONTRACTS = [
       { do: "open filtered orders", via: "onOpenCounter" },
       { do: "open order", via: "onOpenOrder" },
       { do: "add first product", via: "onAddProduct" },
-      // The summary could not be read from the device, or the plan refresh failed.
-      // The plan refresh retry moves to the subscription screen with its error (R9).
+      // The summary could not be read from the device. The plan refresh error and its retry
+      // live on the subscription screen.
       { do: "retry", via: "onRetry" },
       { do: "open announcements", via: "onOpenAnnouncements" },
     ],
@@ -667,7 +667,7 @@ export const CONTRACTS = [
     purpose: "الخطة الحالية والاستهلاك مقابل الحدود",
     entry: ["account", "today — لافتة الخطة", "paywall"],
     exit: ["PlansRoute", "رجوع"],
-    data: ["subscription status", "entitlement usage", "billing flag state"],
+    data: ["subscription status", "entitlement usage", "billing flag state", "plan refresh error"],
     actions: [
       // The `planned` reason had gone stale: PlansRoute was built and wired, and
       // PaywallScreen reached it — but this screen, which declares it as an exit,
@@ -680,6 +680,7 @@ export const CONTRACTS = [
       // later, which is a product decision rather than a wiring gap.
       { do: "register interest", status: "planned", why: "no notify-me control or endpoint exists" },
       { do: "restore purchase", via: "recoverPurchases" },
+      { do: "retry plan refresh", via: "onRetryPlan" },
     ],
     states: ["loading", "content", "error"],
     offline: true,

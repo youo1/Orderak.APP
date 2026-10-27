@@ -1,4 +1,11 @@
 package app.orderak.seller.feature.operations
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.foundation.layout.heightIn
+import app.orderak.seller.core.ui.SemanticRole
+import app.orderak.seller.core.ui.colors
+import app.orderak.seller.data.billing.EntitlementFreshness
+import java.text.DateFormat
+import java.util.Date
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
@@ -122,6 +129,7 @@ fun SubscriptionScreen(
 ) {
     val config by vm.entitlements.config.collectAsStateWithLifecycle()
     val billingState by vm.billingManager.state.collectAsStateWithLifecycle()
+    val sync by vm.planSync.collectAsStateWithLifecycle()
     SubscriptionContent(
         planName = config?.plan_name,
         subscriptionStatus = config?.subscription_status,
@@ -133,19 +141,27 @@ fun SubscriptionScreen(
         onBack = onBack,
         onViewPlans = onViewPlans,
         onRecoverPurchases = vm.billingManager::recoverPurchases,
+        planError = sync.error,
+        offline = sync.freshness == EntitlementFreshness.OFFLINE,
+        figuresAt = sync.lastUpdatedEpochMs,
+        onRetryPlan = vm::retryPlan,
     )
 }
 
 /**
  * The subscription page, as a function of its state.
  *
- * [planName] is nullable and NOT defaulted to "Free" here. The screen read
- * `config?.plan_name ?: "Free"` with no loading state at all, so every paying
- * seller opening it was told they were on the free plan until entitlements
- * arrived — the same defect حسابي had, on the one page whose entire subject is
- * what the seller is paying for.
+ * Which plan the seller is on and how much of it they use, including while nothing can be
+ * bought: a plan card in commerce colours (name, status, renewal or the pending change), all
+ * five meters, a notice while purchase is closed, «مقارنة الخطط» as a tonal button and
+ * «استعادة المشتريات» as a text button. When the plan refresh failed, a banner with
+ * «إعادة المحاولة» sits over the last saved figures, dated; offline, the page says when the
+ * figures are from.
+ *
+ * [planName] is nullable and NOT defaulted to "Free": the page read `plan_name ?: "Free"` with no
+ * loading state, so every paying seller opening it was told they were on the free plan until
+ * entitlements arrived, on the one page whose subject is what the seller is paying for.
  */
-
 @Composable
 fun SubscriptionContent(
     planName: String?,
@@ -158,35 +174,66 @@ fun SubscriptionContent(
     onBack: () -> Unit,
     onViewPlans: () -> Unit,
     onRecoverPurchases: () -> Unit,
+    /** The plan refresh failed: the message, shown over the last saved figures. */
+    planError: String? = null,
+    offline: Boolean = false,
+    /** When the figures on screen were read, if known. */
+    figuresAt: Long? = null,
+    onRetryPlan: () -> Unit = {},
 ) {
+    val spacing = LocalOrderakSpacing.current
+    val locale = LocalConfiguration.current.locales[0]
+    val colors = SemanticRole.Commerce.colors()
+    val figuresDate = figuresAt?.let { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT, locale).format(Date(it)) }
     OperationPage(
         title = stringResource(R.string.subscription_title),
         onBack = onBack,
-        // Loading until entitlements answer. There is nothing on this page that
-        // can be said truthfully without them.
+        // Loading until entitlements answer. There is nothing on this page that can be said
+        // truthfully without them.
         busy = planName == null,
         loading = SkeletonVariant.DetailBlock,
     ) {
-        Text(
-            // Not null here: the page is busy until it is.
-            stringResource(R.string.settings_current_plan, planName.orEmpty()),
-            style = MaterialTheme.typography.titleLarge,
-        )
-        Text(
-            // A missing status is a display gap, not a claim about money, so it
-            // keeps the old fallback where plan_name deliberately does not.
-            stringResource(R.string.subscription_status, subscriptionStatus ?: "active"),
-            style = MaterialTheme.typography.bodyLarge,
-        )
-        currentPeriodEnd?.let {
-            Text(stringResource(R.string.subscription_period_end, it))
+        if (planError != null) {
+            Banner(
+                state = BannerState.Error,
+                title = stringResource(R.string.subscription_refresh_failed),
+                message = figuresDate?.let { stringResource(R.string.subscription_figures_from, it) } ?: planError,
+                actionLabel = stringResource(R.string.common_retry),
+                onAction = onRetryPlan,
+            )
+        } else if (offline) {
+            Banner(
+                state = BannerState.Information,
+                title = stringResource(R.string.plan_using_offline_settings),
+                message = figuresDate?.let { stringResource(R.string.subscription_figures_from, it) },
+            )
         }
-        pendingEffectiveAt?.let {
-            Text(stringResource(R.string.plan_change_pending, it))
+
+        Surface(
+            shape = MaterialTheme.shapes.large,
+            color = colors.container,
+            contentColor = colors.onContainer,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(Modifier.padding(spacing.space4), verticalArrangement = Arrangement.spacedBy(spacing.space1)) {
+                // Not null here: the page is busy until it is.
+                Text(
+                    stringResource(R.string.settings_current_plan, planName.orEmpty()),
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                // A missing status is a display gap, not a claim about money, so it keeps the old
+                // fallback where plan_name deliberately does not.
+                Text(
+                    stringResource(R.string.subscription_status, subscriptionStatus ?: "active"),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                currentPeriodEnd?.let { Text(stringResource(R.string.subscription_period_end, it), style = MaterialTheme.typography.bodyMedium) }
+                pendingEffectiveAt?.let { Text(stringResource(R.string.plan_change_pending, it), style = MaterialTheme.typography.bodyMedium) }
+            }
         }
         when (billingState) {
             is BillingState.VerificationPending, BillingState.Verifying ->
-                Text(stringResource(R.string.subscription_verification_pending))
+                Banner(state = BannerState.SyncInProgress, title = stringResource(R.string.subscription_verification_pending))
             is BillingState.Error ->
                 Banner(
                     state = BannerState.Error,
@@ -196,80 +243,42 @@ fun SubscriptionContent(
             else -> Unit
         }
 
-        // What the seller actually came here to see. The screen showed a plan
-        // name, a status string and a recovery button, and never once said how
-        // much of the plan was used — so "am I close to a limit?" could only be
-        // answered by hitting one.
-        //
-        // The rows come from core/ui/PlanUsage.kt, shared with the dashboard
-        // card. This screen used to build its own and drop every unlimited
-        // entitlement — `if (limit == null) null` — while the dashboard drew it
-        // as a count, so a seller on a plan with an unlimited allowance saw it in
-        // one place and not the other.
-        // usage rows are passed in, already resolved from the config
-
+        // What the seller actually came here to see: how much of the plan is used. The rows come
+        // from core/ui/PlanUsage.kt, shared with the account card.
         if (usage.isNotEmpty()) {
-            Text(
-                stringResource(R.string.plan_usage_title),
-                style = MaterialTheme.typography.titleMedium,
-            )
+            SectionHeader(title = stringResource(R.string.plan_usage_title))
             usage.forEach { row -> PlanUsageRowItem(row) }
         }
 
-        // Say the true thing, and then stop offering the thing. The banner used
-        // to sit ABOVE a Play guidance line and a recover-purchases button that
-        // both rendered unconditionally, so the screen told a seller purchasing
-        // was closed and then showed them two ways to try it — advisory, not a
-        // gate. The *banner* is gated now, and it is the same decision every other
+        // Say the true thing, and then stop offering the thing: the same decision every other
         // buying affordance in the app reads (I-5).
         if (!purchaseOpen) {
             Banner(
                 state = BannerState.LockedByPlan,
                 title = stringResource(R.string.subscription_purchase_closed_title),
                 message = stringResource(R.string.subscription_purchase_closed_body),
-                // The banner said purchasing was closed and offered nothing,
-                // while PlansScreen exists precisely to be READ while it is —
-                // "للعرض طول ما الشراء مقفول". This screen declared PlansRoute as
-                // an exit and had no control that reached it, so the one useful
-                // thing a seller could still do here was unreachable from here.
-                actionLabel = stringResource(R.string.paywall_view_plans),
-                onAction = onViewPlans,
             )
         }
 
-        // Recovery is NOT gated by `purchaseOpen`, and that is the point.
-        //
-        // `purchaseOpen` answers "may this seller buy?" — it is the backend's
-        // `BILLING_ENABLED` launch gate. Recovering a purchase the seller has
-        // already made is not buying: it re-queries Play and re-verifies through
-        // `/api/v1/billing/google/verify`, which is absent from
-        // `BILLING_ACQUISITION_ROUTES` and therefore served while that flag is off.
-        // Play itself connects on `GOOGLE_PLAY_LIFECYCLE_ENABLED`, a separate flag,
-        // so the machinery can be running while purchase is closed.
-        //
-        // Hiding it was indefensible on this screen's own copy: the closed banner
-        // promises "Nothing you have changes", and the guidance line below tells
-        // the seller to "Use purchase recovery after reinstalling or changing
-        // devices". They read both and had no control to press, so a paying seller
-        // who reinstalled while the launch flag was off could not get their plan
-        // back — the exact case `recoverPurchases` exists for.
-        Text(stringResource(R.string.subscription_play_guidance))
-        OutlinedButton(
+        FilledTonalButton(
+            onClick = onViewPlans,
+            modifier = Modifier.fillMaxWidth().heightIn(min = spacing.minimumTouchTarget),
+        ) { Text(stringResource(R.string.subscription_compare)) }
+
+        // Recovery is NOT gated by `purchaseOpen`: that answers "may this seller buy?", and
+        // recovering a purchase already made is not buying. It re-queries Play and re-verifies
+        // through a route that is served while the launch flag is off, so a paying seller who
+        // reinstalled can always get their plan back.
+        Text(
+            stringResource(R.string.subscription_play_guidance),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        TextButton(
             onClick = onRecoverPurchases,
             enabled = billingState == BillingState.Ready,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().heightIn(min = spacing.minimumTouchTarget),
         ) { Text(stringResource(R.string.subscription_recover)) }
-
-        // Offered in both purchase states, for the reason the categories banner
-        // already gives: what the next plan includes is worth reading whether or
-        // not anything is for sale. With purchase closed the banner above is
-        // already the way there, so this button only exists to be the way there
-        // when it is open.
-        if (purchaseOpen) {
-            TextButton(onClick = onViewPlans, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.paywall_view_plans))
-            }
-        }
     }
 }
 

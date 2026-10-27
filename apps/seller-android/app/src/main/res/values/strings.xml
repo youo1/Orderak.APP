@@ -845,4 +845,9 @@
     <string name="ai_typing">…</string>
     <string name="ai_reset_title">Start a new conversation?</string>
     <string name="ai_reset_body">This conversation will be deleted.</string>
+    <string name="subscription_refresh_failed">The plan could not be refreshed</string>
+    <string name="subscription_figures_from">Figures from %1$s</string>
+    <string name="subscription_compare">Compare plans</string>
+    <string name="plans_limits_title">Limits</string>
+    <string name="plans_features_title">Features</string>
 </resources>

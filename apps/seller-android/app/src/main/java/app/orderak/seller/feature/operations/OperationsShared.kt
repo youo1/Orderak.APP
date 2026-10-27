@@ -108,7 +108,16 @@ class OperationsViewModel @Inject constructor(
     val entitlements: EntitlementManager,
     val billingManager: BillingManager,
     private val passkeyClient: PasskeyClient,
+    private val entitlementRepository: app.orderak.seller.data.billing.EntitlementRepository,
 ) : ViewModel() {
+    /** The plan refresh: its error, its freshness and when the figures were read. */
+    val planSync = entitlementRepository.state
+
+    /** Run the plan refresh again after it failed. */
+    fun retryPlan() {
+        viewModelScope.launch { entitlementRepository.refresh(force = true) }
+    }
+
     private val _busy = MutableStateFlow(false)
     val busy = _busy.asStateFlow()
     private val _error = MutableStateFlow<String?>(null)
