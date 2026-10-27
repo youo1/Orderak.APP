@@ -873,4 +873,5 @@
     <string name="setup_add_first_product">Add the first product</string>
     <string name="setup_later">Later</string>
     <string name="setup_bar_title">Store setup</string>
+    <string name="splash_error">We could not open your store</string>
 </resources>
