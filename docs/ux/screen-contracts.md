@@ -472,8 +472,8 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Status | implemented |
 | Entry | account · today — لافتة الخطة · paywall |
 | Exit | PlansRoute · رجوع |
-| Data | subscription status · entitlement usage · billing flag state |
-| Actions | view plans `onViewPlans` · register interest *(planned)* · restore purchase `recoverPurchases` |
+| Data | subscription status · entitlement usage · billing flag state · plan refresh error |
+| Actions | view plans `onViewPlans` · register interest *(planned)* · restore purchase `recoverPurchases` · retry plan refresh `onRetryPlan` |
 
 ### `plans`
 

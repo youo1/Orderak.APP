@@ -182,26 +182,30 @@ class PurchaseEntryPointsTest {
             body.contains("subscription_recover"),
         )
 
+        // Both polarities gate: `if (purchaseOpen)` and `if (!purchaseOpen)` each wrap a branch
+        // that only one purchase state sees, and recovery must be in neither.
         val gatedBranches = mutableListOf<String>()
-        var at = body.indexOf("if (purchaseOpen")
-        while (at >= 0) {
-            val open = body.indexOf('{', at)
-            if (open >= 0) {
-                var depth = 0
-                var close = open
-                while (close < body.length) {
-                    when (body[close]) {
-                        '{' -> depth++
-                        '}' -> {
-                            depth--
-                            if (depth == 0) break
+        for (marker in listOf("if (purchaseOpen", "if (!purchaseOpen")) {
+            var at = body.indexOf(marker)
+            while (at >= 0) {
+                val open = body.indexOf('{', at)
+                if (open >= 0) {
+                    var depth = 0
+                    var close = open
+                    while (close < body.length) {
+                        when (body[close]) {
+                            '{' -> depth++
+                            '}' -> {
+                                depth--
+                                if (depth == 0) break
+                            }
                         }
+                        close++
                     }
-                    close++
+                    gatedBranches += body.substring(open, minOf(close + 1, body.length))
                 }
-                gatedBranches += body.substring(open, minOf(close + 1, body.length))
+                at = body.indexOf(marker, at + 1)
             }
-            at = body.indexOf("if (purchaseOpen", at + 1)
         }
 
         assertTrue(

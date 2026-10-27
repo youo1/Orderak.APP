@@ -185,10 +185,4 @@ class TodayScreenContentTest {
         rule.onAllNodesWithText(string(R.string.today_empty_title)).assertCountEquals(0)
         rule.onAllNodesWithText(string(R.string.today_link_title)).assertCountEquals(0)
     }
-
-    @Test
-    fun aPlanErrorStaysVisibleUntilTheSubscriptionScreenTakesIt() {
-        show(loaded.copy(planError = "تعذّر الاتصال"))
-        rule.onAllNodesWithText("تعذّر الاتصال").assertCountEquals(1)
-    }
 }

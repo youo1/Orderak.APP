@@ -845,4 +845,9 @@
     <string name="ai_typing">…</string>
     <string name="ai_reset_title">Commencer une nouvelle conversation ?</string>
     <string name="ai_reset_body">Cette conversation sera supprimée.</string>
+    <string name="subscription_refresh_failed">La formule n’a pas pu être actualisée</string>
+    <string name="subscription_figures_from">Chiffres du %1$s</string>
+    <string name="subscription_compare">Comparer les formules</string>
+    <string name="plans_limits_title">Limites</string>
+    <string name="plans_features_title">Fonctionnalités</string>
 </resources>
