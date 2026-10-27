@@ -106,6 +106,11 @@ export async function uploadMedia(request: Request, env: Env, storeId: string): 
 	} catch {
 		return jsonResponse({ error: "invalid_form" }, 400);
 	}
+	// The seller's own photo is no longer collected (plan item R8, decision P1: a profile
+	// holds only what is used). Refused rather than quietly stored under another kind.
+	if (String(form.get("kind") ?? "") === "profile") {
+		return jsonResponse({ error: "profile_photo_not_accepted" }, 400);
+	}
 	const file = form.get("file");
 	if (!(file instanceof File)) return jsonResponse({ error: "file_required" }, 400);
 	if (file.size <= 0 || file.size > MAX_BYTES) return jsonResponse({ error: "file_too_large" }, 400);

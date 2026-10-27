@@ -710,20 +710,3 @@ fun StoreInfoContent(
         }
     }
 }
-
-@Composable
-private fun Field(value: String, onValueChange: (String) -> Unit, labelRes: Int) {
-    OutlinedTextField(
-        value = value, onValueChange = onValueChange,
-        label = { Text(stringResource(labelRes)) },
-        singleLine = true, modifier = Modifier.fillMaxWidth()
-    )
-}
-
-@Composable
-private fun ReadOnlyRow(label: String, value: String) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.bodyMedium)
-    }
-}
