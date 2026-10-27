@@ -776,4 +776,16 @@
     <string name="translation_status_machine">Machine translation</string>
     <string name="translation_status_missing">Missing</string>
     <string name="translation_save_approve">Save and approve</string>
+    <string name="customers_empty_title">Customers appear here by themselves</string>
+    <string name="customers_empty_body">After the first order.</string>
+    <string name="customers_row_detail">%1$s · %2$s</string>
+    <string name="customers_mixed_currencies">Mixed currencies</string>
+    <string name="customer_about">About the customer</string>
+    <string name="customer_edit">Edit</string>
+    <string name="customer_edit_title">Edit customer</string>
+    <string name="customer_none">Not added</string>
+    <string name="customer_figure_orders">Orders</string>
+    <string name="customer_figure_spent">Total spent</string>
+    <string name="customer_figure_last">Last order</string>
+    <string name="customer_phone_is_identity_sheet">The number %1$s is the customer’s identity and does not change.</string>
 </resources>
