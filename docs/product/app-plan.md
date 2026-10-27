@@ -117,21 +117,21 @@ desktop.
   Passkey sign-in directly; account creation and recovery use Firebase Phone OTP
   (SMS), with OTP fallback shown only when applicable. Welcome includes the
   existing explicit العربية/English/Français language sheet.
-- **Account setup (step 1/2)** — full name, affirmative confirmation of the
-  canonical statement `عمري ١٨ عامًا أو أكثر`, optional private email, and
-  versioned Terms/Privacy acceptance after phone verification. No birth year is
-  collected.
-- **Store setup (step 2/2)** — store name and owner; a read-only preview of the
-  unchanged canonical URL is shown. Business category and city are optional at
-  setup and can be completed later through the onboarding checklist and Store
-  Information, with the same validation when supplied. Country, subcategory, and
-  logo are not requested here; subcategory and logo remain editable later in
-  Store Information/Profile Settings.
-- **Transition until plan item R3.** The two steps above describe the setup the
-  backend now accepts (R3a). The Android setup screens change in R3; until then
-  the installed app still asks for a birth year, a business category and a city,
-  and sends them. The Worker accepts that request as legacy age evidence, never
-  stores the birth year, and records NULL statement text for it.
+- **Store setup (one step, then a ready screen)** — "لنجهّز متجرك", one line (the rest can
+  wait), the store name with a preview of the link (`orderak.app/EG-name-········`, noting a permanent
+  code is added on creation), the full name (not shown to buyers), the affirmation
+  `عمري ١٨ عامًا أو أكثر` in place of a birth year, the country as a line of text taken from the phone, and
+  the Terms and Privacy documents as two controls of their own. The bar "إنشاء المتجر" saves the account
+  step and then creates the store on one tap; creating covers the page with "جارٍ إنشاء متجرك…", and a
+  failure keeps everything typed, in a banner with a retry. There is no "name taken" outcome: the server
+  derives a unique link from the name and the store's permanent code. The business category, the city, a
+  first product and a payment method are no longer asked at setup.
+- **Ready screen** — "متجرك جاهز", the full link with share and copy, and the checklist "أكمل متجرك ·
+  ١ من ٤" (the store is created; add a first product; add a payment method; set the city and business
+  type). The bar offers "إضافة أول منتج" (opens the product form) and "لاحقًا". The passkey invitation,
+  where offered, appears as a sheet over this screen.
+- **Transition.** The Worker still accepts the legacy birth year from installed clients, as legacy age
+  evidence with NULL statement text; the current Android client sends `age_confirmed: true`.
 - **Main shell** with tabs:
   - **Dashboard** — today / unpaid / to-ship counts + "share catalog" link.
   - **Orders** — list + order details, status updates.

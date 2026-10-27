@@ -200,11 +200,6 @@ control is not measured, because WCAG 1.4.3 exempts inactive components.
 
 | Preview | Rule | Node text / kind | Reason | Plan |
 |---|---|---|---|---|
-| `ShopSetupScreenshotTestKt.setupAccountDark` | Label | 2 inline links (terms, privacy) | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
-| `ShopSetupScreenshotTestKt.setupAccountEmpty` | Label | 2 inline links (terms, privacy) | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
-| `ShopSetupScreenshotTestKt.setupAccountInvalidEmail` | Label | 2 inline links (terms, privacy) | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
-| `ShopSetupScreenshotTestKt.setupAccountLight` | Label | 2 inline links (terms, privacy) | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
-| `ShopSetupScreenshotTestKt.setupAccountSaving` | Label | 2 inline links (terms, privacy) | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
 
 **Spike conclusion.** Compose accessibility checks (`enableAccessibilityChecks`,
 `tryPerformAccessibilityChecks`) and ATF's `AccessibilityHierarchyAndroid` do not

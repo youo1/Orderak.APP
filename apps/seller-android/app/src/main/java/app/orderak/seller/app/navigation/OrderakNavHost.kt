@@ -110,6 +110,10 @@ fun OrderakNavHost() {
         composable<ShopSetupRoute> {
             ShopSetupScreen(
                 onDone = { navController.navigateAsRoot(SplashRoute) },
+                onAddFirstProduct = {
+                    navController.navigateAsRoot(MainRoute)
+                    navController.navigate(ProductEditRoute())
+                },
                 onExit = { navController.navigateAsRoot(AuthRoute) },
                 onReauthenticate = { navController.navigateAsRoot(AuthRoute) },
             )
