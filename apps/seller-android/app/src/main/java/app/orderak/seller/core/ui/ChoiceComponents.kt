@@ -140,7 +140,9 @@ fun SelectField(
             value = value,
             onValueChange = {},
             readOnly = true,
-            enabled = enabled,
+            // Always drawn enabled: the overlay below is the control and carries the disabled
+            // state, and a disabled outlined field draws its label below the 4.5:1 contrast.
+            enabled = true,
             label = { Text(if (required) "$label *" else label) },
             trailingIcon = { Icon(Icons.Filled.ArrowDropDown, contentDescription = null) },
             supportingText = error?.let { { Text(it) } },
