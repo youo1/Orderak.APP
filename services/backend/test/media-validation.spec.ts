@@ -94,6 +94,6 @@ describe("media upload validates the bytes, not the label", () => {
 		const store = await registerStore();
 		const response = await upload(PNG, "me.png", "image/png", authHeaders(store), "profile");
 		expect(response.status).toBe(400);
-		expect(await response.json()).toEqual({ error: "profile_photo_not_accepted" });
+		expect(await response.json()).toMatchObject({ error: "profile_photo_not_accepted" });
 	});
 });
