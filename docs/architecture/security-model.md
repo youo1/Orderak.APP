@@ -49,8 +49,9 @@ throttling, and recovery behavior.
    The transferred value is E.164, resend state is phone-bound, callbacks are
    generation-checked, requests time out after 90 seconds, and WhatsApp is not
    exposed as a client fallback. Phone and OTP share one visual screen: after
-   SMS dispatch the exact phone is locked, Autofill only fills the six digits,
-   explicit Verify submits them, and Change number/Back clears the OTP session.
+   SMS dispatch the exact phone is locked, Autofill fills the six digits,
+   the sixth digit submits them (Verify remains as the retry after a refused
+   code), and Change number/Back clears the OTP session.
 2. **`POST /api/v1/auth/phone/complete`**: the Worker verifies the token, rejects a
    future/stale `auth_time`, and requires the Firebase phone claim to match.
    An existing seller receives a device session; a new seller receives an
