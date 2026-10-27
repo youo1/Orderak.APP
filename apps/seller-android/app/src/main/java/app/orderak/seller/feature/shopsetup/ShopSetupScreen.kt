@@ -4,8 +4,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,111 +14,90 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Fingerprint
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.Button
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.autofill.AutofillNode
-import androidx.compose.ui.autofill.AutofillType
-import androidx.compose.ui.composed
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalAutofill
-import androidx.compose.ui.platform.LocalAutofillTree
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withLink
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.orderak.seller.R
+import app.orderak.seller.core.share.copyLink
+import app.orderak.seller.core.share.shareStoreLink
 import app.orderak.seller.core.text.formatCount
-import app.orderak.seller.data.remote.BusinessCategoryDto
-import app.orderak.seller.data.remote.CityCatalogSuggestionDto
-import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
+import app.orderak.seller.core.ui.Banner
+import app.orderak.seller.core.ui.BannerState
+import app.orderak.seller.core.ui.BottomActionBar
+import app.orderak.seller.core.ui.CheckboxRow
+import app.orderak.seller.core.ui.KeyValueRow
+import app.orderak.seller.core.ui.SemanticRole
+import app.orderak.seller.core.ui.StepItem
+import app.orderak.seller.core.ui.StepList
+import app.orderak.seller.core.ui.TextField
+import app.orderak.seller.core.ui.TopBar
+import app.orderak.seller.core.ui.colors
 import app.orderak.seller.core.ui.theme.LocalOrderakLayout
+import app.orderak.seller.core.ui.theme.LocalOrderakSpacing
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * The setup: one screen that turns a verified number into a working store link, then a ready
+ * screen. [onDone] leaves for the app; [onAddFirstProduct] leaves for the app and opens the
+ * product form.
+ */
 @Composable
 fun ShopSetupScreen(
     onDone: () -> Unit,
     onExit: () -> Unit,
     onReauthenticate: () -> Unit,
+    onAddFirstProduct: () -> Unit = onDone,
     viewModel: ShopSetupViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val locale = LocalConfiguration.current.locales[0]
-    val activity = LocalContext.current.findActivity()
+    val context = LocalContext.current
+    val activity = context.findActivity()
 
     LaunchedEffect(locale) { viewModel.onLocaleChanged(locale) }
     LaunchedEffect(state.reauthenticationRequired) {
         if (state.reauthenticationRequired) onReauthenticate()
     }
-    LaunchedEffect(state.completed, state.showPasskeyInvite) {
-        if (state.completed && !state.showPasskeyInvite) onDone()
-    }
-    BackHandler {
-        if (state.step == 2) viewModel.back() else onExit()
-    }
+    // Once the store exists there is nothing to go back to: back is "later".
+    BackHandler { if (state.completed) onDone() else onExit() }
 
     if (state.showPasskeyInvite) {
         OnboardingPasskeySheet(
@@ -134,130 +111,170 @@ fun ShopSetupScreen(
         state = state,
         actions = ShopSetupActions(
             onFullNameChanged = viewModel::onFullNameChanged,
-            onEmailChanged = viewModel::onEmailChanged,
-            onBirthYearChanged = viewModel::onBirthYearChanged,
+            onAgeConfirmedChanged = viewModel::onAgeConfirmedChanged,
             onNameChanged = viewModel::onNameChanged,
-            onCategorySelected = viewModel::onCategorySelected,
-            retryTaxonomy = viewModel::retryTaxonomy,
-            onCityChanged = viewModel::onCityChanged,
-            onCitySelected = viewModel::onCitySelected,
-            useManualCity = viewModel::useManualCity,
-            retryCitySearch = viewModel::retryCitySearch,
-            next = viewModel::next,
-            finish = viewModel::finish,
-            back = viewModel::back,
+            create = viewModel::create,
+            share = { url -> shareStoreLink(context, state.name, url) },
+            copy = { url -> copyLink(context, url) },
+            addFirstProduct = onAddFirstProduct,
+            later = onDone,
         ),
         onExit = onExit,
     )
 }
 
-/**
- * Everything the two setup steps can ask for, as data.
- *
- * Thirteen separate lambda parameters threaded through two step composables is
- * a signature nobody reads, so this is one value instead. Every field defaults
- * to a no-op, which is what makes `ShopSetupActions()` enough to render either
- * step — and the reason this type exists at all is that both steps took a
- * `ShopSetupViewModel` directly, so the second screen a new seller ever sees
- * could not be drawn without a Hilt graph.
- */
+/** Everything the setup can ask for, as data; every field defaults to a no-op. */
 data class ShopSetupActions(
     val onFullNameChanged: (String) -> Unit = {},
-    val onEmailChanged: (String) -> Unit = {},
-    val onBirthYearChanged: (Int) -> Unit = {},
+    val onAgeConfirmedChanged: (Boolean) -> Unit = {},
     val onNameChanged: (String) -> Unit = {},
-    val onCategorySelected: (BusinessCategoryDto) -> Unit = {},
-    val retryTaxonomy: () -> Unit = {},
-    val onCityChanged: (String) -> Unit = {},
-    val onCitySelected: (CityCatalogSuggestionDto) -> Unit = {},
-    val useManualCity: () -> Unit = {},
-    val retryCitySearch: () -> Unit = {},
-    val next: () -> Unit = {},
-    val finish: () -> Unit = {},
-    val back: () -> Unit = {},
+    val create: () -> Unit = {},
+    val share: (String) -> Unit = {},
+    val copy: (String) -> Unit = {},
+    val addFirstProduct: () -> Unit = {},
+    val later: () -> Unit = {},
 )
 
 /**
- * The two-step setup, as a function of its state.
+ * The setup, as a function of its state: the one step before the store exists, the ready screen
+ * after it.
  *
- * The locale effect, the completion and reauthentication effects, the back
- * handler and the passkey sheet stay in [ShopSetupScreen]: each is a transition
- * or a conversation, and none of them is a state of this page.
+ * The locale effect, the reauthentication effect, the back handler and the passkey sheet stay in
+ * [ShopSetupScreen]: each is a transition or a conversation, and none is a state of this page.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ShopSetupContent(
     state: ShopSetupUiState,
     actions: ShopSetupActions,
     onExit: () -> Unit,
 ) {
+    if (state.completed) {
+        ReadyScreen(state, actions)
+    } else {
+        CreateScreen(state, actions, onExit)
+    }
+}
+
+@Composable
+private fun CreateScreen(state: ShopSetupUiState, actions: ShopSetupActions, onExit: () -> Unit) {
     val layout = LocalOrderakLayout.current
     val spacing = LocalOrderakSpacing.current
-    val locale = LocalConfiguration.current.locales[0]
     Scaffold(
         topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        if (state.step == 1) {
-                            stringResource(R.string.setup_account_title)
-                        } else {
-                            stringResource(R.string.setup_store_title)
-                        },
-                    )
-                },
-                navigationIcon = {
-                    IconButton(
-                        onClick = if (state.step == 2) actions.back else onExit,
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            stringResource(R.string.common_back),
-                        )
-                    }
-                },
+            TopBar(
+                title = stringResource(R.string.setup_bar_title),
+                onBack = onExit,
+                backDescription = stringResource(R.string.common_back),
             )
         },
         bottomBar = {
-            Surface(tonalElevation = 2.dp) {
-                Box(
+            BottomActionBar(
+                primaryLabel = stringResource(R.string.setup_create_store),
+                onPrimary = actions.create,
+                primaryEnabled = state.canCreate && !state.saving,
+                disabledReason = if (!state.canCreate && !state.saving) stringResource(R.string.setup_bar_reason) else null,
+            )
+        },
+    ) { padding ->
+        // Creating the store replaces the form rather than covering it, so a second tap cannot
+        // create a second store and nothing hidden behind a scrim is left for a screen reader.
+        // What was typed lives in the state, so the form comes back whole if creation fails.
+        if (state.saving) {
+            Column(
+                Modifier.fillMaxSize().padding(padding),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                CircularProgressIndicator()
+                Spacer(Modifier.height(spacing.space4))
+                Text(stringResource(R.string.setup_creating), style = MaterialTheme.typography.titleMedium)
+            }
+        } else {
+            Box(Modifier.fillMaxSize().padding(padding)) {
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
+                        .fillMaxSize()
                         .imePadding()
-                        .padding(horizontal = spacing.space6, vertical = spacing.space3),
-                    contentAlignment = Alignment.Center,
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = spacing.space6, vertical = spacing.space4),
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Button(
-                        onClick = if (state.step == 1) actions.next else actions.finish,
-                        enabled = if (state.step == 1) {
-                            // `canContinueAccount` was written for this button and
-                            // had no reader anywhere in the app: step 1's button was
-                            // enabled on "not saving" alone while step 2's consulted
-                            // `canFinishStore`. So the two steps of one screen
-                            // disagreed about when a form is ready, and a seller who
-                            // mistyped their birth year learned it after a tap and a
-                            // round trip instead of before the tap. The validation
-                            // already existed; only the wiring was missing.
-                            state.canContinueAccount && !state.saving
-                        } else {
-                            state.canFinishStore && !state.saving
-                        },
-                        modifier = Modifier.fillMaxWidth().widthIn(max = layout.contentMaxWidth).height(56.dp),
+                    Column(
+                        modifier = Modifier.widthIn(max = layout.contentMaxWidth).fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(spacing.space4),
                     ) {
-                        if (state.saving) {
-                            CircularProgressIndicator(Modifier.size(spacing.iconMedium), strokeWidth = 2.dp)
-                        } else {
-                            Text(
-                                stringResource(
-                                    if (state.step == 1) R.string.setup_next
-                                    else R.string.setup_start_selling,
-                                ),
+                        Text(
+                            stringResource(R.string.setup_headline),
+                            style = MaterialTheme.typography.headlineSmall,
+                            modifier = Modifier.semantics { heading() },
+                        )
+                        Text(
+                            stringResource(R.string.setup_subline),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (state.error != null && !state.saving) {
+                            // Creation failed: everything typed is kept, and the bar still works as the retry.
+                            Banner(
+                                state = BannerState.Error,
+                                title = stringResource(R.string.setup_create_failed),
+                                message = setupErrorText(state.error),
+                                actionLabel = if (state.canCreate) stringResource(R.string.common_retry) else null,
+                                onAction = if (state.canCreate) actions.create else null,
                             )
                         }
+                        // The link as it will be: the name in the middle, a permanent code added on
+                        // creation. The server makes the real one, so there is no "name taken" here.
+                        TextField(
+                            value = state.name,
+                            onValueChange = actions.onNameChanged,
+                            label = stringResource(R.string.setup_shop_name_label),
+                            required = true,
+                            helper = stringResource(
+                                R.string.setup_link_help,
+                                onboardingStoreLinkPreview(state.country.iso, onboardingSlugify(state.name).ifBlank { "…" }),
+                            ),
+                            enabled = !state.saving,
+                        )
+                        TextField(
+                            value = state.fullName,
+                            onValueChange = actions.onFullNameChanged,
+                            label = stringResource(R.string.setup_full_name_label),
+                            required = true,
+                            helper = stringResource(R.string.setup_full_name_help),
+                            enabled = !state.saving,
+                        )
+                        // The statement is the canonical wording the server records.
+                        CheckboxRow(
+                            label = stringResource(R.string.setup_age_confirm),
+                            checked = state.ageConfirmed,
+                            onCheckedChange = actions.onAgeConfirmedChanged,
+                            enabled = !state.saving,
+                        )
+                        // The country is the phone's, shown as a line of text rather than a field.
+                        KeyValueRow(label = stringResource(R.string.setup_country_line), value = state.country.name)
+                        OnboardingLegalText()
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ReadyScreen(state: ShopSetupUiState, actions: ShopSetupActions) {
+    val layout = LocalOrderakLayout.current
+    val spacing = LocalOrderakSpacing.current
+    val locale = LocalConfiguration.current.locales[0]
+    val colors = SemanticRole.Success.colors()
+    Scaffold(
+        bottomBar = {
+            BottomActionBar(
+                primaryLabel = stringResource(R.string.setup_add_first_product),
+                onPrimary = actions.addFirstProduct,
+                secondaryLabel = stringResource(R.string.setup_later),
+                onSecondary = actions.later,
+            )
         },
     ) { padding ->
         Column(
@@ -265,523 +282,112 @@ fun ShopSetupContent(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = spacing.space6, vertical = spacing.space4),
+                .padding(horizontal = spacing.space6, vertical = spacing.space6),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Column(
                 modifier = Modifier.widthIn(max = layout.contentMaxWidth).fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(spacing.space4),
             ) {
-                val progress by animateFloatAsState(
-                    targetValue = if (state.step == 1) 0.5f else 1f,
-                    label = "onboarding_progress",
-                )
-                LinearProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier.fillMaxWidth().height(6.dp).clip(MaterialTheme.shapes.extraSmall),
-                )
-                Spacer(Modifier.height(spacing.space2))
+                Surface(shape = CircleShape, color = colors.container, modifier = Modifier.size(spacing.space16)) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.Outlined.CheckCircle, contentDescription = null, tint = colors.onContainer)
+                    }
+                }
                 Text(
-                    // The Arabic string writes its “of 2” as ٢, so the step has to
-                    // be Arabic-Indic too or one sentence carries both forms.
-                    stringResource(R.string.setup_step_indicator, formatCount(state.step, locale)),
-                    // Emphasis comes from the role, not from a second weight on top of
-                    // it. `labelLarge` is already the scale's medium (500) and the
-                    // design system states the product has no weight above it —
-                    // "Weight is 400 or 500 — there is no bold display type in this
-                    // product" — so `FontWeight.Bold` was an off-scale emphasis. The
-                    // step is still signalled twice without it: by this line and by
-                    // the progress bar above, never by colour alone.
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
+                    stringResource(R.string.setup_ready_title),
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.semantics { heading() },
                 )
-                Spacer(Modifier.height(spacing.space8))
-
-                if (state.step == 1) {
-                    AccountInformationStep(state, actions)
-                } else {
-                    StoreInformationStep(state, actions)
+                state.storeUrl?.let { url ->
+                    Text(
+                        url,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        textAlign = TextAlign.Center,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(spacing.space2)) {
+                        Button(
+                            onClick = { actions.share(url) },
+                            modifier = Modifier.heightIn(min = spacing.minimumTouchTarget),
+                        ) {
+                            Icon(Icons.Outlined.Share, contentDescription = null)
+                            Text(stringResource(R.string.setup_share), Modifier.padding(start = spacing.space2))
+                        }
+                        OutlinedButton(
+                            onClick = { actions.copy(url) },
+                            modifier = Modifier.heightIn(min = spacing.minimumTouchTarget),
+                        ) {
+                            Icon(Icons.Outlined.ContentCopy, contentDescription = null)
+                            Text(stringResource(R.string.setup_copy), Modifier.padding(start = spacing.space2))
+                        }
+                    }
+                }
+                // What is left, in the order that gets a store selling: only the first is done.
+                Surface(
+                    shape = MaterialTheme.shapes.large,
+                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(Modifier.padding(spacing.space4), verticalArrangement = Arrangement.spacedBy(spacing.space3)) {
+                        Text(
+                            stringResource(R.string.setup_checklist_title, formatCount(1, locale), formatCount(4, locale)),
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.semantics { heading() },
+                        )
+                        StepList(
+                            steps = listOf(
+                                StepItem(stringResource(R.string.struct_setup_created), stringResource(R.string.struct_setup_created_detail), done = true),
+                                StepItem(stringResource(R.string.struct_setup_product), stringResource(R.string.struct_setup_product_detail), done = false),
+                                StepItem(stringResource(R.string.setup_step_payment), stringResource(R.string.setup_step_payment_detail), done = false),
+                                StepItem(stringResource(R.string.setup_step_city), stringResource(R.string.setup_step_city_detail), done = false),
+                            ),
+                        )
+                    }
                 }
             }
         }
     }
 }
-
-@OptIn(ExperimentalComposeUiApi::class)
-@Composable
-private fun AccountInformationStep(
-    state: ShopSetupUiState,
-    actions: ShopSetupActions,
-) {
-    val spacing = LocalOrderakSpacing.current
-    var showYearDialog by rememberSaveable { mutableStateOf(false) }
-
-    Text(
-        stringResource(R.string.setup_account_subtitle),
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.fillMaxWidth(),
-    )
-    Spacer(Modifier.height(spacing.space8))
-    OutlinedTextField(
-        value = state.fullName,
-        onValueChange = actions.onFullNameChanged,
-        label = { Text(stringResource(R.string.setup_full_name_label)) },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth().onboardingAutofill(
-            listOf(AutofillType.PersonFullName),
-            actions.onFullNameChanged,
-        ),
-        isError = state.fullName.isNotBlank() && state.fullName.trim().length !in 3..80,
-    )
-    Spacer(Modifier.height(spacing.space4))
-    val openYearLabel = stringResource(R.string.setup_birth_year_open_description)
-    // The read-only field and a full-size clickable sibling share one Box. The
-    // overlay is declared last, so it sits on top and receives every tap and
-    // opens the year dialog even though the field covers the same pixels. The
-    // field clears its own semantics so the control exposes a single labelled
-    // actionable node instead of a duplicate target; the overlay carries the
-    // chosen year as its state so a screen reader still hears it.
-    Box(modifier = Modifier.fillMaxWidth()) {
-        OutlinedTextField(
-            value = state.birthYear?.toString().orEmpty(),
-            onValueChange = {},
-            label = { Text(stringResource(R.string.setup_birth_year_label)) },
-            placeholder = { Text(stringResource(R.string.setup_birth_year_placeholder)) },
-            trailingIcon = {
-                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-            },
-            readOnly = true,
-            singleLine = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clearAndSetSemantics {},
-        )
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .semantics {
-                    contentDescription = openYearLabel
-                    state.birthYear?.let { stateDescription = it.toString() }
-                }
-                .clickable(
-                    onClickLabel = openYearLabel,
-                    role = Role.Button,
-                    onClick = { showYearDialog = true },
-                ),
-        )
-    }
-    Spacer(Modifier.height(spacing.space4))
-    OutlinedTextField(
-        value = state.email,
-        onValueChange = actions.onEmailChanged,
-        label = { Text(stringResource(R.string.setup_email_label)) },
-        supportingText = { Text(stringResource(R.string.setup_email_private_help)) },
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth().onboardingAutofill(
-            listOf(AutofillType.EmailAddress),
-            actions.onEmailChanged,
-        ),
-        isError = !state.emailValid,
-    )
-    SetupError(state.error)
-    Spacer(Modifier.height(spacing.space8))
-    OnboardingLegalText()
-    Spacer(Modifier.height(spacing.space4))
-
-    if (showYearDialog) {
-        YearOfBirthDialog(
-            selectedYear = state.birthYear,
-            onDismiss = { showYearDialog = false },
-            onSelected = {
-                actions.onBirthYearChanged(it)
-                showYearDialog = false
-            },
-        )
-    }
-}
-
-@Composable
-private fun YearOfBirthDialog(
-    selectedYear: Int?,
-    onDismiss: () -> Unit,
-    onSelected: (Int) -> Unit,
-) {
-    val spacing = LocalOrderakSpacing.current
-    val currentYear = remember { currentUtcYear() }
-    val years = remember(currentYear) { birthYearOptions(currentYear) }
-    val selectedIndex = selectedYear
-        ?.let { currentYear - it }
-        ?.coerceIn(0, years.lastIndex)
-        ?: 0
-    val gridState = rememberLazyGridState(initialFirstVisibleItemIndex = selectedIndex)
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.setup_birth_year_title)) },
-        text = {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(3),
-                state = gridState,
-                modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),
-            ) {
-                items(years, key = { it }) { year ->
-                    FilterChip(
-                        selected = selectedYear == year,
-                        onClick = { onSelected(year) },
-                        label = {
-                            Text(
-                                text = year.toString(),
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        },
-                        modifier = Modifier.padding(spacing.space1),
-                    )
-                }
-            }
-        },
-        confirmButton = {},
-    )
-}
-
-internal fun birthYearOptions(currentYear: Int = currentUtcYear()): List<Int> =
-    (currentYear downTo 1900).toList()
 
 internal fun onboardingStoreLinkPreview(countryIso: String, slug: String): String =
-    "https://orderak.app/${countryIso.uppercase()}-$slug-••••••••"
+    "orderak.app/${countryIso.uppercase()}-$slug-••••••••"
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun StoreInformationStep(
-    state: ShopSetupUiState,
-    actions: ShopSetupActions,
-) {
-    val spacing = LocalOrderakSpacing.current
-    var categoryExpanded by rememberSaveable { mutableStateOf(false) }
-    var cityExpanded by rememberSaveable { mutableStateOf(false) }
-
-    LaunchedEffect(state.cityCatalogId) {
-        if (state.cityCatalogId != null) cityExpanded = false
-    }
-
-    Text(
-        stringResource(R.string.setup_store_heading),
-        style = MaterialTheme.typography.headlineSmall,
-        modifier = Modifier.fillMaxWidth(),
-    )
-    Spacer(Modifier.height(spacing.space2))
-    Text(
-        stringResource(R.string.setup_store_subtitle),
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.fillMaxWidth(),
-    )
-    Spacer(Modifier.height(spacing.space6))
-    OutlinedTextField(
-        value = state.name,
-        onValueChange = actions.onNameChanged,
-        label = { Text(stringResource(R.string.setup_shop_name_label)) },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
-    )
-    Spacer(Modifier.height(spacing.space2))
-    Text(
-        text = stringResource(R.string.setup_store_link_preview),
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.fillMaxWidth(),
-    )
-    Text(
-        text = onboardingStoreLinkPreview(state.country.iso, state.slug),
-        style = MaterialTheme.typography.bodyMedium.copy(
-            // A URL is LTR wherever it appears. Without this the trailing
-            // •••••••• placeholder — which stands for the store id the link has
-            // not been given yet — was reordered to the visual start under `ar`,
-            // so a seller setting up their shop read their own link as
-            // "••••••••-https://orderak.app/EG-mona-boutique".
-            textDirection = TextDirection.Ltr,
-        ),
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.fillMaxWidth().padding(top = spacing.space1),
-    )
-    Text(
-        text = when (state.slugAvailability) {
-            SlugAvailability.CHECKING -> stringResource(R.string.setup_slug_checking)
-            SlugAvailability.AVAILABLE -> stringResource(R.string.setup_slug_available)
-            SlugAvailability.TAKEN -> stringResource(R.string.setup_slug_taken)
-            SlugAvailability.INVALID -> stringResource(R.string.setup_slug_invalid)
-            SlugAvailability.OFFLINE -> stringResource(R.string.setup_slug_offline)
-            SlugAvailability.IDLE -> stringResource(R.string.setup_slug_help)
-        },
-        style = MaterialTheme.typography.bodySmall,
-        color = if (state.slugAvailability in setOf(SlugAvailability.TAKEN, SlugAvailability.INVALID)) {
-            MaterialTheme.colorScheme.error
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        },
-        modifier = Modifier.fillMaxWidth().padding(top = spacing.space1),
-    )
-    Spacer(Modifier.height(spacing.space4))
-
-    ExposedDropdownMenuBox(
-        expanded = categoryExpanded,
-        onExpandedChange = { categoryExpanded = it },
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        OutlinedTextField(
-            value = state.categoryName.orEmpty(),
-            onValueChange = {},
-            readOnly = true,
-            singleLine = true,
-            label = { Text(stringResource(R.string.setup_category_label)) },
-            placeholder = { Text(stringResource(R.string.setup_category_placeholder)) },
-            trailingIcon = {
-                ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryExpanded)
-            },
-            isError = state.taxonomyError,
-            // The only retry lives inside the menu, and this field is
-            // read-only — so a seller whose taxonomy call failed saw a red box
-            // with no reason to open it, on the one step that cannot be
-            // finished without a category. The city field below is editable, so
-            // typing opens its menu and finds its error; this one had nothing.
-            supportingText = if (state.taxonomyError) {
-                { Text(stringResource(R.string.setup_category_load_error)) }
-            } else {
-                null
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .menuAnchor(MenuAnchorType.PrimaryNotEditable, true),
-        )
-        ExposedDropdownMenu(
-            expanded = categoryExpanded,
-            onDismissRequest = { categoryExpanded = false },
-            modifier = Modifier.heightIn(max = 360.dp),
-        ) {
-            if (state.taxonomyLoading && state.categories.isEmpty()) {
-                DropdownMenuItem(
-                    text = {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(spacing.iconMedium),
-                            strokeWidth = 2.dp,
-                        )
-                    },
-                    onClick = {},
-                    enabled = false,
-                )
-            }
-            state.categories.forEach { category ->
-                DropdownMenuItem(
-                    text = { Text(category.name) },
-                    onClick = {
-                        actions.onCategorySelected(category)
-                        categoryExpanded = false
-                    },
-                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
-                )
-            }
-            if (state.taxonomyError) {
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            stringResource(R.string.setup_category_load_error),
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    },
-                    onClick = actions.retryTaxonomy,
-                )
-            }
-        }
-    }
-
-    Spacer(Modifier.height(spacing.space4))
-
-    ExposedDropdownMenuBox(
-        expanded = cityExpanded,
-        onExpandedChange = { expanded ->
-            cityExpanded = expanded
-            if (
-                expanded &&
-                state.cityCatalogId == null &&
-                state.citySuggestions.isEmpty() &&
-                !state.citySearching
-            ) {
-                actions.retryCitySearch()
-            }
-        },
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        OutlinedTextField(
-            value = state.city,
-            onValueChange = {
-                cityExpanded = true
-                actions.onCityChanged(it)
-            },
-            singleLine = true,
-            label = { Text(stringResource(R.string.setup_city_label)) },
-            placeholder = { Text(stringResource(R.string.setup_city_placeholder)) },
-            trailingIcon = {
-                ExposedDropdownMenuDefaults.TrailingIcon(expanded = cityExpanded)
-            },
-            isError = state.cityError,
-            modifier = Modifier
-                .fillMaxWidth()
-                .menuAnchor(MenuAnchorType.PrimaryEditable, true),
-        )
-        ExposedDropdownMenu(
-            expanded = cityExpanded,
-            onDismissRequest = { cityExpanded = false },
-            modifier = Modifier.heightIn(max = 380.dp),
-        ) {
-            when {
-                state.citySearching -> DropdownMenuItem(
-                    text = {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(spacing.iconMedium),
-                            strokeWidth = 2.dp,
-                        )
-                    },
-                    onClick = {},
-                    enabled = false,
-                )
-                state.cityError -> DropdownMenuItem(
-                    text = {
-                        Text(
-                            stringResource(R.string.setup_city_search_error),
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    },
-                    onClick = actions.retryCitySearch,
-                )
-                state.city.trim().length >= 2 &&
-                    state.citySuggestions.isEmpty() &&
-                    state.cityCatalogId == null -> DropdownMenuItem(
-                    text = { Text(stringResource(R.string.setup_city_no_results)) },
-                    onClick = {},
-                    enabled = false,
-                )
-                state.city.isBlank() -> DropdownMenuItem(
-                    text = { Text(stringResource(R.string.setup_city_search)) },
-                    onClick = {},
-                    enabled = false,
-                )
-            }
-            state.citySuggestions.forEach { suggestion ->
-                DropdownMenuItem(
-                    text = {
-                        Column {
-                            Text(suggestion.name)
-                            suggestion.state_name?.takeIf(String::isNotBlank)?.let {
-                                Text(
-                                    it,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    },
-                    onClick = { actions.onCitySelected(suggestion) },
-                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
-                )
-            }
-            if (
-                state.city.trim().length >= 2 &&
-                state.cityCatalogId == null &&
-                !state.citySearching
-            ) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.setup_city_use_manual, state.city.trim())) },
-                    onClick = {
-                        actions.useManualCity()
-                        cityExpanded = false
-                    },
-                )
-            }
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        stringResource(R.string.setup_city_data_attribution),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.End,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                },
-                onClick = {},
-                enabled = false,
-            )
-        }
-    }
-    Text(
-        stringResource(R.string.setup_city_country_from_phone, state.country.name),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.fillMaxWidth().padding(top = spacing.space1),
-    )
-    SetupError(state.error)
+private fun setupErrorText(error: String?): String = when (error) {
+    "invalid_full_name" -> stringResource(R.string.setup_full_name_error)
+    "age_confirmation_required" -> stringResource(R.string.setup_age_error)
+    "network", "bad_response" -> stringResource(R.string.error_network)
+    "passkey_failed" -> stringResource(R.string.auth_passkey_failed)
+    "passkey_unavailable" -> stringResource(R.string.auth_passkey_unavailable)
+    else -> stringResource(R.string.error_generic)
 }
 
 @Composable
 private fun OnboardingLegalText() {
     val uriHandler = LocalUriHandler.current
-    val linkStyle = TextLinkStyles(
-        style = SpanStyle(
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold,
-        ),
-    )
-    val text = buildAnnotatedString {
-        append(stringResource(R.string.setup_legal_before_terms))
-        append(' ')
-        withLink(
-            LinkAnnotation.Url(
-                url = "https://orderak.app/terms",
-                styles = linkStyle,
-            ) { uriHandler.openUri("https://orderak.app/terms") },
-        ) {
-            append(stringResource(R.string.auth_terms_link))
-        }
-        append(' ')
-        append(stringResource(R.string.setup_legal_between_links))
-        append(' ')
-        withLink(
-            LinkAnnotation.Url(
-                url = "https://orderak.app/privacy",
-                styles = linkStyle,
-            ) { uriHandler.openUri("https://orderak.app/privacy") },
-        ) {
-            append(stringResource(R.string.auth_privacy_link))
-        }
-    }
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        textAlign = TextAlign.Center,
-        modifier = Modifier.fillMaxWidth(),
-    )
-}
-
-@Composable
-private fun SetupError(error: String?) {
     val spacing = LocalOrderakSpacing.current
-    if (error.isNullOrBlank()) return
-    val text = when (error) {
-        "invalid_full_name" -> stringResource(R.string.setup_full_name_error)
-        "invalid_email", "email_in_use" -> stringResource(R.string.setup_email_error)
-        "invalid_birth_year" -> stringResource(R.string.setup_birth_year_error)
-        "slug_taken" -> stringResource(R.string.setup_slug_taken)
-        "network", "bad_response" -> stringResource(R.string.error_network)
-        "passkey_failed" -> stringResource(R.string.auth_passkey_failed)
-        "passkey_unavailable" -> stringResource(R.string.auth_passkey_unavailable)
-        else -> stringResource(R.string.error_generic)
+    // The two documents are controls of their own, not links inside a sentence: each has a name a
+    // screen reader can announce and a target a thumb can find.
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            stringResource(R.string.setup_legal_before_terms),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(spacing.space2)) {
+            TextButton(
+                onClick = { uriHandler.openUri("https://orderak.app/terms") },
+                modifier = Modifier.heightIn(min = spacing.minimumTouchTarget),
+            ) { Text(stringResource(R.string.auth_terms_link)) }
+            TextButton(
+                onClick = { uriHandler.openUri("https://orderak.app/privacy") },
+                modifier = Modifier.heightIn(min = spacing.minimumTouchTarget),
+            ) { Text(stringResource(R.string.auth_privacy_link)) }
+        }
     }
-    Text(
-        text,
-        color = MaterialTheme.colorScheme.error,
-        style = MaterialTheme.typography.bodySmall,
-        modifier = Modifier.fillMaxWidth().padding(top = spacing.space2),
-    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -804,18 +410,9 @@ private fun OnboardingPasskeySheet(
 /**
  * The onboarding passkey invite, without the sheet around it.
  *
- * `ModalBottomSheet` is not captured by the screenshot harness, so nothing that
- * rendered `ShopSetupScreen` in its `showPasskeyInvite` state would have shown this
- * sheet — and nothing did. There were no baselines for it at all.
- *
- * This is the second copy of the invite's layout: `PasskeyInviteContent` in
- * `AuthScreen.kt` draws the same icon, the same title, the same two buttons. They are
- * not merged here, and the reason is not style. Auth's version takes an `AuthError`
- * and renders it through `AuthErrorText`; this one takes a raw wire code and renders it
- * through [SetupError], which is the only place `setup_*` error strings appear.
- * Collapsing them means choosing one error pipeline for both screens, which changes
- * what a seller reads on the auth screen — a product decision, recorded rather than
- * taken quietly.
+ * `ModalBottomSheet` is not captured by the screenshot harness, so nothing that rendered the
+ * screen in its `showPasskeyInvite` state would have shown this sheet. The error is a raw wire
+ * code resolved by this screen's own pipeline, which is why it is not merged with the auth sheet.
  */
 @Composable
 internal fun OnboardingPasskeyContent(
@@ -840,7 +437,14 @@ internal fun OnboardingPasskeyContent(
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        SetupError(error)
+        if (!error.isNullOrBlank()) {
+            Text(
+                setupErrorText(error),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.fillMaxWidth().padding(top = spacing.space2),
+            )
+        }
         Spacer(Modifier.height(spacing.space6))
         Button(
             onClick = onCreate,
@@ -860,19 +464,4 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null
-}
-
-@OptIn(ExperimentalComposeUiApi::class)
-private fun Modifier.onboardingAutofill(
-    types: List<AutofillType>,
-    onFill: (String) -> Unit,
-) = composed {
-    val autofill = LocalAutofill.current
-    val node = remember { AutofillNode(autofillTypes = types, onFill = onFill) }
-    LocalAutofillTree.current += node
-    onGloballyPositioned { node.boundingBox = it.boundsInWindow() }
-        .onFocusChanged {
-            if (it.isFocused) autofill?.requestAutofillForNode(node)
-            else autofill?.cancelAutofillForNode(node)
-        }
 }

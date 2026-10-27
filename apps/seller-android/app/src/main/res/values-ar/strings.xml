@@ -883,4 +883,27 @@
     <string name="subscription_compare">مقارنة الخطط</string>
     <string name="plans_limits_title">الحدود</string>
     <string name="plans_features_title">المزايا</string>
+    <string name="setup_title">إنشاء المتجر</string>
+    <string name="setup_create_store">إنشاء المتجر</string>
+    <string name="setup_bar_reason">أدخل اسم المتجر واسمك الكامل وأكّد عمرك</string>
+    <string name="setup_headline">لنجهّز متجرك</string>
+    <string name="setup_subline">خطوة واحدة، والباقي متى شئت.</string>
+    <string name="setup_create_failed">تعذّر إنشاء المتجر، وما كتبته باقٍ هنا</string>
+    <string name="setup_link_help">%1$s — يُضاف رمز دائم عند الإنشاء</string>
+    <string name="setup_full_name_help">لا يظهر للمشترين</string>
+    <string name="setup_age_confirm">عمري ١٨ عامًا أو أكثر</string>
+    <string name="setup_age_error">أكّد أن عمرك ١٨ عامًا أو أكثر</string>
+    <string name="setup_country_line">الدولة</string>
+    <string name="setup_creating">جارٍ إنشاء متجرك…</string>
+    <string name="setup_ready_title">متجرك جاهز</string>
+    <string name="setup_share">مشاركة</string>
+    <string name="setup_copy">نسخ</string>
+    <string name="setup_checklist_title">أكمل متجرك · %1$s من %2$s</string>
+    <string name="setup_step_payment">إضافة وسيلة دفع</string>
+    <string name="setup_step_payment_detail">إنستاباي أو محفظة إلكترونية</string>
+    <string name="setup_step_city">تحديد المدينة ونوع النشاط</string>
+    <string name="setup_step_city_detail">ليجدك العملاء بسهولة</string>
+    <string name="setup_add_first_product">إضافة أول منتج</string>
+    <string name="setup_later">لاحقًا</string>
+    <string name="setup_bar_title">إعداد المتجر</string>
 </resources>

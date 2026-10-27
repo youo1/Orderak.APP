@@ -301,7 +301,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 
 ### `shop-setup`
 
-إنشاء الحساب والمتجر في خطوتين، بمسوّدة قابلة للاستئناف
+إنشاء المتجر في خطوة واحدة، ثم شاشة «متجرك جاهز» وقائمة ما تبقّى
 
 | | |
 | --- | --- |
@@ -311,9 +311,9 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Entitlement | — |
 | Status | implemented |
 | Entry | AuthRoute — تحقّق ناجح لبائع جديد |
-| Exit | MainRoute — اكتمل الإنشاء · AuthRoute — رجوع مع حفظ المسوّدة |
-| Data | resumable draft · business categories · city catalogue · slug availability |
-| Actions | save account step `next` · name the shop, and see whether its link is free `onNameChanged` · select city `onCitySelected` · create store `finish` |
+| Exit | MainRoute — اكتمل الإنشاء · ProductEditRoute — إضافة أول منتج · AuthRoute — رجوع مع حفظ المسوّدة |
+| Data | resumable draft · store link preview |
+| Actions | name the shop, and see its link preview `onNameChanged` · confirm age `onAgeConfirmedChanged` · create store `create` · share the link `share` · add the first product `addFirstProduct` · leave the rest for later `later` |
 
 ### `restricted-account`
 

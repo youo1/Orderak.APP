@@ -392,7 +392,8 @@ data class AuthCompleteRes(
 @Serializable
 data class OnboardingAccountReq(
     val full_name: String,
-    val birth_year: Int,
+    /** The affirmation the seller gave; the server records the exact statement shown. */
+    val age_confirmed: Boolean,
     val email: String? = null,
     val terms_accepted: Boolean = true,
     val app_version: String,
@@ -410,14 +411,15 @@ data class OnboardingAccountRes(
 data class OnboardingCompleteReq(
     val device_secret: String,
     val store_name: String,
-    val slug: String,
-    val business_category: String,
-    val business_category_id: String,
+    /** Omitted at setup: the server makes a unique link from the name and the permanent code. */
+    val slug: String? = null,
+    val business_category: String? = null,
+    val business_category_id: String? = null,
     val business_subcategory_id: String? = null,
     val country_iso: String,
     val city_geoname_id: Long? = null,
     val city_catalog_id: Long? = null,
-    val city_name: String,
+    val city_name: String? = null,
 )
 
 @Serializable

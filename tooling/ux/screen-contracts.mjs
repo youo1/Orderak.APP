@@ -111,28 +111,18 @@ export const CONTRACTS = [
     id: "shop-setup",
     kotlinRoute: "ShopSetupRoute",
     surface: "account",
-    purpose: "إنشاء الحساب والمتجر في خطوتين، بمسوّدة قابلة للاستئناف",
+    purpose: "إنشاء المتجر في خطوة واحدة، ثم شاشة «متجرك جاهز» وقائمة ما تبقّى",
     entry: ["AuthRoute — تحقّق ناجح لبائع جديد"],
-    exit: ["MainRoute — اكتمل الإنشاء", "AuthRoute — رجوع مع حفظ المسوّدة"],
-    data: ["resumable draft", "business categories", "city catalogue", "slug availability"],
+    exit: ["MainRoute — اكتمل الإنشاء", "ProductEditRoute — إضافة أول منتج", "AuthRoute — رجوع مع حفظ المسوّدة"],
+    data: ["resumable draft", "store link preview"],
     actions: [
-      { do: "save account step", via: "next" },
-      // Restated, because the old wording described what the seller SEES and
-      // the list is what they DO. `checkSlug()` is private and fires as they
-      // type the shop name; availability is its feedback, not a control. The
-      // action is naming the shop, and `onNameChanged` carries it.
-      { do: "name the shop, and see whether its link is free", via: "onNameChanged" },
-      // Was unverified because the picker lives in a child composable. Splitting
-      // ShopSetupContent out put the callback in ShopSetupScreen's own body,
-      // where the check can see it.
-      { do: "select city", via: "onCitySelected" },
-      // Was `via: "onCreate"`, which resolves to the passkey callback
-      // (`onCreate = { activity?.let(viewModel::createPasskey) }`) rather than to
-      // store creation, which is the bottom button's `actions.finish` →
-      // `viewModel::finish`. The guard passed the whole time, because the symbol
-      // it looked for did exist — it was just the wrong one. Found while checking
-      // this contract against the screen during the surface redesign.
-      { do: "create store", via: "finish" },
+      { do: "name the shop, and see its link preview", via: "onNameChanged" },
+      { do: "confirm age", via: "onAgeConfirmedChanged" },
+      // The bottom bar saves the account step and then creates the store, on one tap.
+      { do: "create store", via: "create" },
+      { do: "share the link", via: "share" },
+      { do: "add the first product", via: "addFirstProduct" },
+      { do: "leave the rest for later", via: "later" },
     ],
     states: ["content", "loading", "error"],
     offline: false,
