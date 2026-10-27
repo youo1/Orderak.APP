@@ -6,6 +6,7 @@
 // guard fails on a word from the glossary's colloquial column in:
 //   - apps/seller-android/app/src/main/res/values-ar/strings.xml
 //   - services/backend/src/platform/localization/messages/ar.ts
+//   - services/backend/src/landing.ts (the public landing page)
 //
 // The brand is written أوردرك and is never a finding. Strings that the
 // authentication contract protects (the consent line and the SMS disclosure)
@@ -106,6 +107,18 @@ export function findings() {
       }
       out.push(`${file}: ${key} uses ${words.join(", ")}`);
     }
+  }
+  // The public landing page is one template; its readable text is every run of text between tags
+  // and the content of the meta tags.
+  const landingFile = "services/backend/src/landing.ts";
+  const landing = readFileSync(path.join(root, landingFile), "utf8");
+  const runs = [
+    ...[...landing.matchAll(/>([^<>]*[ء-ي][^<>]*)</gu)].map((m) => m[1]),
+    ...[...landing.matchAll(/content="([^"]*[ء-ي][^"]*)"/gu)].map((m) => m[1]),
+  ];
+  for (const run of runs) {
+    const words = colloquialWords(run);
+    if (words.length > 0) out.push(`${landingFile}: "${run.trim()}" uses ${words.join(", ")}`);
   }
   for (const a of ALLOWED_PENDING_APPROVAL) {
     if (!allowedUsed.has(a.key)) out.push(`ALLOWED_PENDING_APPROVAL "${a.key}" no longer needs its allowance (remove it)`);
