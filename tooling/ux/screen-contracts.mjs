@@ -111,28 +111,18 @@ export const CONTRACTS = [
     id: "shop-setup",
     kotlinRoute: "ShopSetupRoute",
     surface: "account",
-    purpose: "إنشاء الحساب والمتجر في خطوتين، بمسوّدة قابلة للاستئناف",
+    purpose: "إنشاء المتجر في خطوة واحدة، ثم شاشة «متجرك جاهز» وقائمة ما تبقّى",
     entry: ["AuthRoute — تحقّق ناجح لبائع جديد"],
-    exit: ["MainRoute — اكتمل الإنشاء", "AuthRoute — رجوع مع حفظ المسوّدة"],
-    data: ["resumable draft", "business categories", "city catalogue", "slug availability"],
+    exit: ["MainRoute — اكتمل الإنشاء", "ProductEditRoute — إضافة أول منتج", "AuthRoute — رجوع مع حفظ المسوّدة"],
+    data: ["resumable draft", "store link preview"],
     actions: [
-      { do: "save account step", via: "next" },
-      // Restated, because the old wording described what the seller SEES and
-      // the list is what they DO. `checkSlug()` is private and fires as they
-      // type the shop name; availability is its feedback, not a control. The
-      // action is naming the shop, and `onNameChanged` carries it.
-      { do: "name the shop, and see whether its link is free", via: "onNameChanged" },
-      // Was unverified because the picker lives in a child composable. Splitting
-      // ShopSetupContent out put the callback in ShopSetupScreen's own body,
-      // where the check can see it.
-      { do: "select city", via: "onCitySelected" },
-      // Was `via: "onCreate"`, which resolves to the passkey callback
-      // (`onCreate = { activity?.let(viewModel::createPasskey) }`) rather than to
-      // store creation, which is the bottom button's `actions.finish` →
-      // `viewModel::finish`. The guard passed the whole time, because the symbol
-      // it looked for did exist — it was just the wrong one. Found while checking
-      // this contract against the screen during the surface redesign.
-      { do: "create store", via: "finish" },
+      { do: "name the shop, and see its link preview", via: "onNameChanged" },
+      { do: "confirm age", via: "onAgeConfirmedChanged" },
+      // The bottom bar saves the account step and then creates the store, on one tap.
+      { do: "create store", via: "create" },
+      { do: "share the link", via: "share" },
+      { do: "add the first product", via: "addFirstProduct" },
+      { do: "leave the rest for later", via: "later" },
     ],
     states: ["content", "loading", "error"],
     offline: false,
@@ -234,8 +224,8 @@ export const CONTRACTS = [
       { do: "open filtered orders", via: "onOpenCounter" },
       { do: "open order", via: "onOpenOrder" },
       { do: "add first product", via: "onAddProduct" },
-      // The summary could not be read from the device, or the plan refresh failed.
-      // The plan refresh retry moves to the subscription screen with its error (R9).
+      // The summary could not be read from the device. The plan refresh error and its retry
+      // live on the subscription screen.
       { do: "retry", via: "onRetry" },
       { do: "open announcements", via: "onOpenAnnouncements" },
     ],
@@ -667,7 +657,7 @@ export const CONTRACTS = [
     purpose: "الخطة الحالية والاستهلاك مقابل الحدود",
     entry: ["account", "today — لافتة الخطة", "paywall"],
     exit: ["PlansRoute", "رجوع"],
-    data: ["subscription status", "entitlement usage", "billing flag state"],
+    data: ["subscription status", "entitlement usage", "billing flag state", "plan refresh error"],
     actions: [
       // The `planned` reason had gone stale: PlansRoute was built and wired, and
       // PaywallScreen reached it — but this screen, which declares it as an exit,
@@ -680,6 +670,7 @@ export const CONTRACTS = [
       // later, which is a product decision rather than a wiring gap.
       { do: "register interest", status: "planned", why: "no notify-me control or endpoint exists" },
       { do: "restore purchase", via: "recoverPurchases" },
+      { do: "retry plan refresh", via: "onRetryPlan" },
     ],
     states: ["loading", "content", "error"],
     offline: true,

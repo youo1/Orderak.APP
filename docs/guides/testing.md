@@ -200,16 +200,6 @@ control is not measured, because WCAG 1.4.3 exempts inactive components.
 
 | Preview | Rule | Node text / kind | Reason | Plan |
 |---|---|---|---|---|
-| `AccountScreenshotTestKt.accountContentLight` | Contrast | `text "رقم فودافون كاش"` | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
-| `AccountScreenshotTestKt.accountLoadingLight` | Contrast | `text "رقم فودافون كاش"` | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
-| `AccountScreenshotTestKt.accountFreePlan` | Contrast | `text "رقم فودافون كاش"` (measured 4.26:1 once scrolled into view) | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
-| `AccountScreenshotTestKt.accountFreePlanUpgradable` | Contrast | `text "رقم فودافون كاش"` (measured 4.26:1 once scrolled into view) | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
-| `AccountScreenshotTestKt.accountLinkPending` | Contrast | `text "رقم فودافون كاش"` (measured 4.26:1 once scrolled into view) | Field label colour below 4.5:1 | R1 — use the accessible onSurfaceVariant token |
-| `ShopSetupScreenshotTestKt.setupAccountDark` | Label | 2 inline links (terms, privacy) | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
-| `ShopSetupScreenshotTestKt.setupAccountEmpty` | Label | 2 inline links (terms, privacy) | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
-| `ShopSetupScreenshotTestKt.setupAccountInvalidEmail` | Label | 2 inline links (terms, privacy) | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
-| `ShopSetupScreenshotTestKt.setupAccountLight` | Label | 2 inline links (terms, privacy) | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
-| `ShopSetupScreenshotTestKt.setupAccountSaving` | Label | 2 inline links (terms, privacy) | Inline text link has no semantics label of its own | R3 — present the terms and privacy links as their own controls in the redesigned setup |
 
 **Spike conclusion.** Compose accessibility checks (`enableAccessibilityChecks`,
 `tryPerformAccessibilityChecks`) and ATF's `AccessibilityHierarchyAndroid` do not

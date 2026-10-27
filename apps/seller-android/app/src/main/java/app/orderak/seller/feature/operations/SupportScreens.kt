@@ -6,6 +6,25 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.style.TextDirection
+import app.orderak.seller.core.text.formatAgo
+import app.orderak.seller.core.text.formatNumber
+import app.orderak.seller.core.ui.BottomActionBar
+import app.orderak.seller.core.ui.ChatBubble
+import app.orderak.seller.core.ui.Composer
+import app.orderak.seller.core.ui.SemanticChip
+import app.orderak.seller.core.ui.SemanticRole
+import app.orderak.seller.core.ui.TextField
+import app.orderak.seller.core.ui.isolated
+import java.time.Instant
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -26,7 +45,6 @@ import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -43,11 +61,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -180,11 +196,9 @@ class SupportTicketViewModel @Inject constructor(
 
 @Composable
 fun SupportScreen(onBack: () -> Unit, onTicket: (Long) -> Unit, vm: OperationsViewModel = hiltViewModel()) {
-    val spacing = LocalOrderakSpacing.current
     val tickets by vm.tickets.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val error by vm.error.collectAsStateWithLifecycle()
-    var creating by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) { vm.loadSupport() }
 
     SupportContent(
@@ -194,41 +208,19 @@ fun SupportScreen(onBack: () -> Unit, onTicket: (Long) -> Unit, vm: OperationsVi
         onBack = onBack,
         onRetry = vm::loadSupport,
         onTicket = onTicket,
-        onNew = { creating = true },
+        onCreate = { subject, message -> vm.createTicket(subject, message) },
     )
-
-    if (creating) {
-        var subject by rememberSaveable { mutableStateOf("") }
-        var message by rememberSaveable { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = { creating = false },
-            title = { Text(stringResource(R.string.support_new)) },
-            text = {
-                Column {
-                    OutlinedTextField(subject, { subject = it.take(120) }, label = { Text(stringResource(R.string.support_subject)) })
-                    Spacer(Modifier.height(spacing.space2))
-                    OutlinedTextField(message, { message = it.take(4000) }, label = { Text(stringResource(R.string.support_message)) })
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    enabled = subject.isNotBlank() && message.isNotBlank(),
-                    onClick = { vm.createTicket(subject, message); creating = false },
-                ) { Text(stringResource(R.string.common_send)) }
-            },
-            dismissButton = { TextButton(onClick = { creating = false }) { Text(stringResource(R.string.common_cancel)) } },
-        )
-    }
 }
 
 /**
  * The support ticket list, as a function of its state.
  *
- * `tickets` is nullable and that is the whole point of the split: `busy` seeds
- * false and the list used to seed `emptyList()`, so "no tickets yet, open one"
- * greeted a seller with tickets on every visit, for as long as the request took.
+ * Ticket rows (subject, "#number", the last activity, and a chip for open or closed) and one
+ * bar, "تذكرة جديدة", which opens a sheet: "كيف يمكننا مساعدتك؟", a subject, the details and
+ * "إرسال". `tickets` is nullable: `busy` seeds false and the list used to seed `emptyList()`, so
+ * "no tickets yet" greeted a seller with tickets on every visit, for as long as the request took.
  */
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SupportContent(
     tickets: List<SupportTicketDto>?,
@@ -237,14 +229,15 @@ fun SupportContent(
     onBack: () -> Unit,
     onRetry: () -> Unit,
     onTicket: (Long) -> Unit,
-    onNew: () -> Unit,
+    onCreate: (String, String) -> Unit,
 ) {
     val spacing = LocalOrderakSpacing.current
+    val locale = LocalConfiguration.current.locales[0]
+    var creating by rememberSaveable { mutableStateOf(false) }
     OperationPage(
         title = stringResource(R.string.support_title),
         onBack = onBack,
-        // Loading until the list has been read, not just while a request is in
-        // flight. The two are different and only one of them was checked.
+        // Loading until the list has been read, not just while a request is in flight.
         busy = busy || tickets == null,
         error = error,
         onRetry = onRetry,
@@ -252,27 +245,97 @@ fun SupportContent(
         empty = {
             EmptyState(
                 kind = EmptyStateKind.Empty,
-                title = stringResource(R.string.common_empty),
-                actionLabel = stringResource(R.string.support_new),
-                onAction = onNew,
+                title = stringResource(R.string.support_empty),
+                actionLabel = stringResource(R.string.support_new_ticket),
+                onAction = { creating = true },
             )
         },
+        bottomBar = {
+            if (tickets?.isNotEmpty() == true) {
+                BottomActionBar(
+                    primaryLabel = stringResource(R.string.support_new_ticket),
+                    onPrimary = { creating = true },
+                )
+            }
+        },
     ) {
-        Button(onClick = onNew, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.support_new))
-        }
         tickets.orEmpty().forEach { ticket ->
-            Card(
+            Surface(
                 onClick = { onTicket(ticket.id) },
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surfaceContainerLowest,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Column(Modifier.padding(spacing.space4)) {
-                    Text(ticket.subject, style = MaterialTheme.typography.titleMedium)
-                    Text("${ticket.status} · ${ticket.priority}", style = MaterialTheme.typography.bodySmall)
-                    ticket.last_message?.let {
-                        Text(it, style = MaterialTheme.typography.bodyMedium)
+                Row(
+                    Modifier.padding(spacing.space3),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(spacing.space3),
+                ) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(spacing.space1)) {
+                        Text(
+                            ticket.subject,
+                            style = MaterialTheme.typography.titleSmall.copy(textDirection = TextDirection.Content),
+                        )
+                        val number = isolated("#" + formatNumber(ticket.id, locale))
+                        val last = ticket.updated_at?.let { serverMillis(it) }
+                            ?.let { formatAgo(it, System.currentTimeMillis(), locale) }
+                        Text(
+                            listOfNotNull(number, last).joinToString(" · "),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (ticket.status == "closed") {
+                        SemanticChip(SemanticRole.Neutral, stringResource(R.string.support_status_closed))
+                    } else {
+                        SemanticChip(SemanticRole.Info, stringResource(R.string.support_status_open))
                     }
                 }
+            }
+        }
+    }
+
+    if (creating) {
+        ModalBottomSheet(
+            onDismissRequest = { creating = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = null,
+            shape = RoundedCornerShape(spacing.space0),
+        ) {
+            var subject by rememberSaveable { mutableStateOf("") }
+            var message by rememberSaveable { mutableStateOf("") }
+            Column(
+                Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(spacing.space4),
+                verticalArrangement = Arrangement.spacedBy(spacing.space3),
+            ) {
+                Text(
+                    stringResource(R.string.support_sheet_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.semantics { heading() },
+                )
+                TextField(
+                    value = subject,
+                    onValueChange = { subject = it.take(120) },
+                    label = stringResource(R.string.support_subject),
+                    required = true,
+                )
+                TextField(
+                    value = message,
+                    onValueChange = { message = it.take(4000) },
+                    label = stringResource(R.string.support_message),
+                    required = true,
+                    singleLine = false,
+                )
+                Button(
+                    enabled = subject.isNotBlank() && message.isNotBlank(),
+                    onClick = { onCreate(subject, message); creating = false },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = spacing.minimumTouchTarget),
+                ) { Text(stringResource(R.string.common_send)) }
+                TextButton(
+                    onClick = { creating = false },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = spacing.minimumTouchTarget),
+                ) { Text(stringResource(R.string.common_cancel)) }
             }
         }
     }
@@ -305,11 +368,12 @@ fun SupportTicketScreen(onBack: () -> Unit, vm: SupportTicketViewModel = hiltVie
 /**
  * One support thread, as a function of its state.
  *
- * The reply box is hidden on a closed ticket, and also while the thread has not
- * been read — offering a reply before the status is known is offering one that
- * may not be accepted.
+ * A top bar with the subject and the status under it; the conversation as bubbles, the seller's
+ * at the end and support's at the start, each with its time; and the composer at the bottom. On
+ * a closed ticket the composer is replaced by the sentence that says so. The composer is also
+ * withheld while the thread has not been read: offering a reply before the status is known is
+ * offering one that may not be accepted.
  */
-
 @Composable
 fun SupportTicketContent(
     ticket: SupportTicketDto?,
@@ -325,45 +389,48 @@ fun SupportTicketContent(
     replyError: String? = null,
 ) {
     val spacing = LocalOrderakSpacing.current
+    val locale = LocalConfiguration.current.locales[0]
     OperationPage(
         title = ticket?.subject ?: stringResource(R.string.support_title),
+        subtitle = ticket?.let {
+            stringResource(if (it.status == "closed") R.string.support_status_closed else R.string.support_status_open)
+        },
         onBack = onBack,
         busy = busy || messages == null,
         error = error,
         onRetry = onRetry,
-    ) {
-        messages.orEmpty().forEach { m ->
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(spacing.space4)) {
-                    Text(m.sender, style = MaterialTheme.typography.labelMedium)
-                    Text(m.body, style = MaterialTheme.typography.bodyMedium)
-                    m.created_at?.let {
-                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        bottomBar = {
+            if (ticket != null) {
+                Column {
+                    if (replyError != null && ticket.status != "closed") {
+                        // Above the field, not instead of the thread: the seller is answering
+                        // something they can still read, and their reply is still in the field.
+                        Banner(
+                            state = BannerState.Error,
+                            title = stringResource(R.string.support_reply_failed),
+                            message = stringResource(backendErrorResource(replyError)),
+                            modifier = Modifier.padding(horizontal = spacing.space4, vertical = spacing.space2),
+                        )
                     }
+                    Composer(
+                        value = reply,
+                        onValueChange = { onReplyChange(it.take(4000)) },
+                        onSend = { if (reply.isNotBlank()) onSend() },
+                        placeholder = stringResource(R.string.support_message),
+                        sendDescription = stringResource(R.string.common_send),
+                        closedLabel = if (ticket.status == "closed") stringResource(R.string.support_closed_notice) else null,
+                    )
                 }
             }
-        }
-        if (ticket != null && ticket.status != "closed") {
-            if (replyError != null) {
-                // Above the field, not instead of the thread: the seller is
-                // answering something they can still read.
-                Banner(
-                    state = BannerState.Error,
-                    title = stringResource(R.string.support_reply_failed),
-                    message = stringResource(backendErrorResource(replyError)),
-                )
-            }
-            OutlinedTextField(
-                reply,
-                { onReplyChange(it.take(4000)) },
-                label = { Text(stringResource(R.string.support_message)) },
-                modifier = Modifier.fillMaxWidth(),
+        },
+    ) {
+        messages.orEmpty().forEach { m ->
+            ChatBubble(
+                text = m.body,
+                mine = m.sender == "seller",
+                time = m.created_at?.let { serverMillis(it) }
+                    ?.let { formatAgo(it, System.currentTimeMillis(), locale) },
             )
-            Button(
-                enabled = reply.isNotBlank(),
-                onClick = onSend,
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text(stringResource(R.string.common_send)) }
         }
     }
 }

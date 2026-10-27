@@ -288,6 +288,7 @@ fun MainScreen(
                     onOpenSubscription = onOpenSubscription,
                     onOpenAiAssistant = onOpenAiAssistant,
                     onOpenSellerProfile = onOpenSellerProfile,
+                    unreadAnnouncements = announcements?.count { !it.is_read } ?: 0,
                 )
             }
         }
@@ -334,7 +335,7 @@ private fun NavHostController.navigateToSurface(target: SellerSurface) {
 }
 
 /** The surfaces that draw their own large title, so the shell does not draw its bar over it. */
-private val SURFACES_WITH_OWN_BAR = setOf(SellerSurface.Today, SellerSurface.Orders, SellerSurface.Store)
+private val SURFACES_WITH_OWN_BAR = setOf(SellerSurface.Today, SellerSurface.Orders, SellerSurface.Store, SellerSurface.Customers, SellerSurface.Account)
 
 /**
  * The five-surface shell: what stays on screen whichever surface is showing.
@@ -474,7 +475,6 @@ private fun DashboardTab(
                 latestOrders = latestOrders,
                 monthSales = monthSales?.let { Money(it.totalMinor, it.currency) },
                 storeUrl = storeUrl,
-                planError = entitlementState.error,
             ),
             onOpenCounter = onOpenCounter,
             onOpenOrder = onOpenOrder,

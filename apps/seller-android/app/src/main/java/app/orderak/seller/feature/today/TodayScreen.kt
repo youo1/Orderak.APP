@@ -99,12 +99,6 @@ data class TodayUiState(
     val monthSales: Money? = null,
     /** The link the seller shares, as stored. */
     val storeUrl: String? = null,
-    /**
-     * Non-null when the last plan refresh failed. It moves to the subscription
-     * screen with the plan itself (phase R9); until that screen takes it, the
-     * seller must not lose the only place that says so.
-     */
-    val planError: String? = null,
 )
 
 /**
@@ -151,20 +145,6 @@ fun TodayScreen(
             verticalArrangement = Arrangement.spacedBy(spacing.space4),
         ) {
             item { planNotices() }
-
-            // The error the surface used to swallow. Above the figures because it
-            // explains why they may be behind, and it carries the action that fixes it.
-            state.planError?.let { message ->
-                item {
-                    Banner(
-                        state = BannerState.Error,
-                        title = stringResource(R.string.sync_failed),
-                        message = message,
-                        actionLabel = stringResource(R.string.common_retry),
-                        onAction = onRetry,
-                    )
-                }
-            }
 
             if (state.summaryFailed) {
                 item {

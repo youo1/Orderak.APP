@@ -140,6 +140,7 @@ class SessionStore @Inject constructor(
     val phone: Flow<String?> = context.dataStore.data.map { it[Keys.PHONE] }
     val shopName: Flow<String?> = context.dataStore.data.map { it[Keys.SHOP_NAME] }
     val instapay: Flow<String?> = context.dataStore.data.map { it[Keys.INSTAPAY] }
+    val fullName: Flow<String?> = context.dataStore.data.map { it[Keys.FULL_NAME] }
     val vfcash: Flow<String?> = context.dataStore.data.map { it[Keys.VFCASH] }
     val slug: Flow<String?> = context.dataStore.data.map { it[Keys.SLUG] }
 

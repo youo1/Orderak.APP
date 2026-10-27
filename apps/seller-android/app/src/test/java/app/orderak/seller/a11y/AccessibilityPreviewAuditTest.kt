@@ -275,21 +275,6 @@ private val KNOWN_KINDS: Map<String, KnownKind> = mapOf(
     ),
 )
 private val KNOWN_FINDINGS: List<KnownFinding> = """
-        CF|AccountScreenshotTestKt.accountContentLight|Contrast|text "رقم فودافون كاش"
-        CF|AccountScreenshotTestKt.accountLoadingLight|Contrast|text "رقم فودافون كاش"
-        CF|AccountScreenshotTestKt.accountFreePlan|Contrast|text "رقم فودافون كاش"
-        CF|AccountScreenshotTestKt.accountFreePlanUpgradable|Contrast|text "رقم فودافون كاش"
-        CF|AccountScreenshotTestKt.accountLinkPending|Contrast|text "رقم فودافون كاش"
-        IL|ShopSetupScreenshotTestKt.setupAccountDark|Label|has no ContentDescription or Text
-        IL|ShopSetupScreenshotTestKt.setupAccountDark|Label|has no ContentDescription or Text
-        IL|ShopSetupScreenshotTestKt.setupAccountEmpty|Label|has no ContentDescription or Text
-        IL|ShopSetupScreenshotTestKt.setupAccountEmpty|Label|has no ContentDescription or Text
-        IL|ShopSetupScreenshotTestKt.setupAccountInvalidEmail|Label|has no ContentDescription or Text
-        IL|ShopSetupScreenshotTestKt.setupAccountInvalidEmail|Label|has no ContentDescription or Text
-        IL|ShopSetupScreenshotTestKt.setupAccountLight|Label|has no ContentDescription or Text
-        IL|ShopSetupScreenshotTestKt.setupAccountLight|Label|has no ContentDescription or Text
-        IL|ShopSetupScreenshotTestKt.setupAccountSaving|Label|has no ContentDescription or Text
-        IL|ShopSetupScreenshotTestKt.setupAccountSaving|Label|has no ContentDescription or Text
 """.trimIndent().lines().filter { it.isNotBlank() }.map { line ->
     val parts = line.split("|", limit = 4)
     val kind = KNOWN_KINDS.getValue(parts[0])

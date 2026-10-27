@@ -87,7 +87,6 @@ class StoreInfoContentTest {
     @Test
     fun theLinkExplainsThatTheCodeNeverChanges() {
         show()
-        rule.onAllNodesWithText(string(R.string.store_info_slug_note), substring = true)
         assertTrue(rule.onAllNodesWithText(string(R.string.slug_available), substring = true).fetchSemanticsNodes().isNotEmpty())
     }
 

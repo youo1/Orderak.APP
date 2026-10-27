@@ -110,7 +110,6 @@ class CustomerDetailsContentTest {
     @Test
     fun theirOrdersAreRowsThatOpenTheOrder() {
         show()
-        rule.onAllNodesWithText("منى السيد", substring = true)
         assertTrue(rule.onAllNodesWithText("#١٠٠١", substring = true).fetchSemanticsNodes().isNotEmpty())
         rule.onAllNodesWithText("#١٠٠١", substring = true)[0].performClick()
         assertEquals(1L, opened)

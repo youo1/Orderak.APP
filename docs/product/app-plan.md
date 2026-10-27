@@ -117,21 +117,21 @@ desktop.
   Passkey sign-in directly; account creation and recovery use Firebase Phone OTP
   (SMS), with OTP fallback shown only when applicable. Welcome includes the
   existing explicit العربية/English/Français language sheet.
-- **Account setup (step 1/2)** — full name, affirmative confirmation of the
-  canonical statement `عمري ١٨ عامًا أو أكثر`, optional private email, and
-  versioned Terms/Privacy acceptance after phone verification. No birth year is
-  collected.
-- **Store setup (step 2/2)** — store name and owner; a read-only preview of the
-  unchanged canonical URL is shown. Business category and city are optional at
-  setup and can be completed later through the onboarding checklist and Store
-  Information, with the same validation when supplied. Country, subcategory, and
-  logo are not requested here; subcategory and logo remain editable later in
-  Store Information/Profile Settings.
-- **Transition until plan item R3.** The two steps above describe the setup the
-  backend now accepts (R3a). The Android setup screens change in R3; until then
-  the installed app still asks for a birth year, a business category and a city,
-  and sends them. The Worker accepts that request as legacy age evidence, never
-  stores the birth year, and records NULL statement text for it.
+- **Store setup (one step, then a ready screen)** — "لنجهّز متجرك", one line (the rest can
+  wait), the store name with a preview of the link (`orderak.app/EG-name-········`, noting a permanent
+  code is added on creation), the full name (not shown to buyers), the affirmation
+  `عمري ١٨ عامًا أو أكثر` in place of a birth year, the country as a line of text taken from the phone, and
+  the Terms and Privacy documents as two controls of their own. The bar "إنشاء المتجر" saves the account
+  step and then creates the store on one tap; creating covers the page with "جارٍ إنشاء متجرك…", and a
+  failure keeps everything typed, in a banner with a retry. There is no "name taken" outcome: the server
+  derives a unique link from the name and the store's permanent code. The business category, the city, a
+  first product and a payment method are no longer asked at setup.
+- **Ready screen** — "متجرك جاهز", the full link with share and copy, and the checklist "أكمل متجرك ·
+  ١ من ٤" (the store is created; add a first product; add a payment method; set the city and business
+  type). The bar offers "إضافة أول منتج" (opens the product form) and "لاحقًا". The passkey invitation,
+  where offered, appears as a sheet over this screen.
+- **Transition.** The Worker still accepts the legacy birth year from installed clients, as legacy age
+  evidence with NULL statement text; the current Android client sends `age_confirmed: true`.
 - **Main shell** with tabs:
   - **Dashboard** — today / unpaid / to-ship counts + "share catalog" link.
   - **Orders** — list + order details, status updates.
@@ -632,6 +632,34 @@ figures (orders, total spent, last order), «عن العميل» with the other 
 customer's orders, newest first. Editing is one sheet that also says the number is the customer's identity and
 does not change; where the plan does not open it the card is read-only and a notice says so.
 
+حسابي (Phase R8) has a large title, the person and the shop, and the plan card in commerce colours: the plan, its
+two meters closest to their limits, and «التفاصيل» into the subscription page; until entitlements answer the card holds
+placeholders and never says «الخطة المجانية» as a guess. Rows are grouped by what the seller is doing: متجرك (store
+information, التصنيفات, catalogue languages, and the real store link, which a tap copies), المدفوعات والأمان (payment
+methods, showing which of نقدًا · إنستاباي · محفظة إلكترونية are on; devices and passkeys; «ترقية الخطة» only while
+purchase is open), المساعدة (support; announcements with the unread count; the assistant, or a notice that the plan
+does not include it), أنت (personal details, language) and الحساب (deletion status, delete account, sign out).
+Payment details, the plans to buy, deleting the account and signing out are sheets; deleting and signing out state
+their consequence. بياناتك الشخصية asks for the full name (and says where it appears), shows the sign-in number as
+verified, and keeps the email optional; changing the email says the old one stays in use until the new one is
+confirmed. It no longer asks for a photo or a birth year; what is stored is carried through unchanged on save.
+الدعم lists tickets with a number and an open/closed chip and one bar «تذكرة جديدة» (a sheet); a ticket is a
+conversation of bubbles with a composer, replaced on a closed ticket by the sentence that says so. إعلانات Orderak
+puts unread items first with a dot; tapping one opens it in place and marks it read. حذف الحساب (status) is a
+three-step timeline with dates, then what is deleted and what the law may keep (the wording of the last line needs a
+legal check). الأجهزة lists the devices («هذا الجهاز» on this phone, «تسجيل خروجه» on the others) and the passkeys
+(overflow: rename, remove) with sheets that ask first. المساعد has an overflow with «بدء محادثة جديدة» (asks first),
+the disclosure banner, the quota meter, bubbles, a typing bubble and the composer.
+
+الاشتراك (Phase R9) has a plan card in commerce colours (the plan, its status, the renewal or the pending change), all five
+meters, a notice while purchase is closed, «مقارنة الخطط» as a tonal button and «استعادة المشتريات» as a text button.
+When the plan refresh failed it shows a banner with «إعادة المحاولة» over the last saved figures, dated; offline it
+says when the figures are from. الخطط has one tab per plan with the seller's own marked «خطتك», and for the chosen
+plan its limits as rows with the difference from the current plan, then the features it includes; nothing is sold
+while purchase is closed. The limit page (بلوغ الحد) has a close at the top, a commerce icon, the headline, the full
+meter with the server's numbers, what the next plan gives for that limit, a note while purchase is closed, «عرض
+الخطط» and «رجوع».
+
 اليوم (Phase R4, proposal T1) shows what waits for the seller: three tiles in the
 order an order moves through the shop (new, unpaid, ready to ship), each opening
 the orders it counts; the two newest orders that are not finished, as rows that
@@ -643,8 +671,7 @@ surface is one invitation to add the first and the checklist setup left, and the
 new-order button is not offered. The bell opens the announcements and carries a
 dot while one is unread. The plan appears only when it needs the seller: a
 monthly limit at 90% or more, or a billing notice that asks for action; the rest
-of it is on the subscription screen. A failed plan refresh keeps its banner here
-until that screen takes it (R9).
+of it is on the subscription screen. A failed plan refresh is shown on the subscription page (R9), with its retry, over the last saved figures.
 
 The restricted-account page (Phase R3, proposal R1) tells the seller which of two
 things happened, from the status the server sends. A suspension ends: the page

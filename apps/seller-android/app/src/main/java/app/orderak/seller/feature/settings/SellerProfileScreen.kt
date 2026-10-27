@@ -4,6 +4,11 @@ import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import app.orderak.seller.core.ui.BottomActionBar
+import app.orderak.seller.core.ui.TextField
+import app.orderak.seller.core.ui.TopBar
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -242,29 +247,12 @@ fun SellerProfileScreen(
     var email by rememberSaveable { mutableStateOf("") }
     var birthYear by rememberSaveable { mutableStateOf("") }
     var profilePhotoUri by rememberSaveable { mutableStateOf("") }
-    // A picked photo that never reached storage used to leave no trace: the
-    // callback only ran its success branch, so the seller chose an image,
-    // watched the "photo uploaded" line not appear, and could not tell a failed
-    // upload from a slow one. The same shape `store-info` already reports, with
-    // its own state for the same reason — nothing the seller typed is at risk,
-    // so this is not the save error.
-    var photoUploadFailed by rememberSaveable { mutableStateOf(false) }
-
     // Seed from ViewModel on first load
     LaunchedEffect(savedFullName, savedEmail, savedBirthYear, savedPhotoUri) {
         if (fullName.isBlank()) fullName = savedFullName
         if (email.isBlank()) email = savedEmail
         if (birthYear.isBlank()) birthYear = savedBirthYear
         if (profilePhotoUri.isBlank()) profilePhotoUri = savedPhotoUri
-    }
-
-    val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        uri?.let {
-            photoUploadFailed = false
-            viewModel.uploadProfilePhoto(it) { url ->
-                if (url != null) profilePhotoUri = url else photoUploadFailed = true
-            }
-        }
     }
 
     SellerProfileContent(
@@ -277,12 +265,8 @@ fun SellerProfileScreen(
         email = email,
         birthYear = birthYear,
         profilePhotoUri = profilePhotoUri,
-        photoUploadFailed = photoUploadFailed,
         onFullName = { fullName = it },
         onEmail = { email = it },
-        onBirthYear = { birthYear = it },
-        onProfilePhotoUri = { profilePhotoUri = it },
-        onPickPhoto = { pickPhoto.launch("image/*") },
         onResendVerification = viewModel::resendEmailVerification,
         onSave = viewModel::save,
         onBack = onBack,
@@ -302,7 +286,6 @@ fun SellerProfileScreen(
  * answer on it is drawn — the save's busy state, the verification mail's outcome
  * — and a chosen photo that never reached storage drew nothing at all.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SellerProfileContent(
     phone: String,
@@ -312,14 +295,12 @@ fun SellerProfileContent(
     emailVerificationStatus: String?,
     fullName: String,
     email: String,
+    /** Not edited here any more: carried through unchanged so a save never erases it. */
     birthYear: String,
+    /** Likewise carried through unchanged. */
     profilePhotoUri: String,
-    photoUploadFailed: Boolean = false,
     onFullName: (String) -> Unit,
     onEmail: (String) -> Unit,
-    onBirthYear: (String) -> Unit,
-    onProfilePhotoUri: (String) -> Unit,
-    onPickPhoto: () -> Unit,
     onResendVerification: (() -> Unit) -> Unit,
     onSave: (String, String?, String?, String?, () -> Unit) -> Unit,
     onBack: () -> Unit,
@@ -328,67 +309,84 @@ fun SellerProfileContent(
     val spacing = LocalOrderakSpacing.current
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.seller_profile_title), modifier = Modifier.semantics { heading() }) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.common_back),
-                        )
-                    }
-                },
+            TopBar(
+                title = stringResource(R.string.seller_profile_title),
+                onBack = onBack,
+                backDescription = stringResource(R.string.sheet_close),
+                closeIcon = true,
             )
         },
+        bottomBar = {
+            if (loaded) {
+                BottomActionBar(
+                    primaryLabel = stringResource(R.string.product_save_bar),
+                    onPrimary = { onSave(fullName, email, birthYear, profilePhotoUri, onBack) },
+                    primaryEnabled = !busy && fullName.isNotBlank(),
+                    disabledReason = if (!busy && fullName.isBlank()) stringResource(R.string.seller_profile_bar_reason) else null,
+                )
+            }
+        },
     ) { padding ->
-        // The four editable fields are seeded from the snapshot on first read,
-        // so drawing the form before it lands shows a blank phone number and
-        // then swaps it in.
+        // The editable fields are seeded from the snapshot on first read, so drawing the form
+        // before it lands shows a blank phone number and then swaps it in.
         if (!loaded) {
-            Skeleton(SkeletonVariant.DetailBlock, Modifier.padding(padding).padding(LocalOrderakSpacing.current.space4))
+            Skeleton(SkeletonVariant.DetailBlock, Modifier.padding(padding).padding(spacing.space4))
             return@Scaffold
         }
         Column(
             Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(spacing.space4)
-                .verticalScroll(rememberScrollState()),
+                .imePadding()
+                .verticalScroll(rememberScrollState())
+                .padding(spacing.space4),
             verticalArrangement = Arrangement.spacedBy(spacing.space3),
         ) {
-            Text(
-                stringResource(R.string.seller_profile_header),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            // The person behind the shop, kept apart from the shop itself.
+            TextField(
+                value = fullName,
+                onValueChange = { onFullName(it.take(80)) },
+                label = stringResource(R.string.seller_profile_full_name),
+                required = true,
+                helper = stringResource(R.string.seller_profile_name_where),
+                enabled = !busy,
             )
-
-            OutlinedTextField(
+            // The sign-in number: shown as an identity, not edited.
+            TextField(
                 value = phone,
                 onValueChange = {},
-                label = { Text(stringResource(R.string.seller_profile_phone)) },
+                label = stringResource(R.string.seller_profile_phone_login),
+                helper = stringResource(R.string.seller_profile_phone_verified),
                 enabled = false,
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
             )
+            TextField(
+                value = email,
+                onValueChange = { onEmail(it.take(80)) },
+                label = stringResource(R.string.seller_profile_email_optional),
+                helper = stringResource(R.string.seller_profile_email_used_for),
+                enabled = !busy,
+            )
+            if (savedEmail.isNotBlank() && email.trim() != savedEmail.trim()) {
+                // The old address keeps working until the new one is confirmed, and the page
+                // says so before the seller presses save.
+                Banner(
+                    state = BannerState.Information,
+                    title = stringResource(R.string.seller_profile_email_change),
+                )
+            }
             if (savedEmail.isNotBlank()) {
                 OutlinedButton(
                     onClick = { onResendVerification(onReauthenticate) },
                     enabled = !busy,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.seller_profile_resend_verification))
-                }
+                    modifier = Modifier.fillMaxWidth().heightIn(min = spacing.minimumTouchTarget),
+                ) { Text(stringResource(R.string.seller_profile_resend_verification)) }
                 emailVerificationStatus?.let { status ->
-                    // Three answers, not two: the second success state is the one
-                    // §4.5 found being reported as the first — "**A verified
-                    // seller can be told a verification email was sent.**" A
-                    // verified address is neither a success to celebrate nor a
-                    // failure, so it reads in the neutral colour.
+                    // Three answers, not two: a verified address is neither a success to
+                    // celebrate nor a failure, so it reads in the neutral colour.
                     Text(
                         when (status) {
                             "sent" -> stringResource(R.string.seller_profile_verification_sent)
-                            "already_verified" ->
-                                stringResource(R.string.seller_profile_verification_already_verified)
+                            "already_verified" -> stringResource(R.string.seller_profile_verification_already_verified)
                             else -> stringResource(R.string.seller_profile_verification_failed)
                         },
                         style = MaterialTheme.typography.bodySmall,
@@ -400,70 +398,6 @@ fun SellerProfileContent(
                     )
                 }
             }
-
-            OutlinedTextField(
-                value = fullName,
-                onValueChange = { onFullName(it.take(80)) },
-                label = { Text(stringResource(R.string.seller_profile_full_name)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = email,
-                onValueChange = { onEmail(it.take(80)) },
-                label = { Text(stringResource(R.string.seller_profile_email)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = birthYear,
-                onValueChange = { v -> onBirthYear(v.filter(Char::isDigit).take(4)) },
-                label = { Text(stringResource(R.string.seller_profile_birth_year)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(spacing.space3)) {
-                    Text(
-                        stringResource(R.string.seller_profile_photo),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    if (profilePhotoUri.isNotBlank()) {
-                        Text(
-                            stringResource(R.string.seller_profile_photo_set),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                    OutlinedButton(onClick = { onPickPhoto() }) {
-                        Text(
-                            if (profilePhotoUri.isBlank()) stringResource(R.string.setup_add_photo)
-                            else stringResource(R.string.setup_change_photo),
-                        )
-                    }
-                    if (photoUploadFailed) {
-                        // Beside the control that caused it, not at the bottom of
-                        // the form: the remedy is to pick again, and that button
-                        // is here.
-                        Banner(
-                            state = BannerState.Error,
-                            title = stringResource(R.string.seller_profile_photo_failed),
-                            message = stringResource(R.string.error_unknown),
-                            modifier = Modifier.padding(top = spacing.space3),
-                        )
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(spacing.space2))
-            Button(
-                onClick = {
-                    onSave(fullName, email, birthYear, profilePhotoUri, onBack)
-                },
-                enabled = !busy && fullName.isNotBlank(),
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text(stringResource(R.string.settings_save)) }
         }
     }
 }
