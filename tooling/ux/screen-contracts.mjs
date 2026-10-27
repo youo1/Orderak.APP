@@ -311,6 +311,7 @@ export const CONTRACTS = [
     actions: [
       { do: "add line", via: "changeQty" },
       { do: "set customer", via: "onPhone" },
+      { do: "choose country", via: "onCountry" },
       { do: "submit", via: "save" },
     ],
     states: ["content", "loading", "error"],
@@ -336,8 +337,10 @@ export const CONTRACTS = [
     actions: [
       { do: "add product", via: "onAdd" },
       { do: "edit product", via: "onEdit" },
-      { do: "search", via: "SearchField" },
-      { do: "open categories", status: "planned", why: "the entry lives on the account surface, not here" },
+      { do: "search", via: "onQueryChange" },
+      { do: "open categories", via: "onOpenCategories" },
+      { do: "open store information", via: "onOpenStoreInfo" },
+      { do: "open catalogue languages", via: "onOpenLanguages" },
     ],
     states: ["loading", "content", "empty", "error"],
     offline: true,
@@ -380,7 +383,7 @@ export const CONTRACTS = [
       // model since it was written and no screen ever offered it, so a typo in a
       // category name was permanent — the only way out was deleting the
       // category, which takes its products' filing with it.
-      { do: "rename", via: "pendingRename" },
+      { do: "rename", via: "onRename" },
       { do: "reorder", status: "planned", why: "no ordering control exists on the screen" },
       { do: "delete", via: "delete" },
     ],

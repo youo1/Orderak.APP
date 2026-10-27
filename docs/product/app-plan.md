@@ -553,6 +553,19 @@ only from a current response; stale/offline blocking policy becomes a visible
 warning so an unavailable network cannot permanently lock out the seller.
 `MainRoute#version-governance` is included in the screen manifest.
 
+The order page (Phase R5, details) is titled by the order's number with the time under
+it. It shows where the order stands: the status chip and the five steps it moves
+through (a cancelled order replaces them with a notice). The customer is a row that
+opens their page; the products come with their line totals and the total as the
+largest figure; the payment section names the method, offers the manual payment
+and the receipt check only until the order is paid, and lists what has been
+recorded. The one bar at the bottom holds the next step, named for what happens
+("تأكيد الطلب", "تم الدفع", "تم الشحن", "إكمال الطلب"), and cancelling in its secondary
+slot while it is allowed; a finished or cancelled order has no bar. An order not
+yet on the account disables the step and says why on screen. Cancelling asks in a
+sheet that states the consequence (the products return to stock and a cancelled
+order cannot be restored) and puts the verb on the button.
+
 الطلبات (Phase R5, list) has a large title and a pinned row of filters: all, unpaid,
 ready to ship, today, and one chip, الحالة, that opens a sheet with the six exact
 statuses and names the one chosen. The orders that still need the seller come
@@ -563,6 +576,61 @@ written without grouping because it is a name. A banner appears only while a
 manual order is still only on this phone, or the server refused one. With no
 order at all the page explains that link orders arrive by themselves and offers a
 manual one; a filter with no match keeps the chips and offers all orders.
+
+طلب جديد (Phase R5, manual order) is a form that closes with an ✕, and closing it
+asks first when anything was entered. It has three parts in the order a sale is
+told: the customer (a phone number with its country, chosen from a searchable
+list, and an optional name), the products (only those chosen are listed, each with
+a stepper that stops at the stock; a button opens a searchable picker that shows
+the stock on every row, and a line over stock says how many are available), and
+how it is paid (only the methods this store accepts: نقدًا, إنستاباي, محفظة
+إلكترونية). A note is behind a button. The bar holds the total and
+«تسجيل الطلب»; while the order cannot be recorded it says what is missing, and a
+basket in two currencies has no total and cannot be recorded. A write that fails
+keeps the draft and says so.
+
+المتجر (Phase R6, store) has a large title and, under it in every state, three tonal
+chips that open the store's pages: بيانات المتجر, التصنيفات and اللغات. The product meter
+stays here, because this is where the limited thing is created, then the search and a
+row per product: thumbnail, name, "price · المتبقي n", and a chip only when it matters
+(نفد in warning, مخفي in neutral). The one floating button is "إضافة منتج", and at the
+plan limit it says so and opens the limit. With no product the page says «متجرك فارغ»
+and offers the first product in place of the button; a search with no match names the
+query and offers to clear it; products saved only on the phone get a warning above the
+meter; a failed read offers a retry. Sharing the catalogue is in the bar.
+
+The product form (Phase R6, product editor) closes with an ✕. The image comes first,
+then name, price in the product's own currency, stock as a stepper, "ظاهر في المتجر"
+as a switch, and the category as a field that opens a list (with "no category"). The
+description is behind "تفاصيل إضافية". The bar holds "حفظ" and says what is missing
+while it cannot be pressed. Delete is in the overflow and asks in a sheet. A failed
+write keeps the form and says why in a banner (the plan limit opens the plans); a stock
+changed by an order while editing opens a sheet with both numbers and chooses for
+neither.
+
+التصنيفات (Phase R6) has the category meter, a row per category with how many products are filed under it
+and an overflow holding rename, the category's link and delete, and one bar, "إضافة تصنيف". Adding and
+renaming are one sheet with one field; deleting names the category and says how many products lose it.
+At the limit the bar opens the plans page, and with none the page says products can be sold without one.
+
+بيانات المتجر (Phase R6) closes with an ✕ and is in sections: the cover and logo, الهوية (name and
+description), رابط متجرك (the link as the code builds it, with only the name editable between the fixed
+country prefix and the permanent code, whose note says old links keep working after a rename, plus its
+availability and copy/share), the activity, and التواصل. The sign-in phone is shown, not editable.
+One bar saves, and it says why it cannot while the link name is not available.
+
+لغات الكتالوج (Phase R6) has a switch for the target language, a summary of how many translations are
+approved, and a row per product with its name, the translation under it and a chip (معتمدة, ترجمة آلية,
+ناقصة). A row opens a sheet with the source above and one button, "حفظ واعتماد".
+
+العملاء (Phase R7) has a large title and a search by name or number (Arabic-Indic digits find Latin ones). A
+row has the customer's initials, the name or, with none, the number, "number · n orders" and what they have
+spent; with orders in more than one currency the row says «عملات مختلفة» instead of a total that would be
+wrong. With no customer the page says they appear after the first order, and offers neither a search nor a
+button. The customer page has a header (large avatar, name, number always left to right, «تواصل»), three
+figures (orders, total spent, last order), «عن العميل» with the other contact and the note and «تعديل», and the
+customer's orders, newest first. Editing is one sheet that also says the number is the customer's identity and
+does not change; where the plan does not open it the card is read-only and a notice says so.
 
 اليوم (Phase R4, proposal T1) shows what waits for the seller: three tiles in the
 order an order moves through the shop (new, unpaid, ready to ship), each opening

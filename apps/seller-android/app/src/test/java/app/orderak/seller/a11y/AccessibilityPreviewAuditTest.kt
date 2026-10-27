@@ -369,6 +369,13 @@ fun auditAccessibility(
                 if (touchA.width <= 0f || touchA.height <= 0f || touchB.width <= 0f || touchB.height <= 0f) {
                     continue
                 }
+                // A modal sheet's scrim is one target the size of the window that dismisses
+                // the sheet; everything under it is blocked by design, so it is a barrier and
+                // not a competing target.
+                val rootBounds = mergedRoot.boundsInRoot
+                fun spansWindow(r: androidx.compose.ui.geometry.Rect) =
+                    r.width >= rootBounds.width - 1f && r.height >= rootBounds.height - 1f
+                if (spansWindow(touchA) != spansWindow(touchB)) continue
                 if (touchA.overlaps(touchB) && !isAncestor(a, b) && !isAncestor(b, a)) {
                     diagnostics += "${previewLabel(a, preview)} Target: $touchA overlaps $touchB"
                 }

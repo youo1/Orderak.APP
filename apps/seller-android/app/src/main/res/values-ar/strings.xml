@@ -139,10 +139,10 @@
     <string name="status_cancelled">ملغي</string>
 
     <!-- Pay methods -->
-    <string name="pay_vfcash">فودافون كاش</string>
-    <string name="pay_instapay">انستاباي</string>
+    <string name="pay_vfcash">محفظة إلكترونية</string>
+    <string name="pay_instapay">إنستاباي</string>
     <string name="pay_fawry">فوري</string>
-    <string name="pay_cod">كاش عند الاستلام</string>
+    <string name="pay_cod">نقدًا</string>
 
     <!-- S6 Order details -->
     <string name="order_details_title">أوردر #%1$d</string>
@@ -178,12 +178,12 @@
     <string name="customer_edit_locked">تعديل بيانات العملاء متاح في الباقات المدفوعة</string>
     <string name="customer_orders_heading">الأوردرات</string>
     <plurals name="customer_orders_count">
-        <item quantity="zero">مفيش أوردرات</item>
-        <item quantity="one">أوردر واحد</item>
-        <item quantity="two">أوردرين</item>
-        <item quantity="few">%s أوردرات</item>
-        <item quantity="many">%s أوردر</item>
-        <item quantity="other">%s أوردر</item>
+        <item quantity="zero">لا طلبات</item>
+        <item quantity="one">طلب واحد</item>
+        <item quantity="two">طلبان</item>
+        <item quantity="few">%s طلبات</item>
+        <item quantity="many">%s طلبًا</item>
+        <item quantity="other">%s طلب</item>
     </plurals>
 
     <!-- S13 Settings -->
@@ -731,4 +731,101 @@
         <item quantity="many">%1$s منتجًا</item>
         <item quantity="other">%1$s منتج</item>
     </plurals>
+    <string name="order_heading">طلب %1$s</string>
+    <string name="order_next_confirm">تأكيد الطلب</string>
+    <string name="order_next_paid">تم الدفع</string>
+    <string name="order_next_shipped">تم الشحن</string>
+    <string name="order_next_done">إكمال الطلب</string>
+    <string name="order_bar_unsent_reason">تُتاح الخطوة التالية بعد أن يستلم الخادم هذا الطلب</string>
+    <string name="order_cancel_sheet_title">إلغاء الطلب %1$s؟</string>
+    <string name="order_cancel_sheet_body">ستعود المنتجات إلى المخزون، ولا يمكن استعادة الطلب بعد إلغائه.</string>
+    <string name="order_paid_with">طريقة الدفع</string>
+    <string name="order_advance_to_fallback">التالي</string>
+    <string name="order_note_title">ملاحظة</string>
+    <string name="order_new_customer">العميل</string>
+    <string name="order_new_add_product">إضافة منتج</string>
+    <string name="order_new_add_note">إضافة ملاحظة</string>
+    <string name="order_new_stock_left">المتاح %1$s فقط</string>
+    <string name="order_new_saving">جارٍ التسجيل…</string>
+    <string name="order_new_bar_reason">أدخل رقم هاتف العميل وأضف منتجًا</string>
+    <string name="order_new_discard_title">تجاهل الطلب؟</string>
+    <string name="order_new_discard_body">ستُفقد البيانات التي أدخلتها.</string>
+    <string name="order_new_discard_confirm">تجاهل</string>
+    <string name="order_new_keep_editing">متابعة التعديل</string>
+    <string name="order_new_picker_done">تم</string>
+    <string name="order_new_picker_stock">المتاح: %1$s</string>
+    <string name="order_new_country_title">الدولة</string>
+    <string name="order_new_country_search">ابحث باسم الدولة أو رمزها</string>
+    <string name="store_empty_title">متجرك فارغ</string>
+    <string name="store_empty_body">أضف أول منتج، وسيظهر على رابطك فورًا.</string>
+    <string name="store_empty_action">إضافة أول منتج</string>
+    <string name="store_add_product">إضافة منتج</string>
+    <string name="product_add_locked_short">بلغت حد المنتجات</string>
+    <string name="store_manage_categories">التصنيفات</string>
+    <string name="store_manage_languages">اللغات</string>
+    <string name="store_row_detail">%1$s · المتبقي %2$s</string>
+    <string name="store_row_out">نفد</string>
+    <string name="store_row_hidden">مخفي</string>
+    <string name="product_new_heading">منتج جديد</string>
+    <string name="product_edit_heading">تعديل منتج</string>
+    <string name="product_save_bar">حفظ</string>
+    <string name="product_save_reason">أضف اسمًا من حرفين على الأقل وسعرًا</string>
+    <string name="product_save_failed_title">لم يُحفظ المنتج</string>
+    <string name="product_image_label">صورة المنتج</string>
+    <string name="product_image_add">إضافة صورة</string>
+    <string name="product_price_field">السعر</string>
+    <string name="product_stock_decrease">إنقاص المخزون</string>
+    <string name="product_stock_increase">زيادة المخزون</string>
+    <string name="product_visible">ظاهر في المتجر</string>
+    <string name="product_category_field">التصنيف</string>
+    <string name="product_more_details">تفاصيل إضافية</string>
+    <string name="product_delete_title">حذف هذا المنتج؟</string>
+    <string name="product_delete_body">لا يمكن استرجاعه بعد الحذف.</string>
+    <string name="product_stock_conflict_heading">تغيّر المخزون من جهاز آخر</string>
+    <string name="product_stock_conflict_message">أدخلتَ %1$s، والمخزون الآن %2$s. لم يُحفظ شيء بعد.</string>
+    <string name="product_stock_conflict_take_shop">اعتماد رقم المتجر (%1$s)</string>
+    <string name="product_stock_conflict_save_mine">حفظ رقمي (%1$s)</string>
+    <string name="categories_add_bar">إضافة تصنيف</string>
+    <string name="categories_sheet_add_title">تصنيف جديد</string>
+    <string name="categories_sheet_rename_title">تغيير اسم التصنيف</string>
+    <string name="categories_field">اسم التصنيف</string>
+    <string name="categories_empty_title">لا توجد تصنيفات</string>
+    <string name="categories_empty_body">يمكن بيع المنتجات دون تصنيف.</string>
+    <string name="categories_delete_title">حذف «%1$s»؟</string>
+    <string name="categories_row_more">خيارات %1$s</string>
+    <plurals name="categories_delete_body">
+        <item quantity="zero">لن يتأثر أي منتج.</item>
+        <item quantity="one">سيصبح منتج واحد بلا تصنيف.</item>
+        <item quantity="two">سيصبح منتجان بلا تصنيف.</item>
+        <item quantity="few">ستصبح %1$s منتجات بلا تصنيف.</item>
+        <item quantity="many">ستصبح %1$s منتجًا بلا تصنيف.</item>
+        <item quantity="other">ستصبح %1$s منتج بلا تصنيف.</item>
+    </plurals>
+    <string name="store_info_cover_add">إضافة صورة غلاف</string>
+    <string name="store_info_change">تغيير</string>
+    <string name="store_info_section_identity">الهوية</string>
+    <string name="store_info_section_link">رابط متجرك</string>
+    <string name="store_info_section_activity">النشاط</string>
+    <string name="store_info_section_contact">التواصل</string>
+    <string name="store_info_slug_note">الرمز في نهاية الرابط ثابت لا يتغير، فتبقى الروابط القديمة صالحة بعد تغيير الاسم.</string>
+    <string name="store_info_bar_reason">اختر اسمًا متاحًا للرابط</string>
+    <string name="catalog_languages_error">تعذّرت قراءة الترجمات</string>
+    <string name="catalog_languages_empty">تُنشأ الترجمات بعد إضافة المنتجات</string>
+    <string name="catalog_languages_summary">المعتمد: %1$s من %2$s</string>
+    <string name="translation_status_reviewed">معتمدة</string>
+    <string name="translation_status_machine">ترجمة آلية</string>
+    <string name="translation_status_missing">ناقصة</string>
+    <string name="translation_save_approve">حفظ واعتماد</string>
+    <string name="customers_empty_title">يظهر العملاء هنا تلقائيًا</string>
+    <string name="customers_empty_body">بعد أول طلب.</string>
+    <string name="customers_row_detail">%1$s · %2$s</string>
+    <string name="customers_mixed_currencies">عملات مختلفة</string>
+    <string name="customer_about">عن العميل</string>
+    <string name="customer_edit">تعديل</string>
+    <string name="customer_edit_title">تعديل العميل</string>
+    <string name="customer_none">غير مضاف</string>
+    <string name="customer_figure_orders">الطلبات</string>
+    <string name="customer_figure_spent">إجمالي المشتريات</string>
+    <string name="customer_figure_last">آخر طلب</string>
+    <string name="customer_phone_is_identity_sheet">الرقم %1$s هو هوية العميل ولا يتغير.</string>
 </resources>

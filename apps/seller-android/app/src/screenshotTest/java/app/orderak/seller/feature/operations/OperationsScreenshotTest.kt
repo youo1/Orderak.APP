@@ -231,7 +231,7 @@ private fun catalogLanguages(
                 onBack = {},
                 onRetry = {},
                 onLang = {},
-                onEdit = {},
+                onSave = { _, _, _ -> },
             )
         }
     }

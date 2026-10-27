@@ -43,6 +43,9 @@ fun ProductsScreen(
     onEdit: (Long) -> Unit,
     onLimitReached: (String) -> Unit,
     sellerPhone: String?,
+    onOpenStoreInfo: () -> Unit = {},
+    onOpenCategories: () -> Unit = {},
+    onOpenLanguages: () -> Unit = {},
     viewModel: ProductsViewModel = hiltViewModel(),
     entitlements: EntitlementManager = hiltVm<EntitlementHolderViewModel>().entitlements,
 ) {
@@ -224,6 +227,9 @@ fun ProductsScreen(
             }
         },
         onShowStuck = { showStuckDialog = true },
+        onOpenStoreInfo = onOpenStoreInfo,
+        onOpenCategories = onOpenCategories,
+        onOpenLanguages = onOpenLanguages,
     )
 }
 

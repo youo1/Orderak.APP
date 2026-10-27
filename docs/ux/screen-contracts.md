@@ -179,7 +179,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Entry | orders · today |
 | Exit | OrderDetailsRoute — بعد الإنشاء، مع popUpTo · رجوع |
 | Data | product picker |
-| Actions | add line `changeQty` · set customer `onPhone` · submit `save` |
+| Actions | add line `changeQty` · set customer `onPhone` · choose country `onCountry` · submit `save` |
 
 ## Surface: store
 
@@ -197,7 +197,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Entry | MainRoute — تاب المتجر |
 | Exit | ProductEditRoute · CategoriesRoute · StoreInfoRoute · PaywallRoute — عند الحد |
 | Data | products page · product limit usage |
-| Actions | add product `onAdd` · edit product `onEdit` · search `SearchField` · open categories *(planned)* |
+| Actions | add product `onAdd` · edit product `onEdit` · search `onQueryChange` · open categories `onOpenCategories` · open store information `onOpenStoreInfo` · open catalogue languages `onOpenLanguages` |
 
 ### `product-edit`
 
@@ -229,7 +229,7 @@ overlay بستة أوضاع من versionUiMode(): تحذير، تحديث إجب
 | Entry | store · product-edit |
 | Exit | رجوع |
 | Data | categories · category limit usage |
-| Actions | add `create` · rename `pendingRename` · reorder *(planned)* · delete `delete` |
+| Actions | add `create` · rename `onRename` · reorder *(planned)* · delete `delete` |
 
 ### `store-info`
 

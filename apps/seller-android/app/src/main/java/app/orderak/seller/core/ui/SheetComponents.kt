@@ -286,7 +286,7 @@ fun PickerSheet(
     } else {
         options
     }
-    val offerManualEntry = searchable && trimmed.isNotEmpty() &&
+    val offerManualEntry = searchable && manualEntryLabel.isNotBlank() && trimmed.isNotEmpty() &&
         options.none { SearchText.fold(it.label) == needle }
     SheetFrame(
         modifier = modifier,
