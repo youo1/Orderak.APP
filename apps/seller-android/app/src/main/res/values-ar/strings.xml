@@ -12,7 +12,7 @@
     <string name="auth_subtitle">لنبدأ.</string>
     <string name="auth_phone_label">رقم الهاتف</string>
     <string name="auth_phone_hint">اكتب رقمك</string>
-    <string name="auth_phone_reason">سنرسل رمزًا لتأكيد رقمك.</string>
+    <string name="auth_phone_reason">هنبعت كود لتأكيد رقمك.</string>
     <string name="auth_use_my_number">استخدام رقمي</string>
     <string name="auth_phone_hint_unavailable">اقتراح رقم الهاتف غير متاح. أدخل رقمك يدويًا.</string>
     <string name="auth_phone_invalid">اكتب رقم هاتف صحيحًا</string>
@@ -40,7 +40,7 @@
     <string name="auth_terms_link">الشروط</string>
     <string name="auth_terms_and">و</string>
     <string name="auth_privacy_link">سياسة الخصوصية</string>
-    <string name="auth_marketing_opt_in">أرغب في تلقي نصائح وعروض تخص عملي</string>
+    <string name="auth_marketing_opt_in">عايز استلم نصايح وعروض لشغلي</string>
     <string name="auth_trouble">تحتاج مساعدة؟</string>
 
     <!-- S1a Language -->
