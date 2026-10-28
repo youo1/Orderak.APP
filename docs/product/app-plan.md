@@ -644,7 +644,11 @@ their consequence. بياناتك الشخصية asks for the full name (and say
 verified, and keeps the email optional; changing the email says the old one stays in use until the new one is
 confirmed. It no longer asks for a photo or a birth year; what is stored is carried through unchanged on save.
 الدعم lists tickets with a number and an open/closed chip and one bar «تذكرة جديدة» (a sheet); a ticket is a
-conversation of bubbles with a composer, replaced on a closed ticket by the sentence that says so. إعلانات Orderak
+conversation of bubbles with a composer, replaced on a closed ticket by the sentence that says so; its header names
+the ticket by number before its state («#٢٣٨ · مفتوحة»). The subscription page names the plan and its state in the
+seller's language (the app's own names for the catalogue plans; a plan it has no name for keeps the backend's, and a
+missing name is never replaced by a guess). The sign-in, payment-confirmation and category screens use Modern Standard
+Arabic (D-15): «رقم الهاتف», «إرسال الرمز», «التصنيفات». إعلانات Orderak
 puts unread items first with a dot; tapping one opens it in place and marks it read. حذف الحساب (status) is a
 three-step timeline with dates, then what is deleted and what the law may keep (the wording of the last line needs a
 legal check). الأجهزة lists the devices («هذا الجهاز» on this phone, «تسجيل خروجه» on the others) and the passkeys

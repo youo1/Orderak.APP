@@ -132,6 +132,7 @@ fun SubscriptionScreen(
     val sync by vm.planSync.collectAsStateWithLifecycle()
     SubscriptionContent(
         planName = config?.plan_name,
+        planKey = config?.plan_id,
         subscriptionStatus = config?.subscription_status,
         currentPeriodEnd = config?.current_period_end,
         pendingEffectiveAt = config?.pending_effective_at,
@@ -174,6 +175,8 @@ fun SubscriptionContent(
     onBack: () -> Unit,
     onViewPlans: () -> Unit,
     onRecoverPurchases: () -> Unit,
+    /** The catalogue key of the plan; with it the name is the app's own, without it the backend's. */
+    planKey: String? = null,
     /** The plan refresh failed: the message, shown over the last saved figures. */
     planError: String? = null,
     offline: Boolean = false,
@@ -218,13 +221,13 @@ fun SubscriptionContent(
             Column(Modifier.padding(spacing.space4), verticalArrangement = Arrangement.spacedBy(spacing.space1)) {
                 // Not null here: the page is busy until it is.
                 Text(
-                    stringResource(R.string.settings_current_plan, planName.orEmpty()),
+                    stringResource(R.string.settings_current_plan, localizedPlanName(planKey, planName.orEmpty())),
                     style = MaterialTheme.typography.titleLarge,
                 )
                 // A missing status is a display gap, not a claim about money, so it keeps the old
                 // fallback where plan_name deliberately does not.
                 Text(
-                    stringResource(R.string.subscription_status, subscriptionStatus ?: "active"),
+                    stringResource(R.string.subscription_status, localizedSubscriptionStatus(subscriptionStatus ?: "active")),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 currentPeriodEnd?.let { Text(stringResource(R.string.subscription_period_end, it), style = MaterialTheme.typography.bodyMedium) }
@@ -507,4 +510,26 @@ fun DeletionStatusContent(
         SectionHeader(title = stringResource(R.string.deletion_kept_title))
         Text(stringResource(R.string.deletion_kept_body), style = MaterialTheme.typography.bodyMedium)
     }
+}
+
+/**
+ * The plan's name in the seller's language. A plan the app has no name for keeps the name the
+ * backend sent, because an unknown plan is the backend's to name, not ours to guess.
+ */
+@Composable
+private fun localizedPlanName(planKey: String?, backendName: String): String = when (planKey) {
+    "free" -> stringResource(R.string.plan_free)
+    "paid1" -> stringResource(R.string.plan_paid1)
+    "paid2" -> stringResource(R.string.plan_paid2)
+    "paid3" -> stringResource(R.string.plan_paid3)
+    else -> backendName
+}
+
+/** The subscription state in words; a state the app does not know is shown as sent. */
+@Composable
+private fun localizedSubscriptionStatus(status: String): String = when (status) {
+    "active" -> stringResource(R.string.subscription_status_active)
+    "grace" -> stringResource(R.string.subscription_status_grace)
+    "canceled" -> stringResource(R.string.subscription_status_canceled)
+    else -> status
 }

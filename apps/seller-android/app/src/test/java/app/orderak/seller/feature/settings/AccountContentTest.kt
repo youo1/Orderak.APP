@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -95,7 +96,9 @@ class AccountContentTest {
         )
         assertTrue(rule.onAllNodesWithText(string(R.string.usage_products), substring = true).fetchSemanticsNodes().isNotEmpty())
         assertTrue(rule.onAllNodesWithText(string(R.string.usage_orders_month), substring = true).fetchSemanticsNodes().isNotEmpty())
-        rule.onAllNodesWithText(string(R.string.usage_categories), substring = true).assertCountEquals(0)
+        // The page also has a settings row of the same name, so the meter is told apart by its
+        // description (name and figures), which only a drawn meter carries.
+        rule.onAllNodesWithContentDescription(string(R.string.usage_categories), substring = true).assertCountEquals(0)
     }
 
     @Test

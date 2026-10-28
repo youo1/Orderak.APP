@@ -293,6 +293,9 @@
     <string name="subscription_title">Subscription</string>
     <string name="subscription_recover">Recover Play purchases</string>
     <string name="subscription_status">Status: %1$s</string>
+    <string name="subscription_status_active">Active</string>
+    <string name="subscription_status_grace">Grace period</string>
+    <string name="subscription_status_canceled">Canceled</string>
     <string name="subscription_period_end">Current period ends: %1$s</string>
     <string name="subscription_play_guidance">Manage cancellation and payment methods in Google Play. Use purchase recovery after reinstalling or changing devices.</string>
     <string name="subscription_verification_pending">Google Play verification is still in progress. We’ll update your access automatically.</string>
@@ -828,6 +831,7 @@
     <string name="support_new_ticket">New ticket</string>
     <string name="support_status_open">Open</string>
     <string name="support_status_closed">Closed</string>
+    <string name="support_ticket_subtitle">⁦#%1$s⁩ · %2$s</string>
     <string name="support_sheet_title">How can we help?</string>
     <string name="support_closed_notice">This ticket is closed. Open a new one if you need help.</string>
     <string name="announcements_empty">Nothing new right now</string>

@@ -200,6 +200,7 @@ private fun subscription(
         Surface {
             SubscriptionContent(
                 planName = planName,
+                planKey = if (planName == "Free") "free" else "paid1",
                 subscriptionStatus = "active",
                 currentPeriodEnd = "2026-10-01",
                 pendingEffectiveAt = null,
@@ -280,6 +281,14 @@ private val PASSKEYS = listOf(
     PasskeyDto(id = "p1", label = "الموبايل", device_type = "platform", backed_up = true, last_used_at = "2026-09-16"),
 )
 
+/** The plan meter the design draws at the top of the page, below the limit. */
+private val DEVICE_METER = PlanUsageRow(
+    key = FeatureKeys.MAX_CONCURRENT_DEVICES,
+    label = R.string.usage_devices,
+    used = 2,
+    limit = 3,
+)
+
 @Composable
 private fun devices(
     items: List<DeviceDto>?,
@@ -287,6 +296,7 @@ private fun devices(
     error: String? = null,
     canAdd: Boolean = true,
     dark: Boolean = false,
+    deviceLimit: PlanUsageRow? = null,
 ) {
     OrderakTheme(darkTheme = dark) {
         Surface {
@@ -303,6 +313,7 @@ private fun devices(
                 onRenamePasskey = { _, _ -> },
                 onDeletePasskey = {},
                 onRevokeDevice = {},
+                deviceLimit = deviceLimit,
             )
         }
     }
@@ -322,12 +333,12 @@ fun devicesLoadingDark() = devices(items = null, passkeys = null, dark = true)
 @PreviewTest
 @Preview(name = "Devices content light", locale = "ar")
 @Composable
-fun devicesContentLight() = devices(items = DEVICES, passkeys = PASSKEYS)
+fun devicesContentLight() = devices(items = DEVICES, passkeys = PASSKEYS, deviceLimit = DEVICE_METER)
 
 @PreviewTest
 @Preview(name = "Devices content dark", locale = "ar")
 @Composable
-fun devicesContentDark() = devices(items = DEVICES, passkeys = PASSKEYS, dark = true)
+fun devicesContentDark() = devices(items = DEVICES, passkeys = PASSKEYS, dark = true, deviceLimit = DEVICE_METER)
 
 /** Below Android 9 there is no passkey to add, so the control is disabled rather than hidden. */
 @PreviewTest
