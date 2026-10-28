@@ -47,10 +47,7 @@ const BRAND = "أوردرك";
  * Strings that stay as they are until the authentication contract's owner approves new wording.
  * Exact keys in values-ar; the reason is the contract, not convenience.
  */
-export const ALLOWED_PENDING_APPROVAL = [
-  { key: "auth_marketing_opt_in", reason: "the marketing consent line is consent evidence under the authentication contract" },
-  { key: "auth_phone_reason", reason: "the disclosure shown before an SMS code is sent belongs to the authentication contract" },
-];
+export const ALLOWED_PENDING_APPROVAL = [];
 
 function tokens(value) {
   return stripMarks(value)
