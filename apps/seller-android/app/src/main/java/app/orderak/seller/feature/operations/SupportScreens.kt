@@ -392,8 +392,13 @@ fun SupportTicketContent(
     val locale = LocalConfiguration.current.locales[0]
     OperationPage(
         title = ticket?.subject ?: stringResource(R.string.support_title),
+        // The number first, then the state: "#238 · open" is how the design names a ticket.
         subtitle = ticket?.let {
-            stringResource(if (it.status == "closed") R.string.support_status_closed else R.string.support_status_open)
+            stringResource(
+                R.string.support_ticket_subtitle,
+                formatNumber(it.id, locale),
+                stringResource(if (it.status == "closed") R.string.support_status_closed else R.string.support_status_open),
+            )
         },
         onBack = onBack,
         busy = busy || messages == null,

@@ -9,39 +9,39 @@
 
     <!-- S1 Auth -->
     <string name="auth_title">هل أنت مستعد للبيع على أوردرك؟</string>
-    <string name="auth_subtitle">يلا نبدأ.</string>
-    <string name="auth_phone_label">رقم الموبايل</string>
+    <string name="auth_subtitle">لنبدأ.</string>
+    <string name="auth_phone_label">رقم الهاتف</string>
     <string name="auth_phone_hint">اكتب رقمك</string>
-    <string name="auth_phone_reason">هنبعت كود لتأكيد رقمك.</string>
+    <string name="auth_phone_reason">سنرسل رمزًا لتأكيد رقمك.</string>
     <string name="auth_use_my_number">استخدام رقمي</string>
     <string name="auth_phone_hint_unavailable">اقتراح رقم الهاتف غير متاح. أدخل رقمك يدويًا.</string>
     <string name="auth_phone_invalid">اكتب رقم هاتف صحيحًا</string>
     <string name="auth_unsupported_country">سيصل أوردرك إلى بلدك قريبًا!</string>
-    <string name="auth_send_code">إرسال كود التأكيد</string>
-    <string name="auth_verify_code">تأكيد الكود</string>
+    <string name="auth_send_code">إرسال الرمز</string>
+    <string name="auth_verify_code">تأكيد</string>
     <string name="auth_otp_title">تأكيد الرقم</string>
     <string name="auth_otp_sent_to">تم الإرسال إلى %1$s</string>
     <string name="auth_resend_in">إعادة طلب خلال %1$s ثانية</string>
-    <string name="auth_resend">إعادة إرسال الكود</string>
-    <string name="auth_change_number">غيّر الرقم</string>
+    <string name="auth_resend">إعادة إرسال الرمز</string>
+    <string name="auth_change_number">تغيير الرقم</string>
     <string name="auth_otp_invalid">الرمز غير صحيح، حاول مرة أخرى.</string>
     <string name="auth_send_failed">تعذّر إرسال الرمز، حاول مرة أخرى.</string>
     <string name="auth_too_many_requests">محاولات كثيرة، انتظر قليلًا.</string>
     <string name="auth_network_unavailable">لا يوجد اتصال بالإنترنت.</string>
-    <string name="auth_app_verification_failed">فشل فحص الأمان، حدث التطبيق.</string>
+    <string name="auth_app_verification_failed">فشل فحص الأمان، حدّث التطبيق.</string>
     <string name="auth_send_timeout">انتهت مهلة المحاولة، حاول مرة أخرى.</string>
-    <string name="auth_otp_expired">صلاحية الكود انتهت، اطلب كود جديد.</string>
+    <string name="auth_otp_expired">انتهت صلاحية الرمز، اطلب رمزًا جديدًا.</string>
     <string name="auth_verifying">جاري التأكيد…</string>
-    <string name="auth_otp_code_entered">تم إدخال الكود</string>
-    <string name="auth_otp_waiting_for_code">في انتظار الكود…</string>
+    <string name="auth_otp_code_entered">تم إدخال الرمز</string>
+    <string name="auth_otp_waiting_for_code">في انتظار الرمز…</string>
 
     <!-- Terms -->
-    <string name="auth_terms_prefix">بالضغط على إرسال كود التأكيد، أنت توافق على</string>
+    <string name="auth_terms_prefix">بالضغط على إرسال الرمز، أنت توافق على</string>
     <string name="auth_terms_link">الشروط</string>
     <string name="auth_terms_and">و</string>
     <string name="auth_privacy_link">سياسة الخصوصية</string>
-    <string name="auth_marketing_opt_in">عايز استلم نصايح وعروض لشغلي</string>
-    <string name="auth_trouble">محتاج مساعدة؟</string>
+    <string name="auth_marketing_opt_in">أرغب في تلقي نصائح وعروض تخص عملي</string>
+    <string name="auth_trouble">تحتاج مساعدة؟</string>
 
     <!-- S1a Language -->
     <string name="language_pick_title">اختر لغتك</string>
@@ -152,9 +152,9 @@
 
     <!-- S6a Payment verification -->
     <string name="payment_section_title">الدفع</string>
-    <string name="payment_verify">✅ أكد الدفع بالسكرين شوت</string>
-    <string name="payment_manual">أكد الدفع يدوي</string>
-    <string name="payment_checking">بنفحص السكرين شوت…</string>
+    <string name="payment_verify">التحقق من الدفع بلقطة الشاشة</string>
+    <string name="payment_manual">تأكيد الدفع يدويًا</string>
+    <string name="payment_checking">جارٍ فحص لقطة الشاشة…</string>
     <string name="payment_verified_ok">الدفع مطابق، وقد تأكد تلقائيًا ✅</string>
     <string name="order_status_update_failed">تعذّر تحديث الطلب. تحقق من الاتصال وحاول مرة أخرى.</string>
     <string name="payment_flagged_title">⚠️ هناك ما يستدعي المراجعة</string>
@@ -225,8 +225,8 @@
     <string name="action_share_store">شارك المتجر</string>
     <string name="action_share_link">مشاركة</string>
     <string name="link_copied">تم نسخ الرابط</string>
-    <string name="categories_title">الأقسام</string>
-    <string name="categories_new">قسم جديد</string>
+    <string name="categories_title">التصنيفات</string>
+    <string name="categories_new">تصنيف جديد</string>
     <string name="categories_empty">لا توجد تصنيفات بعد. أضف واحدًا لترتيب منتجاتك.</string>
     <string name="categories_add">إضافة</string>
     <plurals name="categories_product_count">
@@ -260,7 +260,7 @@
     <string name="usage_products">المنتجات</string>
     <string name="usage_orders_month">طلبات هذا الشهر</string>
     <string name="usage_ai_requests">طلبات الذكاء الاصطناعي هذا الشهر</string>
-    <string name="usage_categories">الفئات</string>
+    <string name="usage_categories">التصنيفات</string>
     <string name="usage_devices">الأجهزة</string>
     <string name="usage_value_unlimited">%1$s / غير محدود</string>
     <string name="products_limit_title">تم بلوغ حد المنتجات</string>
@@ -311,6 +311,9 @@
     <string name="subscription_title">الاشتراك</string>
     <string name="subscription_recover">استعادة مشتريات Google Play</string>
     <string name="subscription_status">الحالة: %1$s</string>
+    <string name="subscription_status_active">نشطة</string>
+    <string name="subscription_status_grace">في فترة السماح</string>
+    <string name="subscription_status_canceled">ملغاة</string>
     <string name="subscription_period_end">تنتهي الفترة الحالية: %1$s</string>
     <string name="subscription_play_guidance">يمكنك إدارة الإلغاء وطرق الدفع من Google Play. استخدم استعادة المشتريات بعد إعادة التثبيت أو تغيير الجهاز.</string>
     <string name="subscription_verification_pending">لا يزال التحقق من Google Play قيد التنفيذ. سنحدّث صلاحياتك تلقائيًا.</string>
@@ -861,6 +864,7 @@
     <string name="support_new_ticket">تذكرة جديدة</string>
     <string name="support_status_open">مفتوحة</string>
     <string name="support_status_closed">مغلقة</string>
+    <string name="support_ticket_subtitle">⁦#%1$s⁩ · %2$s</string>
     <string name="support_sheet_title">كيف يمكننا مساعدتك؟</string>
     <string name="support_closed_notice">أُغلقت هذه التذكرة. افتح تذكرة جديدة إن احتجت إلى مساعدة.</string>
     <string name="announcements_empty">لا جديد حاليًا</string>

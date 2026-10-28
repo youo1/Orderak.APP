@@ -3,7 +3,10 @@ package app.orderak.seller.feature.settings
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
+import app.orderak.seller.R
+import app.orderak.seller.core.ui.PlanUsageRow
 import app.orderak.seller.core.ui.theme.OrderakTheme
+import app.orderak.seller.data.billing.FeatureKeys
 import app.orderak.seller.data.remote.CategoryDto
 import app.orderak.seller.data.remote.StoreDto
 import com.android.tools.screenshot.PreviewTest
@@ -35,6 +38,14 @@ private val CATEGORIES = listOf(
     CategoryDto(category_code = "c-000003", name = "فساتين سواريه", product_count = 0),
 )
 
+/** The plan meter the design draws at the top of the list; the view model fills `used`. */
+private val CATEGORY_METER = PlanUsageRow(
+    key = FeatureKeys.MAX_CATEGORIES,
+    label = R.string.usage_categories,
+    used = 3,
+    limit = 5,
+)
+
 // ================= categories =================
 
 @Composable
@@ -44,6 +55,7 @@ private fun categories(
     error: String? = null,
     purchaseOpen: Boolean = false,
     dark: Boolean = false,
+    meter: PlanUsageRow? = null,
 ) {
     OrderakTheme(darkTheme = dark) {
         Surface {
@@ -61,6 +73,7 @@ private fun categories(
                 onCopyLink = {},
                 onShareLink = {},
                 onBack = {},
+                meter = meter,
             )
         }
     }
@@ -92,12 +105,12 @@ fun categoriesLoadingSeededList() = categories(categories = emptyList(), loading
 @PreviewTest
 @Preview(name = "Categories content light", locale = "ar")
 @Composable
-fun categoriesContentLight() = categories(categories = CATEGORIES)
+fun categoriesContentLight() = categories(categories = CATEGORIES, meter = CATEGORY_METER)
 
 @PreviewTest
 @Preview(name = "Categories content dark", locale = "ar")
 @Composable
-fun categoriesContentDark() = categories(categories = CATEGORIES, dark = true)
+fun categoriesContentDark() = categories(categories = CATEGORIES, dark = true, meter = CATEGORY_METER)
 
 /** The state this screen declared and drew nothing for. */
 @PreviewTest

@@ -291,6 +291,9 @@
     <string name="subscription_title">Abonnement</string>
     <string name="subscription_recover">Récupérer les achats Google Play</string>
     <string name="subscription_status">État : %1$s</string>
+    <string name="subscription_status_active">Active</string>
+    <string name="subscription_status_grace">Période de grâce</string>
+    <string name="subscription_status_canceled">Annulée</string>
     <string name="subscription_period_end">Fin de la période actuelle : %1$s</string>
     <string name="subscription_play_guidance">Gérez l’annulation et les moyens de paiement dans Google Play. Utilisez la restauration des achats après une réinstallation ou un changement d’appareil.</string>
     <string name="subscription_verification_pending">La vérification Google Play est toujours en cours. Vos accès seront mis à jour automatiquement.</string>
@@ -828,6 +831,7 @@
     <string name="support_new_ticket">Nouveau ticket</string>
     <string name="support_status_open">Ouvert</string>
     <string name="support_status_closed">Fermé</string>
+    <string name="support_ticket_subtitle">⁦#%1$s⁩ · %2$s</string>
     <string name="support_sheet_title">Comment pouvons-nous vous aider ?</string>
     <string name="support_closed_notice">Ce ticket est fermé. Ouvrez-en un nouveau si vous avez besoin d’aide.</string>
     <string name="announcements_empty">Rien de nouveau</string>
